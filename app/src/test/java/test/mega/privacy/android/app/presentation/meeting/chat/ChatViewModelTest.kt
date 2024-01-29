@@ -5,6 +5,7 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import de.palm.composestateevents.StateEventWithContentConsumed
 import de.palm.composestateevents.StateEventWithContentTriggered
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -22,6 +24,8 @@ import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteParticipantResultMapper
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
+import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_ACTION
+import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_LINK
 import mega.privacy.android.app.presentation.meeting.chat.model.InviteContactToChatResult
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.domain.entity.ChatRequest
@@ -37,27 +41,36 @@ import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.ChatRoomChange
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
+import mega.privacy.android.domain.entity.user.UserChanges
+import mega.privacy.android.domain.entity.user.UserId
+import mega.privacy.android.domain.entity.user.UserUpdate
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.chat.ParticipantAlreadyExistsException
-import mega.privacy.android.domain.usecase.GetChatRoom
+import mega.privacy.android.domain.exception.chat.ResourceDoesNotExistChatException
+import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
+import mega.privacy.android.domain.usecase.MonitorContactCacheUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.chat.ArchiveChatUseCase
 import mega.privacy.android.domain.usecase.chat.ClearChatHistoryUseCase
+import mega.privacy.android.domain.usecase.chat.CloseChatPreviewUseCase
 import mega.privacy.android.domain.usecase.chat.EnableGeolocationUseCase
 import mega.privacy.android.domain.usecase.chat.EndCallUseCase
 import mega.privacy.android.domain.usecase.chat.GetChatMuteOptionListUseCase
 import mega.privacy.android.domain.usecase.chat.GetCustomSubtitleListUseCase
+import mega.privacy.android.domain.usecase.chat.HoldChatCallUseCase
 import mega.privacy.android.domain.usecase.chat.InviteToChatUseCase
+import mega.privacy.android.domain.usecase.chat.IsAnonymousModeUseCase
 import mega.privacy.android.domain.usecase.chat.IsChatNotificationMuteUseCase
 import mega.privacy.android.domain.usecase.chat.IsGeolocationEnabledUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorCallInChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatConnectionStateUseCase
-import mega.privacy.android.domain.usecase.chat.MonitorParticipatingInACallUseCase
+import mega.privacy.android.domain.usecase.chat.MonitorParticipatingInACallInOtherChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorUserChatStatusByHandleUseCase
 import mega.privacy.android.domain.usecase.chat.MuteChatNotificationForChatRoomsUseCase
+import mega.privacy.android.domain.usecase.chat.OpenChatLinkUseCase
 import mega.privacy.android.domain.usecase.chat.UnmuteChatNotificationUseCase
-import mega.privacy.android.domain.usecase.chat.message.MonitorMessageLoadedUseCase
+import mega.privacy.android.domain.usecase.chat.link.JoinPublicChatUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendTextMessageUseCase
 import mega.privacy.android.domain.usecase.contact.GetMyUserHandleUseCase
 import mega.privacy.android.domain.usecase.contact.GetParticipantFirstNameUseCase
@@ -68,6 +81,7 @@ import mega.privacy.android.domain.usecase.contact.MonitorUserLastGreenUpdatesUs
 import mega.privacy.android.domain.usecase.contact.RequestUserLastGreenUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
+import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.IsChatStatusConnectedForCallUseCase
 import mega.privacy.android.domain.usecase.meeting.LoadMessagesUseCase
 import mega.privacy.android.domain.usecase.meeting.SendStatisticsMeetingsUseCase
@@ -112,7 +126,7 @@ internal class ChatViewModelTest {
 
     private lateinit var underTest: ChatViewModel
 
-    private val getChatRoomUseCase: GetChatRoom = mock()
+    private val getChatRoomUseCase: GetChatRoomUseCase = mock()
     private val savedStateHandle: SavedStateHandle = mock {
         on { get<Long>(Constants.CHAT_ID) } doReturn chatId
     }
@@ -130,9 +144,10 @@ internal class ChatViewModelTest {
     private val monitorUserChatStatusByHandleUseCase: MonitorUserChatStatusByHandleUseCase = mock {
         onBlocking { invoke(any()) } doReturn emptyFlow()
     }
-    private val monitorParticipatingInACallUseCase: MonitorParticipatingInACallUseCase = mock {
-        onBlocking { invoke() } doReturn emptyFlow()
-    }
+    private val monitorParticipatingInACallInOtherChatUseCase: MonitorParticipatingInACallInOtherChatUseCase =
+        mock {
+            onBlocking { invoke(any()) } doReturn emptyFlow()
+        }
     private val monitorCallInChatUseCase: MonitorCallInChatUseCase = mock {
         onBlocking { invoke(any()) } doReturn emptyFlow()
     }
@@ -183,9 +198,6 @@ internal class ChatViewModelTest {
     private val startCallUseCase = mock<StartCallUseCase>()
     private val chatManagement = mock<ChatManagement>()
     private val loadMessagesUseCase = mock<LoadMessagesUseCase>()
-    private val monitorMessageLoadedUseCase = mock<MonitorMessageLoadedUseCase> {
-        onBlocking { invoke(chatId) } doReturn emptyFlow()
-    }
     private val muteChatNotificationForChatRoomsUseCase =
         mock<MuteChatNotificationForChatRoomsUseCase>()
     private val getChatMuteOptionListUseCase = mock<GetChatMuteOptionListUseCase>()
@@ -196,11 +208,20 @@ internal class ChatViewModelTest {
     private val isGeolocationEnabledUseCase = mock<IsGeolocationEnabledUseCase>()
     private val enableGeolocationUseCase = mock<EnableGeolocationUseCase>()
     private val sendTextMessageUseCase = mock<SendTextMessageUseCase>()
+    private val openChatLinkUseCase = mock<OpenChatLinkUseCase>()
+    private val holdChatCallUseCase = mock<HoldChatCallUseCase>()
+    private val hangChatCallUseCase = mock<HangChatCallUseCase>()
+    private val monitorContactCacheUpdates: MonitorContactCacheUpdates = mock {
+        onBlocking { invoke() } doReturn emptyFlow()
+    }
+    private val joinPublicChatUseCase = mock<JoinPublicChatUseCase>()
+    private val isAnonymousModeUseCase = mock<IsAnonymousModeUseCase>()
+    private val closeChatPreviewUseCase : CloseChatPreviewUseCase = mock()
+    private val testDispatcher = UnconfinedTestDispatcher()
 
     @BeforeAll
     fun setup() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
-        initTestClass()
+        Dispatchers.setMain(testDispatcher)
     }
 
     @AfterAll
@@ -240,9 +261,16 @@ internal class ChatViewModelTest {
             startMeetingInWaitingRoomChatUseCase,
             isGeolocationEnabledUseCase,
             enableGeolocationUseCase,
-            sendTextMessageUseCase
+            sendTextMessageUseCase,
+            openChatLinkUseCase,
+            holdChatCallUseCase,
+            hangChatCallUseCase,
+            joinPublicChatUseCase,
+            isAnonymousModeUseCase,
+            closeChatPreviewUseCase
         )
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
+        wheneverBlocking { isAnonymousModeUseCase() } doReturn false
         wheneverBlocking { monitorChatRoomUpdates(any()) } doReturn emptyFlow()
         wheneverBlocking { monitorUpdatePushNotificationSettingsUseCase() } doReturn emptyFlow()
         wheneverBlocking { monitorUserChatStatusByHandleUseCase(any()) } doReturn emptyFlow()
@@ -261,9 +289,9 @@ internal class ChatViewModelTest {
         wheneverBlocking { monitorUserLastGreenUpdatesUseCase(userHandle) } doReturn emptyFlow()
         wheneverBlocking { monitorHasAnyContactUseCase() } doReturn emptyFlow()
         wheneverBlocking { monitorCallInChatUseCase(any()) } doReturn emptyFlow()
-        wheneverBlocking { monitorParticipatingInACallUseCase() } doReturn emptyFlow()
+        wheneverBlocking { monitorParticipatingInACallInOtherChatUseCase(any()) } doReturn emptyFlow()
         whenever(monitorAllContactParticipantsInChatUseCase(any())) doReturn emptyFlow()
-        wheneverBlocking { (monitorMessageLoadedUseCase(chatId)) } doReturn emptyFlow()
+        wheneverBlocking { monitorContactCacheUpdates() } doReturn emptyFlow()
     }
 
     private fun initTestClass() {
@@ -274,7 +302,7 @@ internal class ChatViewModelTest {
             monitorUpdatePushNotificationSettingsUseCase = monitorUpdatePushNotificationSettingsUseCase,
             getUserOnlineStatusByHandleUseCase = getUserOnlineStatusByHandleUseCase,
             monitorUserChatStatusByHandleUseCase = monitorUserChatStatusByHandleUseCase,
-            monitorParticipatingInACallUseCase = monitorParticipatingInACallUseCase,
+            monitorParticipatingInACallInOtherChatUseCase = monitorParticipatingInACallInOtherChatUseCase,
             monitorCallInChatUseCase = monitorCallInChatUseCase,
             monitorStorageStateEventUseCase = monitorStorageStateEventUseCase,
             monitorChatConnectionStateUseCase = monitorChatConnectionStateUseCase,
@@ -308,6 +336,14 @@ internal class ChatViewModelTest {
             isGeolocationEnabledUseCase = isGeolocationEnabledUseCase,
             enableGeolocationUseCase = enableGeolocationUseCase,
             sendTextMessageUseCase = sendTextMessageUseCase,
+            openChatLinkUseCase = openChatLinkUseCase,
+            holdChatCallUseCase = holdChatCallUseCase,
+            hangChatCallUseCase = hangChatCallUseCase,
+            monitorContactCacheUpdates = monitorContactCacheUpdates,
+            joinPublicChatUseCase = joinPublicChatUseCase,
+            isAnonymousModeUseCase = isAnonymousModeUseCase,
+            closeChatPreviewUseCase = closeChatPreviewUseCase,
+            applicationScope = CoroutineScope(testDispatcher),
         )
     }
 
@@ -355,14 +391,6 @@ internal class ChatViewModelTest {
         underTest.state.test {
             assertThat(awaitItem().isPrivateChat).isTrue()
         }
-    }
-
-
-    @Test
-    fun `test that title not update when chatId is not passed`() = runTest {
-        whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(null)
-        initTestClass()
-        verifyNoInteractions(getChatRoomUseCase)
     }
 
     @Test
@@ -426,14 +454,6 @@ internal class ChatViewModelTest {
             assertThat(awaitItem().userChatStatus).isEqualTo(updatedUserChatStatus)
         }
     }
-
-    @Test
-    fun `test that notification mute icon is not updated when chatId is not passed`() =
-        runTest {
-            whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(null)
-            initTestClass()
-            verifyNoInteractions(isChatNotificationMuteUseCase)
-        }
 
     @Test
     fun `test that notification mute icon is shown when mute is enabled`() = runTest {
@@ -550,7 +570,7 @@ internal class ChatViewModelTest {
         isParticipatingInChatCall: Long?,
     ) = runTest {
         val flow = MutableSharedFlow<ChatCall?>()
-        whenever(monitorParticipatingInACallUseCase()).thenReturn(flow)
+        whenever(monitorParticipatingInACallInOtherChatUseCase(any())).thenReturn(flow)
         initTestClass()
         val expected = isParticipatingInChatCall?.let {
             mock<ChatCall> {
@@ -559,7 +579,7 @@ internal class ChatViewModelTest {
         }
         flow.emit(expected)
         underTest.state.test {
-            assertThat(awaitItem().currentCall).isEqualTo(expected)
+            assertThat(awaitItem().callInOtherChat).isEqualTo(expected)
         }
     }
 
@@ -817,6 +837,7 @@ internal class ChatViewModelTest {
             on { changes } doReturn listOf(ChatRoomChange.Archive)
         }
         updateFlow.emit(newChatRoom)
+        advanceUntilIdle()
         underTest.state.test {
             assertThat(awaitItem().isArchived).isEqualTo(expectedArchived)
         }
@@ -1195,7 +1216,7 @@ internal class ChatViewModelTest {
         }
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
-        whenever(getCustomSubtitleListUseCase(chatId, userHandles, false))
+        whenever(getCustomSubtitleListUseCase(chatId, userHandles))
             .thenReturn(customSubtitleList)
         initTestClass()
         testScheduler.advanceUntilIdle()
@@ -1229,7 +1250,7 @@ internal class ChatViewModelTest {
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
         whenever(monitorChatRoomUpdates(chatId)).thenReturn(updateFlow)
-        whenever(getCustomSubtitleListUseCase(chatId, userHandles, false))
+        whenever(getCustomSubtitleListUseCase(chatId, userHandles))
             .thenReturn(customSubtitleList)
             .thenReturn(updatedCustomSubtitleList)
         initTestClass()
@@ -2016,6 +2037,212 @@ internal class ChatViewModelTest {
         underTest.state.test {
             assertThat(awaitItem().isGeolocationEnabled).isEqualTo(success)
         }
+    }
+
+    @Test
+    fun `test that join chat successfully when open by chat link`() = runTest {
+        val chatLink = "https://mega.nz/chat/123456789"
+        val action = "action"
+        whenever(savedStateHandle.get<String?>(EXTRA_LINK)).thenReturn(chatLink)
+        whenever(savedStateHandle.get<String?>(EXTRA_ACTION)).thenReturn(action)
+        whenever(openChatLinkUseCase(chatLink, chatId, false)).thenReturn(chatId)
+        whenever(savedStateHandle.get<Long?>(Constants.CHAT_ID)).thenReturn(chatId)
+        initTestClass()
+        underTest.state.test {
+            assertThat(awaitItem().chatId).isEqualTo(chatId)
+        }
+    }
+
+    @Test
+    fun `test that join chat failed with general exception when open by chat link`() = runTest {
+        val chatLink = "https://mega.nz/chat/123456789"
+        val action = "action"
+        whenever(savedStateHandle.get<String?>(EXTRA_LINK)).thenReturn(chatLink)
+        whenever(savedStateHandle.get<String?>(EXTRA_ACTION)).thenReturn(action)
+        whenever(openChatLinkUseCase(chatLink, null, false)).thenThrow(RuntimeException())
+        initTestClass()
+        underTest.state.test {
+            val result = (awaitItem().infoToShowEvent as StateEventWithContentTriggered)
+                .content?.stringId
+            assertThat(result).isEqualTo(R.string.error_general_nodes)
+        }
+    }
+
+    @Test
+    fun `test that join chat failed with resource not found exception when open by chat link`() =
+        runTest {
+            val chatLink = "https://mega.nz/chat/123456789"
+            val action = "action"
+            whenever(savedStateHandle.get<String?>(EXTRA_LINK)).thenReturn(chatLink)
+            whenever(savedStateHandle.get<String?>(EXTRA_ACTION)).thenReturn(action)
+            whenever(openChatLinkUseCase(chatLink, chatId, false)).thenThrow(
+                ResourceDoesNotExistChatException()
+            )
+            initTestClass()
+            underTest.state.test {
+                val result = (awaitItem().infoToShowEvent as StateEventWithContentTriggered)
+                    .content?.stringId
+                assertThat(result).isEqualTo(R.string.invalid_chat_link)
+            }
+        }
+
+    @Test
+    fun `test that hold and answer call invokes use cases if call in other chat exists and hold successes`() =
+        runTest {
+            val otherChatId = 567L
+            val initialCall = mock<ChatCall> {
+                on { chatId } doReturn otherChatId
+            }
+            val flow = MutableSharedFlow<ChatCall?>()
+            whenever(monitorParticipatingInACallInOtherChatUseCase(any())).thenReturn(flow)
+            whenever(holdChatCallUseCase(otherChatId, true)).thenReturn(mock())
+            whenever(answerChatCallUseCase(chatId, video = false, audio = true)).thenReturn(mock())
+            initTestClass()
+            flow.emit(initialCall)
+            underTest.state.test {
+                assertThat(awaitItem().callInOtherChat).isEqualTo(initialCall)
+            }
+            underTest.onHoldAndAnswerCall()
+            verify(holdChatCallUseCase).invoke(otherChatId, true)
+            verify(answerChatCallUseCase).invoke(chatId, video = false, audio = true)
+        }
+
+    @Test
+    fun `test that hold and answer call invokes answer if call in other chat does not exist`() =
+        runTest {
+            whenever(answerChatCallUseCase(chatId, video = false, audio = true)).thenReturn(mock())
+            underTest.onHoldAndAnswerCall()
+            verifyNoInteractions(holdChatCallUseCase)
+            verify(answerChatCallUseCase).invoke(chatId, video = false, audio = true)
+        }
+
+    @Test
+    fun `test that hold and answer call invokes hold but not answer if call in other chat exist and hold fails`() =
+        runTest {
+            val otherChatId = 567L
+            val initialCall = mock<ChatCall> {
+                on { chatId } doReturn otherChatId
+            }
+            val flow = MutableSharedFlow<ChatCall?>()
+            whenever(monitorParticipatingInACallInOtherChatUseCase(any())).thenReturn(flow)
+            whenever(holdChatCallUseCase(otherChatId, true)).thenAnswer {
+                throw Exception("hold call failed")
+            }
+            initTestClass()
+            flow.emit(initialCall)
+            underTest.state.test {
+                assertThat(awaitItem().callInOtherChat).isEqualTo(initialCall)
+            }
+            underTest.onHoldAndAnswerCall()
+            verify(holdChatCallUseCase).invoke(otherChatId, true)
+            verifyNoInteractions(answerChatCallUseCase)
+        }
+
+    @Test
+    fun `test that end and answer call invokes use cases if call in other chat exists and end successes`() =
+        runTest {
+            val callId = 567L
+            val initialCall = mock<ChatCall> {
+                on { this.callId } doReturn callId
+            }
+            val flow = MutableSharedFlow<ChatCall?>()
+            whenever(monitorParticipatingInACallInOtherChatUseCase(any())).thenReturn(flow)
+            whenever(hangChatCallUseCase(callId)).thenReturn(mock())
+            whenever(answerChatCallUseCase(chatId, video = false, audio = true)).thenReturn(mock())
+            initTestClass()
+            flow.emit(initialCall)
+            underTest.state.test {
+                assertThat(awaitItem().callInOtherChat).isEqualTo(initialCall)
+            }
+            underTest.onEndAndAnswerCall()
+            verify(hangChatCallUseCase).invoke(callId)
+            verify(answerChatCallUseCase).invoke(chatId, video = false, audio = true)
+        }
+
+    @Test
+    fun `test that end and answer call invokes answer if call in other chat does not exist`() =
+        runTest {
+            whenever(answerChatCallUseCase(chatId, video = false, audio = true)).thenReturn(mock())
+            underTest.onEndAndAnswerCall()
+            verifyNoInteractions(hangChatCallUseCase)
+            verify(answerChatCallUseCase).invoke(chatId, video = false, audio = true)
+        }
+
+    @Test
+    fun `test that end and answer call invokes end but not answer if call in other chat exist and end fails`() =
+        runTest {
+            val callId = 567L
+            val initialCall = mock<ChatCall> {
+                on { this.callId } doReturn callId
+            }
+            val flow = MutableSharedFlow<ChatCall?>()
+            whenever(monitorParticipatingInACallInOtherChatUseCase(any())).thenReturn(flow)
+            whenever(hangChatCallUseCase(callId)).thenAnswer {
+                throw Exception("end call failed")
+            }
+            initTestClass()
+            flow.emit(initialCall)
+            underTest.state.test {
+                assertThat(awaitItem().callInOtherChat).isEqualTo(initialCall)
+            }
+            underTest.onEndAndAnswerCall()
+            verify(hangChatCallUseCase).invoke(callId)
+            verifyNoInteractions(answerChatCallUseCase)
+        }
+
+    @Test
+    fun `test that userUpdates is updated when user updates`() = runTest {
+        val chatRoom = mock<ChatRoom> {
+            on { chatId } doReturn chatId
+            on { isGroup } doReturn true
+            on { ownPrivilege } doReturn ChatRoomPermission.Standard
+            on { peerCount } doReturn 0L
+            on { peerHandlesList } doReturn listOf(1L, 2L, 3L)
+            on { isPreview } doReturn false
+        }
+        val updateFlow = MutableSharedFlow<UserUpdate>()
+        whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
+        whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
+        whenever(monitorContactCacheUpdates()).thenReturn(updateFlow)
+        initTestClass()
+        underTest.state.test {
+            val actual = awaitItem()
+            assertThat(actual.userUpdate).isNull()
+        }
+        val userUpdate = mock<UserUpdate> {
+            on { changes } doReturn mapOf(UserId(1L) to listOf(UserChanges.Avatar))
+        }
+        updateFlow.emit(userUpdate)
+        advanceUntilIdle()
+        underTest.state.test {
+            val actual = awaitItem()
+            assertThat(actual.userUpdate).isEqualTo(userUpdate)
+        }
+    }
+
+    @Test
+    fun `test that isAnonymousMode is updated`() = runTest {
+        whenever(isAnonymousModeUseCase()).thenReturn(true)
+        initTestClass()
+        underTest.state.test {
+            assertThat(awaitItem().isAnonymousMode).isTrue()
+        }
+    }
+
+    @Test
+    fun `test that joinChatLinkUseCase is invoked if onJoinChat is`() = runTest {
+        whenever(joinPublicChatUseCase(chatId)).thenReturn(Unit)
+        underTest.onJoinChat()
+        verify(joinPublicChatUseCase).invoke(chatId)
+    }
+
+    @Test
+    fun `test that chat management is invoked if onSetPendingJoinLink is`() = runTest {
+        val link = "link"
+        whenever(savedStateHandle.get<String>(EXTRA_LINK)).thenReturn(link)
+        underTest.onSetPendingJoinLink()
+        verify(chatManagement).pendingJoinLink = link
+        verifyNoMoreInteractions(chatManagement)
     }
 
     private fun ChatRoom.getNumberParticipants() =

@@ -28,6 +28,7 @@ import mega.privacy.android.data.mapper.node.MegaNodeMapper
 import mega.privacy.android.data.mapper.node.NodeMapper
 import mega.privacy.android.data.mapper.node.NodeShareKeyResultMapper
 import mega.privacy.android.data.mapper.node.OfflineAvailabilityMapper
+import mega.privacy.android.data.mapper.node.label.NodeLabelIntMapper
 import mega.privacy.android.data.mapper.shares.AccessPermissionIntMapper
 import mega.privacy.android.data.mapper.shares.AccessPermissionMapper
 import mega.privacy.android.data.mapper.shares.ShareDataMapper
@@ -39,6 +40,7 @@ import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.publiclink.PublicLinkFolder
+import mega.privacy.android.domain.entity.offline.OfflineFolderInfo
 import mega.privacy.android.domain.entity.offline.OtherOfflineNodeInformation
 import mega.privacy.android.domain.entity.shares.AccessPermission
 import mega.privacy.android.domain.exception.MegaException
@@ -125,6 +127,8 @@ class NodeRepositoryImplTest {
 
     val offline: Offline = mock()
 
+    private val nodeLabelIntMapper = NodeLabelIntMapper()
+
     @BeforeAll
     fun setup() {
         underTest = NodeRepositoryImpl(
@@ -150,7 +154,8 @@ class NodeRepositoryImplTest {
             nodeShareKeyResultMapper = nodeShareKeyResultMapper,
             accessPermissionIntMapper = accessPermissionIntMapper,
             megaLocalRoomGateway = megaLocalRoomGateway,
-            megaNodeMapper = megaNodeMapper
+            megaNodeMapper = megaNodeMapper,
+            nodeLabelIntMapper = nodeLabelIntMapper
         )
     }
 
@@ -619,6 +624,7 @@ class NodeRepositoryImplTest {
         }
         whenever(cacheGateway.getThumbnailCacheFolder()).thenReturn(File("thumbnail_path"))
         whenever(megaApiGateway.hasVersion(megaNode)).thenReturn(true)
+        whenever(megaApiGateway.getNumVersions(megaNode)).thenReturn(2)
         whenever(megaApiGateway.getNumChildFolders(megaNode)).thenReturn(2)
         whenever(megaApiGateway.getNumChildFiles(megaNode)).thenReturn(3)
         whenever(megaApiGateway.isPendingShare(megaNode)).thenReturn(true)
@@ -856,6 +862,40 @@ class NodeRepositoryImplTest {
             underTest.getNodeFromChatMessage(chatId, messageId)?.id?.longValue
         ).isEqualTo(megaNode.handle)
         verify(megaApiGateway).authorizeChatNode(megaNode2, chat.authorizationToken)
+    }
+
+    @Test
+    fun `test that getOfflineFolderInfo should return correct OfflineFolderInfo`() = runTest {
+        val parentId = 1
+        val offlineNodes = listOf(
+            Offline(
+                1,
+                "56",
+                "path1",
+                "name1",
+                parentId,
+                Offline.FOLDER,
+                Offline.OTHER,
+                "handleIncoming1",
+                12345
+            ),
+            Offline(
+                2,
+                "67",
+                "path2",
+                "name2",
+                parentId,
+                Offline.FILE,
+                Offline.INCOMING,
+                "handleIncoming2",
+                67890
+            ),
+        )
+        whenever(megaLocalRoomGateway.getOfflineInfoByParentId(parentId)).thenReturn(offlineNodes)
+
+        val expected = OfflineFolderInfo(1, 1)
+        val actual = underTest.getOfflineFolderInfo(parentId)
+        assertThat(actual).isEqualTo(expected)
     }
 
     companion object {

@@ -1,6 +1,7 @@
 package mega.privacy.android.app.presentation.node.view.bottomsheetmenuitems
 
 import com.google.common.truth.Truth
+import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.presentation.node.model.menuaction.DisputeTakeDownMenuAction
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import org.junit.jupiter.api.Assertions.*
@@ -15,7 +16,7 @@ class DisputeTakeDownBottomSheetMenuItemTest {
         DisputeTakeDownBottomSheetMenuItem(menuAction = DisputeTakeDownMenuAction())
 
     @Test
-    fun `test that shouldDisplay returns true when node is taken down`() {
+    fun `test that shouldDisplay returns true when node is taken down`() = runTest {
         val node = mock<TypedFileNode> {
             on { isTakenDown } doReturn true
         }
@@ -23,13 +24,14 @@ class DisputeTakeDownBottomSheetMenuItemTest {
             isNodeInRubbish = false,
             accessPermission = null,
             isInBackups = false,
-            node = node
+            node = node,
+            isConnected = true
         )
         Truth.assertThat(result).isTrue()
     }
 
     @Test
-    fun `test that shouldDisplay returns false when node is not taken down`() {
+    fun `test that shouldDisplay returns false when node is not taken down`() = runTest {
         val node = mock<TypedFileNode> {
             on { isTakenDown } doReturn false
         }
@@ -37,7 +39,8 @@ class DisputeTakeDownBottomSheetMenuItemTest {
             isNodeInRubbish = false,
             accessPermission = null,
             isInBackups = false,
-            node = node
+            node = node,
+            isConnected = true
         )
         Truth.assertThat(result).isFalse()
     }

@@ -1,6 +1,7 @@
 package mega.privacy.android.app.mediaplayer
 
 import android.annotation.SuppressLint
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -9,11 +10,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.MediaStore
 import android.view.PixelCopy
 import android.view.SurfaceView
 import android.view.View
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -102,13 +104,12 @@ import mega.privacy.android.app.utils.OfflineUtils.getOfflineFile
 import mega.privacy.android.app.utils.TextUtil
 import mega.privacy.android.app.utils.ThumbnailUtils
 import mega.privacy.android.app.utils.wrapper.GetOfflineThumbnailFileWrapper
-import mega.privacy.android.data.mapper.FileDurationMapper
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.mediaplayer.PlaybackInformation
 import mega.privacy.android.domain.entity.mediaplayer.RepeatToggleMode
 import mega.privacy.android.domain.entity.mediaplayer.SubtitleFileInfo
 import mega.privacy.android.domain.entity.node.TypedFileNode
-import mega.privacy.android.domain.entity.node.TypedNode
+import mega.privacy.android.domain.entity.node.TypedVideoNode
 import mega.privacy.android.domain.entity.statistics.MediaPlayerStatisticsEvents
 import mega.privacy.android.domain.entity.transfer.TransferEvent
 import mega.privacy.android.domain.exception.BlockedMegaException
@@ -121,38 +122,36 @@ import mega.privacy.android.domain.usecase.GetLocalFilePathUseCase
 import mega.privacy.android.domain.usecase.GetLocalFolderLinkFromMegaApiFolderUseCase
 import mega.privacy.android.domain.usecase.GetLocalFolderLinkFromMegaApiUseCase
 import mega.privacy.android.domain.usecase.GetLocalLinkFromMegaApiUseCase
-import mega.privacy.android.domain.usecase.GetNodesByHandlesUseCase
 import mega.privacy.android.domain.usecase.GetParentNodeFromMegaApiFolderUseCase
 import mega.privacy.android.domain.usecase.GetRootNodeFromMegaApiFolderUseCase
 import mega.privacy.android.domain.usecase.GetRootNodeUseCase
 import mega.privacy.android.domain.usecase.GetRubbishNodeUseCase
 import mega.privacy.android.domain.usecase.GetUserNameByEmailUseCase
-import mega.privacy.android.domain.usecase.GetVideoNodesByEmailUseCase
-import mega.privacy.android.domain.usecase.GetVideoNodesByParentHandleUseCase
-import mega.privacy.android.domain.usecase.GetVideoNodesFromInSharesUseCase
-import mega.privacy.android.domain.usecase.GetVideoNodesFromOutSharesUseCase
-import mega.privacy.android.domain.usecase.GetVideoNodesFromPublicLinksUseCase
-import mega.privacy.android.domain.usecase.GetVideoNodesUseCase
-import mega.privacy.android.domain.usecase.GetVideosByParentHandleFromMegaApiFolderUseCase
 import mega.privacy.android.domain.usecase.MonitorPlaybackTimesUseCase
 import mega.privacy.android.domain.usecase.file.GetFingerprintUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.DeletePlaybackInformationUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.GetSRTSubtitleFileListUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.GetVideosBySearchTypeUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiFolderHttpServerIsRunningUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.MegaApiFolderHttpServerSetMaxBufferSizeUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiFolderHttpServerStartUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiFolderHttpServerStopUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunningUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerSetMaxBufferSizeUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStopUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.MonitorVideoRepeatModeUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.SavePlaybackTimesUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.SavePlaybackTimesUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.SendStatisticsMediaPlayerUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.SetVideoRepeatModeUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.TrackPlaybackPositionUseCase
-import mega.privacy.android.domain.usecase.node.GetNodeByHandleUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.DeletePlaybackInformationUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetSRTSubtitleFileListUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideoNodeByHandleUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideoNodesByEmailUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideoNodesByHandlesUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideoNodesByParentHandleUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideoNodesFromInSharesUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideoNodesFromOutSharesUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideoNodesFromPublicLinksUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideoNodesUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideosByParentHandleFromMegaApiFolderUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideosBySearchTypeUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.MonitorVideoRepeatModeUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.SetVideoRepeatModeUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.TrackPlaybackPositionUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorSubFolderMediaDiscoverySettingsUseCase
 import mega.privacy.android.domain.usecase.transfers.MonitorTransferEventsUseCase
 import mega.privacy.mobile.analytics.event.OffOptionForHideSubtitlePressedEvent
@@ -160,7 +159,6 @@ import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import nz.mega.sdk.MegaCancelToken
 import timber.log.Timber
 import java.io.File
-import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Collections
 import java.util.Date
@@ -202,7 +200,7 @@ class VideoPlayerViewModel @Inject constructor(
     private val getRootNodeUseCase: GetRootNodeUseCase,
     private val getRootNodeFromMegaApiFolderUseCase: GetRootNodeFromMegaApiFolderUseCase,
     private val getRubbishNodeUseCase: GetRubbishNodeUseCase,
-    private val getNodeByHandleUseCase: GetNodeByHandleUseCase,
+    private val getVideoNodeByHandleUseCase: GetVideoNodeByHandleUseCase,
     private val getVideoNodesFromPublicLinksUseCase: GetVideoNodesFromPublicLinksUseCase,
     private val getVideoNodesFromInSharesUseCase: GetVideoNodesFromInSharesUseCase,
     private val getVideoNodesFromOutSharesUseCase: GetVideoNodesFromOutSharesUseCase,
@@ -211,9 +209,8 @@ class VideoPlayerViewModel @Inject constructor(
     private val getUserNameByEmailUseCase: GetUserNameByEmailUseCase,
     private val getVideosByParentHandleFromMegaApiFolderUseCase: GetVideosByParentHandleFromMegaApiFolderUseCase,
     private val getVideoNodesByParentHandleUseCase: GetVideoNodesByParentHandleUseCase,
-    private val getNodesByHandlesUseCase: GetNodesByHandlesUseCase,
+    private val getVideoNodesByHandlesUseCase: GetVideoNodesByHandlesUseCase,
     private val getFingerprintUseCase: GetFingerprintUseCase,
-    private val fileDurationMapper: FileDurationMapper,
     private val getSRTSubtitleFileListUseCase: GetSRTSubtitleFileListUseCase,
     private val setVideoRepeatModeUseCase: SetVideoRepeatModeUseCase,
     private val getVideosBySearchTypeUseCase: GetVideosBySearchTypeUseCase,
@@ -234,7 +231,7 @@ class VideoPlayerViewModel @Inject constructor(
     /**
      * SelectState for updating the background color of add subtitle dialog options
      */
-    internal var selectOptionState by mutableStateOf(SUBTITLE_SELECTED_STATE_OFF)
+    internal var selectOptionState by mutableIntStateOf(SUBTITLE_SELECTED_STATE_OFF)
         private set
 
     private val _screenLockState = MutableStateFlow(false)
@@ -574,26 +571,18 @@ class VideoPlayerViewModel @Inject constructor(
     /**
      * Capture the screenshot when video playing
      *
-     * @param rootFolderPath the root folder path of screenshots
      * @param captureView the view that will be captured
      * @param successCallback the callback after the screenshot is saved successfully
      *
      */
     @SuppressLint("SimpleDateFormat")
     internal fun screenshotWhenVideoPlaying(
-        rootFolderPath: String,
         captureView: View,
         successCallback: (bitmap: Bitmap) -> Unit,
     ) {
-        File(rootFolderPath).apply {
-            if (exists().not()) {
-                mkdirs()
-            }
-        }
         val screenshotFileName =
             SimpleDateFormat(DATE_FORMAT_PATTERN).format(Date(System.currentTimeMillis()))
-        val filePath =
-            "$rootFolderPath${SCREENSHOT_NAME_PREFIX}$screenshotFileName${SCREENSHOT_NAME_SUFFIX}"
+        val fileName = "${SCREENSHOT_NAME_PREFIX}$screenshotFileName${SCREENSHOT_NAME_SUFFIX}"
         // Using video size for the capture size to ensure the screenshot is complete.
         val (captureWidth, captureHeight) = currentPlayingVideoSize?.let { (width, height) ->
             width to height
@@ -611,7 +600,7 @@ class VideoPlayerViewModel @Inject constructor(
                 { copyResult ->
                     if (copyResult == PixelCopy.SUCCESS) {
                         viewModelScope.launch {
-                            saveBitmap(filePath, screenshotBitmap, successCallback)
+                            saveBitmap(fileName, screenshotBitmap, successCallback)
                         }
                     }
                 },
@@ -745,7 +734,7 @@ class VideoPlayerViewModel @Inject constructor(
                         _playlistTitleState.update {
                             context.getString(R.string.sortby_type_video_first)
                         }
-                        buildPlaySourcesByTypedNodes(
+                        buildPlaySourcesByTypedVideoNodes(
                             type = type,
                             typedNodes = getVideoNodesUseCase(getSortOrderFromIntent(intent)),
                             firstPlayHandle = firstPlayHandle
@@ -771,7 +760,7 @@ class VideoPlayerViewModel @Inject constructor(
                             _playlistTitleState.update {
                                 context.getString(R.string.tab_links_shares)
                             }
-                            buildPlaySourcesByTypedNodes(
+                            buildPlaySourcesByTypedVideoNodes(
                                 type = type,
                                 typedNodes = getVideoNodesFromPublicLinksUseCase(order),
                                 firstPlayHandle = firstPlayHandle
@@ -783,7 +772,7 @@ class VideoPlayerViewModel @Inject constructor(
                             _playlistTitleState.update {
                                 context.getString(R.string.tab_incoming_shares)
                             }
-                            buildPlaySourcesByTypedNodes(
+                            buildPlaySourcesByTypedVideoNodes(
                                 type = type,
                                 typedNodes = getVideoNodesFromInSharesUseCase(order),
                                 firstPlayHandle = firstPlayHandle
@@ -795,7 +784,7 @@ class VideoPlayerViewModel @Inject constructor(
                             _playlistTitleState.update {
                                 context.getString(R.string.tab_outgoing_shares)
                             }
-                            buildPlaySourcesByTypedNodes(
+                            buildPlaySourcesByTypedVideoNodes(
                                 type = type,
                                 typedNodes = getVideoNodesFromOutSharesUseCase(
                                     lastHandle = INVALID_HANDLE,
@@ -816,7 +805,7 @@ class VideoPlayerViewModel @Inject constructor(
                                                     _playlistTitleState.update { "$sharesTitle $it" }
                                                 }
                                         }
-                                        buildPlaySourcesByTypedNodes(
+                                        buildPlaySourcesByTypedVideoNodes(
                                             type = type,
                                             typedNodes = nodes,
                                             firstPlayHandle = firstPlayHandle
@@ -833,7 +822,7 @@ class VideoPlayerViewModel @Inject constructor(
                                 else -> getRootNodeUseCase()
                             }
                         } else {
-                            getNodeByHandleUseCase(parentHandle)
+                            getVideoNodeByHandleUseCase(parentHandle)
                         }?.let { parent ->
                             if (parentHandle == INVALID_HANDLE) {
                                 context.getString(
@@ -861,7 +850,7 @@ class VideoPlayerViewModel @Inject constructor(
                                     order = getSortOrderFromIntent(intent)
                                 )
                             }?.let { children ->
-                                buildPlaySourcesByTypedNodes(
+                                buildPlaySourcesByTypedVideoNodes(
                                     type = type,
                                     typedNodes = children,
                                     firstPlayHandle = firstPlayHandle
@@ -901,7 +890,7 @@ class VideoPlayerViewModel @Inject constructor(
                                 parentHandle = parent.id.longValue,
                                 order = order
                             )?.let { children ->
-                                buildPlaySourcesByTypedNodes(
+                                buildPlaySourcesByTypedVideoNodes(
                                     type = type,
                                     typedNodes = children,
                                     firstPlayHandle = firstPlayHandle
@@ -940,7 +929,7 @@ class VideoPlayerViewModel @Inject constructor(
         } else {
             playlistItems.clear()
 
-            val node: TypedFileNode? = getNodeByHandleUseCase(firstPlayHandle) as? TypedFileNode
+            val node = getVideoNodeByHandleUseCase(firstPlayHandle)
             val thumbnail = when {
                 type == OFFLINE_ADAPTER -> {
                     offlineThumbnailFileWrapper.getThumbnailFile(
@@ -961,9 +950,7 @@ class VideoPlayerViewModel @Inject constructor(
                 }
             }
 
-            val duration = node?.type?.let {
-                fileDurationMapper(it)
-            } ?: 0
+            val duration = node?.duration ?: 0
 
             playlistItemMapper(
                 firstPlayHandle,
@@ -1037,12 +1024,12 @@ class VideoPlayerViewModel @Inject constructor(
      * Build play sources by node TypedNodes
      *
      * @param type adapter type
-     * @param typedNodes [TypedNode] list
+     * @param typedNodes [TypedVideoNode] list
      * @param firstPlayHandle the index of first playing item
      */
-    private suspend fun buildPlaySourcesByTypedNodes(
+    private suspend fun buildPlaySourcesByTypedVideoNodes(
         type: Int,
-        typedNodes: List<TypedNode>,
+        typedNodes: List<TypedVideoNode>,
         firstPlayHandle: Long,
     ) {
         playlistItems.clear()
@@ -1051,56 +1038,52 @@ class VideoPlayerViewModel @Inject constructor(
         var firstPlayIndex = 0
 
         typedNodes.mapIndexed { currentIndex, typedNode ->
-            if (typedNode is TypedFileNode) {
-                getLocalFilePathUseCase(typedNode).let { localPath ->
-                    if (localPath != null && isLocalFile(typedNode, localPath)) {
-                        mediaItemFromFile(File(localPath), typedNode.id.longValue.toString())
-                    } else {
-                        val url =
-                            if (type == FOLDER_LINK_ADAPTER) {
-                                if (isMegaApiFolder(type)) {
-                                    getLocalFolderLinkFromMegaApiFolderUseCase(typedNode.id.longValue)
-                                } else {
-                                    getLocalFolderLinkFromMegaApiUseCase(typedNode.id.longValue)
-                                }
+            getLocalFilePathUseCase(typedNode).let { localPath ->
+                if (localPath != null && isLocalFile(typedNode, localPath)) {
+                    mediaItemFromFile(File(localPath), typedNode.id.longValue.toString())
+                } else {
+                    val url =
+                        if (type == FOLDER_LINK_ADAPTER) {
+                            if (isMegaApiFolder(type)) {
+                                getLocalFolderLinkFromMegaApiFolderUseCase(typedNode.id.longValue)
                             } else {
-                                getLocalLinkFromMegaApiUseCase(typedNode.id.longValue)
+                                getLocalFolderLinkFromMegaApiUseCase(typedNode.id.longValue)
                             }
-                        if (url == null) {
-                            null
                         } else {
-                            MediaItem.Builder()
-                                .setUri(Uri.parse(url))
-                                .setMediaId(typedNode.id.longValue.toString())
-                                .build()
+                            getLocalLinkFromMegaApiUseCase(typedNode.id.longValue)
                         }
-                    }?.let {
-                        mediaItems.add(it)
+                    if (url == null) {
+                        null
+                    } else {
+                        MediaItem.Builder()
+                            .setUri(Uri.parse(url))
+                            .setMediaId(typedNode.id.longValue.toString())
+                            .build()
                     }
+                }?.let {
+                    mediaItems.add(it)
                 }
+            }
 
-                if (typedNode.id.longValue == firstPlayHandle) {
-                    firstPlayIndex = currentIndex
-                }
-                val thumbnail = typedNode.thumbnailPath?.let { path ->
-                    File(path)
-                }
+            if (typedNode.id.longValue == firstPlayHandle) {
+                firstPlayIndex = currentIndex
+            }
+            val thumbnail = typedNode.thumbnailPath?.let { path ->
+                File(path)
+            }
 
-                val duration = typedNode.type.let {
-                    fileDurationMapper(it) ?: 0
-                }
+            val duration = typedNode.duration
 
-                playlistItemMapper(
-                    typedNode.id.longValue,
-                    typedNode.name,
-                    thumbnail,
-                    currentIndex,
-                    TYPE_NEXT,
-                    typedNode.size,
-                    duration,
-                ).let { playlistItem ->
-                    playlistItems.add(playlistItem)
-                }
+            playlistItemMapper(
+                typedNode.id.longValue,
+                typedNode.name,
+                thumbnail,
+                currentIndex,
+                TYPE_NEXT,
+                typedNode.size,
+                duration,
+            ).let { playlistItem ->
+                playlistItems.add(playlistItem)
             }
         }
         updatePlaySources(mediaItems, playlistItems, firstPlayIndex)
@@ -1118,9 +1101,9 @@ class VideoPlayerViewModel @Inject constructor(
         handles: List<Long>,
         firstPlayHandle: Long,
     ) {
-        buildPlaySourcesByTypedNodes(
+        buildPlaySourcesByTypedVideoNodes(
             type = type,
-            typedNodes = getNodesByHandlesUseCase(handles),
+            typedNodes = getVideoNodesByHandlesUseCase(handles),
             firstPlayHandle = firstPlayHandle
         )
     }
@@ -1842,21 +1825,33 @@ class VideoPlayerViewModel @Inject constructor(
         }
 
     private suspend fun saveBitmap(
-        filePath: String,
+        fileName: String,
         bitmap: Bitmap,
         successCallback: (bitmap: Bitmap) -> Unit,
     ) =
         withContext(ioDispatcher) {
-            val screenshotFile = File(filePath)
-            try {
-                val outputStream = FileOutputStream(screenshotFile)
-                bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY_SCREENSHOT, outputStream)
-                outputStream.flush()
-                outputStream.close()
-                successCallback(bitmap)
-            } catch (e: Exception) {
-                Timber.e("Bitmap is saved error: ${e.message}")
+            val contentValues = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                put(MediaStore.Images.Media.RELATIVE_PATH, MEGA_SCREENSHOTS_FOLDER_NAME)
             }
+
+            val contentResolver = context.contentResolver
+            contentResolver?.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                ?.let { uri ->
+                    contentResolver.openOutputStream(uri)?.use { outputStream ->
+                        try {
+                            bitmap.compress(
+                                Bitmap.CompressFormat.JPEG,
+                                QUALITY_SCREENSHOT,
+                                outputStream
+                            )
+                            successCallback(bitmap)
+                        } catch (e: Exception) {
+                            Timber.e("Bitmap is saved error: ${e.message}")
+                        }
+                    }
+                }
         }
 
     /**
@@ -1981,6 +1976,9 @@ class VideoPlayerViewModel @Inject constructor(
         }
     }
 
+    /**
+     * onCleared
+     */
     override fun onCleared() {
         super.onCleared()
         cancelSearch()
@@ -1988,6 +1986,7 @@ class VideoPlayerViewModel @Inject constructor(
     }
 
     companion object {
+        private const val MEGA_SCREENSHOTS_FOLDER_NAME = "DCIM/MEGA Screenshots/"
         private const val QUALITY_SCREENSHOT = 100
         private const val DATE_FORMAT_PATTERN = "yyyyMMdd-HHmmss"
         private const val SCREENSHOT_NAME_PREFIX = "Screenshot_"

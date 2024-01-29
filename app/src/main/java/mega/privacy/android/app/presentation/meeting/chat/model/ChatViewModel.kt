@@ -6,12 +6,15 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.palm.composestateevents.consumed
 import de.palm.composestateevents.triggered
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -30,25 +33,32 @@ import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.ChatRoomChange
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.android.domain.entity.statistics.EndCallForAll
-import mega.privacy.android.domain.usecase.GetChatRoom
+import mega.privacy.android.domain.exception.chat.ResourceDoesNotExistChatException
+import mega.privacy.android.domain.qualifier.ApplicationScope
+import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
+import mega.privacy.android.domain.usecase.MonitorContactCacheUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.chat.ArchiveChatUseCase
 import mega.privacy.android.domain.usecase.chat.ClearChatHistoryUseCase
+import mega.privacy.android.domain.usecase.chat.CloseChatPreviewUseCase
 import mega.privacy.android.domain.usecase.chat.EnableGeolocationUseCase
 import mega.privacy.android.domain.usecase.chat.EndCallUseCase
 import mega.privacy.android.domain.usecase.chat.GetChatMuteOptionListUseCase
 import mega.privacy.android.domain.usecase.chat.GetCustomSubtitleListUseCase
+import mega.privacy.android.domain.usecase.chat.HoldChatCallUseCase
 import mega.privacy.android.domain.usecase.chat.InviteToChatUseCase
+import mega.privacy.android.domain.usecase.chat.IsAnonymousModeUseCase
 import mega.privacy.android.domain.usecase.chat.IsChatNotificationMuteUseCase
 import mega.privacy.android.domain.usecase.chat.IsGeolocationEnabledUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorCallInChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatConnectionStateUseCase
-import mega.privacy.android.domain.usecase.chat.MonitorParticipatingInACallUseCase
+import mega.privacy.android.domain.usecase.chat.MonitorParticipatingInACallInOtherChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorUserChatStatusByHandleUseCase
 import mega.privacy.android.domain.usecase.chat.MuteChatNotificationForChatRoomsUseCase
+import mega.privacy.android.domain.usecase.chat.OpenChatLinkUseCase
 import mega.privacy.android.domain.usecase.chat.UnmuteChatNotificationUseCase
-import mega.privacy.android.domain.usecase.chat.message.MonitorMessageLoadedUseCase
+import mega.privacy.android.domain.usecase.chat.link.JoinPublicChatUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendTextMessageUseCase
 import mega.privacy.android.domain.usecase.contact.GetMyUserHandleUseCase
 import mega.privacy.android.domain.usecase.contact.GetParticipantFirstNameUseCase
@@ -59,6 +69,7 @@ import mega.privacy.android.domain.usecase.contact.MonitorUserLastGreenUpdatesUs
 import mega.privacy.android.domain.usecase.contact.RequestUserLastGreenUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
+import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.IsChatStatusConnectedForCallUseCase
 import mega.privacy.android.domain.usecase.meeting.SendStatisticsMeetingsUseCase
 import mega.privacy.android.domain.usecase.meeting.StartCallUseCase
@@ -70,6 +81,18 @@ import timber.log.Timber
 import java.util.Collections
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
+
+/**
+ * Extra Action
+ */
+const val EXTRA_ACTION = "ACTION"
+
+/**
+ * Extra Link
+ */
+const val EXTRA_LINK = "LINK"
 
 /**
  * Chat view model.
@@ -83,15 +106,16 @@ import javax.inject.Inject
  *
  * @param savedStateHandle
  */
+@OptIn(FlowPreview::class)
 @HiltViewModel
 internal class ChatViewModel @Inject constructor(
     private val isChatNotificationMuteUseCase: IsChatNotificationMuteUseCase,
-    private val getChatRoomUseCase: GetChatRoom,
+    private val getChatRoomUseCase: GetChatRoomUseCase,
     private val monitorChatRoomUpdates: MonitorChatRoomUpdates,
     private val monitorUpdatePushNotificationSettingsUseCase: MonitorUpdatePushNotificationSettingsUseCase,
     private val getUserOnlineStatusByHandleUseCase: GetUserOnlineStatusByHandleUseCase,
     private val monitorUserChatStatusByHandleUseCase: MonitorUserChatStatusByHandleUseCase,
-    private val monitorParticipatingInACallUseCase: MonitorParticipatingInACallUseCase,
+    private val monitorParticipatingInACallInOtherChatUseCase: MonitorParticipatingInACallInOtherChatUseCase,
     private val monitorCallInChatUseCase: MonitorCallInChatUseCase,
     private val monitorStorageStateEventUseCase: MonitorStorageStateEventUseCase,
     private val monitorChatConnectionStateUseCase: MonitorChatConnectionStateUseCase,
@@ -124,12 +148,24 @@ internal class ChatViewModel @Inject constructor(
     private val isGeolocationEnabledUseCase: IsGeolocationEnabledUseCase,
     private val enableGeolocationUseCase: EnableGeolocationUseCase,
     private val sendTextMessageUseCase: SendTextMessageUseCase,
-    savedStateHandle: SavedStateHandle,
+    private val holdChatCallUseCase: HoldChatCallUseCase,
+    private val hangChatCallUseCase: HangChatCallUseCase,
+    private val monitorContactCacheUpdates: MonitorContactCacheUpdates,
+    private val joinPublicChatUseCase: JoinPublicChatUseCase,
+    private val isAnonymousModeUseCase: IsAnonymousModeUseCase,
+    private val savedStateHandle: SavedStateHandle,
+    private val openChatLinkUseCase: OpenChatLinkUseCase,
+    @ApplicationScope private val applicationScope: CoroutineScope,
+    private val closeChatPreviewUseCase: CloseChatPreviewUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ChatUiState())
     val state = _state.asStateFlow()
 
-    private val chatId = savedStateHandle.get<Long>(Constants.CHAT_ID)
+    private val chatId: Long = savedStateHandle[Constants.CHAT_ID]
+        ?: throw IllegalStateException("Chat screen must have a chat room id")
+    private val chatLink: String
+        get() = savedStateHandle.get<String>(EXTRA_LINK).orEmpty()
+
     private val usersTyping = Collections.synchronizedMap(mutableMapOf<Long, String?>())
     private val jobs = mutableMapOf<Long, Job>()
 
@@ -144,20 +180,72 @@ internal class ChatViewModel @Inject constructor(
 
     init {
         checkGeolocation()
-        monitorParticipatingInACall()
         monitorStorageStateEvent()
-        chatId?.let {
-            updateChatId(it)
-            getChatRoom(it)
-            getNotificationMute(it)
-            getChatConnectionState(it)
-            getScheduledMeeting(it)
-            monitorACallInThisChat(it)
-            monitorChatRoom(it)
-            monitorNotificationMute(it)
-            monitorChatConnectionState(it)
-            monitorNetworkConnectivity(it)
+        loadChatOrPreview()
+        checkAnonymousMode()
+        monitorContactCacheUpdate()
+    }
+
+    private fun loadChatOrPreview() {
+        val action = savedStateHandle.get<String>(EXTRA_ACTION).orEmpty()
+        if (chatLink.isNotEmpty()) {
+            val requireJoin = action == Constants.ACTION_JOIN_OPEN_CHAT_LINK
+            viewModelScope.launch {
+                runCatching {
+                    openChatLinkUseCase(
+                        chatLink = chatLink,
+                        chatId = chatId,
+                        requireJoin = requireJoin,
+                    )
+                }.onSuccess {
+                    loadChatRoom()
+                }.onFailure {
+                    Timber.e(it)
+                    val infoToShow = if (it is ResourceDoesNotExistChatException) {
+                        InfoToShow(stringId = R.string.invalid_chat_link)
+                    } else {
+                        InfoToShow(stringId = R.string.error_general_nodes)
+                    }
+                    _state.update { state -> state.copy(infoToShowEvent = triggered(infoToShow)) }
+                }
+            }
+        } else {
+            loadChatRoom()
         }
+    }
+
+    private fun checkAnonymousMode() {
+        viewModelScope.launch {
+            val isAnonymousMode = isAnonymousModeUseCase()
+            _state.update { state -> state.copy(isAnonymousMode = isAnonymousMode) }
+        }
+    }
+
+    private fun monitorContactCacheUpdate() {
+        viewModelScope.launch {
+            monitorContactCacheUpdates()
+                // I don't know why sdk emit 2 the same events, add debounce to optimize
+                .debounce(300L.toDuration(DurationUnit.MILLISECONDS))
+                .catch { Timber.e(it) }
+                .collect {
+                    Timber.d("Contact cache update: $it")
+                    _state.update { state -> state.copy(userUpdate = it) }
+                }
+        }
+    }
+
+    private fun loadChatRoom() {
+        updateChatId()
+        getChatRoom()
+        getNotificationMute()
+        getChatConnectionState()
+        getScheduledMeeting()
+        monitorACallInThisChat()
+        monitorParticipatingInACall()
+        monitorChatRoom()
+        monitorNotificationMute()
+        monitorChatConnectionState()
+        monitorNetworkConnectivity()
     }
 
     private fun monitorAllContactParticipantsInChat(peerHandles: List<Long>) {
@@ -171,7 +259,7 @@ internal class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun getScheduledMeeting(chatId: Long) {
+    private fun getScheduledMeeting() {
         viewModelScope.launch {
             runCatching {
                 getScheduledMeetingByChatUseCase(chatId)
@@ -192,7 +280,7 @@ internal class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun monitorNetworkConnectivity(chatId: Long) {
+    private fun monitorNetworkConnectivity() {
         viewModelScope.launch {
             monitorConnectivityUseCase()
                 .collect { networkConnected ->
@@ -209,13 +297,13 @@ internal class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun updateChatId(chatId: Long) {
+    private fun updateChatId() {
         viewModelScope.launch {
             _state.update { it.copy(chatId = chatId) }
         }
     }
 
-    private fun monitorChatConnectionState(chatId: Long) {
+    private fun monitorChatConnectionState() {
         viewModelScope.launch {
             monitorChatConnectionStateUseCase()
                 .filter { it.chatId == chatId }
@@ -225,13 +313,13 @@ internal class ChatViewModel @Inject constructor(
                             it.copy(isConnected = false)
                         }
                     } else {
-                        getChatConnectionState(chatId = chatId)
+                        getChatConnectionState()
                     }
                 }
         }
     }
 
-    private fun getChatConnectionState(chatId: Long) {
+    private fun getChatConnectionState() {
         viewModelScope.launch {
             runCatching {
                 isChatStatusConnectedForCallUseCase(chatId = chatId)
@@ -254,7 +342,7 @@ internal class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun getChatRoom(chatId: Long) {
+    private fun getChatRoom() {
         viewModelScope.launch {
             runCatching {
                 getChatRoomUseCase(chatId)
@@ -274,7 +362,8 @@ internal class ChatViewModel @Inject constructor(
                                 isArchived = isArchived,
                                 isMeeting = isMeeting,
                                 participantsCount = getNumberParticipants(),
-                                isWaitingRoom = isWaitingRoom
+                                isWaitingRoom = isWaitingRoom,
+                                numPreviewers = numPreviewers
                             )
                         }
                         if (peerHandlesList.isNotEmpty()) {
@@ -298,9 +387,9 @@ internal class ChatViewModel @Inject constructor(
     }
 
     private fun ChatRoom.checkCustomTitle() {
-        if (isGroup && hasCustomTitle) {
+        if (!isPreview && isGroup && hasCustomTitle) {
             viewModelScope.launch {
-                runCatching { getCustomSubtitleListUseCase(chatId, peerHandlesList, isPreview) }
+                runCatching { getCustomSubtitleListUseCase(chatId, peerHandlesList) }
                     .onSuccess { customSubtitleList ->
                         _state.update { state -> state.copy(customSubtitleList = customSubtitleList) }
                     }
@@ -325,7 +414,7 @@ internal class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun getNotificationMute(chatId: Long) {
+    private fun getNotificationMute() {
         viewModelScope.launch {
             runCatching {
                 isChatNotificationMuteUseCase(chatId)
@@ -337,7 +426,7 @@ internal class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun monitorChatRoom(chatId: Long) {
+    private fun monitorChatRoom() {
         viewModelScope.launch {
             monitorChatRoomUpdates(chatId)
                 .collect { chat ->
@@ -399,6 +488,10 @@ internal class ChatViewModel @Inject constructor(
                                     }
                                 }
 
+                                ChatRoomChange.UpdatePreviewers -> {
+                                    _state.update { state -> state.copy(numPreviewers = numPreviewers) }
+                                }
+
                                 else -> {}
                             }
                         }
@@ -437,11 +530,11 @@ internal class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun monitorNotificationMute(chatId: Long) {
+    private fun monitorNotificationMute() {
         viewModelScope.launch {
             monitorUpdatePushNotificationSettingsUseCase().collect { changed ->
                 if (changed) {
-                    getNotificationMute(chatId)
+                    getNotificationMute()
                 }
             }
         }
@@ -475,16 +568,16 @@ internal class ChatViewModel @Inject constructor(
 
     private fun monitorParticipatingInACall() {
         viewModelScope.launch {
-            monitorParticipatingInACallUseCase()
+            monitorParticipatingInACallInOtherChatUseCase(chatId)
                 .catch { Timber.e(it) }
                 .collect {
                     Timber.d("Monitor call in progress returned chat id: $it")
-                    _state.update { state -> state.copy(currentCall = it) }
+                    _state.update { state -> state.copy(callInOtherChat = it) }
                 }
         }
     }
 
-    private fun monitorACallInThisChat(chatId: Long) {
+    private fun monitorACallInThisChat() {
         viewModelScope.launch {
             monitorCallInChatUseCase(chatId)
                 .catch { Timber.e(it) }
@@ -536,21 +629,19 @@ internal class ChatViewModel @Inject constructor(
     }
 
     private fun unmutePushNotification() {
-        chatId?.let { chatId ->
-            viewModelScope.launch {
-                runCatching {
-                    unmuteChatNotificationUseCase(chatId)
-                    _state.update {
-                        it.copy(
-                            infoToShowEvent = triggered(
-                                InfoToShow(
-                                    chatPushNotificationMuteOption = ChatPushNotificationMuteOption.Unmute
-                                )
+        viewModelScope.launch {
+            runCatching {
+                unmuteChatNotificationUseCase(chatId)
+                _state.update {
+                    it.copy(
+                        infoToShowEvent = triggered(
+                            InfoToShow(
+                                chatPushNotificationMuteOption = ChatPushNotificationMuteOption.Unmute
                             )
                         )
-                    }
-                }.onFailure { Timber.e(it) }
-            }
+                    )
+                }
+            }.onFailure { Timber.e(it) }
         }
     }
 
@@ -558,12 +649,10 @@ internal class ChatViewModel @Inject constructor(
      * Show the dialog of selecting chat mute options
      */
     fun showMutePushNotificationDialog() {
-        chatId?.let {
-            viewModelScope.launch {
-                val muteOptionList = getChatMuteOptionListUseCase(listOf(chatId))
-                _state.update {
-                    it.copy(mutePushNotificationDialogEvent = triggered(muteOptionList))
-                }
+        viewModelScope.launch {
+            val muteOptionList = getChatMuteOptionListUseCase(listOf(chatId))
+            _state.update {
+                it.copy(mutePushNotificationDialogEvent = triggered(muteOptionList))
             }
         }
     }
@@ -579,21 +668,19 @@ internal class ChatViewModel @Inject constructor(
      * @param option [ChatPushNotificationMuteOption]
      */
     fun mutePushNotification(option: ChatPushNotificationMuteOption) {
-        chatId?.let { chatId ->
-            viewModelScope.launch {
-                runCatching {
-                    muteChatNotificationForChatRoomsUseCase(listOf(chatId), option)
-                    _state.update {
-                        it.copy(
-                            infoToShowEvent = triggered(
-                                InfoToShow(
-                                    chatPushNotificationMuteOption = option
-                                )
+        viewModelScope.launch {
+            runCatching {
+                muteChatNotificationForChatRoomsUseCase(listOf(chatId), option)
+                _state.update {
+                    it.copy(
+                        infoToShowEvent = triggered(
+                            InfoToShow(
+                                chatPushNotificationMuteOption = option
                             )
                         )
-                    }
-                }.onFailure { Timber.e(it) }
-            }
+                    )
+                }
+            }.onFailure { Timber.e(it) }
         }
     }
 
@@ -618,24 +705,22 @@ internal class ChatViewModel @Inject constructor(
 
     fun clearChatHistory() {
         viewModelScope.launch {
-            chatId?.let {
-                runCatching { clearChatHistoryUseCase(it) }
-                    .onSuccess {
-                        _state.update { state ->
-                            state.copy(
-                                infoToShowEvent = triggered(InfoToShow(stringId = R.string.clear_history_success))
-                            )
-                        }
+            runCatching { clearChatHistoryUseCase(chatId) }
+                .onSuccess {
+                    _state.update { state ->
+                        state.copy(
+                            infoToShowEvent = triggered(InfoToShow(stringId = R.string.clear_history_success))
+                        )
                     }
-                    .onFailure {
-                        Timber.e("Error clearing chat history $it")
-                        _state.update { state ->
-                            state.copy(
-                                infoToShowEvent = triggered(InfoToShow(stringId = R.string.clear_history_error))
-                            )
-                        }
+                }
+                .onFailure {
+                    Timber.e("Error clearing chat history $it")
+                    _state.update { state ->
+                        state.copy(
+                            infoToShowEvent = triggered(InfoToShow(stringId = R.string.clear_history_error))
+                        )
                     }
-            }
+                }
         }
     }
 
@@ -644,68 +729,60 @@ internal class ChatViewModel @Inject constructor(
     }
 
     fun endCall() {
-        chatId?.let {
-            viewModelScope.launch {
-                runCatching {
-                    endCallUseCase(chatId)
-                    sendStatisticsMeetingsUseCase(EndCallForAll())
-                }.onFailure {
-                    Timber.e(it)
-                }
+        viewModelScope.launch {
+            runCatching {
+                endCallUseCase(chatId)
+                sendStatisticsMeetingsUseCase(EndCallForAll())
+            }.onFailure {
+                Timber.e(it)
             }
         }
     }
 
     fun archiveChat() {
         viewModelScope.launch {
-            chatId?.let {
-                runCatching { archiveChatUseCase(it, true) }
-                    .onFailure {
-                        Timber.e("Error archiving chat $it")
-                        _state.update { state ->
-                            state.copy(
-                                infoToShowEvent = triggered(
-                                    InfoToShow(
-                                        stringId = R.string.error_archive_chat,
-                                        args = state.title?.let { title -> listOf(title) }.orEmpty()
-                                    )
+            runCatching { archiveChatUseCase(chatId, true) }
+                .onFailure {
+                    Timber.e("Error archiving chat $it")
+                    _state.update { state ->
+                        state.copy(
+                            infoToShowEvent = triggered(
+                                InfoToShow(
+                                    stringId = R.string.error_archive_chat,
+                                    args = state.title?.let { title -> listOf(title) }.orEmpty()
                                 )
                             )
-                        }
+                        )
                     }
-            }
+                }
         }
     }
 
     fun unarchiveChat() {
         viewModelScope.launch {
-            chatId?.let {
-                runCatching { archiveChatUseCase(it, false) }
-                    .onFailure {
-                        Timber.e("Error unarchiving chat $it")
-                        _state.update { state ->
-                            state.copy(
-                                infoToShowEvent = triggered(
-                                    InfoToShow(
-                                        stringId = R.string.error_unarchive_chat,
-                                        args = state.title?.let { title -> listOf(title) }.orEmpty()
-                                    )
+            runCatching { archiveChatUseCase(chatId, false) }
+                .onFailure {
+                    Timber.e("Error unarchiving chat $it")
+                    _state.update { state ->
+                        state.copy(
+                            infoToShowEvent = triggered(
+                                InfoToShow(
+                                    stringId = R.string.error_unarchive_chat,
+                                    args = state.title?.let { title -> listOf(title) }.orEmpty()
                                 )
                             )
-                        }
+                        )
                     }
-            }
+                }
         }
     }
 
     fun startCall(video: Boolean) {
         viewModelScope.launch {
-            chatId?.let {
-                runCatching { startCallUseCase(it, video) }
-                    .onSuccess { call ->
-                        setCallReady(call)
-                    }.onFailure { Timber.e("Exception starting call $it") }
-            }
+            runCatching { startCallUseCase(chatId, video) }
+                .onSuccess { call ->
+                    setCallReady(call)
+                }.onFailure { Timber.e("Exception starting call $it") }
         }
     }
 
@@ -757,7 +834,6 @@ internal class ChatViewModel @Inject constructor(
         if (isHost) {
             viewModelScope.launch {
                 runCatching {
-                    val chatId = requireNotNull(chatId)
                     val schedId = state.value.scheduledMeeting?.schedId ?: -1L
                     startMeetingInWaitingRoomChatUseCase(
                         chatId = chatId,
@@ -779,7 +855,6 @@ internal class ChatViewModel @Inject constructor(
     private fun startMeeting() {
         viewModelScope.launch {
             runCatching {
-                val chatId = requireNotNull(chatId)
                 val scheduledMeeting = requireNotNull(state.value.scheduledMeeting)
                 startChatCallNoRingingUseCase(
                     chatId = chatId,
@@ -795,20 +870,18 @@ internal class ChatViewModel @Inject constructor(
 
     fun onAnswerCall() {
         viewModelScope.launch {
-            chatId?.let {
-                chatManagement.addJoiningCallChatId(chatId)
-                runCatching {
-                    answerChatCallUseCase(chatId = chatId, video = false, audio = true)
-                }.onSuccess { call ->
-                    call?.apply {
-                        chatManagement.removeJoiningCallChatId(chatId)
-                        rtcAudioManagerGateway.removeRTCAudioManagerRingIn()
-                        _state.update { state -> state.copy(isStartingCall = true) }
-                    }
-                }.onFailure {
-                    Timber.w("Exception answering call: $it")
+            chatManagement.addJoiningCallChatId(chatId)
+            runCatching {
+                answerChatCallUseCase(chatId = chatId, video = false, audio = true)
+            }.onSuccess { call ->
+                call?.apply {
                     chatManagement.removeJoiningCallChatId(chatId)
+                    rtcAudioManagerGateway.removeRTCAudioManagerRingIn()
+                    _state.update { state -> state.copy(isStartingCall = true) }
                 }
+            }.onFailure {
+                Timber.w("Exception answering call: $it")
+                chatManagement.removeJoiningCallChatId(chatId)
             }
         }
     }
@@ -837,10 +910,67 @@ internal class ChatViewModel @Inject constructor(
 
     fun sendMessage(message: String) {
         viewModelScope.launch {
-            chatId?.let {
-                val tempMessage = sendTextMessageUseCase(it, message)
+            val tempMessage = sendTextMessageUseCase(chatId, message)
+        }
+    }
+
+    fun onHoldAndAnswerCall() {
+        viewModelScope.launch {
+            state.value.callInOtherChat?.chatId?.let {
+                runCatching {
+                    holdChatCallUseCase(chatId = it, setOnHold = true)
+                }.onFailure { Timber.e(it) }
+                    .onSuccess { onAnswerCall() }
+            } ?: run {
+                // The call finished before setting on hold, just answer
+                onAnswerCall()
             }
         }
+    }
+
+    fun onEndAndAnswerCall() {
+        viewModelScope.launch {
+            state.value.callInOtherChat?.callId?.let {
+                runCatching {
+                    hangChatCallUseCase(it)
+                }.onFailure { Timber.e(it) }
+                    .onSuccess { onAnswerCall() }
+            } ?: run {
+                // The call finished before ending, just answer
+                onAnswerCall()
+            }
+        }
+    }
+
+    fun onUserUpdateHandled() {
+        _state.update { state -> state.copy(userUpdate = null) }
+    }
+
+    fun onSetPendingJoinLink() {
+        chatManagement.pendingJoinLink = savedStateHandle[EXTRA_LINK]
+    }
+
+    fun onJoinChat() {
+        viewModelScope.launch {
+            runCatching {
+                joinPublicChatUseCase(chatId)
+            }.onFailure {
+                Timber.e(it)
+            }
+        }
+    }
+
+    override fun onCleared() {
+        if (state.value.isPreviewMode) {
+            applicationScope.launch {
+                runCatching {
+                    closeChatPreviewUseCase(chatId)
+                }.onFailure {
+                    Timber.e(it)
+                }
+            }
+        }
+        super.onCleared()
     }
 
     companion object {

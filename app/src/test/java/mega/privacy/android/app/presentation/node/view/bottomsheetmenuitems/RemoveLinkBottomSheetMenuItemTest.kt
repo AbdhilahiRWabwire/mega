@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.node.view.bottomsheetmenuitems
 
+import kotlinx.coroutines.test.runTest
 import mega.privacy.android.domain.entity.node.ExportedData
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.shares.AccessPermission
@@ -22,18 +23,19 @@ class RemoveLinkBottomSheetMenuItemTest {
 
     @ParameterizedTest(name = "isNodeInRubbish {0} - accessPermission {1} - isInBackups {2} - node {3} - expected {4}")
     @MethodSource("provideTestParameters")
-    fun shouldDisplay(
+    fun `test that remove link bottom sheet menu item visibility is correct`(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedFileNode,
         expected: Boolean,
-    ) {
+    ) = runTest {
         val result = underTest.shouldDisplay(
             isNodeInRubbish,
             accessPermission,
             isInBackups,
-            node
+            node,
+            true
         )
         assertEquals(expected, result)
     }

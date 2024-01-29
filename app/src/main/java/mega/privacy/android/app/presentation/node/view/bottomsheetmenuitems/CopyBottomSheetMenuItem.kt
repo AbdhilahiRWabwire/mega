@@ -14,11 +14,12 @@ import javax.inject.Inject
 class CopyBottomSheetMenuItem @Inject constructor(
     override val menuAction: CopyMenuAction,
 ) : NodeBottomSheetMenuItem<MenuActionWithIcon> {
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedNode,
+        isConnected: Boolean,
     ) = node.isTakenDown.not() && isNodeInRubbish.not()
 
     override val groupId = 8

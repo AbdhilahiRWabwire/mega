@@ -51,9 +51,11 @@ import mega.privacy.android.app.presentation.meeting.view.ParticipantsFullListVi
 import mega.privacy.android.app.presentation.meeting.view.UsersInWaitingRoomDialog
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.REQUIRE_PASSCODE_INVALID
+import mega.privacy.android.app.utils.ScheduledMeetingDateUtil.getAppropriateStringForScheduledMeetingDate
 import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.ThemeMode
+import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
 import mega.privacy.android.domain.entity.meeting.ParticipantsSection
 import mega.privacy.android.domain.usecase.GetThemeMode
 import nz.mega.sdk.MegaChatApiJava.MEGACHAT_INVALID_HANDLE
@@ -91,6 +93,7 @@ class MeetingActivity : PasscodeActivity() {
         const val CALL_ACTION = "call_action"
         const val MEETING_BOTTOM_PANEL_EXPANDED = "meeting_bottom_panel_expanded"
         const val MEETING_CALL_RECORDING = "meeting_call_recording"
+        const val MEETING_IS_RINGIN_ALL = "meeting_is_ringing_all"
 
         fun getIntentOngoingCall(context: Context, chatId: Long): Intent {
             return Intent(context, MeetingActivity::class.java).apply {
@@ -321,6 +324,12 @@ class MeetingActivity : PasscodeActivity() {
                             meetingViewModel.onConsumeShouldWaitingRoomListBeShownEvent()
                             meetingViewModel.onConsumeShouldInCallListBeShownEvent()
                             meetingViewModel.onConsumeShouldNotInCallListBeShownEvent()
+                        },
+                        onRingParticipantClicked = { chatParticipant ->
+                            meetingViewModel.ringParticipant(chatParticipant.handle)
+                        },
+                        onRingAllParticipantsClicked = {
+                            meetingViewModel.ringAllAbsentsParticipants()
                         }
                     )
                 }
@@ -375,6 +384,7 @@ class MeetingActivity : PasscodeActivity() {
                 startActivity(getIntentOngoingCall(this@MeetingActivity, chatId))
             }
         }
+
     }
 
     private fun collectFlows() {
@@ -394,7 +404,12 @@ class MeetingActivity : PasscodeActivity() {
 
             if (state.shouldShareMeetingLink && state.meetingLink.isNotEmpty()) {
                 meetingViewModel.onConsumeShouldShareMeetingLinkEvent()
-                shareLink(state.meetingLink, state.title)
+                shareLink(
+                    state.meetingLink,
+                    state.title,
+                    state.chatScheduledMeeting,
+                    state.myFullName
+                )
             }
 
             if (state.chatIdToOpen != -1L) {
@@ -406,6 +421,10 @@ class MeetingActivity : PasscodeActivity() {
                         .putExtra(Constants.CHAT_ID, state.chatIdToOpen)
                 )
                 meetingViewModel.onConsumeNavigateToChatEvent()
+            }
+
+            if (state.isNecessaryToUpdateCall) {
+                meetingViewModel.getChatCall(false)
             }
 
             binding.recIndicator.visibility =
@@ -478,6 +497,10 @@ class MeetingActivity : PasscodeActivity() {
             meetingViewModel.setIsSessionOnRecording(isSessionOnRecording)
             if (isSessionOnRecording) {
                 meetingViewModel.setIsRecordingConsentAccepted(value = true)
+            }
+
+            if (it.getBooleanExtra(MEETING_IS_RINGIN_ALL, false)) {
+                meetingViewModel.meetingStartedRingingAll()
             }
 
             // Cancel current notification if needed
@@ -708,17 +731,52 @@ class MeetingActivity : PasscodeActivity() {
     /**
      * Method for sharing the link
      *
-     * @param link      link
-     * @param title     title
+     * @param meetingLink               meeting link
+     * @param meetingTitle              meeting title
+     * @param chatScheduledMeeting      [ChatScheduledMeeting]
+     * @param participantFullName       participant full name
      */
-    fun shareLink(link: String, title: String) {
-        Timber.d("Share the link")
-        startActivity(Intent().apply {
-            action = Intent.ACTION_SEND
-            putExtra(Intent.EXTRA_TEXT, link)
-            putExtra(Intent.EXTRA_SUBJECT, title)
-            type = "text/plain"
-        })
+    fun shareLink(
+        meetingLink: String,
+        meetingTitle: String,
+        chatScheduledMeeting: ChatScheduledMeeting?,
+        participantFullName: String,
+    ) {
+        val subject = getString(R.string.meetings_sharing_meeting_link_meeting_invite_subject)
+        val title = getString(R.string.meetings_sharing_meeting_link_title, participantFullName)
+        val meetingName =
+            getString(R.string.meetings_sharing_meeting_link_meeting_name, meetingTitle)
+        val meetingLink =
+            getString(R.string.meetings_sharing_meeting_link_meeting_link, meetingLink)
+
+        val body = StringBuilder()
+        body.append("\n")
+            .append(title)
+            .append("\n\n")
+            .append(meetingName)
+
+        chatScheduledMeeting?.let {
+            val meetingDateAndTime = getString(
+                R.string.meetings_sharing_meeting_link_meeting_date_and_time,
+                getAppropriateStringForScheduledMeetingDate(
+                    this@MeetingActivity,
+                    meetingViewModel.is24HourFormat,
+                    chatScheduledMeeting
+                )
+            )
+            body.append(meetingDateAndTime)
+        }
+
+        body.append("\n")
+            .append(meetingLink)
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = Constants.TYPE_TEXT_PLAIN
+            putExtra(Intent.EXTRA_SUBJECT, "\n${subject}")
+            putExtra(Intent.EXTRA_TEXT, body.toString())
+        }
+
+        startActivity(Intent.createChooser(intent, " "))
     }
 
     /**

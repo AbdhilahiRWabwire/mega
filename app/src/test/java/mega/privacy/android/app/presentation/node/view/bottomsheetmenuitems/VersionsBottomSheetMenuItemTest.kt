@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.node.view.bottomsheetmenuitems
 
+import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.presentation.node.model.menuaction.VersionsMenuAction
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedFolderNode
@@ -21,18 +22,19 @@ class VersionsBottomSheetMenuItemTest {
 
     @ParameterizedTest(name = "isNodeInRubbish {0} - accessPermission {1} - isInBackups {2} - node {3} - expected {4}")
     @MethodSource("provideTestParameters")
-    fun shouldDisplay(
+    fun `test that version bottom sheet menu item visibility is correct`(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedNode,
         expected: Boolean,
-    ) {
+    ) = runTest {
         val result = underTest.shouldDisplay(
             isNodeInRubbish,
             accessPermission,
             isInBackups,
-            node
+            node,
+            true
         )
         assertEquals(expected, result)
     }
@@ -65,6 +67,7 @@ class VersionsBottomSheetMenuItemTest {
             false,
             mock<TypedFileNode> {
                 on { isTakenDown } doReturn false
+                on { versionCount } doReturn 2
                 on { hasVersion } doReturn true
             },
             true

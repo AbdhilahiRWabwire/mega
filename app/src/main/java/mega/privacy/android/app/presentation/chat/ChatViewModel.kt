@@ -41,6 +41,7 @@ import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.chat.ChatCall
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
 import mega.privacy.android.domain.entity.chat.PendingMessage
+import mega.privacy.android.domain.entity.chat.RichLinkConfig
 import mega.privacy.android.domain.entity.chat.ScheduledMeetingChanges
 import mega.privacy.android.domain.entity.contacts.ContactLink
 import mega.privacy.android.domain.entity.meeting.ChatCallChanges
@@ -51,7 +52,7 @@ import mega.privacy.android.domain.entity.statistics.EndCallEmptyCall
 import mega.privacy.android.domain.entity.statistics.EndCallForAll
 import mega.privacy.android.domain.entity.statistics.StayOnCallEmptyCall
 import mega.privacy.android.domain.exception.MegaException
-import mega.privacy.android.domain.usecase.GetChatRoom
+import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.chat.BroadcastChatArchivedUseCase
@@ -60,6 +61,8 @@ import mega.privacy.android.domain.usecase.chat.LoadPendingMessagesUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatArchivedUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorJoinedSuccessfullyUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorLeaveChatUseCase
+import mega.privacy.android.domain.usecase.chat.link.MonitorRichLinkPreviewConfigUseCase
+import mega.privacy.android.domain.usecase.chat.link.SetRichLinkWarningCounterUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactLinkUseCase
 import mega.privacy.android.domain.usecase.contact.IsContactRequestSentUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
@@ -105,7 +108,7 @@ import javax.inject.Inject
  * @property isConnected                                    True if the app has some network connection, false otherwise.
  * @property monitorUpdatePushNotificationSettingsUseCase   monitors push notification settings update
  * @property deviceGateway                                  [DeviceGateway]
- * @property getChatRoom                                    [GetChatRoom]
+ * @property getChatRoomUseCase                                    [GetChatRoomUseCase]
  * @property getFeatureFlagValueUseCase                     [GetFeatureFlagValueUseCase]
  * @property monitorChatArchivedUseCase                     [MonitorChatArchivedUseCase]
  * @property broadcastChatArchivedUseCase                   [BroadcastChatArchivedUseCase]
@@ -134,7 +137,7 @@ class ChatViewModel @Inject constructor(
     private val startMeetingInWaitingRoomChatUseCase: StartMeetingInWaitingRoomChatUseCase,
     private val getScheduledMeetingByChat: GetScheduledMeetingByChat,
     private val getChatCallUseCase: GetChatCallUseCase,
-    private val getChatRoom: GetChatRoom,
+    private val getChatRoomUseCase: GetChatRoomUseCase,
     private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase,
     private val endCallUseCase: EndCallUseCase,
     private val sendStatisticsMeetingsUseCase: SendStatisticsMeetingsUseCase,
@@ -157,6 +160,8 @@ class ChatViewModel @Inject constructor(
     private val broadcastCallRecordingConsentEventUseCase: BroadcastCallRecordingConsentEventUseCase,
     private val monitorCallRecordingConsentEventUseCase: MonitorCallRecordingConsentEventUseCase,
     private val monitorCallEndedUseCase: MonitorCallEndedUseCase,
+    private val setRichLinkWarningCounterUseCase: SetRichLinkWarningCounterUseCase,
+    monitorRichLinkPreviewConfigUseCase: MonitorRichLinkPreviewConfigUseCase,
     monitorPausedTransfersUseCase: MonitorPausedTransfersUseCase,
 ) : ViewModel() {
 
@@ -191,6 +196,21 @@ class ChatViewModel @Inject constructor(
         monitorPausedTransfersUseCase()
             .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     }
+
+    private val richLinkConfig = monitorRichLinkPreviewConfigUseCase()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, RichLinkConfig())
+
+    /**
+     * Is show rich link warning
+     */
+    val isShowRichLinkWarning: Boolean
+        get() = richLinkConfig.value.isShowRichLinkWarning
+
+    /**
+     * Counter not now rich link warning
+     */
+    val counterNotNowRichLinkWarning: Int
+        get() = richLinkConfig.value.counterNotNowRichLinkWarning
 
     /**
      * Current value of areTransfersPausedFlow
@@ -436,7 +456,7 @@ class ChatViewModel @Inject constructor(
     private fun getChat() =
         viewModelScope.launch {
             runCatching {
-                getChatRoom(state.value.chatId)
+                getChatRoomUseCase(state.value.chatId)
             }.onFailure { exception ->
                 Timber.e("Chat room does not exist, finish $exception")
             }.onSuccess { chatRoom ->
@@ -603,7 +623,7 @@ class ChatViewModel @Inject constructor(
         }.onSuccess { call ->
             call?.let {
                 Timber.d("Call started")
-                openCurrentCall(call = it)
+                openCurrentCall(call = it, isRinging = true)
             }
         }.onFailure {
             Timber.e("Exception opening or starting call: $it")
@@ -669,9 +689,10 @@ class ChatViewModel @Inject constructor(
     /**
      * Open current call
      *
-     * @param call  [ChatCall]
+     * @param call      [ChatCall]
+     * @param isRinging True if is ringing or False otherwise
      */
-    private fun openCurrentCall(call: ChatCall) {
+    private fun openCurrentCall(call: ChatCall, isRinging: Boolean = false) {
         chatManagement.setSpeakerStatus(call.chatId, call.hasLocalVideo)
         chatManagement.setRequestSentCall(call.callId, call.isOutgoing)
         passcodeManagement.showPasscodeScreen = true
@@ -680,7 +701,8 @@ class ChatViewModel @Inject constructor(
             it.copy(
                 currentCallChatId = call.chatId,
                 currentCallAudioStatus = call.hasLocalAudio,
-                currentCallVideoStatus = call.hasLocalVideo
+                currentCallVideoStatus = call.hasLocalVideo,
+                isRingingAll = isRinging
             )
         }
     }
@@ -693,7 +715,8 @@ class ChatViewModel @Inject constructor(
             it.copy(
                 currentCallChatId = INVALID_HANDLE,
                 currentCallVideoStatus = false,
-                currentCallAudioStatus = false
+                currentCallAudioStatus = false,
+                isRingingAll = false
             )
         }
     }
@@ -1137,6 +1160,20 @@ class ChatViewModel @Inject constructor(
                 showRecordingConsentDialog = false,
                 isRecordingConsentAccepted = false
             )
+        }
+    }
+
+    /**
+     * Set rich link warning counter
+     *
+     */
+    fun setRichLinkWarningCounter(counter: Int) {
+        viewModelScope.launch {
+            runCatching {
+                setRichLinkWarningCounterUseCase(counter)
+            }.onFailure {
+                Timber.e(it)
+            }
         }
     }
 }

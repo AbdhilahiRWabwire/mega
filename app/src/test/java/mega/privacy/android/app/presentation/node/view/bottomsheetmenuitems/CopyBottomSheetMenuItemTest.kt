@@ -1,6 +1,7 @@
 package mega.privacy.android.app.presentation.node.view.bottomsheetmenuitems
 
 import com.google.common.truth.Truth
+import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.presentation.node.model.menuaction.CopyMenuAction
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import org.junit.jupiter.api.Test
@@ -18,22 +19,24 @@ class CopyBottomSheetMenuItemTest {
     }
 
     @Test
-    fun `test that shouldDisplay returns true when node is not taken down and not in rubbish`() {
-        val node = mock<TypedFileNode> {
-            on { isTakenDown } doReturn false
-        }
-        val result = underTest.shouldDisplay(
-            isNodeInRubbish = false,
-            accessPermission = null,
-            isInBackups = false,
-            node = node
-        )
+    fun `test that shouldDisplay returns true when node is not taken down and not in rubbish`() =
+        runTest {
+            val node = mock<TypedFileNode> {
+                on { isTakenDown } doReturn false
+            }
+            val result = underTest.shouldDisplay(
+                isNodeInRubbish = false,
+                accessPermission = null,
+                isInBackups = false,
+                node = node,
+                isConnected = true
+            )
 
-        Truth.assertThat(result).isTrue()
-    }
+            Truth.assertThat(result).isTrue()
+        }
 
     @Test
-    fun `test that shouldDisplay returns false when node is taken down`() {
+    fun `test that shouldDisplay returns false when node is taken down`() = runTest {
         val node = mock<TypedFileNode> {
             on { isTakenDown } doReturn true
         }
@@ -41,31 +44,34 @@ class CopyBottomSheetMenuItemTest {
             isNodeInRubbish = false,
             accessPermission = null,
             isInBackups = false,
-            node = node
+            node = node,
+            isConnected = true
         )
 
         Truth.assertThat(result).isFalse()
     }
 
     @Test
-    fun `test that shouldDisplay returns false when node is in rubbish`() {
+    fun `test that shouldDisplay returns false when node is in rubbish`() = runTest {
         val result = underTest.shouldDisplay(
             isNodeInRubbish = true,
             accessPermission = null,
             isInBackups = false,
-            node = node
+            node = node,
+            isConnected = true
         )
 
         Truth.assertThat(result).isFalse()
     }
 
     @Test
-    fun `test that shouldDisplay returns true when node is in backups`() {
+    fun `test that shouldDisplay returns true when node is in backups`() = runTest {
         val result = underTest.shouldDisplay(
             isNodeInRubbish = false,
             accessPermission = null,
             isInBackups = true,
-            node = node
+            node = node,
+            isConnected = true
         )
 
         Truth.assertThat(result).isTrue()

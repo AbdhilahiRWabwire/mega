@@ -11,12 +11,15 @@ import javax.inject.Inject
  */
 class RenameBottomSheetMenuItem @Inject constructor() :
     NodeBottomSheetMenuItem<MenuActionWithIcon> {
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedNode,
-    ) = true
+        isConnected: Boolean,
+    ) = isNodeInRubbish.not()
+            && accessPermission in listOf(AccessPermission.OWNER, AccessPermission.FULL)
+            && isInBackups.not()
 
     override val menuAction = RenameMenuAction(220)
     override val groupId = 8

@@ -14,11 +14,12 @@ import javax.inject.Inject
 class DownloadBottomSheetMenuItem @Inject constructor(
     override val menuAction: DownloadMenuAction,
 ) : NodeBottomSheetMenuItem<MenuActionWithIcon> {
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedNode,
+        isConnected: Boolean,
     ) = node.isTakenDown.not() && isNodeInRubbish.not()
 
     override val groupId = 6

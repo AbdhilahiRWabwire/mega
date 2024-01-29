@@ -14,12 +14,13 @@ import javax.inject.Inject
 class OpenLocationBottomSheetMenuItem @Inject constructor(
     override val menuAction: OpenLocationMenuAction,
 ) : NodeBottomSheetMenuItem<MenuActionWithIcon> {
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedNode,
-    ) = false
+        isConnected: Boolean,
+    ) = isInBackups.not()
 
     override val groupId = 5
 }

@@ -1475,4 +1475,20 @@ internal class MegaApiFacade @Inject constructor(
         bitSetToDecimal: Int,
         listener: OptionalMegaRequestListenerInterface,
     ) = megaApi.setCookieSettings(bitSetToDecimal, listener)
+
+    override fun shouldShowRichLinkWarning(listener: MegaRequestListenerInterface) =
+        megaApi.shouldShowRichLinkWarning(listener)
+
+    override fun isRichPreviewsEnabled(listener: MegaRequestListenerInterface) =
+        megaApi.isRichPreviewsEnabled(listener)
+
+    override fun setRichLinkWarningCounterValue(
+        value: Int,
+        listener: MegaRequestListenerInterface,
+    ) {
+        megaApi.setRichLinkWarningCounterValue(value, listener)
+    }
+
+    override fun enableRichPreviews(enable: Boolean, listener: MegaRequestListenerInterface) =
+        megaApi.enableRichPreviews(enable, listener)
 }

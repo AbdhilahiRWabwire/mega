@@ -1,11 +1,14 @@
 package mega.privacy.android.app.presentation.meeting.chat.model
 
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import androidx.paging.insertHeaderItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -43,29 +46,41 @@ class MessageListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    private val chatId = savedStateHandle.get<Long>(Constants.CHAT_ID)
-        ?: throw IllegalStateException("Chat must have a room id")
+    private val chatId = savedStateHandle.get<Long?>(Constants.CHAT_ID) ?: -1
 
-    private val pagedFlow = Pager(
-        PagingConfig(
-            pageSize = 32,
-            prefetchDistance = 10
-        )
-    ) {
-        ChatMessagePagingSource(
-            chatId = chatId,
-            loadMessages = loadMessagesUseCase,
-            fetchMessages = fetchMessagePageUseCase,
-            scope = viewModelScope,
-            messageFlow = monitorChatRoomMessagesUseCase(chatId).shareIn(
+    /**
+     * Latest message time
+     */
+    val latestMessageId = mutableLongStateOf(-1L)
+
+    /**
+     * Asked enable rich link
+     */
+    val askedEnableRichLink = mutableStateOf(false)
+
+    private val pagedFlow =
+        Pager(
+            PagingConfig(
+                pageSize = 32,
+                prefetchDistance = 10
+            )
+        ) {
+            ChatMessagePagingSource(
+                chatId = chatId,
+                loadMessages = loadMessagesUseCase,
+                fetchMessages = fetchMessagePageUseCase,
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
-            ).onEach {
-                Timber.d("Paging monitorChatRoomMessagesUseCase returned with message: $it")
-            },
-            pagedTypedMessageResultUiMapper = pagedTypedMessageResultUiMapper,
-        )
-    }.flow
+                messageFlow = monitorChatRoomMessagesUseCase(chatId).shareIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.Eagerly,
+                ).onEach {
+                    Timber.d("Paging monitorChatRoomMessagesUseCase returned with message: $it")
+                },
+                pagedTypedMessageResultUiMapper = pagedTypedMessageResultUiMapper,
+            )
+        }.flow
+            .cachedIn(viewModelScope)
+
 
     /**
      * Paged messages
@@ -77,4 +92,20 @@ class MessageListViewModel @Inject constructor(
             )
         }
 
+    /**
+     * Update latest message id
+     *
+     * @param id
+     */
+    fun updateLatestMessageId(id: Long) {
+        latestMessageId.longValue = id
+    }
+
+    /**
+     * On asked enable rich link
+     *
+     */
+    fun onAskedEnableRichLink() {
+        askedEnableRichLink.value = true
+    }
 }

@@ -15,8 +15,6 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
-import mega.privacy.android.app.domain.usecase.CreateShareKey
-import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.contactinfo.model.ContactInfoState
@@ -34,12 +32,15 @@ import mega.privacy.android.domain.entity.meeting.ChatCallChanges.Status
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import mega.privacy.android.domain.entity.meeting.ChatSessionChanges
 import mega.privacy.android.domain.entity.meeting.TermCodeType
+import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.NodeChanges
+import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.qualifier.IoDispatcher
-import mega.privacy.android.domain.usecase.GetChatRoom
+import mega.privacy.android.domain.usecase.GetChatRoomUseCase
+import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.MonitorContactUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.chat.CreateChatRoomUseCase
@@ -62,7 +63,9 @@ import mega.privacy.android.domain.usecase.meeting.OpenOrStartCallUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodesUseCase
+import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorUpdatePushNotificationSettingsUseCase
+import mega.privacy.android.domain.usecase.shares.CreateShareKeyUseCase
 import mega.privacy.android.domain.usecase.shares.GetInSharesUseCase
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
@@ -79,7 +82,7 @@ import javax.inject.Inject
  * @property chatManagement                     [ChatManagement]
  * @property monitorContactUpdates              [MonitorContactUpdates]
  * @property requestUserLastGreenUseCase        [RequestUserLastGreenUseCase]
- * @property getChatRoom                        [GetChatRoom]
+ * @property getChatRoomUseCase                        [GetChatRoomUseCase]
  * @property getUserOnlineStatusByHandleUseCase [GetUserOnlineStatusByHandleUseCase]
  * @property getChatRoomByUserUseCase           [GetChatRoomByUserUseCase]
  * @property getContactFromChatUseCase          [GetContactFromChatUseCase]
@@ -99,7 +102,7 @@ class ContactInfoViewModel @Inject constructor(
     private val monitorContactUpdates: MonitorContactUpdates,
     private val getUserOnlineStatusByHandleUseCase: GetUserOnlineStatusByHandleUseCase,
     private val requestUserLastGreenUseCase: RequestUserLastGreenUseCase,
-    private val getChatRoom: GetChatRoom,
+    private val getChatRoomUseCase: GetChatRoomUseCase,
     private val getChatRoomByUserUseCase: GetChatRoomByUserUseCase,
     private val getContactFromChatUseCase: GetContactFromChatUseCase,
     private val getContactFromEmailUseCase: GetContactFromEmailUseCase,
@@ -113,7 +116,8 @@ class ContactInfoViewModel @Inject constructor(
     private val startConversationUseCase: StartConversationUseCase,
     private val createChatRoomUseCase: CreateChatRoomUseCase,
     private val monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase,
-    private val createShareKey: CreateShareKey,
+    private val createShareKeyUseCase: CreateShareKeyUseCase,
+    private val getNodeByIdUseCase: GetNodeByIdUseCase,
     private val monitorChatConnectionStateUseCase: MonitorChatConnectionStateUseCase,
     private val monitorChatOnlineStatusUseCase: MonitorChatOnlineStatusUseCase,
     private val monitorChatPresenceLastGreenUpdatesUseCase: MonitorChatPresenceLastGreenUpdatesUseCase,
@@ -190,7 +194,7 @@ class ContactInfoViewModel @Inject constructor(
         monitorChatConnectionStateUseCase().collectLatest {
             val shouldInitiateCall = isChatConnectedToInitiateCallUseCase(
                 newState = it.chatConnectionStatus,
-                chatRoom = getChatRoom(it.chatId),
+                chatRoom = getChatRoomUseCase(it.chatId),
                 isWaitingForCall = MegaApplication.isWaitingForCall,
                 userWaitingForCall = MegaApplication.userWaitingForCall,
             )
@@ -423,7 +427,7 @@ class ContactInfoViewModel @Inject constructor(
             }
         } else {
             runCatching {
-                chatRoom = getChatRoom(chatHandle)
+                chatRoom = getChatRoomUseCase(chatHandle)
                 userInfo = getContactFromChatUseCase(chatHandle, isOnline())
             }
         }
@@ -623,7 +627,7 @@ class ContactInfoViewModel @Inject constructor(
             runCatching {
                 startConversationUseCase(isGroup = false, userHandles = listOf(it))
             }.onSuccess {
-                val chatRoom = getChatRoom(it)
+                val chatRoom = getChatRoomUseCase(it)
                 chatRoom?.let {
                     _state.update { state ->
                         state.copy(chatRoom = chatRoom, shouldNavigateToChat = true)
@@ -655,7 +659,7 @@ class ContactInfoViewModel @Inject constructor(
             runCatching {
                 createChatRoomUseCase(isGroup = false, userHandles = listOf(it))
             }.onSuccess {
-                val chatRoom = getChatRoom(it)
+                val chatRoom = getChatRoomUseCase(it)
                 _state.update { state ->
                     state.copy(chatRoom = chatRoom)
                 }
@@ -673,7 +677,9 @@ class ContactInfoViewModel @Inject constructor(
      * @param node
      */
     suspend fun initShareKey(node: MegaNode) = runCatching {
-        createShareKey(node)
+        val typedNode = getNodeByIdUseCase(NodeId(node.handle))
+        require(typedNode is FolderNode) { "Cannot create a share key for a non-folder node" }
+        createShareKeyUseCase(typedNode)
     }.onFailure {
         Timber.e(it)
     }

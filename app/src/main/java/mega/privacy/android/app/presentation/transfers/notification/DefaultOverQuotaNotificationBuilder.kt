@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.transfers.notification
 
+import mega.privacy.android.icon.pack.R as iconPackR
 import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
@@ -10,8 +11,6 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import mega.privacy.android.app.R
 import mega.privacy.android.app.data.facade.AccountInfoFacade
-import mega.privacy.android.app.domain.usecase.GetBandWidthOverQuotaDelayUseCase
-import mega.privacy.android.app.fcm.CreateTransferNotificationChannelsUseCase
 import mega.privacy.android.app.presentation.notifications.DownloadNotificationIntentService
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.TimeUtils
@@ -19,8 +18,8 @@ import mega.privacy.android.data.mapper.transfer.OverQuotaNotificationBuilder
 import mega.privacy.android.domain.usecase.AreCredentialsNullUseCase
 import mega.privacy.android.domain.usecase.IsUserLoggedIn
 import mega.privacy.android.domain.usecase.login.ClearEphemeralCredentialsUseCase
+import mega.privacy.android.domain.usecase.quota.GetBandwidthOverQuotaDelayUseCase
 import nz.mega.sdk.MegaAccountDetails
-import mega.privacy.android.icon.pack.R as iconPackR
 import javax.inject.Inject
 
 /**
@@ -30,7 +29,7 @@ class DefaultOverQuotaNotificationBuilder @Inject constructor(
     @ApplicationContext private val context: Context,
     private val isUserLoggedIn: IsUserLoggedIn,
     private val clearEphemeralCredentialsUseCase: ClearEphemeralCredentialsUseCase,
-    private val getBandWidthOverQuotaDelayUseCase: GetBandWidthOverQuotaDelayUseCase,
+    private val getBandwidthOverQuotaDelayUseCase: GetBandwidthOverQuotaDelayUseCase,
     private val areCredentialsNullUseCase: AreCredentialsNullUseCase,
     private val accountInfoFacade: AccountInfoFacade,
 ) : OverQuotaNotificationBuilder {
@@ -80,7 +79,7 @@ class DefaultOverQuotaNotificationBuilder @Inject constructor(
             R.id.content_text,
             context.getString(
                 R.string.current_text_depleted_transfer_overquota,
-                TimeUtils.getHumanizedTime(getBandWidthOverQuotaDelayUseCase())
+                TimeUtils.getHumanizedTime(getBandwidthOverQuotaDelayUseCase())
             )
         )
         val dismissButtonText =
@@ -94,7 +93,7 @@ class DefaultOverQuotaNotificationBuilder @Inject constructor(
 
         val builder = NotificationCompat.Builder(
             context,
-            CreateTransferNotificationChannelsUseCase.NOTIFICATION_CHANNEL_DOWNLOAD_ID
+            Constants.NOTIFICATION_CHANNEL_DOWNLOAD_ID
         ).apply {
             setSmallIcon(iconPackR.drawable.ic_stat_notify)
             color = ContextCompat.getColor(context, R.color.red_600_red_300)

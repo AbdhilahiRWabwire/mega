@@ -7,6 +7,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -18,8 +19,9 @@ import mega.privacy.android.app.presentation.chat.ContactInvitation
 import mega.privacy.android.app.usecase.call.EndCallUseCase
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.data.gateway.DeviceGateway
+import mega.privacy.android.domain.entity.chat.RichLinkConfig
 import mega.privacy.android.domain.entity.contacts.ContactLink
-import mega.privacy.android.domain.usecase.GetChatRoom
+import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.chat.BroadcastChatArchivedUseCase
@@ -28,6 +30,8 @@ import mega.privacy.android.domain.usecase.chat.LoadPendingMessagesUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatArchivedUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorJoinedSuccessfullyUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorLeaveChatUseCase
+import mega.privacy.android.domain.usecase.chat.link.MonitorRichLinkPreviewConfigUseCase
+import mega.privacy.android.domain.usecase.chat.link.SetRichLinkWarningCounterUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactLinkUseCase
 import mega.privacy.android.domain.usecase.contact.IsContactRequestSentUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
@@ -55,6 +59,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.verify
@@ -80,7 +85,7 @@ class ChatViewModelTest {
     private val startCallUseCase: StartCallUseCase = mock()
     private val getScheduledMeetingByChat: GetScheduledMeetingByChat = mock()
     private val getChatCallUseCase: GetChatCallUseCase = mock()
-    private val getChatRoom: GetChatRoom = mock()
+    private val getChatRoomUseCase: GetChatRoomUseCase = mock()
     private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase = mock()
     private val endCallUseCase: EndCallUseCase = mock()
     private val sendStatisticsMeetingsUseCase: SendStatisticsMeetingsUseCase = mock()
@@ -108,6 +113,10 @@ class ChatViewModelTest {
     private val monitorCallRecordingConsentEventUseCase =
         mock<MonitorCallRecordingConsentEventUseCase>()
     private val monitorCallEndedUseCase = mock<MonitorCallEndedUseCase>()
+    private val monitorRichLinkPreviewConfigUseCase = mock<MonitorRichLinkPreviewConfigUseCase> {
+        on { invoke() } doReturn emptyFlow()
+    }
+    private val setRichLinkWarningCounterUseCase = mock<SetRichLinkWarningCounterUseCase>()
 
     @BeforeAll
     fun setUp() {
@@ -134,7 +143,7 @@ class ChatViewModelTest {
             startCallUseCase,
             getScheduledMeetingByChat,
             getChatCallUseCase,
-            getChatRoom,
+            getChatRoomUseCase,
             monitorChatCallUpdatesUseCase,
             endCallUseCase,
             sendStatisticsMeetingsUseCase,
@@ -146,6 +155,7 @@ class ChatViewModelTest {
             getFeatureFlagValueUseCase,
             hangChatCallUseCase,
             broadcastCallRecordingConsentEventUseCase,
+            setRichLinkWarningCounterUseCase
         )
         wheneverBlocking { monitorPausedTransfersUseCase() }.thenReturn(emptyFlow())
         wheneverBlocking { monitorUpdatePushNotificationSettingsUseCase() }.thenReturn(flowOf(true))
@@ -158,6 +168,7 @@ class ChatViewModelTest {
         wheneverBlocking { monitorChatSessionUpdatesUseCase() }.thenReturn(emptyFlow())
         wheneverBlocking { monitorCallRecordingConsentEventUseCase() }.thenReturn(emptyFlow())
         wheneverBlocking { monitorCallEndedUseCase() }.thenReturn(emptyFlow())
+        wheneverBlocking { monitorRichLinkPreviewConfigUseCase() }.thenReturn(emptyFlow())
         initTestClass()
     }
 
@@ -175,7 +186,7 @@ class ChatViewModelTest {
             startChatCallNoRingingUseCase = startChatCallNoRingingUseCase,
             getScheduledMeetingByChat = getScheduledMeetingByChat,
             getChatCallUseCase = getChatCallUseCase,
-            getChatRoom = getChatRoom,
+            getChatRoomUseCase = getChatRoomUseCase,
             monitorChatCallUpdatesUseCase = monitorChatCallUpdatesUseCase,
             endCallUseCase = endCallUseCase,
             sendStatisticsMeetingsUseCase = sendStatisticsMeetingsUseCase,
@@ -199,6 +210,8 @@ class ChatViewModelTest {
             broadcastCallRecordingConsentEventUseCase = broadcastCallRecordingConsentEventUseCase,
             monitorCallRecordingConsentEventUseCase = monitorCallRecordingConsentEventUseCase,
             monitorCallEndedUseCase = monitorCallEndedUseCase,
+            monitorRichLinkPreviewConfigUseCase = monitorRichLinkPreviewConfigUseCase,
+            setRichLinkWarningCounterUseCase = setRichLinkWarningCounterUseCase
         )
     }
 
@@ -346,5 +359,32 @@ class ChatViewModelTest {
                 Truth.assertThat(awaitItem()).isFalse()
                 this.cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `test that rich link config updated when monitorRichLinkPreviewConfigUseCase emit value`() =
+        runTest {
+            val config = RichLinkConfig(
+                isShowRichLinkWarning = true,
+                counterNotNowRichLinkWarning = 1,
+                isRichLinkEnabled = true
+            )
+            whenever(monitorRichLinkPreviewConfigUseCase()).thenReturn(
+                flowOf(config)
+            )
+            initTestClass()
+            advanceUntilIdle()
+            Truth.assertThat(underTest.isShowRichLinkWarning).isEqualTo(config.isRichLinkEnabled)
+            Truth.assertThat(underTest.counterNotNowRichLinkWarning)
+                .isEqualTo(config.counterNotNowRichLinkWarning)
+        }
+
+    @Test
+    fun `test that set rich link counter invoke correct use case`() =
+        runTest {
+            val counter = 1
+            underTest.setRichLinkWarningCounter(counter)
+            advanceUntilIdle()
+            verify(setRichLinkWarningCounterUseCase).invoke(counter)
         }
 }

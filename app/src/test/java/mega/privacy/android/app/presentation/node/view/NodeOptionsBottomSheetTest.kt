@@ -5,14 +5,13 @@ import androidx.compose.material.ModalBottomSheetValue
 import androidx.compose.material.rememberModalBottomSheetState
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.navigation.NavHostController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.flow.MutableStateFlow
-import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.node.NodeBottomSheetActionHandler
 import mega.privacy.android.app.presentation.node.NodeOptionsBottomSheetViewModel
 import mega.privacy.android.app.presentation.node.model.NodeBottomSheetState
 import mega.privacy.android.domain.entity.node.TypedFolderNode
-import mega.privacy.android.domain.entity.node.TypedNode
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,22 +29,20 @@ class NodeOptionsBottomSheetTest {
     private val sampleNode = mock<TypedFolderNode> {
         on { name }.thenReturn("name")
     }
-    private val sampleNodeUiItem = mock<NodeUIItem<TypedNode>> {
-        on { name }.thenReturn("name")
-        on { node }.thenReturn(sampleNode)
-    }
+    private val navHostController = mock<NavHostController>()
 
     @Test
     fun `test that a single group has no dividers`() {
         viewModel.stub {
             on { state }.thenReturn(MutableStateFlow(
                 NodeBottomSheetState(
-                    "",
-                    listOf(
+                    name = "",
+                    isOnline = true,
+                    actions = listOf(
                         BottomSheetMenuItem(
                             group = 1,
                             orderInGroup = 1,
-                            control = { _, _ -> }
+                            control = { _, _, _ -> }
                         )
                     ),
                 ),
@@ -56,10 +53,12 @@ class NodeOptionsBottomSheetTest {
         composeTestRule.setContent {
             NodeOptionsBottomSheet(
                 modalSheetState = rememberModalBottomSheetState(initialValue = ModalBottomSheetValue.Expanded),
-                node = sampleNodeUiItem,
+                node = sampleNode,
+                handler = nodeBottomSheetActionHandler,
                 viewModel = viewModel,
-                handler = nodeBottomSheetActionHandler
-            ) {}
+                navHostController = navHostController,
+                onDismiss = {}
+            )
         }
 
         composeTestRule.onNodeWithTag(DIVIDER_TAG + 0).assertDoesNotExist()
@@ -71,16 +70,17 @@ class NodeOptionsBottomSheetTest {
             on { state }.thenReturn(MutableStateFlow(
                 NodeBottomSheetState(
                     name = "",
+                    isOnline = true,
                     actions = listOf(
                         BottomSheetMenuItem(
                             group = 1,
                             orderInGroup = 1,
-                            control = { _, _ -> }
+                            control = { _, _, _ -> }
                         ),
                         BottomSheetMenuItem(
                             group = 2,
                             orderInGroup = 1,
-                            control = { _, _ -> }
+                            control = { _, _, _ -> }
                         )
                     ),
                 ),
@@ -91,10 +91,12 @@ class NodeOptionsBottomSheetTest {
         composeTestRule.setContent {
             NodeOptionsBottomSheet(
                 modalSheetState = rememberModalBottomSheetState(initialValue = ModalBottomSheetValue.Expanded),
-                node = sampleNodeUiItem,
-                viewModel = viewModel,
+                node = sampleNode,
                 handler = nodeBottomSheetActionHandler,
-            ) {}
+                viewModel = viewModel,
+                navHostController = navHostController,
+                onDismiss = {},
+            )
         }
 
         composeTestRule.onNodeWithTag(DIVIDER_TAG + 0).assertExists()

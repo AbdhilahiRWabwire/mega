@@ -7,7 +7,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +17,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.domain.usecase.CheckNameCollision
-import mega.privacy.android.app.domain.usecase.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.app.domain.usecase.offline.SetNodeAvailableOffline
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.namecollision.data.NameCollisionType
@@ -31,7 +29,6 @@ import mega.privacy.android.app.usecase.exception.MegaNodeException
 import mega.privacy.android.domain.entity.imageviewer.ImageResult
 import mega.privacy.android.domain.entity.node.ImageNode
 import mega.privacy.android.domain.entity.node.NodeId
-import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.usecase.favourites.AddFavouritesUseCase
 import mega.privacy.android.domain.usecase.favourites.IsAvailableOfflineUseCase
 import mega.privacy.android.domain.usecase.favourites.RemoveFavouritesUseCase
@@ -41,6 +38,7 @@ import mega.privacy.android.domain.usecase.node.AddImageTypeUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodeUseCase
 import mega.privacy.android.domain.usecase.node.DisableExportNodesUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodeUseCase
+import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.offline.RemoveOfflineNodeUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
 import timber.log.Timber
@@ -67,7 +65,6 @@ class ImagePreviewViewModel @Inject constructor(
     private val disableExportNodesUseCase: DisableExportNodesUseCase,
     private val removePublicLinkResultMapper: RemovePublicLinkResultMapper,
     private val checkUri: CheckFileUriUseCase,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
     private val imagePreviewFetcherSource: ImagePreviewFetcherSource
         get() = savedStateHandle[IMAGE_NODE_FETCHER_SOURCE] ?: ImagePreviewFetcherSource.TIMELINE
@@ -157,6 +154,10 @@ class ImagePreviewViewModel @Inject constructor(
         return targetImageNodeIndex to imageNodes.getOrNull(targetImageNodeIndex)
     }
 
+    suspend fun isInfoMenuVisible(imageNode: ImageNode): Boolean {
+        return menu?.isInfoMenuVisible(imageNode) ?: false
+    }
+
     suspend fun isSlideshowMenuVisible(imageNode: ImageNode): Boolean {
         return menu?.isSlideshowMenuVisible(imageNode) ?: false && _state.value.imageNodes.size > 1
     }
@@ -183,6 +184,10 @@ class ImagePreviewViewModel @Inject constructor(
 
     suspend fun isSaveToDeviceMenuVisible(imageNode: ImageNode): Boolean {
         return menu?.isSaveToDeviceMenuVisible(imageNode) ?: false
+    }
+
+    suspend fun isImportMenuVisible(imageNode: ImageNode): Boolean {
+        return menu?.isImportMenuVisible(imageNode) ?: false
     }
 
     suspend fun isGetLinkMenuVisible(imageNode: ImageNode): Boolean {
@@ -217,12 +222,20 @@ class ImagePreviewViewModel @Inject constructor(
         return menu?.isRemoveMenuVisible(imageNode) ?: false
     }
 
+    suspend fun isAvailableOfflineMenuVisible(imageNode: ImageNode): Boolean {
+        return menu?.isAvailableOfflineMenuVisible(imageNode) ?: false
+    }
+
     suspend fun isRemoveOfflineMenuVisible(imageNode: ImageNode): Boolean {
         return menu?.isRemoveOfflineMenuVisible(imageNode) ?: false
     }
 
     suspend fun isMoreMenuVisible(imageNode: ImageNode): Boolean {
         return menu?.isMoreMenuVisible(imageNode) ?: false
+    }
+
+    suspend fun isMoveToRubbishBinMenuVisible(imageNode: ImageNode): Boolean {
+        return menu?.isMoveToRubbishBinMenuVisible(imageNode) ?: false
     }
 
     suspend fun monitorImageResult(imageNode: ImageNode): Flow<ImageResult> {
@@ -381,6 +394,43 @@ class ImagePreviewViewModel @Inject constructor(
         }
     }
 
+    fun importNode(context: Context, importHandle: Long, toHandle: Long) {
+        viewModelScope.launch {
+            checkForNameCollision(
+                context = context,
+                nodeHandle = importHandle,
+                newParentHandle = toHandle,
+                type = NameCollisionType.COPY,
+                completeAction = {
+                    handleImportNodeNameCollision(
+                        importHandle,
+                        toHandle,
+                        context
+                    )
+                }
+            )
+        }
+    }
+
+    private suspend fun handleImportNodeNameCollision(
+        importHandle: Long,
+        toHandle: Long,
+        context: Context,
+    ) {
+        runCatching {
+            copyNodeUseCase(
+                nodeToCopy = NodeId(importHandle),
+                newNodeParent = NodeId(toHandle),
+                newNodeName = null,
+            )
+        }.onSuccess {
+            setResultMessage(context.getString(R.string.context_correctly_copied))
+        }.onFailure { throwable ->
+            Timber.e("Error not copied $throwable")
+            setCopyMoveException(throwable)
+        }
+    }
+
     /**
      * Checks if there is a name collision before proceeding with the action.
      *
@@ -483,5 +533,6 @@ class ImagePreviewViewModel @Inject constructor(
         const val IMAGE_PREVIEW_MENU_OPTIONS = "image_preview_menu_options"
         const val FETCHER_PARAMS = "fetcher_params"
         const val PARAMS_CURRENT_IMAGE_NODE_ID_VALUE = "currentImageNodeIdValue"
+        const val IMAGE_PREVIEW_IS_FOREIGN = "image_preview_is_foreign"
     }
 }

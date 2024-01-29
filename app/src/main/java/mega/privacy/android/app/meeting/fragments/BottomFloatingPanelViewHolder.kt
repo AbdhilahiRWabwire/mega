@@ -492,6 +492,12 @@ class BottomFloatingPanelViewHolder(
                             waitingRoomManagementViewModel.denyUsersClick(
                                 it
                             )
+                        },
+                        onRingParticipantClicked = { chatParticipant ->
+                            meetingViewModel.ringParticipant(chatParticipant.handle)
+                        },
+                        onRingAllParticipantsClicked = {
+                            meetingViewModel.ringAllAbsentsParticipants()
                         })
                 }
             }

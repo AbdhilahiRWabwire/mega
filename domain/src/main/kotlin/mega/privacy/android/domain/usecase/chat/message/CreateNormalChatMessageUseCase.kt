@@ -1,41 +1,55 @@
 package mega.privacy.android.domain.usecase.chat.message
 
-import mega.privacy.android.domain.entity.chat.ChatMessage
+import mega.privacy.android.domain.entity.RegexPatternType
+import mega.privacy.android.domain.entity.chat.message.request.CreateTypedMessageRequest
 import mega.privacy.android.domain.entity.chat.messages.normal.ContactLinkMessage
 import mega.privacy.android.domain.entity.chat.messages.normal.NormalMessage
 import mega.privacy.android.domain.entity.chat.messages.normal.TextMessage
-import mega.privacy.android.domain.usecase.link.ExtractContactLinkUseCase
+import mega.privacy.android.domain.usecase.chat.GetLinkTypesUseCase
 import javax.inject.Inject
 
 /**
  * Create normal chat message use case.
  */
 class CreateNormalChatMessageUseCase @Inject constructor(
-    private val extractContactLinkUseCase: ExtractContactLinkUseCase,
+    private val getLinkTypesUseCase: GetLinkTypesUseCase,
 ) : CreateTypedMessageUseCase {
     //To be implemented the different type of normal messages. Check [NormalMessage].
-    override fun invoke(message: ChatMessage, isMine: Boolean): NormalMessage {
-        val contactLink = extractContactLinkUseCase(message.content.orEmpty())
-        return when {
-            !contactLink.isNullOrBlank() ->
-                ContactLinkMessage(
+    override fun invoke(request: CreateTypedMessageRequest): NormalMessage {
+        with(request) {
+            val allLinks = getLinkTypesUseCase(message.content.orEmpty())
+            val contactLink = allLinks.find { it.type == RegexPatternType.CONTACT_LINK }?.link
+            return when {
+                !contactLink.isNullOrBlank() ->
+                    ContactLinkMessage(
+                        msgId = message.msgId,
+                        time = message.timestamp,
+                        isMine = isMine,
+                        userHandle = message.userHandle,
+                        contactLink = contactLink,
+                        content = message.content.orEmpty(),
+                        tempId = message.tempId
+                    )
+
+                else -> TextMessage(
                     msgId = message.msgId,
                     time = message.timestamp,
                     isMine = isMine,
                     userHandle = message.userHandle,
-                    contactLink = contactLink,
-                    content = message.content.orEmpty(),
-                    tempId = message.tempId
+                    tempId = message.tempId,
+                    content = message.content,
+                    hasOtherLink = allLinks.any { it.type !in supportedTypes }
                 )
-
-            else -> TextMessage(
-                msgId = message.msgId,
-                time = message.timestamp,
-                isMine = isMine,
-                userHandle = message.userHandle,
-                tempId = message.tempId,
-                content = message.content
-            )
+            }
         }
+    }
+
+    companion object {
+        private val supportedTypes = setOf(
+            RegexPatternType.CONTACT_LINK,
+            RegexPatternType.FILE_LINK,
+            RegexPatternType.FOLDER_LINK,
+            RegexPatternType.CHAT_LINK,
+        )
     }
 }

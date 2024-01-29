@@ -14,16 +14,20 @@ import javax.inject.Inject
 class MoveBottomSheetMenuItem @Inject constructor(
     override val menuAction: MoveMenuAction,
 ) : NodeBottomSheetMenuItem<MenuActionWithIcon> {
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedNode,
+        isConnected: Boolean,
     ) = isInBackups.not()
             && isNodeInRubbish.not()
             && node.isIncomingShare.not()
             && node.isTakenDown.not()
-
+            && accessPermission in listOf(
+        AccessPermission.OWNER,
+        AccessPermission.FULL,
+    )
 
     override val groupId: Int
         get() = 8

@@ -5,12 +5,11 @@ import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.work.ForegroundInfo
 import androidx.work.ListenableWorker
+import androidx.work.SystemClock
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.impl.WorkDatabase
-import androidx.work.impl.foreground.ForegroundProcessor
 import androidx.work.impl.utils.WorkForegroundUpdater
 import androidx.work.impl.utils.WorkProgressUpdater
 import androidx.work.impl.utils.taskexecutor.WorkManagerTaskExecutor
@@ -33,7 +32,7 @@ import mega.privacy.android.domain.entity.pushes.PushMessage
 import mega.privacy.android.domain.exception.ChatNotInitializedErrorStatus
 import mega.privacy.android.domain.exception.EmptyFolderException
 import mega.privacy.android.domain.exception.SessionNotRetrievedException
-import mega.privacy.android.domain.usecase.GetChatRoom
+import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.RetryPendingConnectionsUseCase
 import mega.privacy.android.domain.usecase.chat.IsChatNotifiableUseCase
 import mega.privacy.android.domain.usecase.login.BackgroundFastLoginUseCase
@@ -74,7 +73,7 @@ class PushMessageWorkerTest {
     private val callsPreferencesGateway = mock<CallsPreferencesGateway>()
     private val notificationManager = mock<NotificationManagerCompat>()
     private val isChatNotifiableUseCase = mock<IsChatNotifiableUseCase>()
-    private val getChatRoom = mock<GetChatRoom>()
+    private val getChatRoomUseCase = mock<GetChatRoomUseCase>()
     private val getChatMessageNotificationDataUseCase =
         mock<GetChatMessageNotificationDataUseCase>()
     private val fileDurationMapper = mock<FileDurationMapper>()
@@ -88,7 +87,8 @@ class PushMessageWorkerTest {
         context = ApplicationProvider.getApplicationContext()
         executor = Executors.newSingleThreadExecutor()
         workExecutor = WorkManagerTaskExecutor(executor)
-        workDatabase = WorkDatabase.create(context, workExecutor.serialTaskExecutor, true)
+        workDatabase =
+            WorkDatabase.create(context, workExecutor.serialTaskExecutor, SystemClock(), true)
 
         underTest = PushMessageWorker(
             context = context,
@@ -103,16 +103,9 @@ class PushMessageWorkerTest {
                 workExecutor,
                 WorkerFactory.getDefaultWorkerFactory(),
                 WorkProgressUpdater(workDatabase, workExecutor),
-                WorkForegroundUpdater(workDatabase, object : ForegroundProcessor {
-                    override fun startForeground(
-                        workSpecId: String,
-                        foregroundInfo: ForegroundInfo,
-                    ) {
-                    }
-
-                    override fun stopForeground(workSpecId: String) {}
-                    override fun isEnqueuedInForeground(workSpecId: String): Boolean = true
-                }, workExecutor)
+                WorkForegroundUpdater(workDatabase,
+                    { _, _ -> }, workExecutor
+                )
             ),
             backgroundFastLoginUseCase = backgroundFastLoginUseCase,
             pushReceivedUseCase = pushReceivedUseCase,
@@ -123,7 +116,7 @@ class PushMessageWorkerTest {
             callsPreferencesGateway = callsPreferencesGateway,
             notificationManager = notificationManager,
             isChatNotifiableUseCase = isChatNotifiableUseCase,
-            getChatRoom = getChatRoom,
+            getChatRoomUseCase = getChatRoomUseCase,
             fileDurationMapper = fileDurationMapper,
             getChatMessageNotificationDataUseCase = getChatMessageNotificationDataUseCase,
             ioDispatcher = ioDispatcher,
@@ -222,13 +215,13 @@ class PushMessageWorkerTest {
             )
             whenever(pushMessageMapper(any())).thenReturn(pushMessage)
             whenever(notificationManager.areNotificationsEnabled()).thenReturn(true)
-            whenever(getChatRoom.invoke(any())).thenReturn(mock())
+            whenever(getChatRoomUseCase.invoke(any())).thenReturn(mock())
             whenever(callsPreferencesGateway.getCallsMeetingRemindersPreference())
                 .thenReturn(flowOf(CallsMeetingReminders.Enabled))
 
             val result = underTest.doWork()
 
-            verify(getChatRoom).invoke(-1L)
+            verify(getChatRoomUseCase).invoke(-1L)
             verify(scheduledMeetingPushMessageNotification).show(context, pushMessage)
             assertThat(result).isEqualTo(ListenableWorker.Result.success())
         }

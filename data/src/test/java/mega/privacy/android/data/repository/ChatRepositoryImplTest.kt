@@ -55,6 +55,7 @@ import nz.mega.sdk.MegaChatMessage
 import nz.mega.sdk.MegaChatRequest
 import nz.mega.sdk.MegaChatRoom
 import nz.mega.sdk.MegaError
+import nz.mega.sdk.MegaRequest
 import nz.mega.sdk.MegaUser
 import org.junit.After
 import org.junit.Before
@@ -852,5 +853,90 @@ class ChatRepositoryImplTest {
         whenever(megaChatApiGateway.sendMessage(chatId, message)).thenReturn(mock())
         underTest.sendMessage(chatId, message)
         verify(megaChatApiGateway).sendMessage(chatId, message)
+    }
+
+    @Test
+    fun `test that set last handle invokes correctly`() = runTest {
+        val chatId = 123L
+        underTest.setLastPublicHandle(chatId)
+        verify(localStorageGateway).setLastPublicHandle(chatId)
+        verify(localStorageGateway).setLastPublicHandleTimeStamp()
+    }
+
+    @Test
+    fun `test that auto join public chat invokes correctly`() = runTest {
+        val chatId = 123L
+        whenever(megaChatApiGateway.autojoinPublicChat(any(), any())).thenAnswer {
+            ((it.arguments[1]) as OptionalMegaChatRequestListenerInterface).onRequestFinish(
+                mock(),
+                mock(),
+                megaChatErrorSuccess,
+            )
+        }
+        underTest.autojoinPublicChat(chatId)
+        verify(megaChatApiGateway).autojoinPublicChat(eq(chatId), any())
+    }
+
+    @Test
+    fun `test that autorejoin public chat invokes correctly`() = runTest {
+        val chatId = 123L
+        val chatPublicHandle = 456L
+        whenever(megaChatApiGateway.autorejoinPublicChat(any(), any(), any())).thenAnswer {
+            ((it.arguments[2]) as OptionalMegaChatRequestListenerInterface).onRequestFinish(
+                mock(),
+                mock(),
+                megaChatErrorSuccess,
+            )
+        }
+        underTest.autorejoinPublicChat(chatId, chatPublicHandle)
+        verify(megaChatApiGateway).autorejoinPublicChat(eq(chatId), eq(chatPublicHandle), any())
+    }
+
+    @Test
+    fun `test that should show rich warning returns correctly`() = runTest {
+        val shouldShow = true
+        val request = mock<MegaRequest> {
+            on { flag }.thenReturn(shouldShow)
+            on { number }.thenReturn(1L)
+        }
+        whenever(megaApiGateway.shouldShowRichLinkWarning(any())).thenAnswer {
+            ((it.arguments[0]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                mock(),
+                request,
+                megaErrorSuccess,
+            )
+        }
+        assertThat(underTest.shouldShowRichLinkWarning()).isEqualTo(shouldShow)
+        underTest.monitorRichLinkPreviewConfig().test {
+            val item = awaitItem()
+            assertThat(item.isShowRichLinkWarning).isEqualTo(shouldShow)
+            assertThat(item.counterNotNowRichLinkWarning).isEqualTo(1)
+        }
+    }
+
+    @Test
+    fun `test that is rich link enabled returns correctly`() = runTest {
+        val isEnabled = true
+        val request = mock<MegaRequest> {
+            on { flag }.thenReturn(isEnabled)
+        }
+        whenever(megaApiGateway.isRichPreviewsEnabled(any())).thenAnswer {
+            ((it.arguments[0]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                mock(),
+                request,
+                megaErrorSuccess,
+            )
+        }
+        assertThat(underTest.isRichPreviewsEnabled()).isEqualTo(isEnabled)
+        underTest.monitorRichLinkPreviewConfig().test {
+            val item = awaitItem()
+            assertThat(item.isRichLinkEnabled).isEqualTo(isEnabled)
+        }
+    }
+
+    @Test
+    fun `test that close chat preview invokes correctly`() = runTest {
+        underTest.closeChatPreview(chatId)
+        verify(megaChatApiGateway).closeChatPreview(chatId)
     }
 }

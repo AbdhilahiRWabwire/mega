@@ -14,12 +14,15 @@ import javax.inject.Inject
 class ShareBottomSheetMenuItem @Inject constructor(
     override val menuAction: ShareMenuAction,
 ) : NodeBottomSheetMenuItem<MenuActionWithIcon> {
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedNode,
-    ) = true
+        isConnected: Boolean,
+    ) = node.isTakenDown.not()
+            && accessPermission == AccessPermission.OWNER
+            && isNodeInRubbish.not()
 
     override val groupId = 7
 }

@@ -17,13 +17,16 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.kotlin.addTo
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -35,6 +38,7 @@ import mega.privacy.android.app.constants.EventConstants
 import mega.privacy.android.app.constants.EventConstants.EVENT_AUDIO_OUTPUT_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_CHAT_TITLE_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_MEETING_CREATED
+import mega.privacy.android.app.extensions.updateItemAt
 
 import mega.privacy.android.app.globalmanagement.MegaChatRequestHandler
 import mega.privacy.android.app.listeners.InviteToChatRoomListener
@@ -59,22 +63,27 @@ import mega.privacy.android.app.utils.ChatUtil.getTitleChat
 import mega.privacy.android.app.utils.Constants.AUDIO_MANAGER_CREATING_JOINING_MEETING
 import mega.privacy.android.app.utils.Constants.REQUEST_ADD_PARTICIPANTS
 import mega.privacy.android.app.utils.VideoCaptureUtils
+import mega.privacy.android.data.gateway.DeviceGateway
 import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.chat.ChatCall
 import mega.privacy.android.domain.entity.chat.ChatParticipant
 import mega.privacy.android.domain.entity.chat.ChatRoomChange
+import mega.privacy.android.domain.entity.chat.ScheduledMeetingChanges
 import mega.privacy.android.domain.entity.contacts.InviteContactRequest
 import mega.privacy.android.domain.entity.meeting.CallType
 import mega.privacy.android.domain.entity.meeting.ChatCallChanges
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import mega.privacy.android.domain.entity.meeting.ChatSessionChanges
+import mega.privacy.android.domain.entity.meeting.MeetingParticipantNotInCallStatus
 import mega.privacy.android.domain.entity.meeting.ParticipantsSection
+import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.usecase.CheckChatLinkUseCase
 import mega.privacy.android.domain.usecase.CreateChatLink
 import mega.privacy.android.domain.usecase.GetChatParticipants
-import mega.privacy.android.domain.usecase.GetChatRoom
+import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
+import mega.privacy.android.domain.usecase.MonitorUserUpdates
 import mega.privacy.android.domain.usecase.QueryChatLink
 import mega.privacy.android.domain.usecase.RemoveFromChat
 import mega.privacy.android.domain.usecase.SetOpenInvite
@@ -82,6 +91,7 @@ import mega.privacy.android.domain.usecase.UpdateChatPermissions
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.chat.IsEphemeralPlusPlusUseCase
 import mega.privacy.android.domain.usecase.chat.StartConversationUseCase
+import mega.privacy.android.domain.usecase.contact.GetMyFullNameUseCase
 import mega.privacy.android.domain.usecase.contact.InviteContactUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.login.LogoutUseCase
@@ -90,10 +100,13 @@ import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.BroadcastCallEndedUseCase
 import mega.privacy.android.domain.usecase.meeting.BroadcastCallRecordingConsentEventUseCase
 import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
+import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorCallEndedUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
+import mega.privacy.android.domain.usecase.meeting.MonitorScheduledMeetingUpdatesUseCase
+import mega.privacy.android.domain.usecase.meeting.RingIndividualInACallUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import nz.mega.sdk.MegaApiJava
@@ -104,6 +117,7 @@ import nz.mega.sdk.MegaChatRoom
 import nz.mega.sdk.MegaError
 import nz.mega.sdk.MegaRequest
 import timber.log.Timber
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 /**
@@ -122,7 +136,7 @@ import javax.inject.Inject
  * @property logoutUseCase                                  [LogoutUseCase]
  * @property monitorFinishActivityUseCase                   [MonitorFinishActivityUseCase]
  * @property monitorChatCallUpdatesUseCase                  [MonitorChatCallUpdatesUseCase]
- * @property getChatRoomByChatIdUseCase                     [GetChatRoom]
+ * @property getChatRoomUseCase                             [GetChatRoomUseCase]
  * @property getChatCallUseCase                             [GetChatCallUseCase]
  * @property getFeatureFlagValue                            [GetFeatureFlagValueUseCase]
  * @property setOpenInvite                                  [SetOpenInvite]
@@ -141,6 +155,11 @@ import javax.inject.Inject
  * @property broadcastCallRecordingConsentEventUseCase      [BroadcastCallRecordingConsentEventUseCase]
  * @property monitorCallEndedUseCase                        [MonitorCallEndedUseCase]
  * @property broadcastCallEndedUseCase                      [BroadcastCallEndedUseCase]
+ * @property monitorScheduledMeetingUpdatesUseCase          [MonitorScheduledMeetingUpdatesUseCase]
+ * @property getMyFullNameUseCase                           [GetMyFullNameUseCase]
+ * @property deviceGateway                                  [DeviceGateway]
+ * @property monitorUserUpdates                             [MonitorUserUpdates]
+ * @property ringIndividualInACallUseCase                   [RingIndividualInACallUseCase]
  * @property state                                          Current view state as [MeetingState]
  */
 @HiltViewModel
@@ -159,7 +178,7 @@ class MeetingActivityViewModel @Inject constructor(
     private val monitorFinishActivityUseCase: MonitorFinishActivityUseCase,
     private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase,
     private val monitorChatSessionUpdatesUseCase: MonitorChatSessionUpdatesUseCase,
-    private val getChatRoomByChatIdUseCase: GetChatRoom,
+    private val getChatRoomUseCase: GetChatRoomUseCase,
     private val monitorChatRoomUpdates: MonitorChatRoomUpdates,
     private val queryChatLink: QueryChatLink,
     private val getFeatureFlagValue: GetFeatureFlagValueUseCase,
@@ -177,6 +196,12 @@ class MeetingActivityViewModel @Inject constructor(
     private val broadcastCallRecordingConsentEventUseCase: BroadcastCallRecordingConsentEventUseCase,
     private val monitorCallEndedUseCase: MonitorCallEndedUseCase,
     private val broadcastCallEndedUseCase: BroadcastCallEndedUseCase,
+    private val getScheduledMeetingByChat: GetScheduledMeetingByChat,
+    private val getMyFullNameUseCase: GetMyFullNameUseCase,
+    private val monitorUserUpdates: MonitorUserUpdates,
+    private val monitorScheduledMeetingUpdatesUseCase: MonitorScheduledMeetingUpdatesUseCase,
+    private val deviceGateway: DeviceGateway,
+    private val ringIndividualInACallUseCase: RingIndividualInACallUseCase,
     @ApplicationContext private val context: Context,
 ) : BaseRxViewModel(), OpenVideoDeviceListener.OnOpenVideoDeviceCallback,
     DisableAudioVideoCallListener.OnDisableAudioVideoCallback {
@@ -190,6 +215,11 @@ class MeetingActivityViewModel @Inject constructor(
      * @return True if it is only or False otherwise.
      */
     fun isOnline(): Boolean = isConnectedToInternetUseCase()
+
+    /**
+     * Check if it's 24 hour format
+     */
+    val is24HourFormat by lazy { deviceGateway.is24HourFormat() }
 
     /**
      * Get latest [StorageState] from [MonitorStorageStateEventUseCase] use case.
@@ -301,6 +331,7 @@ class MeetingActivityViewModel @Inject constructor(
 
         startMonitoringChatCallUpdates()
         startMonitorChatSessionUpdates()
+        getMyFullName()
 
         getCallUseCase.getCallEnded()
             .subscribeOn(Schedulers.io())
@@ -329,6 +360,19 @@ class MeetingActivityViewModel @Inject constructor(
         showDefaultAvatar().invokeOnCompletion {
             loadAvatar(true)
         }
+
+        viewModelScope.launch {
+            flow {
+                emitAll(monitorUserUpdates()
+                    .catch { Timber.w("Exception monitoring user updates: $it") }
+                    .filter { it == UserChanges.Firstname || it == UserChanges.Lastname || it == UserChanges.Email })
+            }.collect {
+                when (it) {
+                    UserChanges.Firstname, UserChanges.Lastname -> getMyFullName()
+                    else -> Unit
+                }
+            }
+        }
     }
 
     /**
@@ -353,16 +397,35 @@ class MeetingActivityViewModel @Inject constructor(
     fun amIAGuest(): Boolean = meetingActivityRepository.amIAGuest()
 
     /**
+     * Get my full name
+     */
+    private fun getMyFullName() = viewModelScope.launch {
+        runCatching {
+            getMyFullNameUseCase()
+        }.onSuccess {
+            it?.apply {
+                _state.update { state ->
+                    state.copy(
+                        myFullName = this,
+                    )
+                }
+            }
+        }.onFailure { exception ->
+            Timber.e(exception)
+        }
+    }
+
+    /**
      * Get chat room
      */
     private fun getChatRoom() = viewModelScope.launch {
         runCatching {
-            getChatRoomByChatIdUseCase(_state.value.chatId)
+            getChatRoomUseCase(_state.value.chatId)
         }.onSuccess { chatRoom ->
             chatRoom?.apply {
                 _state.update {
                     it.copy(
-                        hasHostPermission = ownPrivilege == ChatRoomPermission.Moderator,
+                        myPermission = ownPrivilege,
                         isOpenInvite = isOpenInvite || ownPrivilege == ChatRoomPermission.Moderator,
                         enabledAllowNonHostAddParticipantsOption = isOpenInvite,
                         hasWaitingRoom = isWaitingRoom,
@@ -386,18 +449,187 @@ class MeetingActivityViewModel @Inject constructor(
     /**
      * Get chat call
      */
-    private fun getChatCall() = viewModelScope.launch {
-        runCatching {
-            getChatCallUseCase(_state.value.chatId)
-        }.onSuccess { call ->
-            call?.let {
-                checkIfPresenting(it)
-                checkEphemeralAccountAndWaitingRoom(it)
+    fun getChatCall(checkEphemeralAccount: Boolean = true) {
+        _state.update {
+            it.copy(
+                isNecessaryToUpdateCall = false
+            )
+        }
+        viewModelScope.launch {
+            runCatching {
+                getChatCallUseCase(_state.value.chatId)
+            }.onSuccess { call ->
+                call?.let {
+                    checkIfPresenting(it)
+                    if (checkEphemeralAccount) {
+                        checkEphemeralAccountAndWaitingRoom(it)
+                    }
+                }
+            }.onFailure { exception ->
+                Timber.e(exception)
             }
-        }.onFailure { exception ->
-            Timber.e(exception)
         }
     }
+
+    private fun getScheduledMeeting() =
+        viewModelScope.launch {
+            runCatching {
+                getScheduledMeetingByChat(state.value.chatId)
+            }.onFailure {
+                Timber.d("Scheduled meeting does not exist")
+                _state.update {
+                    it.copy(
+                        chatScheduledMeeting = null
+                    )
+                }
+            }.onSuccess { scheduledMeetingList ->
+                scheduledMeetingList?.let { list ->
+                    list.forEach { scheduledMeetReceived ->
+                        if (scheduledMeetReceived.parentSchedId == -1L) {
+                            _state.update {
+                                it.copy(
+                                    chatScheduledMeeting = scheduledMeetReceived
+                                )
+                            }
+                            return@forEach
+                        }
+                    }
+                }
+            }
+        }
+
+
+    /**
+     * Get scheduled meeting updates
+     */
+    private fun startMonitorScheduledMeetingUpdates() =
+        viewModelScope.launch {
+            monitorScheduledMeetingUpdatesUseCase().collectLatest { scheduledMeetReceived ->
+                if (scheduledMeetReceived.chatId != state.value.chatId) {
+                    return@collectLatest
+                }
+
+                if (scheduledMeetReceived.parentSchedId != -1L) {
+                    return@collectLatest
+                }
+
+                scheduledMeetReceived.changes?.let { changes ->
+                    changes.forEach {
+                        Timber.d("Monitor scheduled meeting updated, changes $changes")
+                        if (_state.value.chatScheduledMeeting == null) {
+                            _state.update { state ->
+                                state.copy(
+                                    chatScheduledMeeting = scheduledMeetReceived
+                                )
+                            }
+                            return@forEach
+                        }
+
+                        when (it) {
+                            ScheduledMeetingChanges.NewScheduledMeeting ->
+                                _state.update { state ->
+                                    state.copy(
+                                        chatScheduledMeeting = scheduledMeetReceived
+                                    )
+                                }
+
+                            ScheduledMeetingChanges.Title ->
+                                _state.update { state ->
+                                    state.copy(
+                                        chatScheduledMeeting = state.chatScheduledMeeting?.copy(
+                                            title = scheduledMeetReceived.title
+                                        )
+                                    )
+                                }
+
+                            ScheduledMeetingChanges.Description ->
+                                _state.update { state ->
+                                    state.copy(
+                                        chatScheduledMeeting = state.chatScheduledMeeting?.copy(
+                                            title = scheduledMeetReceived.description
+                                        )
+                                    )
+                                }
+
+                            ScheduledMeetingChanges.StartDate -> _state.update { state ->
+                                state.copy(
+                                    chatScheduledMeeting = state.chatScheduledMeeting?.copy(
+                                        startDateTime = scheduledMeetReceived.startDateTime,
+                                    )
+                                )
+                            }
+
+                            ScheduledMeetingChanges.EndDate,
+                            -> _state.update { state ->
+                                state.copy(
+                                    chatScheduledMeeting = state.chatScheduledMeeting?.copy(
+                                        startDateTime = scheduledMeetReceived.endDateTime,
+                                    )
+                                )
+                            }
+
+                            ScheduledMeetingChanges.ParentScheduledMeetingId -> _state.update { state ->
+                                state.copy(
+                                    chatScheduledMeeting = state.chatScheduledMeeting?.copy(
+                                        parentSchedId = scheduledMeetReceived.parentSchedId,
+                                    )
+                                )
+                            }
+
+                            ScheduledMeetingChanges.TimeZone -> _state.update { state ->
+                                state.copy(
+                                    chatScheduledMeeting = state.chatScheduledMeeting?.copy(
+                                        timezone = scheduledMeetReceived.timezone,
+                                    )
+                                )
+                            }
+
+                            ScheduledMeetingChanges.Attributes -> _state.update { state ->
+                                state.copy(
+                                    chatScheduledMeeting = state.chatScheduledMeeting?.copy(
+                                        attributes = scheduledMeetReceived.attributes,
+                                    )
+                                )
+                            }
+
+                            ScheduledMeetingChanges.OverrideDateTime -> _state.update { state ->
+                                state.copy(
+                                    chatScheduledMeeting = state.chatScheduledMeeting?.copy(
+                                        overrides = scheduledMeetReceived.overrides,
+                                    )
+                                )
+                            }
+
+                            ScheduledMeetingChanges.ScheduledMeetingsFlags -> _state.update { state ->
+                                state.copy(
+                                    chatScheduledMeeting = state.chatScheduledMeeting?.copy(
+                                        flags = scheduledMeetReceived.flags,
+                                    )
+                                )
+                            }
+
+                            ScheduledMeetingChanges.RepetitionRules -> _state.update { state ->
+                                state.copy(
+                                    chatScheduledMeeting = state.chatScheduledMeeting?.copy(
+                                        rules = scheduledMeetReceived.rules,
+                                    )
+                                )
+                            }
+
+                            ScheduledMeetingChanges.CancelledFlag -> _state.update { state ->
+                                state.copy(
+                                    chatScheduledMeeting = state.chatScheduledMeeting?.copy(
+                                        isCanceled = scheduledMeetReceived.isCanceled,
+                                    )
+                                )
+                            }
+
+                            else -> {}
+                        }
+                    }
+                }
+            }
+        }
 
     /**
      * Check if some participant is presenting
@@ -524,11 +756,7 @@ class MeetingActivityViewModel @Inject constructor(
                                 if (session.hasScreenShare) {
                                     _state.update { it.copy(isParticipantSharingScreen = true) }
                                 } else {
-                                    getChatCallUseCase(_state.value.chatId)?.let {
-                                        it?.let {
-                                            checkIfPresenting(it)
-                                        }
-                                    }
+                                    _state.update { it.copy(isNecessaryToUpdateCall = true) }
                                 }
                             }
                             if (contains(ChatSessionChanges.SessionOnRecording)) {
@@ -646,8 +874,10 @@ class MeetingActivityViewModel @Inject constructor(
             }
             getChatRoom()
             getChatCall()
+            getScheduledMeeting()
             startMonitoringChatParticipantsUpdated(chatId = chatId)
             startMonitorChatRoomUpdates(chatId = chatId)
+            startMonitorScheduledMeetingUpdates()
         }
     }
 
@@ -1060,17 +1290,17 @@ class MeetingActivityViewModel @Inject constructor(
             monitorChatRoomUpdates(chatId).collectLatest { chat ->
                 _state.update { state ->
                     with(state) {
-                        val hostValue = if (chat.hasChanged(ChatRoomChange.OwnPrivilege)) {
+                        val permissionValue = if (chat.hasChanged(ChatRoomChange.OwnPrivilege)) {
                             Timber.d("Changes in own privilege")
-                            chat.ownPrivilege == ChatRoomPermission.Moderator
+                            chat.ownPrivilege
                         } else {
-                            hasHostPermission
+                            myPermission
                         }
 
                         val openInviteValue = if (chat.hasChanged(ChatRoomChange.OpenInvite)) {
                             Timber.d("Changes in OpenInvite")
 
-                            chat.isOpenInvite || hostValue
+                            chat.isOpenInvite || myPermission == ChatRoomPermission.Moderator
                         } else {
                             isOpenInvite
                         }
@@ -1090,7 +1320,7 @@ class MeetingActivityViewModel @Inject constructor(
                         }
 
                         copy(
-                            hasHostPermission = hostValue,
+                            myPermission = permissionValue,
                             isOpenInvite = openInviteValue,
                             enabledAllowNonHostAddParticipantsOption = chat.isOpenInvite,
                             hasWaitingRoom = waitingRoomValue,
@@ -1154,7 +1384,7 @@ class MeetingActivityViewModel @Inject constructor(
                     runCatching {
                         queryChatLink(id)
                     }.onFailure {
-                        if (state.value.hasHostPermission && shouldShareMeetingLink) {
+                        if (state.value.hasHostPermission() && shouldShareMeetingLink) {
                             createChatLink()
                         }
                     }.onSuccess { request ->
@@ -1262,7 +1492,7 @@ class MeetingActivityViewModel @Inject constructor(
             }.onSuccess { isAllowAddParticipantsEnabled ->
                 _state.update { state ->
                     state.copy(
-                        isOpenInvite = isAllowAddParticipantsEnabled || state.hasHostPermission,
+                        isOpenInvite = isAllowAddParticipantsEnabled || state.hasHostPermission(),
                         enabledAllowNonHostAddParticipantsOption = isAllowAddParticipantsEnabled,
                     )
                 }
@@ -1361,7 +1591,7 @@ class MeetingActivityViewModel @Inject constructor(
     private fun checkParticipantLists() {
         val chatParticipantsInWaitingRoom = mutableListOf<ChatParticipant>()
         val chatParticipantsInCall = mutableListOf<ChatParticipant>()
-        val chatParticipantsNotInCall = mutableListOf<ChatParticipant>()
+        val chatParticipantsNotInCall = state.value.chatParticipantsNotInCall.toMutableList()
 
         state.value.chatParticipantList.forEach { chatParticipant ->
             var participantAdded = false
@@ -1375,10 +1605,12 @@ class MeetingActivityViewModel @Inject constructor(
                     chatParticipantsInCall.add(chatParticipantMapper(participant, chatParticipant))
                 }
 
-            if (!participantAdded) {
-                chatParticipantsNotInCall.add(chatParticipant)
-
-            }
+            chatParticipantsNotInCall.find { it.handle == chatParticipant.handle }
+                ?.let { participant ->
+                    if (participantAdded) {
+                        chatParticipantsNotInCall.remove(participant)
+                    }
+                } ?: run { if (!participantAdded) chatParticipantsNotInCall.add(chatParticipant) }
         }
 
         _state.update { state ->
@@ -1559,6 +1791,21 @@ class MeetingActivityViewModel @Inject constructor(
     }
 
     /**
+     * Method tod be called when the meeting has started ringing all absent participants
+     */
+    fun meetingStartedRingingAll() = viewModelScope.launch {
+        _state.update { state -> state.copy(isRingingAll = true) }
+        delay(TimeUnit.SECONDS.toMillis(DEFAULT_RING_TIMEOUT_SECONDS))
+        state.value.chatParticipantsNotInCall.forEach { chatParticipant ->
+            updateNotInCallParticipantStatus(
+                userId = chatParticipant.handle,
+                status = MeetingParticipantNotInCallStatus.NoResponse
+            )
+        }
+        _state.update { state -> state.copy(isRingingAll = false) }
+    }
+
+    /**
      * Hang chat call
      */
     fun hangChatCall() = viewModelScope.launch {
@@ -1602,7 +1849,67 @@ class MeetingActivityViewModel @Inject constructor(
             broadcastCallRecordingConsentEventUseCase(isRecordingConsentAccepted)
         }
 
+    /**
+     * Ring a participant in chatroom with an ongoing call that they didn't pick up
+     *
+     * @param userId   The chat participant ID
+     */
+    fun ringParticipant(userId: Long) = viewModelScope.launch {
+        runCatching {
+            ringIndividualInACallUseCase(chatId = state.value.chatId, userId = userId)
+        }.onSuccess {
+            updateNotInCallParticipantStatus(userId, MeetingParticipantNotInCallStatus.Calling)
+            delay(TimeUnit.SECONDS.toMillis(DEFAULT_RING_TIMEOUT_SECONDS))
+            updateNotInCallParticipantStatus(userId, MeetingParticipantNotInCallStatus.NoResponse)
+        }.onFailure { exception ->
+            Timber.e(exception)
+        }
+    }
+
+    /**
+     * Ring all absents participants
+     */
+    fun ringAllAbsentsParticipants() = viewModelScope.launch {
+        _state.update {
+            it.copy(isRingingAll = true)
+        }
+        state.value.chatParticipantsNotInCall.forEach { chatParticipant ->
+            if (chatParticipant.callStatus != MeetingParticipantNotInCallStatus.Calling) {
+                ringParticipant(chatParticipant.handle)
+            }
+        }
+        delay(TimeUnit.SECONDS.toMillis(DEFAULT_RING_TIMEOUT_SECONDS))
+        _state.update {
+            it.copy(isRingingAll = false)
+        }
+    }
+
+    /**
+     * Update the status of a not in call participant
+     *
+     * @param userId    The not in call participant ID
+     * @param status    New [MeetingParticipantNotInCallStatus]
+     */
+    private fun updateNotInCallParticipantStatus(
+        userId: Long,
+        status: MeetingParticipantNotInCallStatus,
+    ) {
+        val index = state.value.chatParticipantsNotInCall.indexOfFirst { it.handle == userId }
+        if (index != INVALID_POSITION) {
+            val updatedParticipant =
+                state.value.chatParticipantsNotInCall[index].copy(callStatus = status)
+            val updatedList = state.value.chatParticipantsNotInCall.updateItemAt(
+                index, updatedParticipant
+            )
+            _state.update {
+                it.copy(chatParticipantsNotInCall = updatedList)
+            }
+        }
+    }
+
     companion object {
         private const val INVALID_CHAT_HANDLE = -1L
+        private const val INVALID_POSITION = -1
+        private const val DEFAULT_RING_TIMEOUT_SECONDS = 40L
     }
 }

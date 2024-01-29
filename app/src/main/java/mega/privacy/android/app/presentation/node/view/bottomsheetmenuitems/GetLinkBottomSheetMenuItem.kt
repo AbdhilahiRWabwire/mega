@@ -14,11 +14,12 @@ import javax.inject.Inject
 class GetLinkBottomSheetMenuItem @Inject constructor(
     override val menuAction: GetLinkMenuAction,
 ) : NodeBottomSheetMenuItem<MenuActionWithIcon> {
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedNode,
+        isConnected: Boolean,
     ) = node.isTakenDown.not()
             && node.exportedData?.publicLink.isNullOrEmpty()
             && isNodeInRubbish.not()

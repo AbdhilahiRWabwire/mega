@@ -25,7 +25,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.components.PushNotificationSettingManagement
-import mega.privacy.android.app.fcm.CreateNotificationChannelsUseCase
 import mega.privacy.android.app.fetcher.MegaAvatarFetcher
 import mega.privacy.android.app.fetcher.MegaAvatarKeyer
 import mega.privacy.android.app.fetcher.MegaThumbnailFetcher
@@ -135,9 +134,6 @@ class MegaApplication : MultiDexApplication(), DefaultLifecycleObserver,
     lateinit var applicationScope: CoroutineScope
 
     @Inject
-    internal lateinit var createNotificationChannelsUseCase: CreateNotificationChannelsUseCase
-
-    @Inject
     lateinit var themeModeState: ThemeModeState
 
     @Inject
@@ -245,8 +241,6 @@ class MegaApplication : MultiDexApplication(), DefaultLifecycleObserver,
         ContextUtils.initialize(applicationContext)
 
         if (BuildConfig.ACTIVATE_GREETER) greeter.get().initialize()
-
-        applicationScope.launch { createNotificationChannelsUseCase() }
     }
 
     override fun newImageLoader(): ImageLoader {
@@ -522,23 +516,6 @@ class MegaApplication : MultiDexApplication(), DefaultLifecycleObserver,
          */
         @JvmStatic
         var isClosedChat = true
-
-        /**
-         * Is show rich link warning
-         */
-        @JvmStatic
-        var isShowRichLinkWarning = false
-
-        /**
-         * Counter not now rich link warning
-         */
-        @JvmStatic
-        var counterNotNowRichLinkWarning = -1
-
-        /**
-         * Is enabled rich links
-         */
-        var isEnabledRichLinks = false
 
         /**
          * Is enabled geo location

@@ -645,7 +645,8 @@ class PhotosFragment : Fragment() {
                     context = requireContext(),
                     imageSource = ImagePreviewFetcherSource.TIMELINE,
                     menuOptionsSource = ImagePreviewMenuSource.TIMELINE,
-                    anchorImageNodeId = NodeId(photo.id)
+                    anchorImageNodeId = NodeId(photo.id),
+                    showScreenLabel = false,
                 )
                 startActivity(intent)
             } else {
@@ -765,7 +766,6 @@ class PhotosFragment : Fragment() {
         val intent = AlbumScreenWrapperActivity.createAlbumGetLinkScreen(
             context = requireContext(),
             albumId = albumId,
-            isNewLink = true,
         )
         startActivity(intent)
         activity?.overridePendingTransition(0, 0)

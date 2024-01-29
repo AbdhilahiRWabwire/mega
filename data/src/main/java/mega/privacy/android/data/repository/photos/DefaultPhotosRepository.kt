@@ -110,8 +110,6 @@ internal class DefaultPhotosRepository @Inject constructor(
 
     private val imageNodesDispatcher: CoroutineDispatcher = ioDispatcher.limitedParallelism(1)
 
-    private var monitorOfflineNodesJob: Job? = null
-
     private var populateNodesJob: Job? = null
 
     private var monitorNodeUpdatesJob: Job? = null
@@ -120,6 +118,10 @@ internal class DefaultPhotosRepository @Inject constructor(
         ::checkMediaNode,
         ::checkCloudDriveNode,
     )
+
+    init {
+        monitorOfflineNodes()
+    }
 
     override fun monitorPhotos(): Flow<List<Photo>> {
         initialize()
@@ -130,15 +132,12 @@ internal class DefaultPhotosRepository @Inject constructor(
         if (isInitialized) return
         isInitialized = true
 
-        monitorOfflineNodes()
-
         populateNodes()
         monitorNodeUpdates()
     }
 
     private fun monitorOfflineNodes() {
-        monitorOfflineNodesJob?.cancel()
-        monitorOfflineNodesJob = nodeRepository.monitorOfflineNodeUpdates()
+        nodeRepository.monitorOfflineNodeUpdates()
             .onEach(::handleOfflineNodes)
             .launchIn(appScope)
     }
@@ -175,19 +174,28 @@ internal class DefaultPhotosRepository @Inject constructor(
         searchVideos().filter { isVideoNodeValid(it) }
     }
 
-    private suspend fun isImageNodeValid(node: MegaNode, filterSvg: Boolean = true): Boolean {
+    private suspend fun isImageNodeValid(
+        node: MegaNode,
+        filterSvg: Boolean = true,
+        includeRubbishBin: Boolean = false,
+    ): Boolean {
         val fileType = fileTypeInfoMapper(node)
         return node.isFile
                 && fileType is ImageFileTypeInfo
                 && (fileType !is SvgFileTypeInfo || !filterSvg)
-                && node.isValidPhotoNode()
+                && (!nodeRepository.isNodeInRubbish(node.handle) || includeRubbishBin)
+                && node.hasThumbnail()
     }
 
-    private suspend fun isVideoNodeValid(node: MegaNode): Boolean {
+    private suspend fun isVideoNodeValid(
+        node: MegaNode,
+        includeRubbishBin: Boolean = false,
+    ): Boolean {
         val fileType = fileTypeInfoMapper(node)
         return node.isFile
                 && fileType is VideoFileTypeInfo
-                && node.isValidPhotoNode()
+                && (!nodeRepository.isNodeInRubbish(node.handle) || includeRubbishBin)
+                && node.hasThumbnail()
     }
 
     private fun updatePhotos(
@@ -215,9 +223,9 @@ internal class DefaultPhotosRepository @Inject constructor(
         val nodes = (imageNodes + videoNodes).map { node ->
             imageNodeMapper(
                 megaNode = node,
-                hasVersion = megaApiFacade::hasVersion,
                 requireSerializedData = true,
                 offline = offlineNodesCache[node.handle.toString()],
+                numVersion = megaApiFacade::getNumVersions
             )
         }
 
@@ -735,18 +743,32 @@ internal class DefaultPhotosRepository @Inject constructor(
     override suspend fun fetchImageNode(
         nodeId: NodeId,
         filterSvg: Boolean,
+        includeRubbishBin: Boolean,
     ): ImageNode? = withContext(ioDispatcher) {
         getMegaNode(nodeId)?.let { megaNode ->
-            if (isImageNodeValid(megaNode, filterSvg) || isVideoNodeValid(megaNode)) {
+            if (isImageNodeValid(megaNode, filterSvg, includeRubbishBin) ||
+                isVideoNodeValid(megaNode, includeRubbishBin)
+            ) {
                 imageNodeMapper(
                     megaNode = megaNode,
-                    hasVersion = megaApiFacade::hasVersion,
                     requireSerializedData = true,
                     offline = offlineNodesCache[megaNode.handle.toString()],
+                    numVersion = megaApiFacade::getNumVersions
                 )
             } else {
                 null
             }
+        }
+    }
+
+    override suspend fun fetchImageNode(url: String): ImageNode? {
+        return getPublicNode(url)?.let { megaNode ->
+            imageNodeMapper(
+                megaNode = megaNode,
+                numVersion = megaApiFacade::getNumVersions,
+                requireSerializedData = true,
+                offline = offlineNodesCache[megaNode.handle.toString()],
+            )
         }
     }
 
@@ -787,29 +809,39 @@ internal class DefaultPhotosRepository @Inject constructor(
         nodes.map { megaNode ->
             imageNodeMapper(
                 megaNode = megaNode,
-                hasVersion = megaApiFacade::hasVersion,
                 requireSerializedData = true,
                 offline = offlineNodesCache[megaNode.handle.toString()],
+                numVersion = megaApiFacade::getNumVersions
             )
         }
     }
 
-    override suspend fun getCloudDriveImageNodes(
+    override suspend fun fetchImageNodes(
         parentId: NodeId,
         order: SortOrder?,
+        includeRubbishBin: Boolean,
     ): List<ImageNode> = withContext(ioDispatcher) {
         val parentNode = getMegaNode(parentId) ?: return@withContext emptyList()
         val megaNodes = megaApiFacade.getChildrenByNode(
             parentNode = parentNode,
             order = order?.let { sortOrderIntMapper(it) },
-        ).filter { isImageNodeValid(node = it, filterSvg = false) || isVideoNodeValid(it) }
+        ).filter {
+            isImageNodeValid(
+                node = it,
+                filterSvg = false,
+                includeRubbishBin = includeRubbishBin,
+            ) || isVideoNodeValid(
+                node = it,
+                includeRubbishBin = includeRubbishBin,
+            )
+        }
 
         megaNodes.map { megaNode ->
             imageNodeMapper(
                 megaNode = megaNode,
-                hasVersion = megaApiFacade::hasVersion,
                 requireSerializedData = true,
                 offline = offlineNodesCache[megaNode.handle.toString()],
+                numVersion = megaApiFacade::getNumVersions
             )
         }
     }
@@ -822,9 +854,6 @@ internal class DefaultPhotosRepository @Inject constructor(
 
         monitorNodeUpdatesJob?.cancel()
         monitorNodeUpdatesJob = null
-
-        monitorOfflineNodesJob?.cancel()
-        monitorOfflineNodesJob = null
 
         offlineNodesCache = mapOf()
         photosCache.clear()

@@ -33,6 +33,7 @@ import mega.privacy.android.app.presentation.contact.view.ContactStatusView
 import mega.privacy.android.app.presentation.contact.view.DefaultAvatarView
 import mega.privacy.android.app.presentation.contact.view.UriAvatarView
 import mega.privacy.android.app.presentation.extensions.getAvatarFirstLetter
+import mega.privacy.android.core.ui.controls.buttons.TextMegaButton
 import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.android.core.ui.theme.extensions.grey_alpha_012_white_alpha_012
 import mega.privacy.android.core.ui.theme.extensions.grey_alpha_038_white_alpha_038
@@ -43,29 +44,34 @@ import mega.privacy.android.domain.entity.chat.ChatParticipant
 import mega.privacy.android.domain.entity.contacts.ContactData
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.android.domain.entity.meeting.CallParticipantData
+import mega.privacy.android.domain.entity.meeting.MeetingParticipantNotInCallStatus
 import mega.privacy.android.domain.entity.meeting.ParticipantsSection
 
 /**
  * View of a participant in the list
  *
- * @param section                       [ParticipantsSection]
- * @param hasHostPermission             True, it's host. False, if not.
- * @param isGuest                       True, it's guest. False, if not.
- * @param participant                   [ChatParticipant]
- * @param onAdmitParticipantClicked     Detect when admit is clicked
- * @param onDenyParticipantClicked      Detect when deny is clicked
- * @param onParticipantMoreOptionsClicked    Detect when more options button is clicked
+ * @param section                           [ParticipantsSection]
+ * @param myPermission                      My [ChatRoomPermission]
+ * @param isGuest                           True, it's guest. False, if not.
+ * @param participant                       [ChatParticipant]
+ * @param isRingingAll                      True if is ringing for all participants or False otherwise.
+ * @param onAdmitParticipantClicked         Detect when admit is clicked
+ * @param onDenyParticipantClicked          Detect when deny is clicked
+ * @param onParticipantMoreOptionsClicked   Detect when more options button is clicked
+ * @param onRingParticipantClicked          Detect when ring (call) participant is clicked
  */
 @Composable
 fun ParticipantInCallItem(
     section: ParticipantsSection,
-    hasHostPermission: Boolean,
+    myPermission: ChatRoomPermission,
     isGuest: Boolean,
     participant: ChatParticipant,
     modifier: Modifier = Modifier,
+    isRingingAll: Boolean = false,
     onAdmitParticipantClicked: (ChatParticipant) -> Unit = {},
     onDenyParticipantClicked: (ChatParticipant) -> Unit = {},
     onParticipantMoreOptionsClicked: (ChatParticipant) -> Unit = {},
+    onRingParticipantClicked: (ChatParticipant) -> Unit = {},
 ) {
     Column {
         Row(
@@ -139,9 +145,23 @@ fun ParticipantInCallItem(
                         }
                     }
 
-                    if (section == ParticipantsSection.NotInCallSection && !isGuest && hasHostPermission) {
+                    if (section == ParticipantsSection.NotInCallSection && !isGuest) {
                         Text(
-                            text = stringResource(R.string.meetings_bottom_panel_participants_not_in_call_button),
+                            text = stringResource(
+                                when {
+                                    participant.callStatus == MeetingParticipantNotInCallStatus.Calling || isRingingAll -> {
+                                        R.string.meetings_bottom_panel_not_in_call_participants_calling_status
+                                    }
+
+                                    participant.callStatus == MeetingParticipantNotInCallStatus.NoResponse -> {
+                                        R.string.meetings_bottom_panel_not_in_call_participants_no_response_status
+                                    }
+
+                                    else -> {
+                                        R.string.meetings_bottom_panel_not_in_call_participants_not_in_call_status
+                                    }
+                                }
+                            ),
                             style = MaterialTheme.typography.subtitle2.copy(color = MaterialTheme.colors.grey_alpha_054_white_alpha_054),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -156,12 +176,12 @@ fun ParticipantInCallItem(
                 Row(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .padding(end = 20.dp),
+                        .padding(end = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     when (section) {
                         ParticipantsSection.WaitingRoomSection -> {
-                            if (hasHostPermission && !isGuest) {
+                            if (myPermission == ChatRoomPermission.Moderator && !isGuest) {
                                 Icon(
                                     modifier = Modifier.clickable {
                                         onDenyParticipantClicked(
@@ -174,7 +194,7 @@ fun ParticipantInCallItem(
                                 )
                                 Icon(
                                     modifier = Modifier
-                                        .padding(start = 15.dp)
+                                        .padding(start = 15.dp, end = 10.dp)
                                         .clickable {
                                             onAdmitParticipantClicked(
                                                 participant
@@ -196,7 +216,10 @@ fun ParticipantInCallItem(
                             )
 
                             Icon(
-                                modifier = Modifier.padding(start = 10.dp),
+                                modifier = Modifier.padding(
+                                    start = 10.dp,
+                                    end = if (isGuest) 10.dp else 0.dp
+                                ),
                                 imageVector = ImageVector.vectorResource(id = if (participant.callParticipantData.isVideoOn) R.drawable.video_on_participant_icon else R.drawable.video_off_participant_icon),
                                 contentDescription = "Cam icon",
                                 tint = MaterialTheme.colors.grey_alpha_038_white_alpha_038
@@ -214,6 +237,14 @@ fun ParticipantInCallItem(
                             }
                         }
 
+                        ParticipantsSection.NotInCallSection -> {
+                            if (participant.callStatus != MeetingParticipantNotInCallStatus.Calling && !isRingingAll && myPermission > ChatRoomPermission.ReadOnly) {
+                                TextMegaButton(
+                                    text = stringResource(R.string.meetings_bottom_panel_not_in_call_participants_call_button),
+                                    onClick = { onRingParticipantClicked(participant) })
+                            }
+                        }
+
                         else -> {}
                     }
                 }
@@ -227,7 +258,6 @@ fun ParticipantInCallItem(
         )
     }
 }
-
 
 @Composable
 private fun ParticipantAvatar(
@@ -254,7 +284,7 @@ fun PreviewParticipantInWaitingRoomItem() {
     MegaAppTheme(isDark = true) {
         ParticipantInCallItem(
             section = ParticipantsSection.WaitingRoomSection,
-            hasHostPermission = true,
+            myPermission = ChatRoomPermission.Moderator,
             isGuest = false,
             participant = ChatParticipant(
                 handle = 111L,
@@ -281,7 +311,7 @@ fun PreviewMeParticipantInCallItem() {
     MegaAppTheme(isDark = true) {
         ParticipantInCallItem(
             section = ParticipantsSection.InCallSection,
-            hasHostPermission = true,
+            myPermission = ChatRoomPermission.Moderator,
             isGuest = false,
             participant = ChatParticipant(
                 handle = 222L,
@@ -310,7 +340,7 @@ fun PreviewParticipantInCallItem() {
     MegaAppTheme(isDark = true) {
         ParticipantInCallItem(
             section = ParticipantsSection.InCallSection,
-            hasHostPermission = true,
+            myPermission = ChatRoomPermission.Moderator,
             isGuest = false,
             participant = ChatParticipant(
                 handle = 333L,
@@ -336,7 +366,7 @@ fun PreviewGuestParticipantInCallItem() {
     MegaAppTheme(isDark = true) {
         ParticipantInCallItem(
             section = ParticipantsSection.InCallSection,
-            hasHostPermission = true,
+            myPermission = ChatRoomPermission.Moderator,
             isGuest = true,
             participant = ChatParticipant(
                 handle = 666L,
@@ -362,7 +392,7 @@ fun PreviewParticipantNotInCallItem() {
     MegaAppTheme(isDark = true) {
         ParticipantInCallItem(
             section = ParticipantsSection.NotInCallSection,
-            hasHostPermission = true,
+            myPermission = ChatRoomPermission.Moderator,
             isGuest = false,
             participant = ChatParticipant(
                 handle = 444L,
@@ -385,11 +415,67 @@ fun PreviewParticipantNotInCallItem() {
  */
 @Preview
 @Composable
+fun PreviewParticipantNotInCallRingingItem() {
+    MegaAppTheme(isDark = true) {
+        ParticipantInCallItem(
+            section = ParticipantsSection.NotInCallSection,
+            myPermission = ChatRoomPermission.Moderator,
+            isGuest = false,
+            participant = ChatParticipant(
+                handle = 444L,
+                data = ContactData(fullName = "Name4", alias = null, avatarUri = null),
+                email = "name2@mega.nz",
+                isMe = false,
+                privilege = ChatRoomPermission.Moderator,
+                defaultAvatarColor = -30327,
+                status = UserChatStatus.Online,
+                callStatus = MeetingParticipantNotInCallStatus.Calling
+            ),
+            onAdmitParticipantClicked = {},
+            onDenyParticipantClicked = {},
+            onParticipantMoreOptionsClicked = {},
+        )
+    }
+}
+
+/**
+ * [ParticipantInCallItem] preview
+ */
+@Preview
+@Composable
+fun PreviewParticipantNotInCallNoResponseItem() {
+    MegaAppTheme(isDark = true) {
+        ParticipantInCallItem(
+            section = ParticipantsSection.NotInCallSection,
+            myPermission = ChatRoomPermission.Moderator,
+            isGuest = false,
+            participant = ChatParticipant(
+                handle = 444L,
+                data = ContactData(fullName = "Name4", alias = null, avatarUri = null),
+                email = "name2@mega.nz",
+                isMe = false,
+                privilege = ChatRoomPermission.Moderator,
+                defaultAvatarColor = -30327,
+                status = UserChatStatus.Online,
+                callStatus = MeetingParticipantNotInCallStatus.NoResponse
+            ),
+            onAdmitParticipantClicked = {},
+            onDenyParticipantClicked = {},
+            onParticipantMoreOptionsClicked = {},
+        )
+    }
+}
+
+/**
+ * [ParticipantInCallItem] preview
+ */
+@Preview
+@Composable
 fun PreviewParticipantNotInCallItemNonHost() {
     MegaAppTheme(isDark = true) {
         ParticipantInCallItem(
             section = ParticipantsSection.NotInCallSection,
-            hasHostPermission = false,
+            myPermission = ChatRoomPermission.Standard,
             isGuest = false,
             participant = ChatParticipant(
                 handle = 444L,
@@ -417,7 +503,7 @@ fun PreviewGuestParticipantNotInCallItem() {
     MegaAppTheme(isDark = true) {
         ParticipantInCallItem(
             section = ParticipantsSection.NotInCallSection,
-            hasHostPermission = true,
+            myPermission = ChatRoomPermission.Moderator,
             isGuest = true,
             participant = ChatParticipant(
                 handle = 555L,

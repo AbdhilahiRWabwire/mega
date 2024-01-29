@@ -340,6 +340,13 @@ internal class MegaChatApiFacade @Inject constructor(
         listener
     )
 
+    override fun ringIndividualInACall(
+        chatId: Long,
+        userId: Long,
+        ringTimeout: Int,
+        listener: MegaChatRequestListenerInterface,
+    ) = chatApi.ringIndividualInACall(chatId, userId, ringTimeout, listener)
+
     override fun answerChatCall(
         chatId: Long,
         enabledVideo: Boolean,
@@ -727,4 +734,10 @@ internal class MegaChatApiFacade @Inject constructor(
 
     override fun sendMessage(chatId: Long, message: String): MegaChatMessage =
         chatApi.sendMessage(chatId, message)
+
+    override suspend fun closeChatPreview(chatId: Long) {
+        chatApi.closeChatPreview(chatId)
+    }
+
+    override fun hasUrl(content: String) = MegaChatApi.hasUrl(content)
 }

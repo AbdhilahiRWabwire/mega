@@ -14,6 +14,7 @@ import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.CombinedChatRoom
 import mega.privacy.android.domain.entity.chat.ConnectionState
 import mega.privacy.android.domain.entity.chat.PendingMessage
+import mega.privacy.android.domain.entity.chat.RichLinkConfig
 import mega.privacy.android.domain.entity.contacts.InviteContactRequest
 import mega.privacy.android.domain.entity.node.NodeId
 
@@ -800,4 +801,62 @@ interface ChatRepository {
      * @return ChatMessage that will be sent. The message id is not definitive, but temporal.
      */
     suspend fun sendMessage(chatId: Long, message: String): ChatMessage
+
+    /**
+     * Set last public handle
+     *
+     * @param handle
+     */
+    suspend fun setLastPublicHandle(handle: Long)
+
+    /**
+     * Close chat preview
+     *
+     * @param chatId
+     */
+    suspend fun closeChatPreview(chatId: Long)
+
+    /**
+     * Should show rich link warning
+     *
+     * @return true if should show rich link warning, false otherwise
+     */
+    suspend fun shouldShowRichLinkWarning(): Boolean
+
+    /**
+     * Is rich link enabled
+     *
+     * @return true if rich link is enabled, false otherwise
+     */
+    suspend fun isRichPreviewsEnabled(): Boolean
+
+    /**
+     * Monitor rich link preview config
+     *
+     * @return Flow [RichLinkConfig]
+     */
+    fun monitorRichLinkPreviewConfig(): Flow<RichLinkConfig>
+
+    /**
+     * Set rich link warning counter value
+     *
+     * @param value
+     * @return number of rich link warning counter
+     */
+    suspend fun setRichLinkWarningCounterValue(value: Int): Int
+
+    /**
+     * Has url
+     *
+     * @param url
+     * @return true if has url, false otherwise
+     */
+    fun hasUrl(url: String): Boolean
+
+    /**
+     * Enable rich link preview
+     *
+     * @param enable
+     */
+    suspend fun enableRichPreviews(enable: Boolean)
 }

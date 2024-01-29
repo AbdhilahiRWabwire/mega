@@ -3,6 +3,7 @@ package mega.privacy.android.domain.repository
 import kotlinx.coroutines.flow.Flow
 import mega.privacy.android.domain.entity.FileTypeInfo
 import mega.privacy.android.domain.entity.FolderTreeInfo
+import mega.privacy.android.domain.entity.NodeLabel
 import mega.privacy.android.domain.entity.Offline
 import mega.privacy.android.domain.entity.ShareData
 import mega.privacy.android.domain.entity.SortOrder
@@ -12,8 +13,8 @@ import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeUpdate
 import mega.privacy.android.domain.entity.node.TypedFolderNode
-import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.node.UnTypedNode
+import mega.privacy.android.domain.entity.offline.OfflineFolderInfo
 import mega.privacy.android.domain.entity.offline.OfflineNodeInformation
 import mega.privacy.android.domain.entity.shares.AccessPermission
 import mega.privacy.android.domain.entity.user.UserId
@@ -254,10 +255,10 @@ interface NodeRepository {
 
     /**
      * Creates a new share key for the node if there is no share key already created and returns a lambda that can be used to set permissions to this node
-     * @param node [TypedNode] whose key will be created
+     * @param node [FolderNode] whose key will be created
      * @return a suspending lambda to add permissions to the node
      */
-    suspend fun createShareKey(node: TypedNode): (suspend (AccessPermission, userEmail: String) -> Unit)?
+    suspend fun createShareKey(node: FolderNode): (suspend (AccessPermission, userEmail: String) -> Unit)?
 
     /**
      * Get root node.
@@ -570,6 +571,13 @@ interface NodeRepository {
     suspend fun getOfflineNodeByParentId(parentId: Int): List<OfflineNodeInformation>?
 
     /**
+     * Get offline folder info
+     * @param parentId
+     * @return [OfflineFolderInfo]
+     */
+    suspend fun getOfflineFolderInfo(parentId: Int): OfflineFolderInfo?
+
+    /**
      * Get offline node from id
      * @param id
      * @return [OfflineNodeInformation]
@@ -586,7 +594,7 @@ interface NodeRepository {
      * @param nodeId [NodeId]
      * @param label Int
      */
-    suspend fun setNodeLabel(nodeId: NodeId, label: Int)
+    suspend fun setNodeLabel(nodeId: NodeId, label: NodeLabel)
 
     /**
      * Resets the label for node
@@ -609,4 +617,15 @@ interface NodeRepository {
      * @param nodeId the node's handle [NodeId] that we want to move to the rubbish bin
      */
     suspend fun moveNodeToRubbishBinByHandle(nodeId: NodeId)
+
+    /**
+     * Get contact verification warning enabled flag
+     */
+    suspend fun getContactVerificationEnabledWarning(): Boolean
+
+    /**
+     * Gets list of NodeLabel
+     * @return list of [NodeLabel]
+     */
+    fun getNodeLabelList(): List<NodeLabel>
 }

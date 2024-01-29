@@ -56,6 +56,8 @@ fun SearchComposeView(
     updateFilter: (SearchFilter) -> Unit,
     trackAnalytics: (SearchFilter) -> Unit,
     updateSearchQuery: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    onBackPressed: () -> Unit
 ) {
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
@@ -76,12 +78,14 @@ fun SearchComposeView(
         }
     }
     Scaffold(
+        modifier = modifier,
         topBar = {
             SearchToolBar(
                 selectionCount = state.selectedNodes.size,
                 searchQuery = state.searchQuery,
                 updateSearchQuery = updateSearchQuery,
-                menuActions = state.menuActions
+                menuActions = state.menuActions,
+                onBackPressed = onBackPressed
             )
         },
         snackbarHost = {
@@ -154,5 +158,7 @@ private fun PreviewSearchComposeView() {
         updateFilter = {},
         trackAnalytics = {},
         updateSearchQuery = {},
+        modifier = Modifier,
+        onBackPressed = {}
     )
 }

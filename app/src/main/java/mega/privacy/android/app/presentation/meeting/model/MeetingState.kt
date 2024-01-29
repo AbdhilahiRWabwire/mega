@@ -4,7 +4,9 @@ import de.palm.composestateevents.StateEvent
 import de.palm.composestateevents.consumed
 import mega.privacy.android.app.meeting.activity.MeetingActivityViewModel
 import mega.privacy.android.app.meeting.adapter.Participant
+import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.chat.ChatParticipant
+import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
 import mega.privacy.android.domain.entity.meeting.CallType
 import mega.privacy.android.domain.entity.meeting.ParticipantsSection
 
@@ -15,6 +17,7 @@ import mega.privacy.android.domain.entity.meeting.ParticipantsSection
  * @property isMeetingEnded                             True, if the meeting is ended. False, otherwise.
  * @property shouldLaunchLeftMeetingActivity            True when user should be navigated to login page
  * @property hasHostPermission                          True, host permissions. False, other permissions.
+ * @property myPermission                               My [ChatRoomPermission]
  * @property chatParticipantsInCall                     List of [ChatParticipant] in the call.
  * @property usersInCall                                List of [Participant] in the call.
  * @property chatParticipantsNotInCall                  List of [ChatParticipant] not in the call.
@@ -45,12 +48,17 @@ import mega.privacy.android.domain.entity.meeting.ParticipantsSection
  * @property showRecordingConsentDialog                 True if should show the recording consent dialog or False otherwise.
  * @property isRecordingConsentAccepted                 True if recording consent dialog has been already accepted or False otherwise.
  * @property startOrStopRecordingParticipantName        Name of the [Participant] who has started/stopped the recording.
+ * @property isNecessaryToUpdateCall                    True, it is necessary to update call. False, it's not necessary.
+ * @property isScheduledMeeting                         True, if it is a scheduled meeting. False, if not.
+ * @property myFullName                                 My full name
+ * @property chatScheduledMeeting                       [ChatScheduledMeeting]
+ * @property isRingingAll                               True if is ringing for all participants or False otherwise.
  */
 data class MeetingState(
     val chatId: Long = -1L,
     val isMeetingEnded: Boolean? = null,
     val shouldLaunchLeftMeetingActivity: Boolean = false,
-    val hasHostPermission: Boolean = false,
+    val myPermission: ChatRoomPermission = ChatRoomPermission.Unknown,
     val chatParticipantsInCall: List<ChatParticipant> = emptyList(),
     val usersInCall: List<Participant> = emptyList(),
     val chatParticipantsNotInCall: List<ChatParticipant> = emptyList(),
@@ -81,10 +89,20 @@ data class MeetingState(
     val showRecordingConsentDialog: Boolean = false,
     val isRecordingConsentAccepted: Boolean = false,
     val startOrStopRecordingParticipantName: String? = null,
+    val isNecessaryToUpdateCall: Boolean = false,
+    val isScheduledMeeting: Boolean = false,
+    val myFullName: String = "",
+    val chatScheduledMeeting: ChatScheduledMeeting? = null,
+    val isRingingAll: Boolean = false
 ) {
     /**
      * Check if waiting room is opened
      */
     fun isWaitingRoomOpened() =
         participantsSection == ParticipantsSection.WaitingRoomSection && (shouldWaitingRoomListBeShown || isBottomPanelExpanded)
+
+    /**
+     * Check if has host permission
+     */
+    fun hasHostPermission() = myPermission == ChatRoomPermission.Moderator
 }

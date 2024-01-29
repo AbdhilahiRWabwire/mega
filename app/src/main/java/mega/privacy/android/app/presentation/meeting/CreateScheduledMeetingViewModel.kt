@@ -41,8 +41,7 @@ import mega.privacy.android.domain.entity.meeting.WeekOfMonth
 import mega.privacy.android.domain.entity.meeting.Weekday
 import mega.privacy.android.domain.entity.user.UserId
 import mega.privacy.android.domain.usecase.CreateChatLink
-import mega.privacy.android.domain.usecase.GetChatRoom
-import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
+import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.GetVisibleContactsUseCase
 import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
 import mega.privacy.android.domain.usecase.QueryChatLink
@@ -54,6 +53,7 @@ import mega.privacy.android.domain.usecase.chat.SetOpenInviteUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactFromEmailUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactItem
 import mega.privacy.android.domain.usecase.meeting.CreateChatroomAndSchedMeetingUseCase
+import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 import mega.privacy.android.domain.usecase.meeting.SetWaitingRoomRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.SetWaitingRoomUseCase
 import mega.privacy.android.domain.usecase.meeting.UpdateScheduledMeetingUseCase
@@ -72,7 +72,7 @@ import javax.inject.Inject
  * @property getScheduledMeetingByChat                  [GetScheduledMeetingByChat]
  * @property getContactFromEmailUseCase                 [GetContactFromEmailUseCase]
  * @property getContactItem                             [GetContactItem]
- * @property getChatRoomUseCase                         [GetChatRoom]
+ * @property getChatRoomUseCase                         [GetChatRoomUseCase]
  * @property createChatroomAndSchedMeetingUseCase       [CreateChatroomAndSchedMeetingUseCase]
  * @property updateScheduledMeetingUseCase              [UpdateScheduledMeetingUseCase]
  * @property createChatLink                             [CreateChatLink]
@@ -99,7 +99,7 @@ class CreateScheduledMeetingViewModel @Inject constructor(
     private val getScheduledMeetingByChat: GetScheduledMeetingByChat,
     private val getContactFromEmailUseCase: GetContactFromEmailUseCase,
     private val getContactItem: GetContactItem,
-    private val getChatRoomUseCase: GetChatRoom,
+    private val getChatRoomUseCase: GetChatRoomUseCase,
     private val createChatroomAndSchedMeetingUseCase: CreateChatroomAndSchedMeetingUseCase,
     private val updateScheduledMeetingUseCase: UpdateScheduledMeetingUseCase,
     private val createChatLink: CreateChatLink,
@@ -327,6 +327,8 @@ class CreateScheduledMeetingViewModel @Inject constructor(
                     participantItemList = newList,
                 )
             }
+
+            setOnAddingParticipantsConsumed()
 
             if (state.value.participantItemList.isNotEmpty()) {
                 if (participantsAdded.isNotEmpty()) {
@@ -589,7 +591,14 @@ class CreateScheduledMeetingViewModel @Inject constructor(
      * Sets openAddContact as consumed.
      */
     fun setOnOpenAddContactConsumed() = _state.update { state ->
-        state.copy(openAddContact = null)
+        state.copy(openAddContact = null, isAddingParticipants = true)
+    }
+
+    /**
+     * Sets isAddingParticipants as consumed.
+     */
+    fun setOnAddingParticipantsConsumed() = _state.update { state ->
+        state.copy(isAddingParticipants = false)
     }
 
     /**

@@ -12,6 +12,8 @@ import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.main.megachat.ChatActivity
 import mega.privacy.android.app.presentation.bottomsheet.model.NodeDeviceCenterInformation
 import mega.privacy.android.app.presentation.meeting.chat.ChatHostActivity
+import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_ACTION
+import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_LINK
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.qualifier.ApplicationScope
@@ -32,7 +34,7 @@ internal class MegaNavigatorImpl @Inject constructor(
 
     override fun openChat(
         context: Context,
-        chatId: Long?,
+        chatId: Long,
         action: String?,
         link: String?,
         text: String?,
@@ -42,20 +44,77 @@ internal class MegaNavigatorImpl @Inject constructor(
     ) {
         applicationScope.launch {
             val intent = if (getFeatureFlagValueUseCase(AppFeatures.NewChatActivity)) {
-                Intent(context, ChatHostActivity::class.java)
+                getChatActivityIntent(
+                    context = context,
+                    action = action,
+                    link = link,
+                    text = text,
+                    chatId = chatId,
+                    messageId = messageId,
+                    isOverQuota = isOverQuota,
+                    flags = flags
+                )
             } else {
-                Intent(context, ChatActivity::class.java)
-            }.apply {
-                this.action = action
-                link?.let { this.data = Uri.parse(link) }
-                text?.let { putExtra(Constants.SHOW_SNACKBAR, text) }
-                chatId?.let { putExtra(Constants.CHAT_ID, chatId) }
-                messageId?.let { putExtra("ID_MSG", messageId) }
-                isOverQuota?.let { putExtra("IS_OVERQUOTA", isOverQuota) }
-                if (flags > 0) setFlags(flags)
+                getLegacyChatIntent(
+                    context = context,
+                    action = action,
+                    link = link,
+                    text = text,
+                    chatId = chatId,
+                    messageId = messageId,
+                    isOverQuota = isOverQuota,
+                    flags = flags
+                )
             }
             context.startActivity(intent)
         }
+    }
+
+    private fun getChatActivityIntent(
+        context: Context,
+        action: String?,
+        link: String?,
+        text: String?,
+        chatId: Long,
+        messageId: Long?,
+        isOverQuota: Int?,
+        flags: Int,
+    ): Intent {
+        val intent = Intent(context, ChatHostActivity::class.java).apply {
+            this.action = action
+            putExtra(EXTRA_ACTION, action)
+            text?.let { putExtra(Constants.SHOW_SNACKBAR, text) }
+            putExtra(Constants.CHAT_ID, chatId)
+            messageId?.let { putExtra("ID_MSG", messageId) }
+            isOverQuota?.let { putExtra("IS_OVERQUOTA", isOverQuota) }
+            if (flags > 0) setFlags(flags)
+        }
+        link?.let {
+            intent.putExtra(EXTRA_LINK, it)
+        }
+        return intent
+    }
+
+    private fun getLegacyChatIntent(
+        context: Context,
+        action: String?,
+        link: String?,
+        text: String?,
+        chatId: Long?,
+        messageId: Long?,
+        isOverQuota: Int?,
+        flags: Int,
+    ) = Intent(context, ChatActivity::class.java).apply {
+        this.action = action
+        putExtra(EXTRA_ACTION, action)
+        link?.let {
+            this.data = Uri.parse(it)
+        }
+        text?.let { putExtra(Constants.SHOW_SNACKBAR, text) }
+        chatId?.let { putExtra(Constants.CHAT_ID, chatId) }
+        messageId?.let { putExtra("ID_MSG", messageId) }
+        isOverQuota?.let { putExtra("IS_OVERQUOTA", isOverQuota) }
+        if (flags > 0) setFlags(flags)
     }
 
     override fun openDeviceCenterFolderNodeOptions(

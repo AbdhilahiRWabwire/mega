@@ -14,12 +14,13 @@ import javax.inject.Inject
 class VerifyBottomSheetMenuItem @Inject constructor(
     override val menuAction: VerifyMenuAction,
 ) : NodeBottomSheetMenuItem<MenuActionWithIcon> {
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedNode,
-    ) = true
+        isConnected: Boolean,
+    ) = false
 
     override val groupId = 2
 }

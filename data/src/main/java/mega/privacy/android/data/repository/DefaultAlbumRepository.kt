@@ -138,6 +138,7 @@ internal class DefaultAlbumRepository @Inject constructor(
                                     userSetMapper(
                                         newSet.id(),
                                         newSet.name(),
+                                        newSet.type(),
                                         newSet.cover(),
                                         newSet.cts(),
                                         newSet.ts(),
@@ -165,11 +166,17 @@ internal class DefaultAlbumRepository @Inject constructor(
             val setList = megaApiGateway.getSets()
             userSets.clear()
 
-            (0 until setList.size()).map { index ->
-                val userSet = setList.get(index).toUserSet()
-                userSets[userSet.id] = userSet
-                userSet
-            }
+            val userSets = (0 until setList.size())
+                .filter { index ->
+                    setList.get(index).type() == MegaSet.SET_TYPE_ALBUM
+                }.map {
+                    setList.get(it).toUserSet()
+                }
+                .associateBy { it.id }
+
+
+            this@DefaultAlbumRepository.userSets.putAll(userSets)
+            return@withContext userSets.values.toList()
         }
     }
 
@@ -668,8 +675,8 @@ internal class DefaultAlbumRepository @Inject constructor(
             val node = publicNodesMap[nodeId] ?: throw IllegalArgumentException("Node not found")
             imageNodeMapper(
                 megaNode = node,
-                hasVersion = megaApiGateway::hasVersion,
-                offline = offline
+                offline = offline,
+                numVersion = megaApiGateway::getNumVersions
             )
         }
     }
@@ -679,9 +686,9 @@ internal class DefaultAlbumRepository @Inject constructor(
             val offline = megaLocalRoomGateway.getOfflineInformation(nodeHandle = megaNode.handle)
             imageNodeMapper(
                 megaNode = megaNode,
-                hasVersion = megaApiGateway::hasVersion,
                 offline = offline,
                 requireSerializedData = true,
+                numVersion = megaApiGateway::getNumVersions
             )
         }
     }
@@ -753,6 +760,7 @@ internal class DefaultAlbumRepository @Inject constructor(
         return userSetMapper(
             id(),
             name(),
+            type(),
             cover,
             cts(),
             ts(),

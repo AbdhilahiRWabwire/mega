@@ -13,11 +13,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import mega.privacy.android.app.MimeTypeList
-import mega.privacy.android.app.domain.usecase.GetBandWidthOverQuotaDelayUseCase
-import mega.privacy.android.app.domain.usecase.GetFileBrowserChildrenUseCase
-import mega.privacy.android.app.domain.usecase.GetRootFolder
-import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
-import mega.privacy.android.app.domain.usecase.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.app.extensions.updateItemAt
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.globalmanagement.TransfersManagement
@@ -32,16 +27,23 @@ import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeChanges
+import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
 import mega.privacy.android.domain.usecase.GetCloudSortOrder
-import mega.privacy.android.domain.usecase.GetParentNodeHandle
+import mega.privacy.android.domain.usecase.GetParentNodeUseCase
+import mega.privacy.android.domain.usecase.GetRootNodeUseCase
 import mega.privacy.android.domain.usecase.IsNodeInRubbish
 import mega.privacy.android.domain.usecase.MonitorMediaDiscoveryView
 import mega.privacy.android.domain.usecase.account.MonitorRefreshSessionUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.domain.usecase.filebrowser.GetFileBrowserNodeChildrenUseCase
 import mega.privacy.android.domain.usecase.folderlink.ContainsMediaItemUseCase
+import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
+import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
+import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
+import mega.privacy.android.domain.usecase.quota.GetBandwidthOverQuotaDelayUseCase
 import mega.privacy.android.domain.usecase.viewtype.MonitorViewType
 import mega.privacy.android.domain.usecase.viewtype.SetViewType
 import nz.mega.sdk.MegaApiJava
@@ -52,40 +54,41 @@ import javax.inject.Inject
 /**
  * ViewModel associated to FileBrowserFragment
  *
- * @param getRootFolder Fetch the root node
+ * @param getRootNodeUseCase Fetch the root node
  * @param monitorMediaDiscoveryView Monitor media discovery view settings
  * @param monitorNodeUpdatesUseCase Monitor node updates
- * @param getFileBrowserParentNodeHandle To get parent handle of current node
+ * @param getParentNodeUseCase To get parent node of current node
  * @param getIsNodeInRubbish To get current node is in rubbish
- * @param getFileBrowserChildrenUseCase [GetFileBrowserChildrenUseCase]
+ * @param getFileBrowserNodeChildrenUseCase [GetFileBrowserNodeChildrenUseCase]
  * @param getCloudSortOrder [GetCloudSortOrder]
  * @param monitorViewType [MonitorViewType] check view type
  * @param setViewType [SetViewType] to set view type
  * @param handleOptionClickMapper [HandleOptionClickMapper] handle option click click mapper
  * @param monitorRefreshSessionUseCase [MonitorRefreshSessionUseCase]
- * @param getBandWidthOverQuotaDelayUseCase [GetBandWidthOverQuotaDelayUseCase]
+ * @param getBandwidthOverQuotaDelayUseCase [GetBandwidthOverQuotaDelayUseCase]
  * @param transfersManagement [TransfersManagement]
  * @param containsMediaItemUseCase [ContainsMediaItemUseCase]
  * @param fileDurationMapper [FileDurationMapper]
  */
 @HiltViewModel
 class FileBrowserViewModel @Inject constructor(
-    private val getRootFolder: GetRootFolder,
+    private val getRootNodeUseCase: GetRootNodeUseCase,
     private val monitorMediaDiscoveryView: MonitorMediaDiscoveryView,
     private val monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase,
-    private val getFileBrowserParentNodeHandle: GetParentNodeHandle,
+    private val getParentNodeUseCase: GetParentNodeUseCase,
     private val getIsNodeInRubbish: IsNodeInRubbish,
-    private val getFileBrowserChildrenUseCase: GetFileBrowserChildrenUseCase,
+    private val getFileBrowserNodeChildrenUseCase: GetFileBrowserNodeChildrenUseCase,
     private val getCloudSortOrder: GetCloudSortOrder,
     private val monitorViewType: MonitorViewType,
     private val setViewType: SetViewType,
     private val handleOptionClickMapper: HandleOptionClickMapper,
     private val monitorRefreshSessionUseCase: MonitorRefreshSessionUseCase,
-    private val getBandWidthOverQuotaDelayUseCase: GetBandWidthOverQuotaDelayUseCase,
+    private val getBandwidthOverQuotaDelayUseCase: GetBandwidthOverQuotaDelayUseCase,
     private val transfersManagement: TransfersManagement,
     private val containsMediaItemUseCase: ContainsMediaItemUseCase,
     private val fileDurationMapper: FileDurationMapper,
     private val monitorOfflineNodeUpdatesUseCase: MonitorOfflineNodeUpdatesUseCase,
+    private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
 ) : ViewModel() {
 
@@ -109,6 +112,15 @@ class FileBrowserViewModel @Inject constructor(
         monitorRefreshSession()
         changeTransferOverQuotaBannerVisibility()
         monitorOfflineNodes()
+        monitorConnectivity()
+    }
+
+    private fun monitorConnectivity() {
+        viewModelScope.launch {
+            monitorConnectivityUseCase().collect {
+                _state.update { state -> state.copy(isConnected = it) }
+            }
+        }
     }
 
     /**
@@ -225,7 +237,8 @@ class FileBrowserViewModel @Inject constructor(
     suspend fun handleBackFromMD() {
         handleStack.pop()
         val currentParent =
-            _state.value.parentHandle ?: getRootFolder()?.handle ?: MegaApiJava.INVALID_HANDLE
+            _state.value.parentHandle ?: getRootNodeUseCase()?.id?.longValue
+            ?: MegaApiJava.INVALID_HANDLE
         _state.update {
             it.copy(
                 fileBrowserHandle = currentParent,
@@ -243,7 +256,9 @@ class FileBrowserViewModel @Inject constructor(
      */
     fun getSafeBrowserParentHandle(): Long = runBlocking {
         if (_state.value.fileBrowserHandle == -1L) {
-            setBrowserParentHandle(getRootFolder()?.handle ?: MegaApiJava.INVALID_HANDLE)
+            setBrowserParentHandle(
+                getRootNodeUseCase()?.id?.longValue ?: MegaApiJava.INVALID_HANDLE
+            )
         }
         return@runBlocking _state.value.fileBrowserHandle
     }
@@ -259,7 +274,7 @@ class FileBrowserViewModel @Inject constructor(
         parentHandle: Long,
         mediaDiscoveryViewSettings: Int,
     ): Boolean =
-        getFileBrowserChildrenUseCase(parentHandle).let { nodes ->
+        getFileBrowserNodeChildrenUseCase(parentHandle).let { nodes ->
             if (nodes.isEmpty() || mediaDiscoveryViewSettings == MediaDiscoveryViewSettings.DISABLED.ordinal) {
                 false
             } else {
@@ -284,18 +299,18 @@ class FileBrowserViewModel @Inject constructor(
     }
 
     private suspend fun refreshNodesState() {
-        val typedNodeList = getFileBrowserChildrenUseCase(_state.value.fileBrowserHandle)
+        val typedNodeList = getFileBrowserNodeChildrenUseCase(_state.value.fileBrowserHandle)
         val nodeList = getNodeUiItems(typedNodeList)
         val hasMediaFile: Boolean = containsMediaItemUseCase(typedNodeList)
-        val isRootNode = getRootFolder()?.handle == _state.value.fileBrowserHandle
+        val isRootNode = getRootNodeUseCase()?.id?.longValue == _state.value.fileBrowserHandle
         _state.update {
             it.copy(
                 showMediaDiscoveryIcon = !isRootNode && hasMediaFile,
-                parentHandle = getFileBrowserParentNodeHandle(_state.value.fileBrowserHandle),
+                parentHandle = getParentNodeUseCase(NodeId(_state.value.fileBrowserHandle))?.id?.longValue,
                 nodesList = nodeList,
                 sortOrder = getCloudSortOrder(),
                 isFileBrowserEmpty = MegaApiJava.INVALID_HANDLE == _state.value.fileBrowserHandle ||
-                        getRootFolder()?.handle == _state.value.fileBrowserHandle
+                        getRootNodeUseCase()?.id?.longValue == _state.value.fileBrowserHandle
             )
         }
     }
@@ -429,7 +444,7 @@ class FileBrowserViewModel @Inject constructor(
      */
     fun changeTransferOverQuotaBannerVisibility() {
         viewModelScope.launch {
-            val overQuotaBannerTimeDelay = getBandWidthOverQuotaDelayUseCase()
+            val overQuotaBannerTimeDelay = getBandwidthOverQuotaDelayUseCase()
             _state.update {
                 it.copy(
                     shouldShowBannerVisibility = transfersManagement.isTransferOverQuotaBannerShown,

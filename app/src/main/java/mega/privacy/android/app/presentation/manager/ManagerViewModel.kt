@@ -13,16 +13,13 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.components.ChatManagement
-import mega.privacy.android.app.domain.usecase.CreateShareKey
 import mega.privacy.android.app.domain.usecase.GetBackupsNode
-import mega.privacy.android.app.domain.usecase.MonitorGlobalUpdates
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.main.dialog.shares.RemoveShareResultMapper
@@ -35,7 +32,6 @@ import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.app.utils.livedata.SingleLiveEvent
-import mega.privacy.android.data.model.GlobalUpdate
 import mega.privacy.android.domain.entity.Feature
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRestartMode
@@ -45,12 +41,14 @@ import mega.privacy.android.domain.entity.contacts.ContactRequestStatus
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import mega.privacy.android.domain.entity.meeting.ChatSessionChanges
 import mega.privacy.android.domain.entity.meeting.ScheduledMeetingStatus
+import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.entity.search.SearchType
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.usecase.GetCloudSortOrder
 import mega.privacy.android.domain.usecase.GetExtendedAccountDetail
+import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.GetNumUnreadUserAlertsUseCase
 import mega.privacy.android.domain.usecase.GetRootNodeUseCase
 import mega.privacy.android.domain.usecase.HasBackupsChildren
@@ -58,6 +56,7 @@ import mega.privacy.android.domain.usecase.MonitorBackupFolder
 import mega.privacy.android.domain.usecase.MonitorContactRequestUpdates
 import mega.privacy.android.domain.usecase.MonitorContactUpdates
 import mega.privacy.android.domain.usecase.MonitorOfflineFileAvailabilityUseCase
+import mega.privacy.android.domain.usecase.MonitorUserAlertUpdates
 import mega.privacy.android.domain.usecase.MonitorUserUpdates
 import mega.privacy.android.domain.usecase.account.GetFullAccountInfoUseCase
 import mega.privacy.android.domain.usecase.account.GetIncomingContactRequestsUseCase
@@ -74,9 +73,9 @@ import mega.privacy.android.domain.usecase.camerauploads.GetPrimarySyncHandleUse
 import mega.privacy.android.domain.usecase.camerauploads.GetSecondarySyncHandleUseCase
 import mega.privacy.android.domain.usecase.camerauploads.ListenToNewMediaUseCase
 import mega.privacy.android.domain.usecase.camerauploads.MonitorCameraUploadsFolderDestinationUseCase
-import mega.privacy.android.domain.usecase.chat.GetChatLinkContentUseCase
 import mega.privacy.android.domain.usecase.chat.GetNumUnreadChatsUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatArchivedUseCase
+import mega.privacy.android.domain.usecase.chat.link.GetChatLinkContentUseCase
 import mega.privacy.android.domain.usecase.contact.SaveContactByEmailUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.login.MonitorFinishActivityUseCase
@@ -102,6 +101,7 @@ import mega.privacy.android.domain.usecase.node.RestoreNodesUseCase
 import mega.privacy.android.domain.usecase.photos.mediadiscovery.SendStatisticsMediaDiscoveryUseCase
 import mega.privacy.android.domain.usecase.psa.DismissPsaUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorUpdatePushNotificationSettingsUseCase
+import mega.privacy.android.domain.usecase.shares.CreateShareKeyUseCase
 import mega.privacy.android.domain.usecase.shares.GetUnverifiedIncomingShares
 import mega.privacy.android.domain.usecase.shares.GetUnverifiedOutgoingShares
 import mega.privacy.android.domain.usecase.transfers.completed.DeleteOldestCompletedTransfersUseCase
@@ -117,7 +117,7 @@ import javax.inject.Inject
 /**
  * Manager view model
  *
- * @property monitorGlobalUpdates
+ * @property monitorUserAlertUpdates
  * @property getBackupsNode
  * @property getNumUnreadUserAlertsUseCase
  * @property hasBackupsChildren
@@ -164,7 +164,7 @@ import javax.inject.Inject
 class ManagerViewModel @Inject constructor(
     monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase,
     monitorContactUpdates: MonitorContactUpdates,
-    private val monitorGlobalUpdates: MonitorGlobalUpdates,
+    private val monitorUserAlertUpdates: MonitorUserAlertUpdates,
     monitorContactRequestUpdates: MonitorContactRequestUpdates,
     private val getBackupsNode: GetBackupsNode,
     private val getNumUnreadUserAlertsUseCase: GetNumUnreadUserAlertsUseCase,
@@ -195,7 +195,8 @@ class ManagerViewModel @Inject constructor(
     private val startCameraUploadUseCase: StartCameraUploadUseCase,
     private val stopCameraUploadsUseCase: StopCameraUploadsUseCase,
     private val saveContactByEmailUseCase: SaveContactByEmailUseCase,
-    private val createShareKey: CreateShareKey,
+    private val createShareKeyUseCase: CreateShareKeyUseCase,
+    private val getNodeByIdUseCase: GetNodeByIdUseCase,
     private val deleteOldestCompletedTransfersUseCase: DeleteOldestCompletedTransfersUseCase,
     private val getIncomingContactRequestsUseCase: GetIncomingContactRequestsUseCase,
     monitorMyAccountUpdateUseCase: MonitorMyAccountUpdateUseCase,
@@ -385,6 +386,7 @@ class ManagerViewModel @Inject constructor(
                     MegaNodeUtil.myBackupHandle = backupsFolderNodeId.longValue
                 }
         }
+
         viewModelScope.launch {
             monitorContactRequestUpdates()
                 .collect {
@@ -393,10 +395,9 @@ class ManagerViewModel @Inject constructor(
                     updateContactRequests(it)
                 }
         }
-        @Suppress("DEPRECATION")
+
         viewModelScope.launch {
-            monitorGlobalUpdates()
-                .filterIsInstance<GlobalUpdate.OnUserAlertsUpdate>()
+            monitorUserAlertUpdates()
                 .collect {
                     Timber.d("onUserAlertsUpdate")
                     updateIncomingContactRequests()
@@ -695,7 +696,10 @@ class ManagerViewModel @Inject constructor(
      * @param node
      */
     suspend fun initShareKey(node: MegaNode?) = runCatching {
-        node?.let { createShareKey(it) }
+        require(node != null) { "Cannot create a share key for a null node" }
+        val typedNode = getNodeByIdUseCase(NodeId(node.handle))
+        require(typedNode is FolderNode) { "Cannot create a share key for a non-folder node" }
+        createShareKeyUseCase(typedNode)
     }.onFailure {
         Timber.e(it)
     }

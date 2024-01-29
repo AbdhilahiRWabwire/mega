@@ -15,11 +15,12 @@ import javax.inject.Inject
 class VersionsBottomSheetMenuItem @Inject constructor(
     override val menuAction: VersionsMenuAction,
 ) : NodeBottomSheetMenuItem<MenuActionWithIcon> {
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedNode,
+        isConnected: Boolean,
     ) = node is TypedFileNode
             && node.hasVersion
             && node.isTakenDown.not()

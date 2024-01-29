@@ -253,7 +253,7 @@ interface TransferRepository {
     /**
      * Starts the download worker to monitor the download transfers as a foreground service
      */
-    fun startDownloadWorker()
+    suspend fun startDownloadWorker()
 
     /**
      * Monitors transfers finished.
@@ -494,4 +494,9 @@ interface TransferRepository {
                 "Replace with the corresponding value get from ActiveTransfers when ready"
     )
     suspend fun getTotalDownloads(): Int
+
+    /**
+     * @return a flow that emits true if DownloadsWorker is enqueued. false otherwise
+     */
+    fun isDownloadsWorkerEnqueuedFlow(): Flow<Boolean>
 }

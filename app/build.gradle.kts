@@ -326,7 +326,7 @@ dependencies {
     implementation(androidx.constraintlayout)
     implementation(androidx.constraintlayout.compose)
     implementation(androidx.datastore.preferences)
-    implementation(androidx.emoji)
+    implementation(androidx.emoji2)
     implementation(androidx.exifinterface)
     implementation(androidx.fragment)
     implementation(androidx.legacy.support)
@@ -361,6 +361,7 @@ dependencies {
     implementation(google.accompanist.flowlayout)
     implementation(google.accompanist.placeholder)
     implementation(google.accompanist.permissions)
+    implementation(google.accompanist.navigationmaterial)
     implementation(google.accompanist.navigationanimation)
     implementation(google.accompanist.systemui)
 
@@ -440,8 +441,8 @@ dependencies {
     if (shouldUsePrebuiltSdk()) {
         // These 2 ExoPlayer libs are created by SDK build. If upgrading ExoPlayer version,
         // remember to upload these 2 files.
-        implementation(files("src/main/libs/exoplayer-extension-ffmpeg-2.18.1.aar"))
-        implementation(files("src/main/libs/exoplayer-extension-flac-2.18.1.aar"))
+        implementation(files("src/main/libs/exoplayer-extension-ffmpeg-2.19.1.aar"))
+        implementation(files("src/main/libs/exoplayer-extension-flac-2.19.1.aar"))
     } else {
         implementation(
             fileTree(

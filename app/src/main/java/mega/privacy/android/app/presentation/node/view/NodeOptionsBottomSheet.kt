@@ -7,14 +7,15 @@ import androidx.compose.material.Divider
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.ModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
 import mega.privacy.android.app.MimeTypeList
-import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.node.NodeBottomSheetActionHandler
 import mega.privacy.android.app.presentation.node.NodeOptionsBottomSheetViewModel
 import mega.privacy.android.app.presentation.view.extension.fileInfo
@@ -38,42 +39,46 @@ import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
 @Composable
 internal fun NodeOptionsBottomSheet(
     modalSheetState: ModalBottomSheetState,
-    node: NodeUIItem<TypedNode>,
+    node: TypedNode,
     handler: NodeBottomSheetActionHandler,
-    viewModel: NodeOptionsBottomSheetViewModel = hiltViewModel(),
+    navHostController: NavHostController,
     onDismiss: () -> Unit,
+    viewModel: NodeOptionsBottomSheetViewModel = hiltViewModel(),
 ) {
-    viewModel.getBottomSheetOptions(node)
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.getBottomSheetOptions(node)
+    }
     BottomSheet(
         modalSheetState = modalSheetState,
         sheetHeader = {
             NodeListViewItem(
-                title = node.node.name,
-                subtitle = when (node.node) {
-                    is FileNode -> node.node.fileInfo()
-                    is FolderNode -> node.node.folderInfo()
+                title = node.name,
+                subtitle = when (node) {
+                    is FileNode -> node.fileInfo()
+                    is FolderNode -> node.folderInfo()
                     else -> ""
                 },
-                icon = node.node.let { node -> node as? TypedFolderNode }?.getIcon()
-                    ?: MimeTypeList.typeForName(node.node.name).iconResourceId,
-                thumbnailData = ThumbnailRequest(node.node.id),
+                icon = node.let { node -> node as? TypedFolderNode }?.getIcon()
+                    ?: MimeTypeList.typeForName(node.name).iconResourceId,
+                thumbnailData = ThumbnailRequest(node.id),
             )
         },
         sheetBody = {
             LazyColumn {
-                state.actions.groupBy { it.group }
-                    .toSortedMap()
+                val groups = state.actions.groupBy { it.group }
+                groups.toSortedMap()
                     .mapValues { (_, list) ->
                         list.sortedBy { it.orderInGroup }
                     }
                     .values
                     .forEachIndexed { index, actions ->
                         items(actions) { item: BottomSheetMenuItem ->
-                            item.control(onDismiss, handler::handleAction)
+                            item.control(onDismiss, handler::handleAction, navHostController)
                         }
 
-                        if (index < state.actions.size - 1) {
+                        if (index < state.actions.size - 1 && index != groups.size - 1) {
                             item {
                                 Divider(
                                     modifier = Modifier

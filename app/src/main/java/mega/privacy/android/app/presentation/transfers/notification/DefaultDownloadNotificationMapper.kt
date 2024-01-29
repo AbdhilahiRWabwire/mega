@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.transfers.notification
 
+import mega.privacy.android.icon.pack.R as iconPackR
 import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
@@ -7,14 +8,12 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import mega.privacy.android.app.R
-import mega.privacy.android.app.fcm.CreateTransferNotificationChannelsUseCase
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.presentation.manager.model.TransfersTab
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.data.mapper.transfer.DownloadNotificationMapper
 import mega.privacy.android.domain.entity.transfer.ActiveTransferTotals
-import mega.privacy.android.icon.pack.R as iconPackR
 import javax.inject.Inject
 
 /**
@@ -68,7 +67,7 @@ class DefaultDownloadNotificationMapper @Inject constructor(
 
         val builder = NotificationCompat.Builder(
             context,
-            CreateTransferNotificationChannelsUseCase.NOTIFICATION_CHANNEL_DOWNLOAD_ID
+            Constants.NOTIFICATION_CHANNEL_DOWNLOAD_ID
         ).apply {
             setSmallIcon(iconPackR.drawable.ic_stat_notify)
             setOngoing(true)

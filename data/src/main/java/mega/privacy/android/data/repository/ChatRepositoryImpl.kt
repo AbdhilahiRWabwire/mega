@@ -4,7 +4,9 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -53,10 +56,12 @@ import mega.privacy.android.domain.entity.chat.ChatInitState
 import mega.privacy.android.domain.entity.chat.ChatListItem
 import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.CombinedChatRoom
+import mega.privacy.android.domain.entity.chat.RichLinkConfig
 import mega.privacy.android.domain.entity.contacts.InviteContactRequest
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.settings.ChatSettings
 import mega.privacy.android.domain.exception.chat.ParticipantAlreadyExistsException
+import mega.privacy.android.domain.exception.chat.ResourceDoesNotExistChatException
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.repository.ChatRepository
@@ -74,6 +79,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 /**
@@ -120,9 +126,10 @@ internal class ChatRepositoryImpl @Inject constructor(
     private val megaLocalRoomGateway: MegaLocalRoomGateway,
     private val databaseHandler: DatabaseHandler,
 ) : ChatRepository {
-
+    private val richLinkConfig = MutableStateFlow(RichLinkConfig())
     private var chatRoomUpdates: HashMap<Long, Flow<ChatRoomUpdate>> = hashMapOf()
     private val chatRoomUpdatesMutex = Mutex()
+    private val joiningIds = mutableSetOf<Long>()
 
     override suspend fun getChatInitState(): ChatInitState = withContext(ioDispatcher) {
         chatInitStateMapper(megaChatApiGateway.initState)
@@ -419,10 +426,18 @@ internal class ChatRepositoryImpl @Inject constructor(
         suspendCancellableCoroutine { continuation ->
             val listener = OptionalMegaChatRequestListenerInterface(
                 onRequestFinish = { request: MegaChatRequest, error: MegaChatError ->
-                    if (error.errorCode == MegaChatError.ERROR_OK || error.errorCode == MegaChatError.ERROR_EXIST) {
-                        continuation.resume(chatPreviewMapper(request, error.errorCode))
-                    } else {
-                        continuation.failWithError(error, "openChatPreview")
+                    when (error.errorCode) {
+                        MegaChatError.ERROR_OK, MegaChatError.ERROR_EXIST -> {
+                            continuation.resume(chatPreviewMapper(request, error.errorCode))
+                        }
+
+                        MegaChatError.ERROR_NOENT -> {
+                            continuation.resumeWithException(ResourceDoesNotExistChatException())
+                        }
+
+                        else -> {
+                            continuation.failWithError(error, "openChatPreview")
+                        }
                     }
                 }
             )
@@ -463,30 +478,43 @@ internal class ChatRepositoryImpl @Inject constructor(
         }
 
     override suspend fun autojoinPublicChat(chatId: Long) = withContext(ioDispatcher) {
-        suspendCancellableCoroutine { continuation ->
-            val listener = continuation.getChatRequestListener("autojoinPublicChat") {}
+        if (joiningIds.contains(chatId)) return@withContext
+        joiningIds.add(chatId)
+        runCatching {
+            suspendCancellableCoroutine { continuation ->
+                val listener = continuation.getChatRequestListener("autojoinPublicChat") {}
 
-            megaChatApiGateway.autojoinPublicChat(chatId, listener)
+                megaChatApiGateway.autojoinPublicChat(chatId, listener)
 
-            continuation.invokeOnCancellation {
-                megaChatApiGateway.removeRequestListener(listener)
+                continuation.invokeOnCancellation {
+                    megaChatApiGateway.removeRequestListener(listener)
+                }
             }
-        }
+        }.also {
+            joiningIds.remove(chatId)
+        }.getOrThrow()
     }
 
     override suspend fun autorejoinPublicChat(
         chatId: Long,
         publicHandle: Long,
     ) = withContext(ioDispatcher) {
-        suspendCancellableCoroutine { continuation ->
-            val listener = continuation.getChatRequestListener("autorejoinPublicChat") {}
+        if (joiningIds.contains(chatId) && joiningIds.contains(publicHandle)) return@withContext
+        joiningIds.add(chatId)
+        joiningIds.add(publicHandle)
+        runCatching {
+            suspendCancellableCoroutine { continuation ->
+                val listener = continuation.getChatRequestListener("autorejoinPublicChat") {}
 
-            megaChatApiGateway.autorejoinPublicChat(chatId, publicHandle, listener)
+                megaChatApiGateway.autorejoinPublicChat(chatId, publicHandle, listener)
 
-            continuation.invokeOnCancellation {
-                megaChatApiGateway.removeRequestListener(listener)
+                continuation.invokeOnCancellation {
+                    megaChatApiGateway.removeRequestListener(listener)
+                }
             }
-        }
+        }.also {
+            joiningIds.remove(chatId)
+        }.getOrThrow()
     }
 
     override suspend fun hasWaitingRoomChatOptions(chatOptionsBitMask: Int): Boolean =
@@ -1048,5 +1076,87 @@ internal class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun sendMessage(chatId: Long, message: String) = withContext(ioDispatcher) {
         chatMessageMapper(megaChatApiGateway.sendMessage(chatId, message))
+    }
+
+    override suspend fun setLastPublicHandle(handle: Long) {
+        localStorageGateway.setLastPublicHandle(handle)
+        localStorageGateway.setLastPublicHandleTimeStamp()
+    }
+
+    override suspend fun closeChatPreview(chatId: Long) {
+        megaChatApiGateway.closeChatPreview(chatId)
+    }
+
+    override suspend fun shouldShowRichLinkWarning(): Boolean = withContext(ioDispatcher) {
+        suspendCancellableCoroutine { continuation ->
+            val listener = OptionalMegaRequestListenerInterface(
+                onRequestFinish = { request, error ->
+                    if (error.errorCode == MegaError.API_OK || error.errorCode == MegaError.API_ENOENT) {
+                        richLinkConfig.update { config ->
+                            config.copy(
+                                isShowRichLinkWarning = request.flag,
+                                counterNotNowRichLinkWarning = request.number.toInt()
+                            )
+                        }
+                        continuation.resumeWith(Result.success(request.flag))
+                    } else {
+                        continuation.failWithError(error, "shouldShowRichLinkWarning")
+                    }
+                }
+            )
+            megaApiGateway.shouldShowRichLinkWarning(listener)
+            continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
+        }
+    }
+
+    override suspend fun isRichPreviewsEnabled(): Boolean = withContext(ioDispatcher) {
+        suspendCancellableCoroutine { continuation ->
+            val listener = OptionalMegaRequestListenerInterface(
+                onRequestFinish = { request, error ->
+                    if (error.errorCode == MegaError.API_OK || error.errorCode == MegaError.API_ENOENT) {
+                        richLinkConfig.update { config ->
+                            config.copy(isRichLinkEnabled = request.flag)
+                        }
+                        continuation.resumeWith(Result.success(request.flag))
+                    } else {
+                        continuation.failWithError(error, "isRichPreviewsEnabled")
+                    }
+                }
+            )
+            megaApiGateway.isRichPreviewsEnabled(listener)
+            continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
+        }
+    }
+
+    override suspend fun setRichLinkWarningCounterValue(value: Int): Int =
+        withContext(ioDispatcher) {
+            suspendCancellableCoroutine { continuation ->
+                val listener = continuation.getRequestListener("setRichLinkWarningCounterValue") {
+                    richLinkConfig.update { config ->
+                        config.copy(
+                            counterNotNowRichLinkWarning = value
+                        )
+                    }
+                    value
+                }
+                megaApiGateway.setRichLinkWarningCounterValue(value, listener)
+                continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
+            }
+        }
+
+    override fun monitorRichLinkPreviewConfig(): Flow<RichLinkConfig> = richLinkConfig.asStateFlow()
+
+    override fun hasUrl(url: String): Boolean = megaChatApiGateway.hasUrl(url)
+
+    override suspend fun enableRichPreviews(enable: Boolean) = withContext(ioDispatcher) {
+        suspendCancellableCoroutine { continuation ->
+            val listener = continuation.getRequestListener("enableRichLinkPreview") {
+                richLinkConfig.update { config ->
+                    config.copy(isRichLinkEnabled = enable)
+                }
+            }
+            megaApiGateway.enableRichPreviews(enable, listener)
+            continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
+        }
     }
 }

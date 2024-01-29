@@ -13,7 +13,6 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import mega.privacy.android.app.domain.usecase.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.node.model.mapper.NodeToolbarActionMapper
 import mega.privacy.android.app.presentation.node.model.menuaction.DownloadMenuAction
@@ -35,11 +34,11 @@ import mega.privacy.android.domain.entity.search.SearchCategory
 import mega.privacy.android.domain.entity.search.SearchType
 import mega.privacy.android.domain.usecase.CheckNodeCanBeMovedToTargetNode
 import mega.privacy.android.domain.usecase.GetCloudSortOrder
-import mega.privacy.android.domain.usecase.GetParentNodeHandle
 import mega.privacy.android.domain.usecase.GetRubbishNodeUseCase
 import mega.privacy.android.domain.usecase.canceltoken.CancelCancelTokenUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInBackupsUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
+import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.search.GetSearchCategoriesUseCase
 import mega.privacy.android.domain.usecase.search.SearchNodesUseCase
 import mega.privacy.android.domain.usecase.shares.GetNodeAccessPermission
@@ -61,7 +60,6 @@ class SearchActivityViewModelTest {
     private lateinit var underTest: SearchActivityViewModel
     private val monitorNodeUpdatesFakeFlow = MutableSharedFlow<NodeUpdate>()
     private val monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase = mock()
-    private val getParentNodeHandle: GetParentNodeHandle = mock()
     private val cancelCancelTokenUseCase: CancelCancelTokenUseCase = mock()
     private val searchNodesUseCase: SearchNodesUseCase = mock()
     private val getSearchCategoriesUseCase: GetSearchCategoriesUseCase = mock()
@@ -105,7 +103,6 @@ class SearchActivityViewModelTest {
     private fun initViewModel() {
         underTest = SearchActivityViewModel(
             monitorNodeUpdatesUseCase = monitorNodeUpdatesUseCase,
-            getParentNodeHandle = getParentNodeHandle,
             setViewType = setViewType,
             monitorViewType = monitorViewType,
             stateHandle = stateHandle,
@@ -422,7 +419,6 @@ class SearchActivityViewModelTest {
         nodeList.clear()
         reset(
             monitorNodeUpdatesUseCase,
-            getParentNodeHandle,
             cancelCancelTokenUseCase,
             searchNodesUseCase,
             getSearchCategoriesUseCase,

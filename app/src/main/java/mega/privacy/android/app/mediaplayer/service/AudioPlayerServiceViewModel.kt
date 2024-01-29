@@ -78,11 +78,10 @@ import mega.privacy.android.app.utils.OfflineUtils.getOfflineFolderName
 import mega.privacy.android.app.utils.TextUtil
 import mega.privacy.android.app.utils.ThumbnailUtils.getThumbFolder
 import mega.privacy.android.app.utils.wrapper.GetOfflineThumbnailFileWrapper
-import mega.privacy.android.data.mapper.FileDurationMapper
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.mediaplayer.RepeatToggleMode
+import mega.privacy.android.domain.entity.node.TypedAudioNode
 import mega.privacy.android.domain.entity.node.TypedFileNode
-import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.transfer.TransferEvent
 import mega.privacy.android.domain.exception.BlockedMegaException
 import mega.privacy.android.domain.exception.MegaException
@@ -90,19 +89,11 @@ import mega.privacy.android.domain.exception.QuotaExceededMegaException
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.usecase.AreCredentialsNullUseCase
-import mega.privacy.android.domain.usecase.GetAudioNodesByEmailUseCase
-import mega.privacy.android.domain.usecase.GetAudioNodesByParentHandleUseCase
-import mega.privacy.android.domain.usecase.GetAudioNodesFromInSharesUseCase
-import mega.privacy.android.domain.usecase.GetAudioNodesFromOutSharesUseCase
-import mega.privacy.android.domain.usecase.GetAudioNodesFromPublicLinksUseCase
-import mega.privacy.android.domain.usecase.GetAudioNodesUseCase
-import mega.privacy.android.domain.usecase.GetAudiosByParentHandleFromMegaApiFolderUseCase
 import mega.privacy.android.domain.usecase.GetBackupsNodeUseCase
 import mega.privacy.android.domain.usecase.GetLocalFilePathUseCase
 import mega.privacy.android.domain.usecase.GetLocalFolderLinkFromMegaApiFolderUseCase
 import mega.privacy.android.domain.usecase.GetLocalFolderLinkFromMegaApiUseCase
 import mega.privacy.android.domain.usecase.GetLocalLinkFromMegaApiUseCase
-import mega.privacy.android.domain.usecase.GetNodesByHandlesUseCase
 import mega.privacy.android.domain.usecase.GetParentNodeFromMegaApiFolderUseCase
 import mega.privacy.android.domain.usecase.GetRootNodeFromMegaApiFolderUseCase
 import mega.privacy.android.domain.usecase.GetRootNodeUseCase
@@ -117,14 +108,22 @@ import mega.privacy.android.domain.usecase.mediaplayer.MegaApiFolderHttpServerSt
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunningUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStopUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.MonitorAudioBackgroundPlayEnabledUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.MonitorAudioRepeatModeUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.MonitorAudioShuffleEnabledUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.SetAudioBackgroundPlayEnabledUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.SetAudioRepeatModeUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.SetAudioShuffleEnabledUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.GetAudioNodeByHandleUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.GetAudioNodesByEmailUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.GetAudioNodesByHandlesUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.GetAudioNodesByParentHandleUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.GetAudioNodesFromInSharesUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.GetAudioNodesFromOutSharesUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.GetAudioNodesFromPublicLinksUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.GetAudioNodesUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.GetAudiosByParentHandleFromMegaApiFolderUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.MonitorAudioBackgroundPlayEnabledUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.MonitorAudioRepeatModeUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.MonitorAudioShuffleEnabledUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.SetAudioBackgroundPlayEnabledUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.SetAudioRepeatModeUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.SetAudioShuffleEnabledUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
-import mega.privacy.android.domain.usecase.node.GetNodeByHandleUseCase
 import mega.privacy.android.domain.usecase.transfers.MonitorTransferEventsUseCase
 import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import nz.mega.sdk.MegaCancelToken
@@ -162,7 +161,7 @@ class AudioPlayerServiceViewModel @Inject constructor(
     private val getRootNodeUseCase: GetRootNodeUseCase,
     private val getRootNodeFromMegaApiFolderUseCase: GetRootNodeFromMegaApiFolderUseCase,
     private val getRubbishNodeUseCase: GetRubbishNodeUseCase,
-    private val getNodeByHandleUseCase: GetNodeByHandleUseCase,
+    private val getAudioNodeByHandleUseCase: GetAudioNodeByHandleUseCase,
     private val getAudioNodesFromPublicLinksUseCase: GetAudioNodesFromPublicLinksUseCase,
     private val getAudioNodesFromInSharesUseCase: GetAudioNodesFromInSharesUseCase,
     private val getAudioNodesFromOutSharesUseCase: GetAudioNodesFromOutSharesUseCase,
@@ -171,16 +170,15 @@ class AudioPlayerServiceViewModel @Inject constructor(
     private val getUserNameByEmailUseCase: GetUserNameByEmailUseCase,
     private val getAudiosByParentHandleFromMegaApiFolderUseCase: GetAudiosByParentHandleFromMegaApiFolderUseCase,
     private val getAudioNodesByParentHandleUseCase: GetAudioNodesByParentHandleUseCase,
-    private val getNodesByHandlesUseCase: GetNodesByHandlesUseCase,
+    private val getAudioNodesByHandlesUseCase: GetAudioNodesByHandlesUseCase,
     private val getFingerprintUseCase: GetFingerprintUseCase,
-    private val fileDurationMapper: FileDurationMapper,
-    monitorAudioBackgroundPlayEnabledUseCase: MonitorAudioBackgroundPlayEnabledUseCase,
-    monitorAudioShuffleEnabledUseCase: MonitorAudioShuffleEnabledUseCase,
-    monitorAudioRepeatModeUseCase: MonitorAudioRepeatModeUseCase,
     private val setAudioBackgroundPlayEnabledUseCase: SetAudioBackgroundPlayEnabledUseCase,
     private val setAudioShuffleEnabledUseCase: SetAudioShuffleEnabledUseCase,
     private val setAudioRepeatModeUseCase: SetAudioRepeatModeUseCase,
     private val isConnectedToInternetUseCase: IsConnectedToInternetUseCase,
+    monitorAudioBackgroundPlayEnabledUseCase: MonitorAudioBackgroundPlayEnabledUseCase,
+    monitorAudioShuffleEnabledUseCase: MonitorAudioShuffleEnabledUseCase,
+    monitorAudioRepeatModeUseCase: MonitorAudioRepeatModeUseCase,
 ) : AudioPlayerServiceViewModelGateway, ExposedShuffleOrder.ShuffleChangeListener,
     SearchCallback.Data {
     private val compositeDisposable = CompositeDisposable()
@@ -361,9 +359,9 @@ class AudioPlayerServiceViewModel @Inject constructor(
 
                     AUDIO_BROWSE_ADAPTER -> {
                         playlistTitle.postValue(context.getString(R.string.upload_to_audio))
-                        buildPlaySourcesByTypedNodes(
+                        buildPlaySourcesByTypedAudioNodes(
                             type = type,
-                            typedNodes = getAudioNodesUseCase(getSortOrderFromIntent(intent)),
+                            typedAudioNodes = getAudioNodesUseCase(getSortOrderFromIntent(intent)),
                             firstPlayHandle = firstPlayHandle
                         )
                     }
@@ -384,9 +382,9 @@ class AudioPlayerServiceViewModel @Inject constructor(
 
                         if (isInRootLinksLevel(type, parentHandle)) {
                             playlistTitle.postValue(context.getString(R.string.tab_links_shares))
-                            buildPlaySourcesByTypedNodes(
+                            buildPlaySourcesByTypedAudioNodes(
                                 type = type,
-                                typedNodes = getAudioNodesFromPublicLinksUseCase(order),
+                                typedAudioNodes = getAudioNodesFromPublicLinksUseCase(order),
                                 firstPlayHandle = firstPlayHandle
                             )
                             return@launch
@@ -394,9 +392,9 @@ class AudioPlayerServiceViewModel @Inject constructor(
 
                         if (type == INCOMING_SHARES_ADAPTER && parentHandle == INVALID_HANDLE) {
                             playlistTitle.postValue(context.getString(R.string.tab_incoming_shares))
-                            buildPlaySourcesByTypedNodes(
+                            buildPlaySourcesByTypedAudioNodes(
                                 type = type,
-                                typedNodes = getAudioNodesFromInSharesUseCase(order),
+                                typedAudioNodes = getAudioNodesFromInSharesUseCase(order),
                                 firstPlayHandle = firstPlayHandle
                             )
                             return@launch
@@ -404,9 +402,9 @@ class AudioPlayerServiceViewModel @Inject constructor(
 
                         if (type == OUTGOING_SHARES_ADAPTER && parentHandle == INVALID_HANDLE) {
                             playlistTitle.postValue(context.getString(R.string.tab_outgoing_shares))
-                            buildPlaySourcesByTypedNodes(
+                            buildPlaySourcesByTypedAudioNodes(
                                 type = type,
-                                typedNodes = getAudioNodesFromOutSharesUseCase(
+                                typedAudioNodes = getAudioNodesFromOutSharesUseCase(
                                     lastHandle = INVALID_HANDLE,
                                     order = order
                                 ),
@@ -425,9 +423,9 @@ class AudioPlayerServiceViewModel @Inject constructor(
                                                     playlistTitle.postValue("$sharesTitle $it")
                                                 }
                                         }
-                                        buildPlaySourcesByTypedNodes(
+                                        buildPlaySourcesByTypedAudioNodes(
                                             type = type,
-                                            typedNodes = nodes,
+                                            typedAudioNodes = nodes,
                                             firstPlayHandle = firstPlayHandle
                                         )
                                     }
@@ -442,7 +440,7 @@ class AudioPlayerServiceViewModel @Inject constructor(
                                 else -> getRootNodeUseCase()
                             }
                         } else {
-                            getNodeByHandleUseCase(parentHandle)
+                            getAudioNodeByHandleUseCase(parentHandle)
                         }?.let { parent ->
                             if (parentHandle == INVALID_HANDLE) {
                                 context.getString(
@@ -461,9 +459,9 @@ class AudioPlayerServiceViewModel @Inject constructor(
                                 parentHandle = parent.id.longValue,
                                 order = getSortOrderFromIntent(intent)
                             )?.let { children ->
-                                buildPlaySourcesByTypedNodes(
+                                buildPlaySourcesByTypedAudioNodes(
                                     type = type,
-                                    typedNodes = children,
+                                    typedAudioNodes = children,
                                     firstPlayHandle = firstPlayHandle
                                 )
                             }
@@ -499,9 +497,9 @@ class AudioPlayerServiceViewModel @Inject constructor(
                                 parentHandle = parent.id.longValue,
                                 order = order
                             )?.let { children ->
-                                buildPlaySourcesByTypedNodes(
+                                buildPlaySourcesByTypedAudioNodes(
                                     type = type,
-                                    typedNodes = children,
+                                    typedAudioNodes = children,
                                     firstPlayHandle = firstPlayHandle
                                 )
                             }
@@ -538,8 +536,7 @@ class AudioPlayerServiceViewModel @Inject constructor(
         } else {
             playlistItems.clear()
 
-            val node: TypedFileNode? =
-                getNodeByHandleUseCase(firstPlayHandle) as? TypedFileNode
+            val node = getAudioNodeByHandleUseCase(firstPlayHandle)
             val thumbnail = when {
                 type == OFFLINE_ADAPTER -> {
                     offlineThumbnailFileWrapper.getThumbnailFile(
@@ -557,9 +554,7 @@ class AudioPlayerServiceViewModel @Inject constructor(
                 }
             }
 
-            val duration = node?.type?.let {
-                fileDurationMapper(it)
-            } ?: 0
+            val duration = node?.duration ?: 0
 
             playlistItemMapper(
                 firstPlayHandle,
@@ -656,12 +651,12 @@ class AudioPlayerServiceViewModel @Inject constructor(
      * Build play sources by node TypedNodes
      *
      * @param type adapter type
-     * @param typedNodes [TypedNode] list
+     * @param typedAudioNodes [TypedAudioNode] list
      * @param firstPlayHandle the index of first playing item
      */
-    private suspend fun buildPlaySourcesByTypedNodes(
+    private suspend fun buildPlaySourcesByTypedAudioNodes(
         type: Int,
-        typedNodes: List<TypedNode>,
+        typedAudioNodes: List<TypedAudioNode>,
         firstPlayHandle: Long,
     ) {
         playlistItems.clear()
@@ -671,61 +666,57 @@ class AudioPlayerServiceViewModel @Inject constructor(
 
         val nodesWithoutThumbnail = ArrayList<Pair<Long, File>>()
 
-        typedNodes.mapIndexed { currentIndex, typedNode ->
-            if (typedNode is TypedFileNode) {
-                getLocalFilePathUseCase(typedNode).let { localPath ->
-                    if (localPath != null && isLocalFile(typedNode, localPath)) {
-                        mediaItemFromFile(File(localPath), typedNode.id.longValue.toString())
-                    } else {
-                        val url =
-                            if (type == FOLDER_LINK_ADAPTER) {
-                                if (isMegaApiFolder(type)) {
-                                    getLocalFolderLinkFromMegaApiFolderUseCase(typedNode.id.longValue)
-                                } else {
-                                    getLocalFolderLinkFromMegaApiUseCase(typedNode.id.longValue)
-                                }
+        typedAudioNodes.mapIndexed { currentIndex, typedAudioNode ->
+            getLocalFilePathUseCase(typedAudioNode).let { localPath ->
+                if (localPath != null && isLocalFile(typedAudioNode, localPath)) {
+                    mediaItemFromFile(File(localPath), typedAudioNode.id.longValue.toString())
+                } else {
+                    val url =
+                        if (type == FOLDER_LINK_ADAPTER) {
+                            if (isMegaApiFolder(type)) {
+                                getLocalFolderLinkFromMegaApiFolderUseCase(typedAudioNode.id.longValue)
                             } else {
-                                getLocalLinkFromMegaApiUseCase(typedNode.id.longValue)
+                                getLocalFolderLinkFromMegaApiUseCase(typedAudioNode.id.longValue)
                             }
-                        if (url == null) {
-                            null
                         } else {
-                            MediaItem.Builder()
-                                .setUri(Uri.parse(url))
-                                .setMediaId(typedNode.id.longValue.toString())
-                                .build()
+                            getLocalLinkFromMegaApiUseCase(typedAudioNode.id.longValue)
                         }
-                    }?.let {
-                        mediaItems.add(it)
+                    if (url == null) {
+                        null
+                    } else {
+                        MediaItem.Builder()
+                            .setUri(Uri.parse(url))
+                            .setMediaId(typedAudioNode.id.longValue.toString())
+                            .build()
                     }
+                }?.let {
+                    mediaItems.add(it)
                 }
+            }
 
-                if (typedNode.id.longValue == firstPlayHandle) {
-                    firstPlayIndex = currentIndex
-                }
-                val thumbnail = typedNode.thumbnailPath?.let { path ->
-                    File(path)
-                }
+            if (typedAudioNode.id.longValue == firstPlayHandle) {
+                firstPlayIndex = currentIndex
+            }
+            val thumbnail = typedAudioNode.thumbnailPath?.let { path ->
+                File(path)
+            }
 
-                val duration = typedNode.type.let {
-                    fileDurationMapper(it) ?: 0
-                }
+            val duration = typedAudioNode.duration
 
-                playlistItemMapper(
-                    typedNode.id.longValue,
-                    typedNode.name,
-                    thumbnail,
-                    currentIndex,
-                    TYPE_NEXT,
-                    typedNode.size,
-                    duration,
-                ).let { playlistItem ->
-                    playlistItems.add(playlistItem)
-                }
+            playlistItemMapper(
+                typedAudioNode.id.longValue,
+                typedAudioNode.name,
+                thumbnail,
+                currentIndex,
+                TYPE_NEXT,
+                typedAudioNode.size,
+                duration,
+            ).let { playlistItem ->
+                playlistItems.add(playlistItem)
+            }
 
-                if (thumbnail != null && !thumbnail.exists()) {
-                    nodesWithoutThumbnail.add(Pair(typedNode.id.longValue, thumbnail))
-                }
+            if (thumbnail != null && !thumbnail.exists()) {
+                nodesWithoutThumbnail.add(Pair(typedAudioNode.id.longValue, thumbnail))
             }
         }
 
@@ -773,9 +764,9 @@ class AudioPlayerServiceViewModel @Inject constructor(
         handles: List<Long>,
         firstPlayHandle: Long,
     ) {
-        buildPlaySourcesByTypedNodes(
+        buildPlaySourcesByTypedAudioNodes(
             type = type,
-            typedNodes = getNodesByHandlesUseCase(handles),
+            typedAudioNodes = getAudioNodesByHandlesUseCase(handles),
             firstPlayHandle = firstPlayHandle
         )
     }
@@ -1398,6 +1389,9 @@ class AudioPlayerServiceViewModel @Inject constructor(
         }
     }
 
+    /**
+     * onShuffleChanged
+     */
     override fun onShuffleChanged(newShuffle: ShuffleOrder) {
         shuffleOrder = newShuffle
         if (shuffleEnabled.value && shuffleOrder.length != 0 && shuffleOrder.length == playlistItems.size) {

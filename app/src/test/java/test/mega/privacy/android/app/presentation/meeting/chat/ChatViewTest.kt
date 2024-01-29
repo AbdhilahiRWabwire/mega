@@ -21,12 +21,11 @@ import mega.privacy.android.app.presentation.meeting.chat.view.sheet.TEST_TAG_AT
 import mega.privacy.android.core.ui.controls.chat.TEST_TAG_ATTACHMENT_ICON
 import mega.privacy.android.core.ui.controls.menus.TAG_MENU_ACTIONS_SHOW_MORE
 import mega.privacy.android.domain.entity.ChatRoomPermission
-import mega.privacy.android.domain.entity.chat.ChatCall
-import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.mock
+import test.mega.privacy.android.app.onNodeWithText
 
 @RunWith(AndroidJUnit4::class)
 class ChatViewTest {
@@ -41,7 +40,8 @@ class ChatViewTest {
         initComposeRuleContent(
             ChatUiState(
                 myPermission = ChatRoomPermission.Standard,
-                currentCall = mock()
+                isConnected = true,
+                callInOtherChat = mock()
             )
         )
         composeTestRule.onNodeWithTag(TEST_TAG_VIDEO_CALL_ACTION, true).apply {
@@ -57,7 +57,8 @@ class ChatViewTest {
         initComposeRuleContent(
             ChatUiState(
                 myPermission = ChatRoomPermission.Standard,
-                currentCall = null
+                callInOtherChat = null,
+                isConnected = true,
             )
         )
         composeTestRule.onNodeWithTag(TEST_TAG_VIDEO_CALL_ACTION, true).apply {
@@ -75,6 +76,7 @@ class ChatViewTest {
                 hasAnyContact = false,
                 myPermission = ChatRoomPermission.Moderator,
                 isGroup = true,
+                isConnected = true,
             )
         )
         composeTestRule.onNodeWithTag(TAG_MENU_ACTIONS_SHOW_MORE, true).performClick()
@@ -91,6 +93,7 @@ class ChatViewTest {
                 allContactsParticipateInChat = true,
                 isGroup = true,
                 hasAnyContact = true,
+                isConnected = true,
             )
         )
         composeTestRule.onNodeWithTag(TAG_MENU_ACTIONS_SHOW_MORE, true).apply {
@@ -128,6 +131,7 @@ class ChatViewTest {
                 myPermission = ChatRoomPermission.Moderator,
                 callInThisChat = mock(),
                 isGroup = true,
+                isConnected = true,
             )
         )
         composeTestRule.onNodeWithTag(TAG_MENU_ACTIONS_SHOW_MORE, true).apply {
@@ -141,83 +145,12 @@ class ChatViewTest {
             .assertIsDisplayed()
     }
 
-
-    @Test
-    fun `test that start meeting view shows correctly when chat room is pending meeting and available and user doesn't join`() {
-        initComposeRuleContent(
-            ChatUiState(
-                schedIsPending = true,
-                isActive = true,
-                callInThisChat = ChatCall(
-                    chatId = 1L,
-                    callId = 1L,
-                    status = ChatCallStatus.Unknown
-                ),
-            )
-        )
-        composeTestRule.onNodeWithText(
-            composeTestRule.activity.getString(
-                R.string.meetings_chat_room_start_scheduled_meeting_option
-            )
-        ).assertIsDisplayed()
-    }
-
-    @Test
-    fun `test that join meeting view shows correctly when chat room is pending meeting and available and user doesn't join`() {
-        initComposeRuleContent(
-            ChatUiState(
-                schedIsPending = true,
-                isActive = true,
-                callInThisChat = ChatCall(
-                    chatId = 1L,
-                    callId = 1L,
-                    status = ChatCallStatus.UserNoPresent
-                ),
-            )
-        )
-        composeTestRule.onNodeWithText(
-            composeTestRule.activity.getString(
-                R.string.meetings_chat_room_join_scheduled_meeting_option
-            )
-        ).assertIsDisplayed()
-    }
-
-    @Test
-    fun `test that join current call banner is shown in 1on1 chat, in which there is a call I am not participating yet`() {
-        initComposeRuleContent(
-            ChatUiState(
-                isConnected = true,
-                callInThisChat = ChatCall(
-                    chatId = 1L,
-                    callId = 1L,
-                    status = ChatCallStatus.UserNoPresent
-                ),
-                isGroup = false,
-            )
-        )
-        composeTestRule.onNodeWithText(
-            composeTestRule.activity.getString(R.string.join_call_layout)
-        ).assertIsDisplayed()
-    }
-
-    @Test
-    fun `test that return to call banner is shown when I am already participating in a call`() {
-        initComposeRuleContent(
-            ChatUiState(
-                isConnected = true,
-                currentCall = mock(),
-            )
-        )
-        composeTestRule.onNodeWithText(
-            composeTestRule.activity.getString(R.string.call_in_progress_layout)
-        ).assertIsDisplayed()
-    }
-
     @Test
     fun `test that enable geolocation dialog shows when geolocation is not enabled and user clicks on location`() {
         initComposeRuleContent(
             ChatUiState(
-                isGeolocationEnabled = false
+                myPermission = ChatRoomPermission.Standard,
+                isGeolocationEnabled = false,
             )
         )
         composeTestRule.onNodeWithTag(TEST_TAG_ATTACHMENT_ICON, true).apply {
@@ -228,6 +161,18 @@ class ChatViewTest {
         composeTestRule.onNodeWithTag(TEST_TAG_ENABLE_GEOLOCATION_DIALOG).assertIsDisplayed()
     }
 
+    @Test
+    fun `test that join button is shown if it is in preview mode`() {
+        initComposeRuleContent(ChatUiState(isPreviewMode = true))
+        composeTestRule.onNodeWithText(R.string.action_join).assertIsDisplayed()
+    }
+
+    @Test
+    fun `test that join button is not shown if it is not in preview mode`() {
+        initComposeRuleContent(ChatUiState(isPreviewMode = false))
+        composeTestRule.onNodeWithText(R.string.action_join).assertDoesNotExist()
+    }
+
 
     private fun initComposeRuleContent(state: ChatUiState) {
         composeTestRule.setContent {
@@ -235,7 +180,7 @@ class ChatViewTest {
                 uiState = state,
                 onBackPressed = {},
                 onMenuActionPressed = actionPressed,
-                messageListView = {}
+                messageListView = { _, _, _ -> }
             )
         }
     }

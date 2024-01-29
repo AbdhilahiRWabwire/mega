@@ -46,7 +46,7 @@ class MonitorCloudDriveNodesUseCase @Inject constructor(
 
     private suspend fun populateNodes(parentId: NodeId): List<ImageNode> {
         val sortOrder = getCloudSortOrder()
-        val nodes = photosRepository.getCloudDriveImageNodes(parentId, sortOrder)
+        val nodes = photosRepository.fetchImageNodes(parentId, sortOrder)
 
         nodesCache.clear()
         nodesCache.putAll(nodes.associateBy { it.id })

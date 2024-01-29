@@ -14,11 +14,12 @@ import javax.inject.Inject
 class SlideshowBottomSheetMenuItem @Inject constructor(
     override val menuAction: SlideshowMenuAction,
 ) : NodeBottomSheetMenuItem<MenuActionWithIcon> {
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedNode,
+        isConnected: Boolean,
     ) = false //Due to requirement change, now just hide slideshow entry in node context menu
 
     override val groupId = 5

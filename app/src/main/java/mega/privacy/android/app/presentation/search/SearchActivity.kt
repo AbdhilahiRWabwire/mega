@@ -5,21 +5,19 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.ModalBottomSheetValue
-import androidx.compose.material.rememberModalBottomSheetState
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.Scaffold
+import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
+import de.palm.composestateevents.EventEffect
 import kotlinx.coroutines.launch
 import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
@@ -27,16 +25,13 @@ import mega.privacy.android.app.activities.WebViewActivity
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.modalbottomsheet.SortByBottomSheetDialogFragment
 import mega.privacy.android.app.presentation.clouddrive.FileBrowserViewModel
-import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.mapper.GetIntentToOpenFileMapper
 import mega.privacy.android.app.presentation.node.NodeBottomSheetActionHandler
-import mega.privacy.android.app.presentation.node.view.NodeOptionsBottomSheet
+import mega.privacy.android.app.presentation.node.dialogs.deletenode.MoveToRubbishOrDeleteNodeDialogViewModel
 import mega.privacy.android.app.presentation.search.model.SearchFilter
-import mega.privacy.android.app.presentation.search.view.SearchComposeView
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.MegaApiUtils
-import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.FolderNode
@@ -44,6 +39,7 @@ import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.search.SearchCategory
 import mega.privacy.android.domain.entity.search.SearchType
 import mega.privacy.android.domain.usecase.GetThemeMode
+import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.mobile.analytics.event.SearchAudioFilterPressedEvent
 import mega.privacy.mobile.analytics.event.SearchDocsFilterPressedEvent
 import mega.privacy.mobile.analytics.event.SearchImageFilterPressedEvent
@@ -59,6 +55,7 @@ import javax.inject.Inject
 class SearchActivity : AppCompatActivity() {
 
     private val viewModel: SearchActivityViewModel by viewModels()
+    private val moveToRubbishOrDeleteNodeDialogViewModel: MoveToRubbishOrDeleteNodeDialogViewModel by viewModels()
 
     private val sortByHeaderViewModel: SortByHeaderViewModel by viewModels()
 
@@ -113,65 +110,45 @@ class SearchActivity : AppCompatActivity() {
     /**
      * onCreate
      */
-    @OptIn(ExperimentalMaterialApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             val themeMode by getThemeMode()
                 .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
-            val uiState by viewModel.state.collectAsStateWithLifecycle()
-            val modalSheetState = rememberModalBottomSheetState(
-                initialValue = ModalBottomSheetValue.Hidden,
-                skipHalfExpanded = false,
-            )
-            var selectedNode: NodeUIItem<TypedNode>? by remember {
-                mutableStateOf(null)
-            }
 
-            BackHandler(enabled = modalSheetState.isVisible) {
-                selectedNode = null
-            }
+            val moveToRubbishState by moveToRubbishOrDeleteNodeDialogViewModel.state.collectAsStateWithLifecycle()
+            val scaffoldState = rememberScaffoldState()
             MegaAppTheme(isDark = themeMode.isDarkMode()) {
-                SearchComposeView(
-                    state = uiState,
-                    sortOrder = getString(
-                        SortByHeaderViewModel.orderNameMap[uiState.sortOrder]
-                            ?: R.string.sortby_name
-                    ),
-                    onItemClick = viewModel::onItemClicked,
-                    onLongClick = viewModel::onLongItemClicked,
-                    onChangeViewTypeClick = viewModel::onChangeViewTypeClicked,
-                    onSortOrderClick = {
-                        showSortOrderBottomSheet()
-                    },
-                    onMenuClick = {
-                        selectedNode = it
-                    },
-                    onDisputeTakeDownClicked = ::navigateToLink,
-                    onLinkClicked = ::navigateToLink,
-                    onErrorShown = viewModel::errorMessageShown,
-                    updateFilter = viewModel::updateFilter,
-                    trackAnalytics = ::trackAnalytics,
-                    updateSearchQuery = viewModel::updateSearchQuery,
-                )
-                handleClick(uiState.lastSelectedNode)
-
-                selectedNode?.let {
-                    NodeOptionsBottomSheet(
-                        modalSheetState = modalSheetState,
-                        node = it,
-                        handler = NodeBottomSheetActionHandler(this),
-                    ) {
-                        selectedNode = null
-                    }
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    scaffoldState = scaffoldState,
+                ) { padding ->
+                    SearchNavHostController(
+                        modifier = Modifier.padding(padding),
+                        viewModel = viewModel,
+                        moveToRubbishOrDeleteNodeDialogViewModel = moveToRubbishOrDeleteNodeDialogViewModel,
+                        handleClick = ::handleClick,
+                        navigateToLink = ::navigateToLink,
+                        showSortOrderBottomSheet = ::showSortOrderBottomSheet,
+                        trackAnalytics = ::trackAnalytics,
+                        nodeBottomSheetActionHandler = NodeBottomSheetActionHandler(this),
+                        onBackPressed = {
+                            if (viewModel.state.value.selectedNodes.isNotEmpty()) {
+                                viewModel.clearSelection()
+                            } else {
+                                onBackPressedDispatcher.onBackPressed()
+                            }
+                        }
+                    )
                 }
-            }
 
-            LaunchedEffect(key1 = selectedNode) {
-                if (selectedNode == null) {
-                    modalSheetState.hide()
-                } else {
-                    modalSheetState.show()
+                EventEffect(
+                    moveToRubbishState.deleteEvent,
+                    onConsumed = {
+                        moveToRubbishOrDeleteNodeDialogViewModel.consumeDeleteEvent()
+                    }
+                ) {
+                    scaffoldState.snackbarHostState.showSnackbar(it)
                 }
             }
         }
@@ -195,7 +172,7 @@ class SearchActivity : AppCompatActivity() {
      */
     private fun navigateToLink(link: String) {
         val uriUrl = Uri.parse(link)
-        val launchBrowser = Intent(this@SearchActivity, WebViewActivity::class.java)
+        val launchBrowser = Intent(this, WebViewActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             .setData(uriUrl)
         startActivity(launchBrowser)
@@ -275,7 +252,7 @@ class SearchActivity : AppCompatActivity() {
         } else {
             when (selectedFilter?.filter) {
                 SearchCategory.IMAGES -> SearchImageFilterPressedEvent
-                SearchCategory.DOCUMENTS -> SearchDocsFilterPressedEvent
+                SearchCategory.ALL_DOCUMENTS -> SearchDocsFilterPressedEvent
                 SearchCategory.AUDIO -> SearchAudioFilterPressedEvent
                 SearchCategory.VIDEO -> SearchVideosFilterPressedEvent
                 else -> SearchResetFilterPressedEvent

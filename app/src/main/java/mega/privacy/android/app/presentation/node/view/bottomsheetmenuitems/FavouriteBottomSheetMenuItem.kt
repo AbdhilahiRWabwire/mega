@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.node.view.bottomsheetmenuitems
 
+import androidx.navigation.NavHostController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.presentation.node.model.menuaction.FavouriteMenuAction
@@ -22,21 +23,24 @@ class FavouriteBottomSheetMenuItem @Inject constructor(
     private val updateNodeFavoriteUseCase: UpdateNodeFavoriteUseCase,
     @ApplicationScope private val scope: CoroutineScope,
 ) : NodeBottomSheetMenuItem<MenuActionWithIcon> {
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         isNodeInRubbish: Boolean,
         accessPermission: AccessPermission?,
         isInBackups: Boolean,
         node: TypedNode,
+        isConnected: Boolean,
     ) = node.isTakenDown.not()
             && isNodeInRubbish.not()
             && accessPermission == AccessPermission.OWNER
             && node.isFavourite.not()
+            && isInBackups.not()
 
 
     override fun getOnClickFunction(
         node: TypedNode,
         onDismiss: () -> Unit,
         actionHandler: (menuAction: MenuAction, node: TypedNode) -> Unit,
+        navController: NavHostController,
     ): () -> Unit = {
         onDismiss()
         scope.launch {

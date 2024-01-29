@@ -2116,6 +2116,7 @@ public class ChatActivity extends PasscodeActivity
                 intentMeeting.putExtra(MeetingActivity.MEETING_AUDIO_ENABLE, chatState.getCurrentCallAudioStatus());
                 intentMeeting.putExtra(MeetingActivity.MEETING_VIDEO_ENABLE, chatState.getCurrentCallVideoStatus());
                 intentMeeting.putExtra(MeetingActivity.MEETING_CALL_RECORDING, chatState.isSessionOnRecording());
+                intentMeeting.putExtra(MeetingActivity.MEETING_IS_RINGIN_ALL, chatState.isRingingAll());
                 startActivity(intentMeeting);
             }
 
@@ -9515,7 +9516,7 @@ public class ChatActivity extends PasscodeActivity
             writeMsgLayout.setBackground(ContextCompat.getDrawable(this, R.drawable.background_write_layout));
 
             tB.setVisibility(View.VISIBLE);
-            expandCollapseInputTextIcon.setImageResource(R.drawable.ic_expand_text_input);
+            expandCollapseInputTextIcon.setImageResource(mega.privacy.android.core.R.drawable.ic_expand_text_input);
 
             writingContainerLayout.getLayoutParams().height = WRAP_CONTENT;
             inputTextContainer.getLayoutParams().height = WRAP_CONTENT;
@@ -9546,7 +9547,7 @@ public class ChatActivity extends PasscodeActivity
             writeMsgLayout.setBackground(null);
 
             tB.setVisibility(View.GONE);
-            expandCollapseInputTextIcon.setImageResource(R.drawable.ic_collapse_text_input);
+            expandCollapseInputTextIcon.setImageResource(mega.privacy.android.core.R.drawable.ic_collapse_text_input);
 
             writingContainerLayout.getLayoutParams().height = MATCH_PARENT;
             inputTextContainer.getLayoutParams().height = MATCH_PARENT;
