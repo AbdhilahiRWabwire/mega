@@ -21,14 +21,13 @@ import org.mockito.kotlin.whenever
 internal class ShouldShowCookieDialogWithAdsUseCaseTest {
 
     private lateinit var underTest: ShouldShowCookieDialogWithAdsUseCase
-    private val getCookieSettingsUseCase = mock<GetCookieSettingsUseCase>()
     private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase>()
+    private val updateCookieSettingsUseCase = mock<UpdateCookieSettingsUseCase>()
 
     @AfterEach
     fun resetMocks() {
         reset(
             getFeatureFlagValueUseCase,
-            getCookieSettingsUseCase,
         )
     }
 
@@ -36,7 +35,6 @@ internal class ShouldShowCookieDialogWithAdsUseCaseTest {
     fun initTestClass() {
         underTest = ShouldShowCookieDialogWithAdsUseCase(
             getFeatureFlagValueUseCase,
-            getCookieSettingsUseCase,
         )
     }
 
@@ -65,8 +63,9 @@ internal class ShouldShowCookieDialogWithAdsUseCaseTest {
                 isAdsEnabledFeature,
                 isExternalAdsEnabledFeature
             )
-            whenever(getCookieSettingsUseCase.invoke()).thenReturn(cookieSettings)
+            whenever(updateCookieSettingsUseCase.invoke(any())).thenReturn(Unit)
             val result = underTest.invoke(
+                cookieSettings = cookieSettings,
                 inAppAdvertisementFeature = mock(),
                 isAdsEnabledFeature = mock(),
                 isExternalAdsEnabledFeature = mock(),

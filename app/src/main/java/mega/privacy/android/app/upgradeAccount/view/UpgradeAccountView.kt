@@ -1,5 +1,7 @@
 package mega.privacy.android.app.upgradeAccount.view
 
+import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -51,6 +53,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
@@ -69,25 +72,31 @@ import mega.privacy.android.app.upgradeAccount.model.mapper.LocalisedPriceString
 import mega.privacy.android.app.upgradeAccount.view.components.MonthlyYearlyTabs
 import mega.privacy.android.app.upgradeAccount.view.components.ProPlanInfoCard
 import mega.privacy.android.app.upgradeAccount.view.components.SaveUpToLabel
-import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.app.utils.Constants.INVALID_VALUE
+import mega.privacy.android.app.utils.Constants.PRICING_PAGE_URL
+import mega.privacy.android.app.utils.PLAY_STORE_SUBSCRIPTION_URL
+import mega.privacy.android.core.ui.controls.text.MegaSpannedClickableText
+import mega.privacy.android.core.ui.controls.text.MegaText
+import mega.privacy.android.core.ui.model.MegaSpanStyle
+import mega.privacy.android.core.ui.model.MegaSpanStyleWithAnnotation
 import mega.privacy.android.core.ui.model.SpanIndicator
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.core.ui.theme.Typography
 import mega.privacy.android.core.ui.theme.extensions.black_white
 import mega.privacy.android.core.ui.theme.extensions.black_yellow_700
+import mega.privacy.android.core.ui.theme.extensions.body4
 import mega.privacy.android.core.ui.theme.extensions.grey_020_grey_800
 import mega.privacy.android.core.ui.theme.extensions.grey_100_alpha_060_dark_grey
 import mega.privacy.android.core.ui.theme.extensions.grey_alpha_012_white_alpha_012
 import mega.privacy.android.core.ui.theme.extensions.teal_300_teal_200
 import mega.privacy.android.core.ui.theme.extensions.yellow_100_yellow_700_alpha_015
 import mega.privacy.android.core.ui.theme.subtitle1
+import mega.privacy.android.core.ui.theme.tokens.TextColor
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.Currency
 import mega.privacy.android.domain.entity.account.CurrencyAmount
 import mega.privacy.android.legacy.core.ui.controls.appbar.SimpleNoTitleTopAppBar
-import mega.privacy.android.legacy.core.ui.controls.text.MegaSpannedClickableText
-import mega.privacy.android.legacy.core.ui.model.SpanStyleWithAnnotation
+import mega.privacy.android.shared.theme.MegaAppTheme
 
 internal const val UPGRADE_ACCOUNT_SCREEN_TAG = "upgrade_account_screen:"
 internal const val TOS_TAG = "upgrade_account_screen:link_terms_of_service"
@@ -98,6 +107,13 @@ internal const val EMPTY_CARD_TAG = "upgrade_account_screen:card_empty_loading_p
 internal const val PRO_PLAN_CARD_TAG = "upgrade_account_screen:card_pro_plan_"
 internal const val PRICING_PAGE_LINK_TAG = "upgrade_account_screen:text_pricing_page_link"
 internal const val BUY_BUTTON_TAG = "upgrade_account_screen:button_buy_pro_plan_"
+internal const val UPGRADE_WARNING_BANNER_TAG = "upgrade_account_screen:upgrade_warning_banner"
+internal const val GOOGLE_PLAY_STORE_SUBSCRIPTION_LINK_TAG =
+    "upgrade_account_screen:text_link_google_play_store_subscription"
+internal const val SUBSCRIPTION_DETAILS_TITLE_TAG =
+    "upgrade_account_screen:text_subscription_details_title"
+internal const val SUBSCRIPTION_DETAILS_DESCRIPTION_TAG =
+    "upgrade_account_screen:text_subscription_details_description"
 
 /**
  * Screen is shown when user taps on Upgrade button
@@ -110,12 +126,15 @@ fun UpgradeAccountView(
     onBackPressed: () -> Unit,
     onBuyClicked: () -> Unit,
     onTOSClicked: () -> Unit,
+    onPlayStoreLinkClicked: (String) -> Unit,
     onPricingPageClicked: (String) -> Unit,
     onChoosingMonthlyYearlyPlan: (isMonthly: Boolean) -> Unit,
     onChoosingPlanType: (chosenPlan: AccountType) -> Unit,
     hideBillingWarning: () -> Unit,
+    showBillingWarning: () -> Unit,
     onDialogConfirmButtonClicked: (Int) -> Unit,
     onDialogDismissButtonClicked: () -> Unit,
+    showUpgradeWarningBanner: Boolean,
 ) {
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
@@ -126,8 +145,10 @@ fun UpgradeAccountView(
     var isClickedCurrentPlan by rememberSaveable { mutableStateOf(false) }
     var isPreselectedPlanOnce by rememberSaveable { mutableStateOf(false) }
     val isPaymentMethodAvailable = state.isPaymentMethodAvailable
-    var hideFloatButton by rememberSaveable { mutableStateOf(false) }
+    var hideFloatButton by rememberSaveable { mutableStateOf(showUpgradeWarningBanner) }
     val context = LocalContext.current
+    var isUpgradeWarningBannerVisible by rememberSaveable { mutableStateOf(showUpgradeWarningBanner) }
+
     Scaffold(
         scaffoldState = scaffoldState,
         topBar = {
@@ -172,7 +193,20 @@ fun UpgradeAccountView(
                 .verticalScroll(state = scrollState)
         ) {
             if (state.showBillingWarning) {
-                BillingWarning(hideBillingWarning)
+                WarningBanner(
+                    textResId = R.string.upgrade_billing_warning,
+                    testTag = BILLING_WARNING_TAG,
+                    hideBillingWarning = hideBillingWarning
+                )
+            }
+            AnimatedVisibility(visible = isUpgradeWarningBannerVisible) {
+                WarningBanner(
+                    textResId = R.string.account_upgrade_vpn_wrong_account_upgrade_banner_description,
+                    testTag = UPGRADE_WARNING_BANNER_TAG
+                ) {
+                    isUpgradeWarningBannerVisible = false
+                    showBillingWarning()
+                }
             }
             Text(
                 text = stringResource(id = R.string.account_upgrade_account_title_choose_right_plan),
@@ -190,7 +224,7 @@ fun UpgradeAccountView(
                     isMonthly = it
                     onChoosingMonthlyYearlyPlan(it)
                     hideFloatButton =
-                        isClickedCurrentPlan && ((isMonthly && userSubscription == UserSubscription.MONTHLY_SUBSCRIBED) || (!isMonthly && userSubscription == UserSubscription.YEARLY_SUBSCRIBED))
+                        (isClickedCurrentPlan && ((isMonthly && userSubscription == UserSubscription.MONTHLY_SUBSCRIBED) || (!isMonthly && userSubscription == UserSubscription.YEARLY_SUBSCRIBED))) || showUpgradeWarningBanner
                 },
                 testTag = UPGRADE_ACCOUNT_SCREEN_TAG,
             )
@@ -242,7 +276,7 @@ fun UpgradeAccountView(
                                     onChoosingMonthlyYearlyPlan(isMonthly)
                                     onChoosingPlanType(it.accountType)
                                     isClickedCurrentPlan = isCurrentPlan
-                                    hideFloatButton = false
+                                    hideFloatButton = showUpgradeWarningBanner
                                 }
                             }
                         },
@@ -260,6 +294,7 @@ fun UpgradeAccountView(
                 }
 
                 FeaturesOfPlans(showNoAdsFeature = state.showNoAdsFeature)
+                SubscriptionDetails(onLinkClick = onPlayStoreLinkClicked)
 
                 Text(
                     text = stringResource(id = R.string.account_upgrade_account_terms_of_service_link),
@@ -289,14 +324,18 @@ fun UpgradeAccountView(
 }
 
 @Composable
-fun BillingWarning(hideBillingWarning: () -> Unit) {
+fun WarningBanner(
+    @StringRes textResId: Int,
+    testTag: String,
+    hideBillingWarning: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(
                 color = MaterialTheme.colors.yellow_100_yellow_700_alpha_015
             )
-            .testTag(BILLING_WARNING_TAG)
+            .testTag(testTag)
     ) {
         Row(
             modifier = Modifier
@@ -312,7 +351,7 @@ fun BillingWarning(hideBillingWarning: () -> Unit) {
                     )
             ) {
                 Text(
-                    text = stringResource(id = R.string.upgrade_billing_warning),
+                    text = stringResource(id = textResId),
                     fontSize = 13.sp,
                     style = Typography.caption,
                     color = MaterialTheme.colors.black_yellow_700,
@@ -506,7 +545,7 @@ private fun FeaturesOfPlans(
             start = 24.dp,
             top = 12.dp,
             end = 24.dp,
-            bottom = 50.dp
+            bottom = 30.dp
         )
     ) {
         Text(
@@ -585,6 +624,44 @@ private fun FeaturesOfPlans(
 }
 
 @Composable
+private fun SubscriptionDetails(
+    onLinkClick: (link: String) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .padding(
+                start = 24.dp,
+                end = 24.dp,
+                bottom = 50.dp
+            )
+            .testTag(GOOGLE_PLAY_STORE_SUBSCRIPTION_LINK_TAG)
+    ) {
+        MegaText(
+            modifier = Modifier.testTag(SUBSCRIPTION_DETAILS_TITLE_TAG),
+            text = stringResource(id = R.string.account_upgrade_account_description_subscription_title),
+            style = MaterialTheme.typography.body2,
+            textColor = TextColor.Primary,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        MegaSpannedClickableText(
+            modifier = Modifier.testTag(SUBSCRIPTION_DETAILS_DESCRIPTION_TAG),
+            value = stringResource(id = R.string.account_upgrade_subscription_details),
+            styles = hashMapOf(
+                SpanIndicator('A') to MegaSpanStyleWithAnnotation(
+                    MegaSpanStyle(
+                        SpanStyle(textDecoration = TextDecoration.None),
+                        color = TextColor.Accent,
+                    ), PLAY_STORE_SUBSCRIPTION_URL
+                )
+            ),
+            onAnnotationClick = onLinkClick,
+            baseStyle = MaterialTheme.typography.body4,
+            color = TextColor.Primary
+        )
+    }
+}
+
+@Composable
 private fun PricingPageLinkText(
     onLinkClick: (link: String) -> Unit,
 ) {
@@ -595,17 +672,18 @@ private fun PricingPageLinkText(
         value = stringResource(
             id = R.string.account_upgrade_account_pricing_page_link_text
         ),
-        styles = mapOf(
-            SpanIndicator('A') to SpanStyleWithAnnotation(
-                SpanStyle(
-                    fontWeight = FontWeight.W500,
-                    color = MaterialTheme.colors.teal_300_teal_200
+        styles = hashMapOf(
+            SpanIndicator('A') to MegaSpanStyleWithAnnotation(
+                MegaSpanStyle(
+                    SpanStyle(fontWeight = FontWeight.W500),
+                    color = TextColor.Accent,
                 ),
-                Constants.PRICING_PAGE_URL
+                PRICING_PAGE_URL
             )
         ),
         onAnnotationClick = onLinkClick,
-        baseStyle = MaterialTheme.typography.subtitle2.copy(color = MaterialTheme.colors.black_white),
+        baseStyle = MaterialTheme.typography.subtitle2,
+        color = TextColor.Primary
     )
 }
 
@@ -621,12 +699,15 @@ fun PreviewUpgradeAccountView(
             onBackPressed = {},
             onBuyClicked = {},
             onTOSClicked = {},
+            onPlayStoreLinkClicked = {},
             onPricingPageClicked = {},
             onChoosingMonthlyYearlyPlan = {},
             onChoosingPlanType = {},
+            showBillingWarning = {},
             hideBillingWarning = {},
             onDialogConfirmButtonClicked = {},
             onDialogDismissButtonClicked = {},
+            showUpgradeWarningBanner = true
         )
     }
 }
@@ -648,7 +729,7 @@ private class UpgradeAccountPreviewProvider :
                 showBillingWarning = false,
                 showBuyNewSubscriptionDialog = false,
                 currentPayment = UpgradePayment(
-                    upgradeType = Constants.INVALID_VALUE,
+                    upgradeType = INVALID_VALUE,
                     currentPayment = null,
                 ),
             )

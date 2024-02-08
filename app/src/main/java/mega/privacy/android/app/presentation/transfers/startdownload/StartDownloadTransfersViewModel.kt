@@ -22,7 +22,7 @@ import mega.privacy.android.app.presentation.transfers.startdownload.model.Start
 import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
 import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.TypedNode
-import mega.privacy.android.domain.entity.transfer.DownloadNodesEvent
+import mega.privacy.android.domain.entity.transfer.MultiTransferEvent
 import mega.privacy.android.domain.entity.transfer.TransferType
 import mega.privacy.android.domain.usecase.BroadcastOfflineFileAvailabilityUseCase
 import mega.privacy.android.domain.usecase.file.TotalFileSizeOfNodesUseCase
@@ -32,9 +32,10 @@ import mega.privacy.android.domain.usecase.offline.SaveOfflineNodeInformationUse
 import mega.privacy.android.domain.usecase.setting.IsAskBeforeLargeDownloadsSettingUseCase
 import mega.privacy.android.domain.usecase.setting.SetAskBeforeLargeDownloadsSettingUseCase
 import mega.privacy.android.domain.usecase.transfers.active.ClearActiveTransfersIfFinishedUseCase
-import mega.privacy.android.domain.usecase.transfers.downloads.GetDownloadLocationForNodeUseCase
-import mega.privacy.android.domain.usecase.transfers.downloads.StartDownloadUseCase
+import mega.privacy.android.domain.usecase.transfers.downloads.GetOrCreateStorageDownloadLocationUseCase
+import mega.privacy.android.domain.usecase.transfers.downloads.StartDownloadsWithWorkerUseCase
 import timber.log.Timber
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -43,8 +44,8 @@ import javax.inject.Inject
 @HiltViewModel
 class StartDownloadTransfersViewModel @Inject constructor(
     private val getOfflinePathForNodeUseCase: GetOfflinePathForNodeUseCase,
-    private val getDownloadLocationForNodeUseCase: GetDownloadLocationForNodeUseCase,
-    private val startDownloadUseCase: StartDownloadUseCase,
+    private val getOrCreateStorageDownloadLocationUseCase: GetOrCreateStorageDownloadLocationUseCase,
+    private val startDownloadsWithWorkerUseCase: StartDownloadsWithWorkerUseCase,
     private val saveOfflineNodeInformationUseCase: SaveOfflineNodeInformationUseCase,
     private val broadcastOfflineFileAvailabilityUseCase: BroadcastOfflineFileAvailabilityUseCase,
     private val clearActiveTransfersIfFinishedUseCase: ClearActiveTransfersIfFinishedUseCase,
@@ -131,7 +132,7 @@ class StartDownloadTransfersViewModel @Inject constructor(
                 startDownloadNodes(
                     siblingNodes,
                     getPath = {
-                        getDownloadLocationForNodeUseCase(firstSibling)
+                        getOrCreateStorageDownloadLocationUseCase()?.ensureSuffix(File.separator)
                     },
                 )
             }
@@ -178,7 +179,7 @@ class StartDownloadTransfersViewModel @Inject constructor(
             }
         }.onFailure { lastError = it }
             .getOrNull()?.let { path ->
-                startDownloadUseCase(
+                startDownloadsWithWorkerUseCase(
                     destinationPath = path,
                     nodes = nodes,
                     isHighPriority = false
@@ -191,10 +192,10 @@ class StartDownloadTransfersViewModel @Inject constructor(
                     }
                 }.last()
             }
-        if (terminalEvent == DownloadNodesEvent.FinishProcessingTransfers) toDoAfterProcessing?.invoke()
+        if (terminalEvent == MultiTransferEvent.ScanningFoldersFinished) toDoAfterProcessing?.invoke()
         _uiState.updateEventAndClearProgress(
             when (terminalEvent) {
-                DownloadNodesEvent.NotSufficientSpace -> StartDownloadTransferEvent.Message.NotSufficientSpace
+                MultiTransferEvent.InsufficientSpace -> StartDownloadTransferEvent.Message.NotSufficientSpace
                 else -> {
                     StartDownloadTransferEvent.FinishProcessing(
                         exception = lastError?.takeIf { terminalEvent == null },
@@ -256,4 +257,6 @@ class StartDownloadTransfersViewModel @Inject constructor(
                 jobInProgressState = null,
             )
         }
+
+    private fun String.ensureSuffix(suffix: String) = this.removeSuffix(suffix).plus(suffix)
 }

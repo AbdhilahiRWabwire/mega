@@ -294,14 +294,6 @@ interface FileSystemRepository {
     suspend fun isSDCardCachePath(localPath: String): Boolean
 
     /**
-     * Get or create a folder with current timestamp name in the cache of SD Card if any
-     *
-     * @return the File corresponding to the folder in cache in the SD
-     *         Return null if the folder cannot be created or there's no SD card
-     */
-    suspend fun getOrCreateSDCardCacheFolder(): File?
-
-    /**
      * Moves a [file] to a [targetPath] on the sd. It first copies the file to the [targetPath] and then deletes the original one
      *
      * @param file the file to be moved
@@ -309,4 +301,46 @@ interface FileSystemRepository {
      * @param sdCardUriString an uri pointing to the Sd card for permission reasons. It should point the same path than [targetPath] or an ancestor in its folder hierarchy. In android we can't access the Sd card directly (except cache folder)
      */
     suspend fun moveFileToSd(file: File, targetPath: String, sdCardUriString: String): Boolean
+
+    /**
+     * Create new image uri
+     *
+     * @param fileName file name
+     * @return uri string
+     */
+    suspend fun createNewImageUri(fileName: String): String?
+
+    /**
+     * @return true if the [uriString] represents a file Uri
+     */
+    suspend fun isFileUri(uriString: String): Boolean
+
+    /**
+     * Get the file represented by [uriString]
+     *
+     * @param uriString must be a file uri (file://...)
+     */
+    suspend fun getFileFromFileUri(uriString: String): File
+
+    /**
+     * @return true if the [uriString] represents a content Uri
+     */
+    suspend fun isContentUri(uriString: String): Boolean
+
+    /**
+     * @return the file name of the file represented by [uriString]
+     */
+    suspend fun getFileNameFromUri(uriString: String): String?
+
+    /**
+     * @return the extension of the file represented by [uriString]
+     */
+    suspend fun getFileExtensionFromUri(uriString: String): String?
+
+    /**
+     * Copies the file represented by a content [uriString] to the destination File. Usually, it is to make a content file returned by a share intent usable by the SDK.
+     * @param uriString the string representing the file, it must be a "content" uri
+     * @param file the destination file where the original file will be copied
+     */
+    suspend fun copyContentUriToFile(uriString: String, file: File)
 }

@@ -111,6 +111,30 @@ interface MegaApiGateway {
     )
 
     /**
+     * Upload a file or folder.
+     *
+     * This method should be used ONLY to share by chat a local file
+     *
+     * @param localPath The local path of the file or folder
+     * @param parentNode The parent node for the file or folder
+     * @param fileName The custom file name for the file or folder. Leave the parameter as "null"
+     * if there are no changes
+     * seconds since the epoch
+     * @param appData The custom app data to save, which can be nullable
+     * @param isSourceTemporary Whether the temporary file or folder that is created for upload
+     * should be deleted or not
+     * @param listener The [MegaTransferListenerInterface] to track the upload
+     */
+    fun startUploadForChat(
+        localPath: String,
+        parentNode: MegaNode,
+        fileName: String?,
+        appData: String?,
+        isSourceTemporary: Boolean,
+        listener: MegaTransferListenerInterface,
+    )
+
+    /**
      * Adds a [MegaTransferListenerInterface] to listen for Transfer events
      *
      * @param listener [MegaTransferListenerInterface]
@@ -3190,7 +3214,22 @@ interface MegaApiGateway {
      *
      * @param listener MegaRequestListenerInterface to track this request
      */
-    fun getMiscFlags(listener: OptionalMegaRequestListenerInterface)
+    fun getMiscFlags(listener: OptionalMegaRequestListenerInterface? = null)
+
+    /**
+     * @brief Get data about the logged account
+     *
+     * The associated request type with this request is MegaRequest::TYPE_GET_USER_DATA.
+     *
+     * Valid data in the MegaRequest object received in onRequestFinish when the error code
+     * is MegaError::API_OK:
+     * - MegaRequest::getName - Returns the name of the logged user
+     * - MegaRequest::getPassword - Returns the the public RSA key of the account, Base64-encoded
+     * - MegaRequest::getPrivateKey - Returns the private RSA key of the account, Base64-encoded
+     *
+     * @param listener MegaRequestListener to track this request
+     */
+    fun getUserData(listener: OptionalMegaRequestListenerInterface? = null)
 
     /**
      * Get cookie settings from SDK
@@ -3275,4 +3314,18 @@ interface MegaApiGateway {
      * @param listener MegaRequestListener to track this request
      */
     fun enableRichPreviews(enable: Boolean, listener: MegaRequestListenerInterface)
+
+    /**
+     * Get an URL to transfer the current session to the webclient
+     *
+     *
+     * The associated request type with this request is MegaRequest::TYPE_GET_SESSION_TRANSFER_URL
+     * Valid data in the MegaRequest object received in onRequestFinish when the error code
+     * is MegaError::API_OK:
+     * - MegaRequest::getLink - URL to open the desired page with the same account
+     *
+     * @param path Path inside https://mega.nz/# that we want to open with the current session
+     * @param listener MegaRequestListener to track this request
+     */
+    fun getSessionTransferURL(path: String, listener: MegaRequestListenerInterface)
 }

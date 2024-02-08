@@ -17,7 +17,6 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import mega.privacy.android.core.R as CoreUiR
 import mega.privacy.android.app.R
@@ -56,7 +55,6 @@ import mega.privacy.android.app.utils.Constants.VIDEO_SEARCH_ADAPTER
 import mega.privacy.android.app.utils.Constants.VIEWER_FROM_VIDEOS
 import mega.privacy.android.app.utils.FileUtil
 import mega.privacy.android.app.utils.MegaApiUtils
-import mega.privacy.android.app.utils.NodeTakenDownDialogListener
 import mega.privacy.android.app.utils.RunOnUIThreadUtils
 import mega.privacy.android.app.utils.TextUtil.formatEmptyScreenText
 import mega.privacy.android.app.utils.Util

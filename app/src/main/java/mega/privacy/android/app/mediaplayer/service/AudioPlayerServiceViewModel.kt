@@ -4,11 +4,13 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import androidx.annotation.OptIn
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.asFlow
-import com.google.android.exoplayer2.C
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.source.ShuffleOrder
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.source.ShuffleOrder
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import kotlinx.coroutines.CoroutineDispatcher
@@ -75,7 +77,6 @@ import mega.privacy.android.app.utils.FileUtil.isFileAvailable
 import mega.privacy.android.app.utils.MegaNodeUtil.isInRootLinksLevel
 import mega.privacy.android.app.utils.OfflineUtils.getOfflineFile
 import mega.privacy.android.app.utils.OfflineUtils.getOfflineFolderName
-import mega.privacy.android.app.utils.TextUtil
 import mega.privacy.android.app.utils.ThumbnailUtils.getThumbFolder
 import mega.privacy.android.app.utils.wrapper.GetOfflineThumbnailFileWrapper
 import mega.privacy.android.domain.entity.SortOrder
@@ -251,6 +252,8 @@ class AudioPlayerServiceViewModel @Inject constructor(
     private var cancelToken: MegaCancelToken? = null
 
     private val cancellableJobs = mutableMapOf<String, Job>()
+
+    private var isSearchMode: Boolean = false
 
     init {
         itemsSelectedCount.value = 0
@@ -995,6 +998,7 @@ class AudioPlayerServiceViewModel @Inject constructor(
      * @param isScroll true is scroll to target position, otherwise is false.
      * @param isBuildPlaySources true is building play sources, otherwise is false.
      */
+    @OptIn(UnstableApi::class)
     private fun recreateAndUpdatePlaylistItems(
         originalItems: List<PlaylistItem?> = playlistItems,
         isScroll: Boolean = true,
@@ -1039,46 +1043,50 @@ class AudioPlayerServiceViewModel @Inject constructor(
             }
 
             val searchQuery = playlistSearchQuery
-            if (!TextUtil.isTextEmpty(searchQuery)) {
-                filterPlaylistItems(recreatedItems, searchQuery ?: return@launch)
-                return@launch
-            }
-            for ((index, item) in recreatedItems.withIndex()) {
-                val type = when {
-                    index < playingPosition -> TYPE_PREVIOUS
-                    playingPosition == index -> TYPE_PLAYING
-                    else -> TYPE_NEXT
+            if (isSearchMode && !searchQuery.isNullOrEmpty()) {
+                filterPlaylistItems(recreatedItems, searchQuery)
+            } else {
+                for ((index, item) in recreatedItems.withIndex()) {
+                    val type = when {
+                        index < playingPosition -> TYPE_PREVIOUS
+                        playingPosition == index -> TYPE_PLAYING
+                        else -> TYPE_NEXT
+                    }
+                    recreatedItems[index] =
+                        item.finalizeItem(
+                            index = index,
+                            type = type,
+                            isSelected = item.isSelected,
+                            duration = item.duration,
+                        )
                 }
-                recreatedItems[index] =
-                    item.finalizeItem(
-                        index = index,
-                        type = type,
-                        isSelected = item.isSelected,
-                        duration = item.duration,
-                    )
-            }
-            val hasPrevious = playingPosition > 0
-            var scrollPosition = playingPosition
-            if (hasPrevious) {
-                recreatedItems[0] = recreatedItems[0].copy(headerIsVisible = true)
-            }
-            recreatedItems[playingPosition] =
-                recreatedItems[playingPosition].copy(headerIsVisible = true)
 
-            Timber.d("recreateAndUpdatePlaylistItems post ${recreatedItems.size} items")
-            if (!isScroll) {
-                scrollPosition = -1
-            }
-            playlistItemsFlow.update {
-                it.copy(recreatedItems, scrollPosition)
+                if (playingPosition > 0) {
+                    recreatedItems[0] = recreatedItems[0].copy(headerIsVisible = true)
+                }
+                recreatedItems[playingPosition] =
+                    recreatedItems[playingPosition].copy(headerIsVisible = true)
+
+                recreatedItems
+            }.let { updatedList ->
+                Timber.d("recreateAndUpdatePlaylistItems post ${updatedList.size} items")
+                val scrollPosition = if (isScroll) {
+                    playingPosition
+                } else {
+                    -1
+                }
+                playlistItemsFlow.update {
+                    it.copy(updatedList, scrollPosition)
+                }
             }
         }
         cancellableJobs[JOB_KEY_UPDATE_PLAYLIST] = updatePlaylistJob
     }
 
-    private fun filterPlaylistItems(items: List<PlaylistItem>, filter: String) {
-        if (items.isEmpty()) return
-
+    private fun filterPlaylistItems(
+        items: List<PlaylistItem>,
+        filter: String,
+    ): MutableList<PlaylistItem> {
         val filteredItems = ArrayList<PlaylistItem>()
         items.forEachIndexed { index, item ->
             if (item.nodeName.contains(filter, true)) {
@@ -1087,18 +1095,12 @@ class AudioPlayerServiceViewModel @Inject constructor(
                 filteredItems.add(item.finalizeItem(index, TYPE_PREVIOUS))
             }
         }
-
-        playlistItemsFlow.update {
-            it.copy(filteredItems, 0)
-        }
+        return filteredItems.toMutableList()
     }
 
     override fun searchQueryUpdate(newText: String?) {
         playlistSearchQuery = newText
-        recreateAndUpdatePlaylistItems(
-            originalItems = playlistItemsFlow.value.first,
-            isBuildPlaySources = false
-        )
+        recreateAndUpdatePlaylistItems(isBuildPlaySources = false)
     }
 
     override fun getCurrentIntent() = currentIntent
@@ -1350,7 +1352,7 @@ class AudioPlayerServiceViewModel @Inject constructor(
         playlistItems.indexOfFirst {
             it.nodeHandle == item.nodeHandle
         }.takeIf { index ->
-            index in playlistItemsFlow.value.first.indices
+            index in playlistItems.indices
         }
 
     override fun updatePlaySource() {
@@ -1392,6 +1394,7 @@ class AudioPlayerServiceViewModel @Inject constructor(
     /**
      * onShuffleChanged
      */
+    @OptIn(UnstableApi::class)
     override fun onShuffleChanged(newShuffle: ShuffleOrder) {
         shuffleOrder = newShuffle
         if (shuffleEnabled.value && shuffleOrder.length != 0 && shuffleOrder.length == playlistItems.size) {
@@ -1426,6 +1429,10 @@ class AudioPlayerServiceViewModel @Inject constructor(
         File(getDownloadLocation(), node.name).let { file ->
             isFileAvailable(file) && file.length() == node.size
         }
+
+    override fun setSearchMode(value: Boolean) {
+        isSearchMode = value
+    }
 
     companion object {
         private const val MAX_RETRY = 6

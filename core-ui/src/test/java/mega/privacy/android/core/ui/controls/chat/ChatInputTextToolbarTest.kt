@@ -40,7 +40,15 @@ class ChatInputTextToolbarTest {
         placeHolder: String,
     ) {
         composeRule.setContent {
-            ChatInputTextToolbar(text = text, placeholder = placeHolder, {}, {})
+            ChatInputTextToolbar(
+                text = text,
+                placeholder = placeHolder,
+                showEmojiPicker = false,
+                onAttachmentClick = {},
+                onSendClick = {},
+                onEmojiClick = {},
+                onTextChange = {},
+            )
         }
     }
 }

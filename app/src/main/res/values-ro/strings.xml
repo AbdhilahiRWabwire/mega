@@ -1494,8 +1494,6 @@
     <string name="dialog_title_new_text_file">Fișier text nou</string>
     <!-- Input field description in the create file dialog. -->
     <string name="context_new_file_name">Numele fișierului</string>
-    <!-- Title of the dialog to create a new link by inserting the name, e.g. when try to share a web link to your Cloud Drive or incoming shares. -->
-    <string name="dialog_title_new_link">Numele linkului</string>
     <!-- Input field description in the create link dialog, e.g. when try to share a web link to your Cloud Drive or incoming shares. -->
     <string name="context_new_link_name">URL-ul linkului</string>
     <!-- Title of the field subject when a new file is created to upload -->
@@ -2386,7 +2384,7 @@
     <!-- Permissions screen title -->
     <string name="general_setup_mega">Configurare MEGA</string>
     <!-- Permissions screen explanation -->
-    <string name="setup_mega_explanation">MEGA needs your permission to access your media and files for sharing. Other access permissions may be needed to use features and services that this app provides.</string>
+    <string name="setup_mega_explanation">MEGA are nevoie de permisiunea dvs. pentru a vă accesa media și fișierele pentru partajare. Pot fi necesare alte permisiuni de acces pentru a folosi funcțiile și serviciile pe care le oferă această aplicație.</string>
     <!-- Title of the screen asking permissions for files -->
     <string name="allow_acces_media_title">Permite accesul la fotografii, conținut media și fișiere</string>
     <!-- Subtitle of the screen asking permissions for files -->
@@ -3493,22 +3491,10 @@
     <string name="backup_remove_folder_title">Mută „%1s” în Coșul de gunoi</string>
     <!-- The confirm information of warning dialog for deleting -->
     <string name="backup_disable_confirm">Dezactivează backupul</string>
-    <!-- The confirm information of warning dialog for deleting -->
-    <string name="backup_action_confirm">Te rugăm să tastezi „%1s” pentru a confirma această acțiune</string>
-    <!-- when checking the input -->
-    <string name="error_backup_confirm_dont_match">Textul introdus nu coincide</string>
-    <!-- The title of confirm dialog for adding item to "My backup" -->
-    <string name="backup_add_confirm_title">Adaugă elementul în „%1s”</string>
-    <!-- The title of warning dialog for adding item to "My backup" -->
-    <string name="backup_add_item_title">Configurează backupul</string>
-    <!-- If users want to add items to the "My backup" folder, Warning dialog will show to confirm -->
-    <string name="backup_add_item_to_root_text">Pentru a te asigura că aceste elemente adăugate în folderul de backup sunt sincronizate automat în unitatea cloud MEGA, te rugăm să le configurezi în Aplicația Desktop MEGA.</string>
     <!-- If users want to share items in the "My backup" folder, Warning dialog will show to confirm -->
     <string name="backup_share_permission_title">Numai citire</string>
     <!-- If users want to share items in the "My backup" folder, Warning dialog will show to confirm -->
     <string name="backup_share_permission_text">Acest folder poate fi partajat doar în modul numai citire; deoarece este un folder de backup, orice modificare a conținutului său ar putea dezactiva backupul.</string>
-    <!-- If users want to add items to the "My backup" device folder, Warning dialog will show to confirm -->
-    <string name="backup_add_item_text">Elementele din acest folder fac parte dintr-un backup configurat și sunt sincronizate cu un folder local. Efectuarea acestei acțiuni va întrerupe sincronizarea și va dezactiva backupul. Backupul poate fi reactivat în Aplicația Desktop MEGA. Sigur vrei să continui?</string>
     <!-- Share multi backup folders, show below warning message -->
     <string name="backup_multi_share_permission_text">Aceste foldere pot fi partajate doar în modul numai citire; deoarece sunt foldere de backup, orice modificare a conținutului lor ar putea dezactiva backupurile.</string>
     <!-- Share multi folders mix with backup and non-backup folders, show below warning message -->
@@ -5371,22 +5357,6 @@
     <string name="meetings_waiting_room_call_ui_see_all_button">Vezi toți</string>
     <!-- Dialog button to don't deny entry to a participant in the call -->
     <string name="meetings_waiting_room_do_not_deny_user_to_call_dialog_button">Nu refuza</string>
-    <!--  -->
-    <string name="camera_uploads_up_to_date">Încărcări camere au fost actualizate</string>
-    <!--  -->
-    <string name="camera_uploads_paused_due_to_no_internet">Încărcarea întreruptă din cauza lipsei conexiunii la internet</string>
-    <!-- Add new strings to this file (the string code must be unique). Add edits for strings to this file (the string code must match the existing string). -->
-    <plurals name="camera_uploads_in_progress_pending_files">
-        <item quantity="one">Încărcări cameră în desfășurare, %1$d&#160;fișier în așteptare</item>
-        <item quantity="few">Încărcări cameră în desfășurare, %1$d&#160;fișiere în așteptare</item>
-        <item quantity="other">Încărcări cameră în desfășurare, %1$d de fișiere în așteptare</item>
-    </plurals>
-    <!--  -->
-    <plurals name="camera_uploads_complete_uploaded_files">
-        <item quantity="one">Încărcări cameră complete, %1$d&#160;fișier încărcat</item>
-        <item quantity="few">Încărcări cameră complete, %1$d&#160;fișiere încărcate</item>
-        <item quantity="other">Încărcări cameră complete, %1$d de fișiere încărcate</item>
-    </plurals>
     <!-- camera uploads limited access -->
     <string name="camera_uploads_limited_access">MEGA are acces limitat la biblioteca dvs. foto și nu poate face copii de rezervă pentru toate fotografiile.</string>
     <!-- camera uploads change permissions -->
@@ -5462,7 +5432,7 @@
     <!-- Title of the Sync feature in the navigation drawer when Sync feature is enabled -->
     <string name="home_side_menu_sync_title">Sincronizează</string>
     <!-- Description of feature, which will be available for user, if they buy plan. This means the user won't see Advertisements if they buy a Pro plan. -->
-    <string name="account_upgrade_account_description_feature_advertisement">&#8226;&#160;Fără&#160;reclame</string>
+    <string name="account_upgrade_account_description_feature_advertisement">&#8226;&#160;Fără&#160;publicitate</string>
     <!-- Text when sharing a meeting link indicating the subject for the email -->
     <string name="meetings_sharing_meeting_link_meeting_invite_subject">Invitație la întâlnire MEGA</string>
     <!-- Text when sharing a meeting link indicating that a participant is inviting you to the meeting. The placeholder is to include the full name of the invitation sender -->
@@ -5487,4 +5457,50 @@
     <string name="meetings_bottom_panel_not_in_call_participants_no_response_status">Niciun răspuns</string>
     <!-- Label of the button to call all absent participants from the not in call participants list -->
     <string name="meetings_bottom_panel_not_in_call_participants_call_all_button">Suna pe toți</string>
+    <!-- Banner description when a user navigates from other app with a different account than the one currently logged in -->
+    <string name="account_upgrade_vpn_wrong_account_upgrade_banner_description">Această aplicație este conectată la un alt cont MEGA. \nDeconectați-vă de la acest cont și conectați-vă cu contul MEGA VPN</string>
+    <!-- Warning shown if user denies the camera permission when trying to capture photos or videos from camera -->
+    <string name="chat_attach_pick_from_camera_deny_permission">MEGA are nevoie de acces la camera dvs. pentru a captura fotografii și videoclipuri.</string>
+    <!-- Warning shown if user denies the location permission when trying to pick a location -->
+    <string name="chat_attach_location_deny_permission">Ați refuzat accesul MEGA la locația dvs. Dacă doriți să vă partajează locația, permiteți MEGA permisiunea de a face acest lucru.</string>
+    <!-- Title for the confirmation dialog shown when the user is starting a large download -->
+    <string name="transfers_confirm_large_download_title">Descărcarea mare</string>
+    <!-- Confirmation button title for the confirmation dialog shown when the user is starting a large download. When the user clicks this button the download will start -->
+    <string name="transfers_confirm_large_download_button_start">Începeți descărcarea</string>
+    <!-- Confirmation button title for the confirmation dialog shown when the user is starting a large download. When the user clicks this button the download will start and this dialog won't appear anymore in future large downloads-->
+    <string name="transfers_confirm_large_download_button_start_always">Descărcați întotdeauna și nu întrebați din nou</string>
+    <!-- Success message when folder is shared when  share clicked -->
+    <plurals name="shared_items_cloud_drive_snackbar_sharing_folder_success">
+        <item quantity="one"></item>
+        <item quantity="few"></item>
+        <item quantity="other"></item>
+    </plurals>
+    <!-- Result message after Success message when folder is shared when  share clicked, this plurals template will be used when some copy request are successful and some failed, this is the success part Space after "," is required because it will be concatenated with `general_copy_snackbar_concat_fail` ** eg: Copied 1 item, couldn't copy 1 item || Copied 2 items, couldn't copy 1 item || Copied 2 items, couldn't copy 3 items -->
+    <plurals name="shared_items_cloud_drive_snackbar_sharing_folder_contact_success">
+        <item quantity="one"></item>
+        <item quantity="few"></item>
+        <item quantity="other"></item>
+    </plurals>
+    <!-- error message when sharing a folder(s) fails to be completed concat-->
+    <plurals name="shared_items_cloud_drive_snackbar_sharing_folder_failed_concat">
+        <item quantity="one"></item>
+        <item quantity="few"></item>
+        <item quantity="other"></item>
+    </plurals>
+    <!-- Button text to mute a participant in the info of participant in call screen-->
+    <string name="meetings_bottom_panel_in_call_participants_mute_a_participant_button">Pune pe mut</string>
+    <!-- Button text to mute all participant in the call screen-->
+    <string name="meetings_bottom_panel_in_call_participants_mute_all_participants_button">Amuțire toate</string>
+    <!-- Label text indicating that all participants are muted -->
+    <string name="meetings_bottom_panel_in_call_participants_all_muted_label">Toate microfoanele au fost dezactivate</string>
+    <!-- Message of the snackbar displayed when you have muted a participant. The placeholder is for the name of the participant you muted -->
+    <string name="meetings_muted_a_participant_snackbar_message">Ați dezactivat microfonul lui %s</string>
+    <!-- Message of the snackbar displayed when you have muted all participants -->
+    <string name="meetings_muted_all_participants_snackbar_message">Ați dezactivat microfonul pentru toți participanții</string>
+    <!-- Message of the snackbar displayed when you have been muted. The placeholder is for the name of who muted you -->
+    <string name="meetings_muted_by_a_participant_snackbar_message">Microfonul dvs. a fost dezactivat de %s</string>
+    <!-- Title of subscription details section, which shows to the user to provide details about subscription. -->
+    <string name="account_upgrade_account_description_subscription_title">Detaliile abonamentului</string>
+    <!-- Details body for the subscription details section, which shows to the user to provide details about subscription. -->
+    <string name="account_upgrade_subscription_details">Subscriptions are renewed automatically for successive subscription periods of the same duration and at the same price as the initial period chosen.You can switch off the automatic renewal of your MEGA Pro subscription no later than 24 hours before your next subscription payment is due via Subscriptions in [A]Google Play[/A].</string>
 </resources>

@@ -50,6 +50,7 @@ import mega.privacy.android.app.presentation.login.view.LoginView
 import mega.privacy.android.app.presentation.settings.startscreen.util.StartScreenUtil.setStartScreenTimeStamp
 import mega.privacy.android.app.providers.FileProviderActivity
 import mega.privacy.android.app.upgradeAccount.ChooseAccountActivity
+import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.utils.AlertsAndWarnings.showOverDiskQuotaPaywallWarning
 import mega.privacy.android.app.utils.ColorUtils.getThemeColor
 import mega.privacy.android.app.utils.Constants
@@ -58,11 +59,11 @@ import mega.privacy.android.app.utils.ConstantsUrl.RECOVERY_URL
 import mega.privacy.android.app.utils.ConstantsUrl.RECOVERY_URL_EMAIL
 import mega.privacy.android.app.utils.TextUtil
 import mega.privacy.android.app.utils.Util
-import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.qualifier.LoginMutex
 import mega.privacy.android.domain.usecase.GetThemeMode
+import mega.privacy.android.shared.theme.MegaAppTheme
 import nz.mega.sdk.MegaError
 import timber.log.Timber
 import javax.inject.Inject
@@ -557,6 +558,18 @@ class LoginFragment : Fragment() {
                                 }
                             }
 
+                            Constants.ACTION_SHOW_UPGRADE_ACCOUNT -> {
+                                intent.action = Constants.ACTION_SHOW_UPGRADE_ACCOUNT
+                                val isCrossAccountMatch = requireActivity().intent.getBooleanExtra(
+                                    UpgradeAccountActivity.IS_CROSS_ACCOUNT_MATCH,
+                                    false
+                                )
+                                intent.putExtra(
+                                    UpgradeAccountActivity.IS_CROSS_ACCOUNT_MATCH,
+                                    isCrossAccountMatch
+                                )
+                            }
+
                             else -> intent =
                                 refreshActivityIntent ?: handleLinkNavigation(loginActivity)
                         }
@@ -600,7 +613,7 @@ class LoginFragment : Fragment() {
                     }
 
                     if (viewModel.getStorageState() === StorageState.PayWall) {
-                        showOverDiskQuotaPaywallWarning(true)
+                        showOverDiskQuotaPaywallWarning(activity, true)
                     } else {
                         loginActivity.startActivity(intent)
                     }

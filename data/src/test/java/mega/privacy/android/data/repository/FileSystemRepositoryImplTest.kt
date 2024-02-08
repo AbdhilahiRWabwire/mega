@@ -1,13 +1,13 @@
 package mega.privacy.android.data.repository
 
 import android.content.Context
+import android.net.Uri
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.data.cache.Cache
-import mega.privacy.android.data.gateway.AndroidDeviceGateway
 import mega.privacy.android.data.gateway.CacheGateway
 import mega.privacy.android.data.gateway.DeviceGateway
 import mega.privacy.android.data.gateway.FileAttributeGateway
@@ -43,6 +43,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.NullAndEmptySource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.times
@@ -79,7 +80,6 @@ internal class FileSystemRepositoryImplTest {
     private val deviceGateway = mock<DeviceGateway>()
     private val sdCardGateway = mock<SDCardGateway>()
     private val fileAttributeGateway = mock<FileAttributeGateway>()
-    private val androidDeviceGateway = mock<AndroidDeviceGateway>()
 
     @BeforeAll
     fun setUp() {
@@ -104,7 +104,6 @@ internal class FileSystemRepositoryImplTest {
             deviceGateway = deviceGateway,
             sdCardGateway = sdCardGateway,
             fileAttributeGateway = fileAttributeGateway,
-            androidDeviceGateway = androidDeviceGateway
         )
     }
 
@@ -129,7 +128,6 @@ internal class FileSystemRepositoryImplTest {
             streamingGateway,
             deviceGateway,
             sdCardGateway,
-            androidDeviceGateway,
         )
     }
 
@@ -348,6 +346,50 @@ internal class FileSystemRepositoryImplTest {
         }
     }
 
+    @Test
+    fun `test that create new image uri returns correct value`() =
+        runTest {
+            val uri = mock<Uri> {
+                on { toString() } doReturn "uri"
+            }
+            whenever(fileGateway.createNewImageUri(any())).thenReturn(uri)
+            assertThat(underTest.createNewImageUri("name")).isEqualTo("uri")
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `test that isContentUri returns correct value`(
+        expected: Boolean,
+    ) = runTest {
+        val uri = "uri//:example.txt"
+        whenever(fileGateway.isContentUri(uri)).thenReturn(expected)
+        assertThat(underTest.isContentUri(uri)).isEqualTo(expected)
+    }
+
+    @Test
+    fun `test that getFileNameFromUri returns correct value`() = runTest {
+        val uri = "uri//:example.txt"
+        val expected = "example"
+        whenever(fileGateway.getFileNameFromUri(any())).thenReturn(expected)
+        assertThat(underTest.getFileNameFromUri(uri)).isEqualTo(expected)
+    }
+
+    @Test
+    fun `test that getFileExtensionFromUri returns correct value`() = runTest {
+        val uri = "uri//:example.txt"
+        val expected = "txt"
+        whenever(fileGateway.getFileExtensionFromUri(any())).thenReturn(expected)
+        assertThat(underTest.getFileExtensionFromUri(uri)).isEqualTo(expected)
+    }
+
+    @Test
+    fun `test that copyContentUriToFile calls gateway method`() = runTest {
+        val uri = "uri//:example.txt"
+        val file = mock<File>()
+        underTest.copyContentUriToFile(uri, file)
+        verify(fileGateway).copyContentUriToFile(uri, file)
+    }
+
     @Nested
     @DisplayName("SD Card related methods")
     inner class SDCard {
@@ -364,15 +406,5 @@ internal class FileSystemRepositoryImplTest {
             whenever(sdCardGateway.isSDCardCachePath(any())).thenReturn(expected)
             assertThat(underTest.isSDCardCachePath("something")).isEqualTo(expected)
         }
-
-        @Test
-        fun `test that getOrCreateSDCardCacheFolder returns gateway value`() =
-            runTest {
-                val result = File("path")
-                val time = 11L
-                whenever(androidDeviceGateway.getCurrentTimeInMillis()).thenReturn(time)
-                whenever(sdCardGateway.getOrCreateCacheFolder(time.toString())).thenReturn(result)
-                assertThat(underTest.getOrCreateSDCardCacheFolder()).isEqualTo(result)
-            }
     }
 }

@@ -19,6 +19,19 @@ interface WorkManagerGateway {
     suspend fun enqueueDownloadsWorkerRequest()
 
     /**
+     * Enqueue unique work request to start chat uploads worker to monitor the chat upload transfers as a foreground service
+     */
+    suspend fun enqueueChatUploadsWorkerRequest()
+
+    /**
+     * Enqueue unique work request to start new media worker
+     *
+     * @param forceEnqueue True if the worker should be enqueued even if it is already running
+     *                     Used for enqueueing the same worker from itself
+     */
+    suspend fun enqueueNewMediaWorkerRequest(forceEnqueue: Boolean)
+
+    /**
      * Queue a one time work request of camera upload to upload immediately.
      * The worker will not be queued if a camera uploads worker is already running
      */
@@ -49,4 +62,9 @@ interface WorkManagerGateway {
      * Get DownloadsWorker Info
      */
     fun monitorDownloadsStatusInfo(): Flow<List<WorkInfo>>
+
+    /**
+     * Get DownloadsWorker Info
+     */
+    fun monitorChatUploadsStatusInfo(): Flow<List<WorkInfo>>
 }

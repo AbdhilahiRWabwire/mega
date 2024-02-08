@@ -21,7 +21,7 @@ import mega.privacy.android.app.presentation.transfers.startdownload.model.Trans
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedFolderNode
-import mega.privacy.android.domain.entity.transfer.DownloadNodesEvent
+import mega.privacy.android.domain.entity.transfer.MultiTransferEvent
 import mega.privacy.android.domain.entity.transfer.TransferType
 import mega.privacy.android.domain.usecase.BroadcastOfflineFileAvailabilityUseCase
 import mega.privacy.android.domain.usecase.file.TotalFileSizeOfNodesUseCase
@@ -31,8 +31,8 @@ import mega.privacy.android.domain.usecase.offline.SaveOfflineNodeInformationUse
 import mega.privacy.android.domain.usecase.setting.IsAskBeforeLargeDownloadsSettingUseCase
 import mega.privacy.android.domain.usecase.setting.SetAskBeforeLargeDownloadsSettingUseCase
 import mega.privacy.android.domain.usecase.transfers.active.ClearActiveTransfersIfFinishedUseCase
-import mega.privacy.android.domain.usecase.transfers.downloads.GetDownloadLocationForNodeUseCase
-import mega.privacy.android.domain.usecase.transfers.downloads.StartDownloadUseCase
+import mega.privacy.android.domain.usecase.transfers.downloads.GetOrCreateStorageDownloadLocationUseCase
+import mega.privacy.android.domain.usecase.transfers.downloads.StartDownloadsWithWorkerUseCase
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -56,8 +56,7 @@ class StartDownloadTransfersViewModelTest {
     lateinit var underTest: StartDownloadTransfersViewModel
 
     private val getOfflinePathForNodeUseCase: GetOfflinePathForNodeUseCase = mock()
-    private val getDownloadLocationForNodeUseCase: GetDownloadLocationForNodeUseCase = mock()
-    private val startDownloadUseCase: StartDownloadUseCase = mock()
+    private val startDownloadsWithWorkerUseCase: StartDownloadsWithWorkerUseCase = mock()
     private val saveOfflineNodeInformationUseCase: SaveOfflineNodeInformationUseCase = mock()
     private val broadcastOfflineFileAvailabilityUseCase: BroadcastOfflineFileAvailabilityUseCase =
         mock()
@@ -70,6 +69,8 @@ class StartDownloadTransfersViewModelTest {
         mock<IsAskBeforeLargeDownloadsSettingUseCase>()
     private val setAskBeforeLargeDownloadsSettingUseCase =
         mock<SetAskBeforeLargeDownloadsSettingUseCase>()
+    private val getOrCreateStorageDownloadLocationUseCase =
+        mock<GetOrCreateStorageDownloadLocationUseCase>()
 
 
     private val node: TypedFileNode = mock()
@@ -81,8 +82,8 @@ class StartDownloadTransfersViewModelTest {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         underTest = StartDownloadTransfersViewModel(
             getOfflinePathForNodeUseCase,
-            getDownloadLocationForNodeUseCase,
-            startDownloadUseCase,
+            getOrCreateStorageDownloadLocationUseCase,
+            startDownloadsWithWorkerUseCase,
             saveOfflineNodeInformationUseCase,
             broadcastOfflineFileAvailabilityUseCase,
             clearActiveTransfersIfFinishedUseCase,
@@ -98,8 +99,8 @@ class StartDownloadTransfersViewModelTest {
     @BeforeEach
     fun resetMocks() {
         reset(
-            getDownloadLocationForNodeUseCase,
-            startDownloadUseCase,
+            getOrCreateStorageDownloadLocationUseCase,
+            startDownloadsWithWorkerUseCase,
             saveOfflineNodeInformationUseCase,
             broadcastOfflineFileAvailabilityUseCase,
             isConnectedToInternetUseCase,
@@ -138,7 +139,7 @@ class StartDownloadTransfersViewModelTest {
             whenever(getOfflinePathForNodeUseCase(any())).thenReturn(destination)
         }
         underTest.startDownload(startEvent)
-        verify(startDownloadUseCase).invoke(nodes, destination, false)
+        verify(startDownloadsWithWorkerUseCase).invoke(nodes, destination, false)
     }
 
     @Test
@@ -187,7 +188,7 @@ class StartDownloadTransfersViewModelTest {
             commonStub()
             stubStartDownload(flow {
                 delay(500)
-                emit(DownloadNodesEvent.FinishProcessingTransfers)
+                emit(MultiTransferEvent.ScanningFoldersFinished)
             })
             underTest.startDownload(TransferTriggerEvent.StartDownloadNode(nodes))
             Truth.assertThat(underTest.uiState.value.jobInProgressState)
@@ -206,7 +207,7 @@ class StartDownloadTransfersViewModelTest {
     fun `test that NotSufficientSpace event is emitted if start download use case returns NotSufficientSpace`() =
         runTest {
             commonStub()
-            stubStartDownload(flowOf(DownloadNodesEvent.NotSufficientSpace))
+            stubStartDownload(flowOf(MultiTransferEvent.InsufficientSpace))
             underTest.startDownload(TransferTriggerEvent.StartDownloadNode(nodes))
             assertCurrentEventIsEqualTo(StartDownloadTransferEvent.Message.NotSufficientSpace)
         }
@@ -214,11 +215,11 @@ class StartDownloadTransfersViewModelTest {
     @ParameterizedTest(name = "when StartDownloadUseCase finishes with {0}, then {1} is emitted")
     @MethodSource("provideDownloadNodeParameters")
     fun `test that a specific StartDownloadTransferEvent is emitted`(
-        downloadNodesEvent: DownloadNodesEvent,
+        multiTransferEvent: MultiTransferEvent,
         startDownloadTransferEvent: StartDownloadTransferEvent,
     ) = runTest {
         commonStub()
-        stubStartDownload(flowOf(downloadNodesEvent))
+        stubStartDownload(flowOf(multiTransferEvent))
         underTest.startDownload(TransferTriggerEvent.StartDownloadNode(nodes))
         assertCurrentEventIsEqualTo(startDownloadTransferEvent)
     }
@@ -261,11 +262,11 @@ class StartDownloadTransfersViewModelTest {
 
     private fun provideDownloadNodeParameters() = listOf(
         Arguments.of(
-            DownloadNodesEvent.FinishProcessingTransfers,
+            MultiTransferEvent.ScanningFoldersFinished,
             StartDownloadTransferEvent.FinishProcessing(null, 1),
         ),
         Arguments.of(
-            DownloadNodesEvent.NotSufficientSpace,
+            MultiTransferEvent.InsufficientSpace,
             StartDownloadTransferEvent.Message.NotSufficientSpace,
         ),
     )
@@ -288,16 +289,16 @@ class StartDownloadTransfersViewModelTest {
         whenever(node.parentId).thenReturn(parentId)
         whenever(parentNode.id).thenReturn(parentId)
 
-        whenever(getDownloadLocationForNodeUseCase(node)).thenReturn(destination)
+        whenever(getOrCreateStorageDownloadLocationUseCase()).thenReturn(destination)
 
         whenever(isConnectedToInternetUseCase()).thenReturn(true)
         whenever(totalFileSizeOfNodesUseCase(any())).thenReturn(1)
-        stubStartDownload(flowOf(DownloadNodesEvent.FinishProcessingTransfers))
+        stubStartDownload(flowOf(MultiTransferEvent.ScanningFoldersFinished))
     }
 
-    private fun stubStartDownload(flow: Flow<DownloadNodesEvent>) {
+    private fun stubStartDownload(flow: Flow<MultiTransferEvent>) {
         whenever(
-            startDownloadUseCase(
+            startDownloadsWithWorkerUseCase(
                 anyOrNull(),
                 anyOrNull(),
                 anyOrNull(),
@@ -310,6 +311,6 @@ class StartDownloadTransfersViewModelTest {
         private const val PARENT_NODE_HANDLE = 12L
         private val nodeId = NodeId(NODE_HANDLE)
         private val parentId = NodeId(PARENT_NODE_HANDLE)
-        private const val destination = "/destination"
+        private const val destination = "/destination/"
     }
 }

@@ -34,7 +34,6 @@ android {
     }
 
     compileOptions {
-        isCoreLibraryDesugaringEnabled = true
         val javaVersion: JavaVersion by rootProject.extra
         sourceCompatibility = javaVersion
         targetCompatibility = javaVersion
@@ -74,6 +73,7 @@ android {
 
     ksp {
         arg("room.schemaLocation", "$projectDir/schemas")
+        arg("room.generateKotlin", "true")
     }
     sourceSets {
         // Adds exported schema location as test app assets.
@@ -102,6 +102,9 @@ dependencies {
     implementation(androidx.hilt.work)
     implementation(google.hilt.android)
     implementation(androidx.concurrent.futures)
+    implementation(androidx.paging)
+    implementation(androidx.room.paging)
+    implementation(androidx.documentfile)
     ksp(androidx.room.compiler)
 
     val shouldApplyDefaultConfiguration: Closure<Boolean> by rootProject.extra
@@ -118,8 +121,6 @@ dependencies {
 
     implementation(platform(google.firebase.bom))
     implementation(google.firebase.perf.ktx)
-
-    coreLibraryDesugaring(lib.desugar)
 
     // Logging
     implementation(lib.bundles.logging)

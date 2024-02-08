@@ -74,7 +74,6 @@ import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.IsAudioLevelMonitorEnabledUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 
-import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.RequestHighResolutionVideoUseCase
 import mega.privacy.android.domain.usecase.meeting.RequestLowResolutionVideoUseCase
 import mega.privacy.android.domain.usecase.meeting.SendStatisticsMeetingsUseCase
@@ -115,7 +114,6 @@ import javax.inject.Inject
  * @property sendStatisticsMeetingsUseCase      [SendStatisticsMeetingsUseCase]
  * @property enableAudioLevelMonitorUseCase     [EnableAudioLevelMonitorUseCase]
  * @property isAudioLevelMonitorEnabledUseCase  [IsAudioLevelMonitorEnabledUseCase]
- * @property monitorChatSessionUpdatesUseCase   [MonitorChatSessionUpdatesUseCase]
  * @property requestHighResolutionVideoUseCase  [RequestHighResolutionVideoUseCase]
  * @property requestLowResolutionVideoUseCase   [RequestLowResolutionVideoUseCase]
  * @property stopHighResolutionVideoUseCase     [StopHighResolutionVideoUseCase]
@@ -142,7 +140,6 @@ class InMeetingViewModel @Inject constructor(
     private val sendStatisticsMeetingsUseCase: SendStatisticsMeetingsUseCase,
     private val enableAudioLevelMonitorUseCase: EnableAudioLevelMonitorUseCase,
     private val isAudioLevelMonitorEnabledUseCase: IsAudioLevelMonitorEnabledUseCase,
-    private val monitorChatSessionUpdatesUseCase: MonitorChatSessionUpdatesUseCase,
     private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase,
     private val monitorChatRoomUpdates: MonitorChatRoomUpdates,
     private val requestHighResolutionVideoUseCase: RequestHighResolutionVideoUseCase,
@@ -179,16 +176,32 @@ class InMeetingViewModel @Inject constructor(
      */
     fun onItemClick(participant: Participant) {
         onSnackbarMessageConsumed()
+
+        _pinItemEvent.value = Event(participant)
         getSession(participant.clientId)?.let {
-            if (it.hasScreenShare() && _state.value.callUIStatus == CallUIStatusType.SpeakerView && !participant.isScreenShared) {
-                _state.update { state ->
-                    state.copy(
-                        snackbarMessage = triggered(R.string.meetings_meeting_screen_main_view_participant_is_sharing_screen_warning),
-                    )
+            if (it.hasScreenShare() && _state.value.callUIStatus == CallUIStatusType.SpeakerView) {
+                if (!participant.isScreenShared) {
+                    _state.update { state ->
+                        state.copy(
+                            snackbarMessage = triggered(R.string.meetings_meeting_screen_main_view_participant_is_sharing_screen_warning),
+                        )
+                    }
                 }
+
+                Timber.d("Participant clicked: $participant")
+                sortParticipantsListForSpeakerView(participant)
             }
         }
+    }
+
+    /**
+     * Pin speaker and sort the participants list
+     *
+     * @param participant   [Participant]
+     */
+    private fun pinSpeaker(participant: Participant) {
         _pinItemEvent.value = Event(participant)
+        sortParticipantsListForSpeakerView(participant)
     }
 
     /**
@@ -1321,7 +1334,7 @@ class InMeetingViewModel @Inject constructor(
         val removeScreensSharedParticipantsList = mutableSetOf<Participant>()
         participants.value?.forEach {
             getSession(it.clientId)?.apply {
-                if (participantHasScreenSharedParticipant(it) && ((it.isSpeaker && hasScreenShare()) || (!it.isSpeaker && !hasScreenShare()) || (!it.isSpeaker && hasScreenShare() && !hasCamera()))) {
+                if (participantHasScreenSharedParticipant(it) && ((it.isSpeaker && hasScreenShare()) || (!it.isSpeaker && !hasScreenShare()))) {
                     getScreenShared(it.peerId, it.clientId)?.let { screenShared ->
                         removeScreensSharedParticipantsList.add(screenShared)
                     }
@@ -1371,7 +1384,6 @@ class InMeetingViewModel @Inject constructor(
      */
     fun addScreenShareParticipant(list: List<Participant>?, context: Context): Int? {
         _state.update { state -> state.copy(addScreensSharedParticipantsList = null) }
-
         list?.forEach { participant ->
             createParticipant(
                 isScreenShared = true,
@@ -1397,12 +1409,11 @@ class InMeetingViewModel @Inject constructor(
     private fun createParticipant(isScreenShared: Boolean, clientId: Long): Participant? {
         _state.value.call?.apply {
             inMeetingRepository.getMegaChatSession(this.chatId, clientId)?.let { session ->
-
                 when {
                     isScreenShared ->
                         participants.value?.filter { it.peerId == session.peerid && it.clientId == session.clientid && it.isScreenShared }
                             ?.apply {
-                                if (!session.hasCamera() || isNotEmpty()) {
+                                if (isNotEmpty()) {
                                     return null
                                 }
                             }
@@ -1454,7 +1465,9 @@ class InMeetingViewModel @Inject constructor(
                     isGuest = isGuest,
                     hasOptionsAllowed = shouldParticipantsOptionBeVisible(false, isGuest),
                     isPresenting = session.hasScreenShare(),
-                    isScreenShared = isScreenShared
+                    isScreenShared = isScreenShared,
+                    isCameraOn = session.hasCamera(),
+                    isScreenShareOn = session.hasScreenShare()
                 )
             }
         }
@@ -1692,7 +1705,8 @@ class InMeetingViewModel @Inject constructor(
             myTexture,
             participant.peerId,
             participant.clientId,
-            participant.isMe
+            participant.isMe,
+            participant.isScreenShared
         )
     }
 
@@ -1794,6 +1808,27 @@ class InMeetingViewModel @Inject constructor(
     }
 
     /**
+     * Get participant or screen share from peerId and clientId
+     *
+     * @param peerId peer ID of a participant
+     * @param clientId client ID of a participant
+     * @param isScreenShared True, it's the screen shared. False if not.
+     * @return The participant or screen shared from peerId and clientId.
+     */
+    fun getParticipantOrScreenShared(
+        peerId: Long,
+        clientId: Long,
+        isScreenShared: Boolean? = false,
+    ): Participant? {
+        participants.value?.filter { it.peerId == peerId && it.clientId == clientId && isScreenShared == it.isScreenShared }
+            ?.apply {
+                return if (isNotEmpty()) first() else null
+            }
+
+        return null
+    }
+
+    /**
      * Get speaker participant
      *
      * @param peerId    Peer Id
@@ -1835,9 +1870,19 @@ class InMeetingViewModel @Inject constructor(
         var hasChanged = false
         participants.value = participants.value?.map { participant ->
             return@map when {
-                participant.peerId == session.peerid && participant.clientId == session.clientid && participant.isVideoOn != session.hasVideo() -> {
-                    hasChanged = true
-                    participant.copy(isVideoOn = session.hasVideo())
+                participant.peerId == session.peerid && participant.clientId == session.clientid -> {
+                    if (participant.isVideoOn != session.hasVideo() ||
+                        participant.isCameraOn != session.hasCamera() ||
+                        participant.isScreenShareOn != session.hasScreenShare()
+                    ) {
+                        hasChanged = true
+                    }
+
+                    return@map participant.copy(
+                        isVideoOn = session.hasVideo(),
+                        isCameraOn = session.hasCamera(),
+                        isScreenShareOn = session.hasScreenShare()
+                    )
                 }
 
                 else -> participant
@@ -1891,8 +1936,7 @@ class InMeetingViewModel @Inject constructor(
 
         participantSharingScreen?.let {
             if (_state.value.callUIStatus == CallUIStatusType.SpeakerView) {
-                _pinItemEvent.value = Event(it)
-                sortParticipantsListForSpeakerView(it)
+                pinSpeaker(it)
             }
         } ?: run {
             speakerParticipants.value = speakerParticipants.value?.map { speakerParticipant ->
@@ -1915,8 +1959,7 @@ class InMeetingViewModel @Inject constructor(
 
         participantSharingScreenForSpeaker?.let {
             if (_state.value.callUIStatus == CallUIStatusType.SpeakerView) {
-                _pinItemEvent.value = Event(it)
-                sortParticipantsListForSpeakerView(it)
+                pinSpeaker(it)
             }
         }
 
@@ -2581,7 +2624,7 @@ class InMeetingViewModel @Inject constructor(
      */
     fun getCurrentSpeakerParticipant(): Participant? {
         speakerParticipants.value?.filter { it.isSpeaker }?.apply {
-            return if(isNotEmpty()) first() else null
+            return if (isNotEmpty()) first() else null
         }
 
         return null
@@ -2868,6 +2911,7 @@ class InMeetingViewModel @Inject constructor(
      * @param participantAtTheBeginning [Participant] to be placed first in the carousel
      */
     private fun sortParticipantsListForSpeakerView(participantAtTheBeginning: Participant? = null) {
+        Timber.d("Sort participant list")
         participantAtTheBeginning?.apply {
             participants.value?.sortByDescending { it.peerId == peerId }
         }

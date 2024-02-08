@@ -46,6 +46,7 @@ class VideoMeetingViewHolder(
     private var avatarSize = BIG_AVATAR
     private var peerId = MEGACHAT_INVALID_HANDLE
     private var clientId = MEGACHAT_INVALID_HANDLE
+    private var isScreenShared: Boolean? = null
 
     private var isDrawing = true
 
@@ -64,10 +65,10 @@ class VideoMeetingViewHolder(
             Timber.e("Error. Peer id or client id invalid")
             return
         }
-
-
         peerId = participant.peerId
         clientId = participant.clientId
+        isScreenShared = participant.isScreenShared
+
         if (isGrid) {
             avatarSize = BIG_AVATAR
 
@@ -166,12 +167,23 @@ class VideoMeetingViewHolder(
     private fun checkUI(participant: Participant) {
         Timber.d("Check the current UI status")
         inMeetingViewModel.getSession(participant.clientId)?.let {
-            if (it.hasVideo()) {
-                Timber.d("Check if video should be on")
-                checkVideoOn(participant)
-            } else {
-                Timber.d("Video should be off")
-                videoOffUI(participant)
+            when (isGrid) {
+                true -> if (it.hasVideo() && participant.isVideoOn) {
+                    Timber.d("Check if camera should be on")
+                    checkVideoOn(participant)
+                } else {
+                    Timber.d("Video should be off")
+                    videoOffUI(participant)
+                }
+
+
+                false -> if ((it.hasScreenShare() && participant.isScreenShared) || (it.hasCamera() && !participant.isScreenShared)) {
+                    Timber.d("Check if video should be on")
+                    checkVideoOn(participant)
+                } else {
+                    Timber.d("Video should be off")
+                    videoOffUI(participant)
+                }
             }
 
             updateAudioIcon(participant)
@@ -473,25 +485,33 @@ class VideoMeetingViewHolder(
     fun checkVideoOn(participant: Participant) {
         if (isInvalid(participant)) return
 
-        if (!isGrid) {
-            if (inMeetingViewModel.getSession(participant.clientId)
-                    ?.hasVideo() == true && !inMeetingViewModel.isCallOrSessionOnHold(participant.clientId)
-            ) {
-                Timber.d("Video should be on")
-                videoOnUI(participant)
-                return
-            }
-        } else {
-            if (inMeetingViewModel.getSession(participant.clientId)
-                    ?.hasCamera() == true && !inMeetingViewModel.isCallOrSessionOnHold(participant.clientId)
-            ) {
-                Timber.d("Video should be on")
-                videoOnUI(participant)
-                return
+        if (!inMeetingViewModel.isCallOrSessionOnHold(participant.clientId)) {
+            inMeetingViewModel.getSession(participant.clientId)?.let { session ->
+                when (isGrid) {
+                    true -> {
+                        if (session.hasVideo() && participant.isVideoOn) {
+                            Timber.d("Grid video/screen share should be on")
+                            videoOnUI(participant)
+                            return
+                        }
+                    }
+
+                    false -> {
+                        if (participant.isScreenShared && session.hasScreenShare() && participant.isScreenShareOn) {
+                            Timber.d("Screen share should be on")
+                            videoOnUI(participant)
+                            return
+                        }
+
+                        if (!participant.isScreenShared && session.hasCamera() && participant.isCameraOn) {
+                            Timber.d("Video should be on")
+                            videoOnUI(participant)
+                            return
+                        }
+                    }
+                }
             }
         }
-
-
 
         Timber.d("Video should be off")
         videoOffUI(participant)
@@ -777,16 +797,17 @@ class VideoMeetingViewHolder(
         if (isGrid) return
 
         isDrawing = false
-        inMeetingViewModel.getParticipant(peerId, clientId)?.let { participant ->
-            inMeetingViewModel.removeParticipantVisible(participant)
+        inMeetingViewModel.getParticipantOrScreenShared(peerId, clientId, isScreenShared)
+            ?.let { participant ->
+                inMeetingViewModel.removeParticipantVisible(participant)
 
-            if (inMeetingViewModel.getSession(participant.clientId)?.hasVideo() == true) {
-                Timber.d("Recycle participant in the list, participant clientId is ${participant.clientId}")
-                participant.videoListener?.let {
-                    removeResolutionAndListener(participant)
+                if (inMeetingViewModel.getSession(participant.clientId)?.hasVideo() == true) {
+                    Timber.d("Recycle participant in the list, participant clientId is ${participant.clientId}")
+                    participant.videoListener?.let {
+                        removeResolutionAndListener(participant)
+                    }
                 }
             }
-        }
     }
 
     /**
@@ -796,7 +817,7 @@ class VideoMeetingViewHolder(
      * @return If the compared participants are different. False, if they are the same
      */
     private fun isInvalid(participant: Participant) =
-        (participant.peerId != peerId || participant.clientId != clientId)
+        (participant.peerId != peerId || participant.clientId != clientId || participant.isScreenShared != isScreenShared)
 
     /**
      * Set rounded corners for a view

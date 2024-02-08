@@ -202,7 +202,7 @@ class FileBrowserViewModel @Inject constructor(
                         handleStack.pop()
                     }
                     handleStack.takeIf { stack -> stack.isNotEmpty() }?.peek()?.let { parent ->
-                        setBrowserParentHandle(parent)
+                        setFileBrowserHandle(parent)
                         return
                     }
                 }
@@ -216,36 +216,41 @@ class FileBrowserViewModel @Inject constructor(
     }
 
     /**
-     * Set the current browser handle to the UI state
+     * Updates the current File Browser Handle [FileBrowserState.fileBrowserHandle]
      *
-     * @param handle the id of the current browser handle to set
+     * @param handle The new File Browser Handle to be set
      */
-    fun setBrowserParentHandle(handle: Long) = viewModelScope.launch {
-        handleStack.push(handle)
-        _state.update {
-            it.copy(
-                fileBrowserHandle = handle,
-                mediaHandle = handle
-            )
+    fun setFileBrowserHandle(handle: Long) =
+        viewModelScope.launch {
+            handleStack.push(handle)
+            _state.update { it.copy(fileBrowserHandle = handle) }
+            refreshNodesState()
         }
-        refreshNodes()
-    }
 
     /**
-     * handle logic if back from Media Discovery
+     * Immediately opens a Node in order to display its contents
+     *
+     * @param folderHandle The Folder Handle
      */
-    suspend fun handleBackFromMD() {
-        handleStack.pop()
-        val currentParent =
-            _state.value.parentHandle ?: getRootNodeUseCase()?.id?.longValue
-            ?: MegaApiJava.INVALID_HANDLE
+    suspend fun openFileBrowserWithSpecificNode(folderHandle: Long) {
+        handleStack.push(folderHandle)
         _state.update {
             it.copy(
-                fileBrowserHandle = currentParent,
-                mediaHandle = currentParent
+                fileBrowserHandle = folderHandle,
+                accessedFolderHandle = folderHandle,
             )
         }
         refreshNodesState()
+        if (shouldEnterMediaDiscoveryMode(
+                folderHandle = folderHandle,
+                mediaDiscoveryViewSettings = state.value.mediaDiscoveryViewSettings,
+            )
+        ) {
+            setMediaDiscoveryVisibility(
+                isMediaDiscoveryOpen = true,
+                isMediaDiscoveryOpenedByIconClick = false,
+            )
+        }
     }
 
     /**
@@ -256,7 +261,7 @@ class FileBrowserViewModel @Inject constructor(
      */
     fun getSafeBrowserParentHandle(): Long = runBlocking {
         if (_state.value.fileBrowserHandle == -1L) {
-            setBrowserParentHandle(
+            setFileBrowserHandle(
                 getRootNodeUseCase()?.id?.longValue ?: MegaApiJava.INVALID_HANDLE
             )
         }
@@ -266,15 +271,15 @@ class FileBrowserViewModel @Inject constructor(
     /**
      * If a folder only contains images or videos, then go to MD mode directly
      *
-     * @param parentHandle the folder handle
+     * @param folderHandle the folder handle
      * @param mediaDiscoveryViewSettings [mediaDiscoveryViewSettings]
      * @return true is should enter MD mode, otherwise is false
      */
     suspend fun shouldEnterMediaDiscoveryMode(
-        parentHandle: Long,
+        folderHandle: Long,
         mediaDiscoveryViewSettings: Int,
     ): Boolean =
-        getFileBrowserNodeChildrenUseCase(parentHandle).let { nodes ->
+        getFileBrowserNodeChildrenUseCase(folderHandle).let { nodes ->
             if (nodes.isEmpty() || mediaDiscoveryViewSettings == MediaDiscoveryViewSettings.DISABLED.ordinal) {
                 false
             } else {
@@ -290,7 +295,7 @@ class FileBrowserViewModel @Inject constructor(
         }
 
     /**
-     * This will refresh file browser nodes and update [FileBrowserState.nodesList]
+     * Refreshes the File Browser Nodes
      */
     fun refreshNodes() {
         viewModelScope.launch {
@@ -299,18 +304,22 @@ class FileBrowserViewModel @Inject constructor(
     }
 
     private suspend fun refreshNodesState() {
-        val typedNodeList = getFileBrowserNodeChildrenUseCase(_state.value.fileBrowserHandle)
-        val nodeList = getNodeUiItems(typedNodeList)
-        val hasMediaFile: Boolean = containsMediaItemUseCase(typedNodeList)
-        val isRootNode = getRootNodeUseCase()?.id?.longValue == _state.value.fileBrowserHandle
+        val fileBrowserHandle = _state.value.fileBrowserHandle
+        val rootNode = getRootNodeUseCase()?.id?.longValue
+        val isRootNode = fileBrowserHandle == rootNode
+
+        val childrenNodes = getFileBrowserNodeChildrenUseCase(fileBrowserHandle)
+        val showMediaDiscoveryIcon = !isRootNode && containsMediaItemUseCase(childrenNodes)
+        val nodeUIItems = getNodeUiItems(childrenNodes)
+        val sortOrder = getCloudSortOrder()
+        val isFileBrowserEmpty = isRootNode || (fileBrowserHandle == MegaApiJava.INVALID_HANDLE)
+
         _state.update {
             it.copy(
-                showMediaDiscoveryIcon = !isRootNode && hasMediaFile,
-                parentHandle = getParentNodeUseCase(NodeId(_state.value.fileBrowserHandle))?.id?.longValue,
-                nodesList = nodeList,
-                sortOrder = getCloudSortOrder(),
-                isFileBrowserEmpty = MegaApiJava.INVALID_HANDLE == _state.value.fileBrowserHandle ||
-                        getRootNodeUseCase()?.id?.longValue == _state.value.fileBrowserHandle
+                showMediaDiscoveryIcon = showMediaDiscoveryIcon,
+                nodesList = nodeUIItems,
+                sortOrder = sortOrder,
+                isFileBrowserEmpty = isFileBrowserEmpty,
             )
         }
     }
@@ -335,38 +344,123 @@ class FileBrowserViewModel @Inject constructor(
     }
 
     /**
-     * Handles back click of rubbishBinFragment
+     * Checks if Media Discovery is open or not
+     *
+     * @return true if Media Discovery is indicated to be open
      */
-    fun onBackPressed() {
+    fun isMediaDiscoveryOpen() = _state.value.isMediaDiscoveryOpen
+
+    /**
+     * Sets the Media Discovery Visibility
+     *
+     * @param isMediaDiscoveryOpen If true, this indicates that Media Discovery is open
+     * @param isMediaDiscoveryOpenedByIconClick true if Media Discovery was accessed by clicking the
+     * Media Discovery Icon
+     */
+    fun setMediaDiscoveryVisibility(
+        isMediaDiscoveryOpen: Boolean,
+        isMediaDiscoveryOpenedByIconClick: Boolean,
+    ) {
         _state.update {
-            it.copy(showMediaDiscoveryIcon = false)
-        }
-        _state.value.parentHandle?.let {
-            setBrowserParentHandle(it)
-            handleStack.takeIf { stack -> stack.isNotEmpty() }?.pop()
+            it.copy(
+                isMediaDiscoveryOpen = isMediaDiscoveryOpen,
+                isMediaDiscoveryOpenedByIconClick = isMediaDiscoveryOpenedByIconClick,
+            )
         }
     }
 
     /**
-     * Performs action when folder is clicked from adapter
-     * @param handle node handle
+     * Navigate back to the Cloud Drive Root Level hierarchy
      */
-    private fun onFolderItemClicked(
-        handle: Long,
-    ) {
+    suspend fun goBackToRootLevel() {
+        _state.update {
+            it.copy(
+                accessedFolderHandle = null,
+                isMediaDiscoveryOpen = false,
+                isMediaDiscoveryOpenedByIconClick = false,
+            )
+        }
+        getRootNodeUseCase()?.id?.longValue?.let { rootHandle ->
+            Timber.d("Root Node Exists. Set data from the Root Node")
+            setFileBrowserHandle(rootHandle)
+        }
+    }
+
+    /**
+     * Exits the Media Discovery
+     *
+     * @param performBackNavigation If true, goes back one level from the Cloud Drive hierarchy
+     */
+    suspend fun exitMediaDiscovery(performBackNavigation: Boolean) {
+        if (performBackNavigation) {
+            handleStack.pop()
+            handleAccessedFolderOnBackPress()
+
+            val parentHandle =
+                getParentNodeUseCase(NodeId(_state.value.fileBrowserHandle))?.id?.longValue
+                    ?: getRootNodeUseCase()?.id?.longValue ?: MegaApiJava.INVALID_HANDLE
+            _state.update { it.copy(fileBrowserHandle = parentHandle) }
+            setMediaDiscoveryVisibility(
+                isMediaDiscoveryOpen = false,
+                isMediaDiscoveryOpenedByIconClick = false,
+            )
+            refreshNodesState()
+        } else {
+            setMediaDiscoveryVisibility(
+                isMediaDiscoveryOpen = false,
+                isMediaDiscoveryOpenedByIconClick = false,
+            )
+        }
+    }
+
+    /**
+     * Goes back one level from the Cloud Drive hierarchy
+     */
+    suspend fun performBackNavigation() {
+        handleAccessedFolderOnBackPress()
+        getParentNodeUseCase(NodeId(_state.value.fileBrowserHandle))?.id?.longValue?.let { parentHandle ->
+            setFileBrowserHandle(parentHandle)
+            handleStack.takeIf { stack -> stack.isNotEmpty() }?.pop()
+            // Update the Toolbar Title
+            _state.update { it.copy(updateToolbarTitleEvent = triggered) }
+        } ?: run {
+            // Exit File Browser if there is nothing left in the Back Stack
+            _state.update { it.copy(exitFileBrowserEvent = triggered) }
+        }
+    }
+
+    /**
+     * Checks and updates State Parameters if the User performs a Back Navigation event, and is in
+     * the Folder Level that he/she immediately accessed
+     */
+    private fun handleAccessedFolderOnBackPress() {
+        if (_state.value.fileBrowserHandle == _state.value.accessedFolderHandle) {
+            _state.update {
+                it.copy(
+                    isAccessedFolderExited = true,
+                    accessedFolderHandle = null,
+                )
+            }
+        }
+    }
+
+    /**
+     * Performs specific actions upon clicking a Folder Node
+     *
+     * @param folderHandle The Folder Handle
+     */
+    private fun onFolderItemClicked(folderHandle: Long) {
         viewModelScope.launch {
-            setBrowserParentHandle(handle)
+            setFileBrowserHandle(folderHandle)
             if (shouldEnterMediaDiscoveryMode(
-                    parentHandle = handle,
-                    mediaDiscoveryViewSettings = state.value.mediaDiscoveryViewSettings
+                    folderHandle = folderHandle,
+                    mediaDiscoveryViewSettings = state.value.mediaDiscoveryViewSettings,
                 )
             ) {
-                _state.update { state ->
-                    state.copy(
-                        showMediaDiscovery = true,
-                        showMediaDiscoveryIcon = true
-                    )
-                }
+                setMediaDiscoveryVisibility(
+                    isMediaDiscoveryOpen = true,
+                    isMediaDiscoveryOpenedByIconClick = false,
+                )
             }
         }
     }
@@ -607,7 +701,6 @@ class FileBrowserViewModel @Inject constructor(
             it.copy(
                 currentFileNode = null,
                 itemIndex = -1,
-                showMediaDiscovery = false
             )
         }
     }
@@ -620,4 +713,31 @@ class FileBrowserViewModel @Inject constructor(
             it.copy(downloadEvent = consumed())
         }
     }
+
+    /**
+     * Consumes the Exit File Browser Event
+     */
+    fun consumeExitFileBrowserEvent() {
+        _state.update { it.copy(exitFileBrowserEvent = consumed) }
+    }
+
+    /**
+     * Consumes the Update Toolbar Title Event
+     */
+    fun consumeUpdateToolbarTitleEvent() {
+        _state.update { it.copy(updateToolbarTitleEvent = consumed) }
+    }
+
+    /**
+     * Checks if the User has left the Folder that was immediately accessed
+     *
+     * @return true if the User left the accessed Folder
+     */
+    fun isAccessedFolderExited() = _state.value.isAccessedFolderExited
+
+    /**
+     * Resets the value of [FileBrowserState.isAccessedFolderExited]
+     */
+    fun resetIsAccessedFolderExited() =
+        _state.update { it.copy(isAccessedFolderExited = false) }
 }

@@ -20,8 +20,9 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.util.Util
 import androidx.navigation.fragment.NavHostFragment
-import com.google.android.exoplayer2.util.Util
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
@@ -161,6 +162,7 @@ class AudioPlayerActivity : MediaPlayerActivity() {
         }
     }
 
+    @androidx.annotation.OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -565,10 +567,14 @@ class AudioPlayerActivity : MediaPlayerActivity() {
                 }
             }
             setOnActionExpandListener(object : MenuItem.OnActionExpandListener {
-                override fun onMenuItemActionExpand(item: MenuItem): Boolean = true
+                override fun onMenuItemActionExpand(item: MenuItem): Boolean {
+                    playerServiceGateway?.setSearchMode(true)
+                    return true
+                }
 
                 override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
                     playerServiceGateway?.searchQueryUpdate(null)
+                    playerServiceGateway?.setSearchMode(false)
                     return true
                 }
             })

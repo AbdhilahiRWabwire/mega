@@ -2,7 +2,7 @@ package test.mega.privacy.android.app.presentation.clouddrive
 
 import android.view.MenuItem
 import app.cash.turbine.test
-import com.google.common.truth.Truth
+import com.google.common.truth.Truth.assertThat
 import de.palm.composestateevents.StateEventWithContentConsumed
 import de.palm.composestateevents.StateEventWithContentTriggered
 import kotlinx.coroutines.Dispatchers
@@ -126,46 +126,44 @@ class FileBrowserViewModelTest {
     fun `test that initial state is returned`() = runTest {
         underTest.state.test {
             val initial = awaitItem()
-            Truth.assertThat(initial.currentViewType).isEqualTo(ViewType.LIST)
-            Truth.assertThat(initial.fileBrowserHandle).isEqualTo(-1L)
-            Truth.assertThat(initial.mediaDiscoveryViewSettings)
+            assertThat(initial.currentViewType).isEqualTo(ViewType.LIST)
+            assertThat(initial.fileBrowserHandle).isEqualTo(-1L)
+            assertThat(initial.mediaDiscoveryViewSettings)
                 .isEqualTo(MediaDiscoveryViewSettings.INITIAL.ordinal)
-            Truth.assertThat(initial.parentHandle).isNull()
-            Truth.assertThat(initial.mediaHandle).isEqualTo(-1L)
-            Truth.assertThat(initial.nodesList).isEmpty()
+            assertThat(initial.nodesList).isEmpty()
         }
     }
 
 
     @Test
-    fun `test that browser parent handle is updated if new value provided`() = runTest {
+    fun `test that the file browser handle is updated if new value provided`() = runTest {
         underTest.state.map { it.fileBrowserHandle }.distinctUntilChanged()
             .test {
                 val newValue = 123456789L
-                Truth.assertThat(awaitItem()).isEqualTo(-1L)
-                underTest.setBrowserParentHandle(newValue)
-                Truth.assertThat(awaitItem()).isEqualTo(newValue)
+                assertThat(awaitItem()).isEqualTo(-1L)
+                underTest.setFileBrowserHandle(newValue)
+                assertThat(awaitItem()).isEqualTo(newValue)
             }
     }
 
     @Test
-    fun `test that get safe browser handle returns INVALID_HANDLE if not set and root folder fails`() =
+    fun `test that get safe browser parent handle returns INVALID_HANDLE if not set and root folder fails`() =
         runTest {
             whenever(getRootNodeUseCase()).thenReturn(null)
-            Truth.assertThat(underTest.getSafeBrowserParentHandle())
+            assertThat(underTest.getSafeBrowserParentHandle())
                 .isEqualTo(MegaApiJava.INVALID_HANDLE)
         }
 
     @Test
-    fun `test that get safe browser handle returns if set`() =
+    fun `test that the file browser handle is set`() =
         runTest {
             val expectedHandle = 123456789L
-            underTest.setBrowserParentHandle(expectedHandle)
-            Truth.assertThat(underTest.getSafeBrowserParentHandle()).isEqualTo(expectedHandle)
+            underTest.setFileBrowserHandle(expectedHandle)
+            assertThat(underTest.getSafeBrowserParentHandle()).isEqualTo(expectedHandle)
         }
 
     @Test
-    fun `test that on setting Browser Parent Handle, handle File Browser node returns some items in list`() =
+    fun `test that the nodes are returned when setting the file browser handle`() =
         runTest {
             val newValue = 123456789L
             whenever(getFileBrowserNodeChildrenUseCase(newValue)).thenReturn(
@@ -177,52 +175,52 @@ class FileBrowserViewModelTest {
                 mock<Node>() to emptyList()
             )
             monitorNodeUpdatesFakeFlow.emit(NodeUpdate(update))
-            underTest.setBrowserParentHandle(newValue)
-            Truth.assertThat(underTest.state.value.nodesList.size).isEqualTo(2)
+            underTest.setFileBrowserHandle(newValue)
+            assertThat(underTest.state.value.nodesList.size).isEqualTo(2)
         }
 
     @Test
-    fun `test that on setting Browser Parent Handle, handle File Browser node returns null`() =
+    fun `test that no nodes are returned when setting the file browser handle and the file browser node is null`() =
         runTest {
             val newValue = 123456789L
             whenever(getFileBrowserNodeChildrenUseCase.invoke(newValue)).thenReturn(emptyList())
-            underTest.setBrowserParentHandle(newValue)
-            Truth.assertThat(underTest.state.value.nodesList.size).isEqualTo(0)
+            underTest.setFileBrowserHandle(newValue)
+            assertThat(underTest.state.value.nodesList.size).isEqualTo(0)
             verify(getFileBrowserNodeChildrenUseCase).invoke(newValue)
         }
 
     @Test
-    fun `test that when nodes are empty then Enter in MD mode will return false`() = runTest {
+    fun `test that media discovery cannot be entered when there are no nodes`() = runTest {
         val newValue = 123456789L
         whenever(getFileBrowserNodeChildrenUseCase.invoke(newValue)).thenReturn(emptyList())
-        underTest.setBrowserParentHandle(newValue)
+        underTest.setFileBrowserHandle(newValue)
 
         val shouldEnter =
             underTest.shouldEnterMediaDiscoveryMode(
                 newValue,
                 MediaDiscoveryViewSettings.INITIAL.ordinal
             )
-        Truth.assertThat(shouldEnter).isFalse()
+        assertThat(shouldEnter).isFalse()
     }
 
     @Test
-    fun `test that when MediaDiscoveryViewSettings is Disabled then Enter in MD mode will return false`() =
+    fun `test that media discovery cannot be entered when media discovery view settings is disabled`() =
         runTest {
             val newValue = 123456789L
             val list = listOf<TypedFileNode>(mock(), mock())
             whenever(getFileBrowserNodeChildrenUseCase(newValue)).thenReturn(list)
-            underTest.setBrowserParentHandle(newValue)
+            underTest.setFileBrowserHandle(newValue)
 
             val shouldEnter =
                 underTest.shouldEnterMediaDiscoveryMode(
                     newValue,
                     MediaDiscoveryViewSettings.DISABLED.ordinal
                 )
-            Truth.assertThat(shouldEnter).isFalse()
+            assertThat(shouldEnter).isFalse()
         }
 
     @Test
-    fun `test that when MediaDiscoveryViewSettings is Enabled and nodes contains not folder then Enter in MD mode will return false`() =
+    fun `test that media discovery cannot be entered when media discovery view settings is enabled and a folder node is found`() =
         runTest {
             val newValue = 123456789L
             val folderNode = mock<TypedFolderNode>()
@@ -232,39 +230,39 @@ class FileBrowserViewModelTest {
                 )
             )
 
-            underTest.setBrowserParentHandle(newValue)
+            underTest.setFileBrowserHandle(newValue)
 
             val shouldEnter =
                 underTest.shouldEnterMediaDiscoveryMode(
                     newValue,
                     MediaDiscoveryViewSettings.ENABLED.ordinal
                 )
-            Truth.assertThat(shouldEnter).isFalse()
+            assertThat(shouldEnter).isFalse()
         }
 
     @Test
-    fun `test that when handle on back pressed and parent handle is null, then getRubbishBinChildrenNode is not invoked`() =
+    fun `test that the nodes are not retrieved when a back navigation is performed and the parent handle is null`() =
         runTest {
             val newValue = 123456789L
-            underTest.onBackPressed()
+            underTest.performBackNavigation()
             verify(getFileBrowserNodeChildrenUseCase, times(0)).invoke(newValue)
         }
 
     @Test
-    fun `test that when handle on back pressed and parent handle is not null, then getBrowserChildrenNode is invoked once`() =
+    fun `test that get file browser node children use case is invoked when a back navigation is performed and the parent handle exists`() =
         runTest {
             val newValue = 123456789L
             // to update handles fileBrowserHandle
             whenever(getFileBrowserNodeChildrenUseCase.invoke(newValue)).thenReturn(
                 listOf<TypedFolderNode>(mock(), mock())
             )
-            underTest.setBrowserParentHandle(newValue)
-            underTest.onBackPressed()
+            underTest.setFileBrowserHandle(newValue)
+            underTest.performBackNavigation()
             verify(getFileBrowserNodeChildrenUseCase).invoke(newValue)
         }
 
     @Test
-    fun `test when when nodeUIItem is long clicked, then it updates selected item by 1`() =
+    fun `test that the selected node handle count is incremented when a node is long clicked`() =
         runTest {
             val nodesListItem1 = mock<TypedFolderNode>()
             val nodesListItem2 = mock<TypedFileNode>()
@@ -284,14 +282,14 @@ class FileBrowserViewModelTest {
             )
             underTest.state.test {
                 val state = awaitItem()
-                Truth.assertThat(state.selectedFolderNodes).isEqualTo(1)
-                Truth.assertThat(state.selectedFileNodes).isEqualTo(0)
-                Truth.assertThat(state.selectedNodeHandles.size).isEqualTo(1)
+                assertThat(state.selectedFolderNodes).isEqualTo(1)
+                assertThat(state.selectedFileNodes).isEqualTo(0)
+                assertThat(state.selectedNodeHandles.size).isEqualTo(1)
             }
         }
 
     @Test
-    fun `test that when item is clicked and some items are already selected on list then checked index gets decremented by 1`() =
+    fun `test that the selected node handle count is decremented when one of the selected nodes is clicked`() =
         runTest {
             val nodesListItem1 = mock<TypedFolderNode>()
             val nodesListItem2 = mock<TypedFileNode>()
@@ -319,14 +317,14 @@ class FileBrowserViewModelTest {
             )
             underTest.state.test {
                 val state = awaitItem()
-                Truth.assertThat(state.selectedFolderNodes).isEqualTo(0)
-                Truth.assertThat(state.selectedFileNodes).isEqualTo(0)
-                Truth.assertThat(state.selectedNodeHandles.size).isEqualTo(0)
+                assertThat(state.selectedFolderNodes).isEqualTo(0)
+                assertThat(state.selectedFileNodes).isEqualTo(0)
+                assertThat(state.selectedNodeHandles.size).isEqualTo(0)
             }
         }
 
     @Test
-    fun `test that when selected item gets clicked then checked index gets incremented by 1`() =
+    fun `test that the selected node handle count is incremented when the selected node is clicked`() =
         runTest {
             val nodesListItem1 = mock<TypedFileNode>()
             val nodesListItem2 = mock<TypedFolderNode>()
@@ -354,21 +352,21 @@ class FileBrowserViewModelTest {
             )
             underTest.state.test {
                 val state = awaitItem()
-                Truth.assertThat(state.selectedFolderNodes).isEqualTo(1)
-                Truth.assertThat(state.selectedFileNodes).isEqualTo(1)
-                Truth.assertThat(state.selectedNodeHandles.size).isEqualTo(2)
+                assertThat(state.selectedFolderNodes).isEqualTo(1)
+                assertThat(state.selectedFileNodes).isEqualTo(1)
+                assertThat(state.selectedNodeHandles.size).isEqualTo(2)
             }
         }
 
     @Test
-    fun `test that on clicking on change view type to Grid it calls setViewType at least once`() =
+    fun `test that set view type is called when changing the view type`() =
         runTest {
             underTest.onChangeViewTypeClicked()
             verify(setViewType).invoke(ViewType.GRID)
         }
 
     @Test
-    fun `test that when select all nodes clicked size of node items and equal to size of selected nodes`() =
+    fun `test that the sizes of both selected node handles and the nodes are equal when selecting all nodes`() =
         runTest {
             whenever(getFileBrowserNodeChildrenUseCase(underTest.state.value.fileBrowserHandle)).thenReturn(
                 listOf<TypedFolderNode>(mock(), mock())
@@ -376,72 +374,72 @@ class FileBrowserViewModelTest {
             whenever(getCloudSortOrder()).thenReturn(SortOrder.ORDER_NONE)
             underTest.refreshNodes()
             underTest.selectAllNodes()
-            Truth.assertThat(underTest.state.value.nodesList.size)
+            assertThat(underTest.state.value.nodesList.size)
                 .isEqualTo(underTest.state.value.selectedNodeHandles.size)
         }
 
     @Test
-    fun `test that when clear all nodes clicked, size of selected nodes is empty`() = runTest {
+    fun `test that the selected node handles is empty when clearing all nodes`() = runTest {
         underTest.clearAllNodes()
         underTest.state.test {
             val state = awaitItem()
-            Truth.assertThat(state.selectedNodeHandles).isEmpty()
+            assertThat(state.selectedNodeHandles).isEmpty()
         }
     }
 
     @Test
-    fun `test that when onOptionItemClicked then it invokes handleOptionClickMapper`() = runTest {
-        val menuItem: MenuItem = mock()
-        whenever(handleOptionClickMapper.invoke(menuItem, emptyList())).thenReturn(
-            OptionsItemInfo(
-                optionClickedType = OptionItems.MOVE_CLICKED,
-                selectedNode = emptyList(),
-                selectedMegaNode = emptyList()
+    fun `test that handle option click mapper is invoked when selecting an option item`() =
+        runTest {
+            val menuItem: MenuItem = mock()
+            whenever(handleOptionClickMapper.invoke(menuItem, emptyList())).thenReturn(
+                OptionsItemInfo(
+                    optionClickedType = OptionItems.MOVE_CLICKED,
+                    selectedNode = emptyList(),
+                    selectedMegaNode = emptyList()
+                )
             )
-        )
-        underTest.onOptionItemClicked(item = menuItem)
-        verify(handleOptionClickMapper).invoke(menuItem, emptyList())
-    }
+            underTest.onOptionItemClicked(item = menuItem)
+            verify(handleOptionClickMapper).invoke(menuItem, emptyList())
+        }
 
     @Test
-    fun `test that isPendingRefresh as true when monitorRefreshSessionUseCase emit`() = runTest {
+    fun `test that is pending refresh is true when a node refresh event is emitted`() = runTest {
         val flow = MutableSharedFlow<Unit>()
         whenever(monitorRefreshSessionUseCase()).thenReturn(flow)
         initViewModel()
         advanceUntilIdle()
         underTest.state.test {
-            Truth.assertThat(awaitItem().isPendingRefresh).isFalse()
+            assertThat(awaitItem().isPendingRefresh).isFalse()
             flow.emit(Unit)
-            Truth.assertThat(awaitItem().isPendingRefresh).isTrue()
+            assertThat(awaitItem().isPendingRefresh).isTrue()
         }
     }
 
     @Test
-    fun `test that when transfer management quota is false then visibility for transfer in state is false`() =
+    fun `test that the transfer overquota banner is hidden when transfers management detects a non overquota state`() =
         runTest {
             whenever(transfersManagement.isTransferOverQuotaBannerShown).thenReturn(false)
             whenever(getBandwidthOverQuotaDelayUseCase()).thenReturn(10000)
             underTest.changeTransferOverQuotaBannerVisibility()
             underTest.state.test {
-                Truth.assertThat(awaitItem().shouldShowBannerVisibility).isFalse()
+                assertThat(awaitItem().shouldShowBannerVisibility).isFalse()
             }
         }
 
     @Test
-    fun `test that downloadEvent is updated when onOptionItemClicked is invoked with download option and feature flag is true`() =
+    fun `test that download event is updated when on download option click is invoked and both download option and feature flag are true`() =
         runTest {
             onDownloadOptionClick()
             underTest.state.test {
                 val state = awaitItem()
-                Truth.assertThat(state.downloadEvent)
-                    .isInstanceOf(StateEventWithContentTriggered::class.java)
-                Truth.assertThat((state.downloadEvent as StateEventWithContentTriggered).content)
+                assertThat(state.downloadEvent).isInstanceOf(StateEventWithContentTriggered::class.java)
+                assertThat((state.downloadEvent as StateEventWithContentTriggered).content)
                     .isInstanceOf(TransferTriggerEvent.StartDownloadNode::class.java)
             }
         }
 
     @Test
-    fun `test that downloadEvent is cleared when consumeDownloadEvent is invoked`() =
+    fun `test that download event is cleared when the download event is consumed`() =
         runTest {
             //first set to triggered
             onDownloadOptionClick()
@@ -449,8 +447,7 @@ class FileBrowserViewModelTest {
             underTest.consumeDownloadEvent()
             underTest.state.test {
                 val state = awaitItem()
-                Truth.assertThat(state.downloadEvent)
-                    .isInstanceOf(StateEventWithContentConsumed::class.java)
+                assertThat(state.downloadEvent).isInstanceOf(StateEventWithContentConsumed::class.java)
             }
         }
 
@@ -495,7 +492,7 @@ class FileBrowserViewModelTest {
             fileDurationMapper,
             getFeatureFlagValueUseCase,
             monitorOfflineNodeUpdatesUseCase,
-            monitorConnectivityUseCase
+            monitorConnectivityUseCase,
         )
     }
 }

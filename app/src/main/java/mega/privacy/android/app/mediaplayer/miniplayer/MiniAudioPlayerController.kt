@@ -14,7 +14,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
-import com.google.android.exoplayer2.ui.StyledPlayerView
+import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -32,8 +32,8 @@ import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_REBUILD_PLAYLIS
  * @param playerView the ExoPlayer view
  * @param onPlayerVisibilityChanged a callback for mini player view visibility change
  */
-class MiniAudioPlayerController constructor(
-    private val playerView: StyledPlayerView,
+class MiniAudioPlayerController(
+    private val playerView: PlayerView,
     private val onPlayerVisibilityChanged: (() -> Unit)? = null,
 ) : LifecycleEventObserver {
     private val context = playerView.context

@@ -7,34 +7,53 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.Scaffold
+import androidx.compose.material.SnackbarDuration
+import androidx.compose.material.SnackbarHost
+import androidx.compose.material.SnackbarHostState
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.compose.rememberNavController
+import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
+import com.google.accompanist.navigation.material.rememberBottomSheetNavigator
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import dagger.hilt.android.AndroidEntryPoint
 import de.palm.composestateevents.EventEffect
 import kotlinx.coroutines.launch
 import mega.privacy.android.analytics.Analytics
+import mega.privacy.android.app.BaseActivity
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.WebViewActivity
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.modalbottomsheet.SortByBottomSheetDialogFragment
+import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.presentation.clouddrive.FileBrowserViewModel
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.mapper.GetIntentToOpenFileMapper
+import mega.privacy.android.app.presentation.movenode.mapper.MoveRequestMessageMapper
 import mega.privacy.android.app.presentation.node.NodeBottomSheetActionHandler
-import mega.privacy.android.app.presentation.node.dialogs.deletenode.MoveToRubbishOrDeleteNodeDialogViewModel
+import mega.privacy.android.app.presentation.node.NodeOptionsBottomSheetViewModel
 import mega.privacy.android.app.presentation.search.model.SearchFilter
+import mega.privacy.android.app.presentation.search.navigation.searchForeignNodeDialog
+import mega.privacy.android.app.presentation.search.navigation.searchOverQuotaDialog
+import mega.privacy.android.app.presentation.snackbar.MegaSnackbarDuration
+import mega.privacy.android.app.presentation.snackbar.MegaSnackbarShower
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.MegaApiUtils
+import mega.privacy.android.core.ui.controls.snackbars.MegaSnackbar
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.FolderNode
+import mega.privacy.android.domain.entity.node.NodeNameCollisionResult
+import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.search.SearchCategory
 import mega.privacy.android.domain.entity.search.SearchType
@@ -52,11 +71,9 @@ import javax.inject.Inject
  * Search activity to search Nodes and display
  */
 @AndroidEntryPoint
-class SearchActivity : AppCompatActivity() {
-
+class SearchActivity : BaseActivity(), MegaSnackbarShower {
     private val viewModel: SearchActivityViewModel by viewModels()
-    private val moveToRubbishOrDeleteNodeDialogViewModel: MoveToRubbishOrDeleteNodeDialogViewModel by viewModels()
-
+    private val nodeOptionsBottomSheetViewModel: NodeOptionsBottomSheetViewModel by viewModels()
     private val sortByHeaderViewModel: SortByHeaderViewModel by viewModels()
 
     /**
@@ -64,6 +81,14 @@ class SearchActivity : AppCompatActivity() {
      */
     @Inject
     lateinit var getThemeMode: GetThemeMode
+
+    /**
+     * Move request message mapper
+     */
+    @Inject
+    lateinit var moveRequestMessageMapper: MoveRequestMessageMapper
+
+    private val snackbarHostState = SnackbarHostState()
 
     companion object {
         /**
@@ -110,28 +135,57 @@ class SearchActivity : AppCompatActivity() {
     /**
      * onCreate
      */
+    @OptIn(ExperimentalMaterialNavigationApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        //Should be done in onCreate to avoid the issue that the activity is attempting to register while current state is RESUMED. LifecycleOwners must call register before they are STARTED.
+        val bottomSheetActionHandler =
+            NodeBottomSheetActionHandler(this, nodeOptionsBottomSheetViewModel)
         setContent {
             val themeMode by getThemeMode()
                 .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
 
-            val moveToRubbishState by moveToRubbishOrDeleteNodeDialogViewModel.state.collectAsStateWithLifecycle()
-            val scaffoldState = rememberScaffoldState()
+            val nodeOptionsBottomSheetState by nodeOptionsBottomSheetViewModel.state.collectAsStateWithLifecycle()
+
+            // Remember a SystemUiController
+            val systemUiController = rememberSystemUiController()
+            val useDarkIcons = themeMode.isDarkMode().not()
+            systemUiController.setSystemBarsColor(
+                color = Color.Transparent,
+                darkIcons = useDarkIcons
+            )
+
+            val scaffoldState = rememberScaffoldState(snackbarHostState = snackbarHostState)
+            val bottomSheetNavigator = rememberBottomSheetNavigator()
+            val navHostController = rememberNavController(bottomSheetNavigator)
+
             MegaAppTheme(isDark = themeMode.isDarkMode()) {
                 Scaffold(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier,
                     scaffoldState = scaffoldState,
+                    snackbarHost = {
+                        SnackbarHost(
+                            modifier = Modifier.navigationBarsPadding(),
+                            hostState = snackbarHostState
+                        ) { data ->
+                            MegaSnackbar(snackbarData = data)
+                        }
+                    }
                 ) { padding ->
                     SearchNavHostController(
-                        modifier = Modifier.padding(padding),
+                        modifier = Modifier
+                            .padding(padding)
+                            .statusBarsPadding(),
                         viewModel = viewModel,
-                        moveToRubbishOrDeleteNodeDialogViewModel = moveToRubbishOrDeleteNodeDialogViewModel,
+                        nodeOptionsBottomSheetViewModel = nodeOptionsBottomSheetViewModel,
                         handleClick = ::handleClick,
                         navigateToLink = ::navigateToLink,
                         showSortOrderBottomSheet = ::showSortOrderBottomSheet,
                         trackAnalytics = ::trackAnalytics,
-                        nodeBottomSheetActionHandler = NodeBottomSheetActionHandler(this),
+                        nodeBottomSheetActionHandler = bottomSheetActionHandler,
+                        navHostController = navHostController,
+                        bottomSheetNavigator = bottomSheetNavigator,
                         onBackPressed = {
                             if (viewModel.state.value.selectedNodes.isNotEmpty()) {
                                 viewModel.clearSelection()
@@ -143,13 +197,24 @@ class SearchActivity : AppCompatActivity() {
                 }
 
                 EventEffect(
-                    moveToRubbishState.deleteEvent,
-                    onConsumed = {
-                        moveToRubbishOrDeleteNodeDialogViewModel.consumeDeleteEvent()
+                    event = nodeOptionsBottomSheetState.nodeNameCollisionResult,
+                    onConsumed = nodeOptionsBottomSheetViewModel::markHandleNodeNameCollisionResult,
+                    action = {
+                        handleNodesNameCollisionResult(it)
                     }
-                ) {
-                    scaffoldState.snackbarHostState.showSnackbar(it)
-                }
+                )
+                EventEffect(
+                    event = nodeOptionsBottomSheetState.showForeignNodeDialog,
+                    onConsumed = nodeOptionsBottomSheetViewModel::markForeignNodeDialogShown,
+                    action = { navHostController.navigate(searchForeignNodeDialog) }
+                )
+                EventEffect(
+                    event = nodeOptionsBottomSheetState.showQuotaDialog,
+                    onConsumed = nodeOptionsBottomSheetViewModel::markQuotaDialogShown,
+                    action = {
+                        navHostController.navigate(searchOverQuotaDialog.plus("/${it}"))
+                    }
+                )
             }
         }
 
@@ -157,6 +222,7 @@ class SearchActivity : AppCompatActivity() {
             viewModel.onSortOrderChanged()
         }
     }
+
 
     private fun handleClick(node: TypedNode?) = node?.let {
         when (it) {
@@ -259,5 +325,49 @@ class SearchActivity : AppCompatActivity() {
             }
         }
         Analytics.tracker.trackEvent(event)
+    }
+
+    private fun handleNodesNameCollisionResult(result: NodeNameCollisionResult) {
+        if (result.conflictNodes.isNotEmpty()) {
+            nameCollisionActivityContract
+                ?.launch(
+                    ArrayList(
+                        result.conflictNodes.values.map {
+                            when (result.type) {
+                                NodeNameCollisionType.RESTORE,
+                                NodeNameCollisionType.MOVE,
+                                -> NameCollision.Movement.getMovementCollision(it)
+
+                                NodeNameCollisionType.COPY -> NameCollision.Copy.getCopyCollision(it)
+                            }
+                        },
+                    )
+                )
+        }
+        if (result.noConflictNodes.isNotEmpty()) {
+            when (result.type) {
+                NodeNameCollisionType.MOVE -> nodeOptionsBottomSheetViewModel.moveNodes(result.noConflictNodes)
+                NodeNameCollisionType.COPY -> nodeOptionsBottomSheetViewModel.copyNodes(result.noConflictNodes)
+                else -> Timber.d("Not implemented")
+            }
+        }
+    }
+
+    override fun showMegaSnackbar(
+        message: String,
+        actionLabel: String?,
+        duration: MegaSnackbarDuration,
+    ) {
+        lifecycleScope.launch {
+            snackbarHostState.showSnackbar(
+                message = message,
+                actionLabel = actionLabel,
+                duration = when (duration) {
+                    MegaSnackbarDuration.Short -> SnackbarDuration.Short
+                    MegaSnackbarDuration.Long -> SnackbarDuration.Long
+                    MegaSnackbarDuration.Indefinite -> SnackbarDuration.Indefinite
+                }
+            )
+        }
     }
 }

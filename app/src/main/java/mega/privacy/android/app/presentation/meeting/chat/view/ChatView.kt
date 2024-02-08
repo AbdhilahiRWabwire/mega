@@ -6,18 +6,21 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -28,6 +31,7 @@ import androidx.compose.material.SnackbarHostState
 import androidx.compose.material.SnackbarResult
 import androidx.compose.material.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,22 +43,22 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import de.palm.composestateevents.EventEffect
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
 import mega.privacy.android.app.extensions.navigateToAppSettings
 import mega.privacy.android.app.main.AddContactActivity
 import mega.privacy.android.app.main.InviteContactActivity
+import mega.privacy.android.app.presentation.meeting.chat.extension.isJoined
 import mega.privacy.android.app.presentation.meeting.chat.extension.isStarted
 import mega.privacy.android.app.presentation.meeting.chat.extension.toInfoText
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction
@@ -62,6 +66,7 @@ import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
 import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
 import mega.privacy.android.app.presentation.meeting.chat.view.appbar.ChatAppBar
+import mega.privacy.android.app.presentation.meeting.chat.view.bottombar.ChatBottomBar
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.AllContactsAddedDialog
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.ClearChatConfirmationDialog
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.EnableGeolocationDialog
@@ -79,20 +84,21 @@ import mega.privacy.android.app.presentation.meeting.chat.view.navigation.startM
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.startWaitingRoom
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ChatAttachFileBottomSheet
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ChatToolbarBottomSheet
+import mega.privacy.android.app.presentation.meeting.chat.view.sheet.MessageOptionsBottomSheet
 import mega.privacy.android.app.presentation.qrcode.findActivity
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.permission.PermissionUtils
 import mega.privacy.android.core.ui.controls.appbar.SelectModeAppBar
-import mega.privacy.android.core.ui.controls.buttons.RaisedDefaultMegaButton
-import mega.privacy.android.core.ui.controls.chat.ChatInputTextToolbar
 import mega.privacy.android.core.ui.controls.chat.ChatObserverIndicator
 import mega.privacy.android.core.ui.controls.chat.ScrollToBottomFab
 import mega.privacy.android.core.ui.controls.layouts.MegaScaffold
 import mega.privacy.android.core.ui.controls.sheets.BottomSheet
 import mega.privacy.android.core.ui.controls.snackbars.MegaSnackbar
-import mega.privacy.android.domain.entity.ChatRoomPermission
+import mega.privacy.android.core.ui.model.KeyboardState
 import mega.privacy.android.domain.entity.chat.ChatPushNotificationMuteOption
+import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
+import mega.privacy.android.legacy.core.ui.controls.keyboard.keyboardAsState
 import mega.privacy.android.shared.theme.MegaAppTheme
 
 @Composable
@@ -122,12 +128,15 @@ internal fun ChatView(
         onStartOrJoinMeeting = viewModel::onStartOrJoinMeeting,
         onAnswerCall = viewModel::onAnswerCall,
         onEnableGeolocation = viewModel::onEnableGeolocation,
-        onSendClick = viewModel::sendMessage,
+        onSendClick = viewModel::sendTextMessage,
         onHoldAndAnswerCall = viewModel::onHoldAndAnswerCall,
         onEndAndAnswerCall = viewModel::onEndAndAnswerCall,
         onUserUpdateHandled = viewModel::onUserUpdateHandled,
         onJoinChat = viewModel::onJoinChat,
         onSetPendingJoinLink = viewModel::onSetPendingJoinLink,
+        createNewImage = viewModel::createNewImageUri,
+        onSendLocationMessage = viewModel::sendLocationMessage,
+        onAttachFiles = viewModel::onAttachFiles,
     )
 }
 
@@ -137,7 +146,11 @@ internal fun ChatView(
  * @param uiState [ChatUiState]
  * @param onBackPressed Action to perform for back button.
  */
-@OptIn(ExperimentalMaterialApi::class, ExperimentalPermissionsApi::class)
+@OptIn(
+    ExperimentalMaterialApi::class,
+    ExperimentalPermissionsApi::class,
+    ExperimentalComposeUiApi::class
+)
 @Composable
 internal fun ChatView(
     uiState: ChatUiState,
@@ -160,12 +173,30 @@ internal fun ChatView(
     onAnswerCall: () -> Unit = {},
     onEnableGeolocation: () -> Unit = {},
     onUserUpdateHandled: () -> Unit = {},
-    messageListView: @Composable (ChatUiState, LazyListState, Dp) -> Unit = { state, listState, bottomPadding ->
+    messageListView: @Composable (ChatUiState, LazyListState, Dp, (TypedMessage) -> Unit) -> Unit = { state, listState, bottomPadding, onMessageLongClick ->
         MessageListView(
             uiState = state,
             scrollState = listState,
             bottomPadding = bottomPadding,
             onUserUpdateHandled = onUserUpdateHandled,
+            onMessageLongClick = onMessageLongClick,
+        )
+    },
+    bottomBar: @Composable (
+        uiState: ChatUiState,
+        showEmojiPicker: Boolean,
+        onSendClick: (String) -> Unit,
+        onAttachmentClick: () -> Unit,
+        onEmojiClick: () -> Unit,
+        interactionSourceTextInput: MutableInteractionSource,
+    ) -> Unit = { state, showEmojiPicker, onSendClicked, onAttachmentClick, onEmojiClick, interactionSourceTextInput ->
+        ChatBottomBar(
+            uiState = state,
+            showEmojiPicker = showEmojiPicker,
+            onSendClick = onSendClicked,
+            onAttachmentClick = onAttachmentClick,
+            onEmojiClick = onEmojiClick,
+            interactionSourceTextInput = interactionSourceTextInput,
         )
     },
     onSendClick: (String) -> Unit = {},
@@ -173,6 +204,9 @@ internal fun ChatView(
     onEndAndAnswerCall: () -> Unit = {},
     onJoinChat: () -> Unit = {},
     onSetPendingJoinLink: () -> Unit = {},
+    createNewImage: suspend () -> Uri? = { null },
+    onSendLocationMessage: (Intent?) -> Unit = { _ -> },
+    onAttachFiles: (List<Uri>) -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -186,6 +220,10 @@ internal fun ChatView(
     var muteNotificationDialogOptions by rememberSaveable { mutableStateOf(emptyList<ChatPushNotificationMuteOption>()) }
     var isSelectMode by rememberSaveable { mutableStateOf(false) }
     var showJoinAnswerCallDialog by rememberSaveable { mutableStateOf(false) }
+    var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
+    var showReactionPicker by rememberSaveable { mutableStateOf(false) }
+    val keyboardState by keyboardAsState()
+    val isKeyboardShown = keyboardState == KeyboardState.Opened
     val audioPermissionState = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
     val keyboardController = LocalSoftwareKeyboardController.current
     val toolbarModalSheetState =
@@ -206,6 +244,15 @@ internal fun ChatView(
             true
         }
     )
+    val messageOptionsModalSheetState = rememberModalBottomSheetState(
+        initialValue = ModalBottomSheetValue.Hidden,
+        confirmValueChange = {
+            if (it != ModalBottomSheetValue.Hidden) {
+                keyboardController?.hide()
+            }
+            true
+        }
+    )
     var showEnableGeolocationDialog by rememberSaveable { mutableStateOf(false) }
     var waitingForPickLocation by rememberSaveable { mutableStateOf(false) }
     val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -213,25 +260,32 @@ internal fun ChatView(
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.StartActivityForResult()
         ) {
-            // Manage picked location here
+            onSendLocationMessage(it.data)
             coroutineScope.launch { toolbarModalSheetState.hide() }
         }
     val locationPermissionsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { permissionsResult ->
-        if (permissionsResult) {
+    ) { isGranted ->
+        if (isGranted) {
             openLocationPicker(context, locationPickerLauncher)
         } else {
-            //TODO show snackbar when string is approved by content team
+            coroutineScope.launch { toolbarModalSheetState.hide() }
+            showPermissionNotAllowedSnackbar(
+                context,
+                coroutineScope,
+                snackBarHostState,
+                R.string.chat_attach_location_deny_permission
+            )
         }
     }
     val scrollState = rememberLazyListState()
     val showScrollToBottomFab by remember {
         derivedStateOf {
-            scrollState.layoutInfo.totalItemsCount > 0
-                    && scrollState.layoutInfo.visibleItemsInfo.lastOrNull()?.index != scrollState.layoutInfo.totalItemsCount - 1
+            scrollState.layoutInfo.totalItemsCount > 0 && scrollState.firstVisibleItemIndex != 0
         }
     }
+    val interactionSourceTextInput = remember { MutableInteractionSource() }
+    val isTextInputPressed by interactionSourceTextInput.collectIsPressedAsState()
     BackHandler(enabled = toolbarModalSheetState.isVisible) {
         coroutineScope.launch {
             toolbarModalSheetState.hide()
@@ -242,7 +296,17 @@ internal fun ChatView(
             fileModalSheetState.hide()
         }
     }
-
+    BackHandler(enabled = isKeyboardShown) {
+        keyboardController?.hide()
+    }
+    BackHandler(enabled = showEmojiPicker) {
+        showEmojiPicker = false
+    }
+    LaunchedEffect(isTextInputPressed) {
+        if (isTextInputPressed) {
+            showEmojiPicker = false
+        }
+    }
 
     val callPermissionsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -251,15 +315,12 @@ internal fun ChatView(
             val isStarted = uiState.callInThisChat?.status?.isStarted == true
             onStartOrJoinMeeting(isStarted)
         } else {
-            coroutineScope.launch {
-                val result = snackBarHostState.showSnackbar(
-                    context.getString(R.string.allow_acces_calls_subtitle_microphone),
-                    context.getString(R.string.general_allow),
-                )
-                if (result == SnackbarResult.ActionPerformed) {
-                    context.navigateToAppSettings()
-                }
-            }
+            showPermissionNotAllowedSnackbar(
+                context,
+                coroutineScope,
+                snackBarHostState,
+                R.string.allow_acces_calls_subtitle_microphone
+            )
         }
     }
 
@@ -285,53 +346,109 @@ internal fun ChatView(
             ) { result ->
                 // TODO attach contact to chat room
             }
+        var takePictureUri by remember { mutableStateOf(Uri.EMPTY) }
+        val takePictureLauncher =
+            rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.TakePicture()
+            ) { resultOk ->
+                if (resultOk) {
+                    onAttachFiles(listOf(takePictureUri))
+                }
+                takePictureUri = Uri.EMPTY
+            }
 
-        val isFileModalShown = fileModalSheetState.currentValue != ModalBottomSheetValue.Hidden
+        val isFileModalShown by derivedStateOf { fileModalSheetState.currentValue != ModalBottomSheetValue.Hidden }
+        val isMessageOptionsModalShown by derivedStateOf {
+            messageOptionsModalSheetState.currentValue != ModalBottomSheetValue.Hidden
+        }
+
+        if (!isMessageOptionsModalShown) {
+            showReactionPicker = false
+        }
 
         BottomSheet(
-            modalSheetState = if (isFileModalShown) fileModalSheetState else toolbarModalSheetState,
+            modalSheetState = when {
+                isFileModalShown -> fileModalSheetState
+                isMessageOptionsModalShown -> messageOptionsModalSheetState
+                else -> toolbarModalSheetState
+            },
             sheetBody = {
-                if (isFileModalShown) {
-                    ChatAttachFileBottomSheet(
-                        sheetState = fileModalSheetState
-                    )
-                } else {
-                    ChatToolbarBottomSheet(
-                        onAttachFileClicked = {
-                            onBackPressed()
-                            coroutineScope.launch {
-                                fileModalSheetState.show()
-                            }
-                        },
-                        onAttachContactClicked = {
-                            if (uiState.hasAnyContact) {
-                                openAttachContactActivity(context, attachContactLauncher)
-                            } else {
+                when {
+                    isFileModalShown -> {
+                        ChatAttachFileBottomSheet(
+                            onAttachFiles = onAttachFiles,
+                            sheetState = fileModalSheetState,
+                        )
+                    }
+
+                    isMessageOptionsModalShown -> {
+                        MessageOptionsBottomSheet(
+                            showReactionPicker = showReactionPicker,
+                            onReactionClicked = {
+                                // Add reaction
+                            },
+                            onMoreReactionsClicked = { showReactionPicker = true },
+                            sheetState = messageOptionsModalSheetState,
+                        )
+                    }
+
+                    else -> {
+                        ChatToolbarBottomSheet(
+                            onAttachFileClicked = {
+                                onBackPressed()
                                 coroutineScope.launch {
-                                    snackBarHostState.showSnackbar(context.getString(R.string.no_contacts_invite))
+                                    fileModalSheetState.show()
                                 }
-                            }
-                        },
-                        onPickLocation = {
-                            checkLocationPicker(
-                                isGeolocationEnabled = isGeolocationEnabled,
-                                isPermissionGranted = locationPermissionState.status.isGranted,
-                                onShowEnableGeolocationDialog = {
-                                    showEnableGeolocationDialog = true
-                                },
-                                onAskForLocationPermission = {
-                                    locationPermissionsLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                                },
-                                onPickLocation = {
-                                    openLocationPicker(context, locationPickerLauncher)
+                            },
+                            onAttachContactClicked = {
+                                if (uiState.hasAnyContact) {
+                                    openAttachContactActivity(context, attachContactLauncher)
+                                } else {
+                                    coroutineScope.launch {
+                                        snackBarHostState.showSnackbar(context.getString(R.string.no_contacts_invite))
+                                    }
                                 }
-                            )
-                        },
-                        isLoadingGalleryFiles = isLoadingGalleryFiles,
-                        sheetState = toolbarModalSheetState
-                    )
+                            },
+                            onPickLocation = {
+                                checkLocationPicker(
+                                    isGeolocationEnabled = isGeolocationEnabled,
+                                    isPermissionGranted = locationPermissionState.status.isGranted,
+                                    onShowEnableGeolocationDialog = {
+                                        showEnableGeolocationDialog = true
+                                    },
+                                    onAskForLocationPermission = {
+                                        locationPermissionsLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                    },
+                                    onPickLocation = {
+                                        openLocationPicker(context, locationPickerLauncher)
+                                    }
+                                )
+                            },
+                            onTakePicture = {
+                                coroutineScope.launch {
+                                    createNewImage()?.let {
+                                        takePictureUri = it
+                                        takePictureLauncher.launch(it)
+                                    }
+                                    toolbarModalSheetState.hide()
+                                }
+                            },
+                            isLoadingGalleryFiles = isLoadingGalleryFiles,
+                            sheetState = toolbarModalSheetState,
+                            onCameraPermissionDenied = {
+                                showPermissionNotAllowedSnackbar(
+                                    context,
+                                    coroutineScope,
+                                    snackBarHostState,
+                                    R.string.chat_attach_pick_from_camera_deny_permission
+                                )
+                            },
+                            onAttachFiles = onAttachFiles
+                        )
+                    }
                 }
             },
+            sheetGesturesEnabled = !showReactionPicker,
         ) {
             MegaScaffold(
                 topBar = {
@@ -398,42 +515,35 @@ internal fun ChatView(
                     }
                 },
                 bottomBar = {
-                    if (myPermission == ChatRoomPermission.Standard || myPermission == ChatRoomPermission.Moderator) {
-                        Column {
-                            UserTypingView(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                usersTyping = uiState.usersTyping,
-                            )
-                            ChatInputTextToolbar(
-                                onAttachmentClick = {
-                                    coroutineScope.launch {
-                                        toolbarModalSheetState.show()
-                                    }
-                                },
-                                text = uiState.sendingText,
-                                placeholder = stringResource(
-                                    R.string.type_message_hint_with_customized_title,
-                                    uiState.title.orEmpty()
-                                ),
-                                onSendClick = onSendClick
-                            )
-                        }
-                    }
-                    if (isPreviewMode) {
-                        RaisedDefaultMegaButton(
-                            textId = R.string.action_join,
-                            onClick = {
-                                if (isAnonymousMode) {
-                                    onSetPendingJoinLink()
-                                    startLoginActivity(context, chatLink)
-                                } else {
-                                    onJoinChat()
+                    if (haveWritePermission) {
+                        bottomBar(
+                            uiState,
+                            showEmojiPicker,
+                            onSendClick,
+                            {
+                                coroutineScope.launch {
+                                    toolbarModalSheetState.show()
                                 }
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
+                            {
+                                showEmojiPicker = !showEmojiPicker
+
+                                if (showEmojiPicker) {
+                                    keyboardController?.hide()
+                                } else {
+                                    keyboardController?.show()
+                                }
+                            },
+                            interactionSourceTextInput,
                         )
+                    }
+                    JoinChatButton(isPreviewMode = isPreviewMode, isJoining = isJoining) {
+                        if (isAnonymousMode) {
+                            onSetPendingJoinLink()
+                            startLoginActivity(context, chatLink)
+                        } else {
+                            onJoinChat()
+                        }
                     }
                 },
                 floatingActionButton = {
@@ -444,7 +554,7 @@ internal fun ChatView(
                     ) {
                         ScrollToBottomFab {
                             coroutineScope.launch {
-                                scrollState.animateScrollToItem(scrollState.layoutInfo.totalItemsCount - 1)
+                                scrollState.animateScrollToItem(0)
                             }
                         }
                     }
@@ -477,7 +587,12 @@ internal fun ChatView(
                                 uiState,
                                 scrollState,
                                 bottomPadding
-                            )
+                            ) { message ->
+                                // Use message for showing correct available options
+                                coroutineScope.launch {
+                                    messageOptionsModalSheetState.show()
+                                }
+                            }
                         },
                     )
                 }
@@ -488,7 +603,7 @@ internal fun ChatView(
                         onConfirm = {
                             showParticipatingInACallDialog = false
                             // return to active call
-                            callInOtherChat?.let {
+                            callsInOtherChats.find { it.status?.isJoined == true }?.let {
                                 enablePasscodeCheck()
                                 startMeetingActivity(context, it.chatId)
                             }
@@ -564,6 +679,7 @@ internal fun ChatView(
                 if (showJoinAnswerCallDialog) {
                     JoinAnswerCallDialog(
                         isGroup = isGroup,
+                        numberOfCallsInOtherChats = callsInOtherChats.size,
                         onHoldAndAnswer = {
                             showJoinAnswerCallDialog = false
                             onHoldAndAnswerCall()
@@ -614,14 +730,13 @@ internal fun ChatView(
     }
 }
 
-private fun getInfoToShow(infoToShow: InfoToShow, context: Context): String? = with(infoToShow) {
-    inviteContactToChatResult?.toInfoText(context)
-        ?: chatPushNotificationMuteOption?.toInfoText(context)
-        ?: if (args.isNotEmpty()) {
-            stringId?.let { context.getString(it, *args.toTypedArray()) }
-        } else {
-            stringId?.let { context.getString(it) }
-        }
+private fun getInfoToShow(infoToShow: InfoToShow, context: Context) = with(infoToShow) {
+    when (this) {
+        is InfoToShow.InviteContactResult -> result.toInfoText(context)
+        is InfoToShow.MuteOptionResult -> result.toInfoText(context)
+        is InfoToShow.StringWithParams -> context.getString(stringId, *args.toTypedArray())
+        is InfoToShow.SimpleString -> context.getString(stringId)
+    }
 }
 
 /**
@@ -649,17 +764,31 @@ private fun checkLocationPicker(
     }
 }
 
+private fun showPermissionNotAllowedSnackbar(
+    context: Context,
+    coroutineScope: CoroutineScope,
+    snackBarHostState: SnackbarHostState,
+    @StringRes permissionStringId: Int,
+) {
+    coroutineScope.launch {
+        val result = snackBarHostState.showSnackbar(
+            context.getString(permissionStringId),
+            context.getString(R.string.general_allow),
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            context.navigateToAppSettings()
+        }
+    }
+}
+
 @Preview
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, name = "ChatView")
 @Composable
 private fun ChatViewPreview() {
     MegaAppTheme(isDark = isSystemInDarkTheme()) {
         val uiState = ChatUiState(
-            title = "My Name",
             userChatStatus = UserChatStatus.Away,
             isChatNotificationMute = true,
-            isPrivateChat = true,
-            myPermission = ChatRoomPermission.Standard,
         )
         ChatView(
             uiState = uiState,

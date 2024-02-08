@@ -4,12 +4,12 @@ import com.google.common.truth.Truth.assertThat
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ContainsMeta
 import mega.privacy.android.domain.entity.chat.ContainsMetaType
-import mega.privacy.android.domain.entity.chat.message.request.CreateTypedMessageRequest
 import mega.privacy.android.domain.entity.chat.messages.meta.GiphyMessage
 import mega.privacy.android.domain.entity.chat.messages.meta.InvalidMetaMessage
 import mega.privacy.android.domain.entity.chat.messages.meta.LocationMessage
 import mega.privacy.android.domain.entity.chat.messages.meta.MetaMessage
 import mega.privacy.android.domain.entity.chat.messages.meta.RichPreviewMessage
+import mega.privacy.android.domain.entity.chat.messages.request.CreateTypedMessageRequest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -32,12 +32,22 @@ class CreateMetaMessageUseCaseTest {
     @Test
     fun `test that InvalidMetaMessage is mapped when meta is null`() {
 
-        val chatMessage = mock<ChatMessage> {
+        val message = mock<ChatMessage> {
             on { containsMeta }.thenReturn(null)
         }
         val isMine = true
 
-        assertThat(underTest.invoke(CreateTypedMessageRequest(chatMessage, true))).isInstanceOf(
+        assertThat(
+            underTest.invoke(
+                CreateTypedMessageRequest(
+                    chatMessage = message,
+                    isMine = true,
+                    shouldShowAvatar = true,
+                    shouldShowTime = true,
+                    shouldShowDate = true,
+                )
+            )
+        ).isInstanceOf(
             InvalidMetaMessage::class.java
         )
     }
@@ -51,12 +61,22 @@ class CreateMetaMessageUseCaseTest {
         val mockContainsMeta = mock<ContainsMeta> {
             on { type }.thenReturn(metaType)
         }
-        val chatMessage = mock<ChatMessage> {
+        val message = mock<ChatMessage> {
             on { containsMeta }.thenReturn(mockContainsMeta)
         }
 
         val isMine = true
-        assertThat(underTest.invoke(CreateTypedMessageRequest(chatMessage, true))).isInstanceOf(
+        assertThat(
+            underTest.invoke(
+                CreateTypedMessageRequest(
+                    chatMessage = message,
+                    isMine = true,
+                    shouldShowAvatar = true,
+                    shouldShowTime = true,
+                    shouldShowDate = true,
+                )
+            )
+        ).isInstanceOf(
             clazz
         )
     }

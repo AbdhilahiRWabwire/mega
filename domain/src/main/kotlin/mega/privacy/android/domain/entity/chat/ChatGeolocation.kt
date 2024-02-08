@@ -1,5 +1,7 @@
 package mega.privacy.android.domain.entity.chat
 
+import mega.privacy.android.domain.entity.chat.messages.ChatGeolocationInfo
+
 /**
  * Data class for storing geolocation data.
  *
@@ -8,7 +10,7 @@ package mega.privacy.android.domain.entity.chat
  * @property image ChatGeolocation preview as a byte array encoded in Base64URL or null if not available.
  */
 data class ChatGeolocation(
-    val longitude: Float,
-    val latitude: Float,
-    val image: String?,
-)
+    override val longitude: Float,
+    override val latitude: Float,
+    override val image: String?,
+) : ChatGeolocationInfo

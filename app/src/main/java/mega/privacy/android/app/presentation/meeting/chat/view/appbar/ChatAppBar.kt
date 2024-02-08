@@ -28,6 +28,7 @@ import mega.privacy.android.app.extensions.navigateToAppSettings
 import mega.privacy.android.app.presentation.contact.view.getLastSeenString
 import mega.privacy.android.app.presentation.extensions.isValid
 import mega.privacy.android.app.presentation.extensions.text
+import mega.privacy.android.app.presentation.meeting.chat.extension.isJoined
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
 import mega.privacy.android.app.utils.permission.PermissionUtils
@@ -36,6 +37,7 @@ import mega.privacy.android.core.ui.controls.appbar.MegaAppBar
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.StorageState
+import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.android.shared.theme.MegaAppTheme
 
@@ -104,7 +106,7 @@ internal fun ChatAppBar(
             when (it) {
                 is ChatRoomMenuAction.AudioCall, is ChatRoomMenuAction.VideoCall -> {
                     isVideoCall = it is ChatRoomMenuAction.VideoCall
-                    if (uiState.callInOtherChat != null) {
+                    if (uiState.callsInOtherChats.any { call -> call.status?.isJoined == true }) {
                         showParticipatingInACallDialog()
                         return@onActionPressed
                     }
@@ -153,7 +155,7 @@ private fun getChatRoomActions(uiState: ChatUiState): List<ChatRoomMenuAction> =
 
         val hasModeratorPermission = myPermission == ChatRoomPermission.Moderator
 
-        if (hasModeratorPermission || myPermission == ChatRoomPermission.Standard) {
+        if (haveWritePermission) {
             add(ChatRoomMenuAction.AudioCall(!hasACallInThisChat && (!isWaitingRoom || hasModeratorPermission)))
 
             if (!isGroup) {
@@ -243,10 +245,14 @@ private fun getSubtitle(uiState: ChatUiState) = with(uiState) {
         }
 
         participantsCount != null -> {
+            val participants =
+                if (isPreviewMode) participantsCount.toInt() - 1
+                else participantsCount.toInt()
+
             pluralStringResource(
                 id = R.plurals.subtitle_of_group_chat,
-                participantsCount.toInt(),
-                participantsCount.toInt()
+                participants,
+                participants
             )
         }
 
@@ -314,11 +320,34 @@ private fun ChatAppBarPreview() {
     MegaAppTheme(isDark = isSystemInDarkTheme()) {
         ChatAppBar(
             uiState = ChatUiState(
-                title = "My Name",
+                chat = ChatRoom(
+                    chatId = 1L,
+                    ownPrivilege = ChatRoomPermission.Standard,
+                    numPreviewers = 0L,
+                    peerPrivilegesByHandles = mapOf(),
+                    peerCount = 0,
+                    peerHandlesList = emptyList(),
+                    peerPrivilegesList = emptyList(),
+                    isGroup = false,
+                    isPublic = false,
+                    isPreview = false,
+                    authorizationToken = "authorizationToken",
+                    title = "My name",
+                    hasCustomTitle = false,
+                    unreadCount = 0,
+                    userTyping = 0,
+                    userHandle = 0,
+                    isActive = true,
+                    isArchived = false,
+                    retentionTime = 0,
+                    creationTime = 0,
+                    isMeeting = false,
+                    isWaitingRoom = false,
+                    isOpenInvite = false,
+                    isSpeakRequest = false,
+                ),
                 userChatStatus = UserChatStatus.Away,
                 isChatNotificationMute = true,
-                isPrivateChat = true,
-                myPermission = ChatRoomPermission.Standard,
             )
         )
     }

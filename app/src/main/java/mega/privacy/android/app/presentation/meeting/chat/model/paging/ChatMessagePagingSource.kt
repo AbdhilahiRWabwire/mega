@@ -5,7 +5,7 @@ import androidx.paging.PagingState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
-import mega.privacy.android.app.presentation.meeting.chat.mapper.PagedTypedMessageResultUiMapper
+import mega.privacy.android.app.presentation.meeting.chat.mapper.UiChatMessageMapper
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.UiChatMessage
 import mega.privacy.android.domain.entity.chat.ChatHistoryLoadStatus
 import mega.privacy.android.domain.entity.chat.ChatMessage
@@ -21,7 +21,6 @@ import timber.log.Timber
  * @property fetchMessages
  * @property messageFlow
  * @property scope
- * @property pagedTypedMessageResultUiMapper
  */
 class ChatMessagePagingSource(
     private val chatId: Long,
@@ -29,7 +28,7 @@ class ChatMessagePagingSource(
     private val fetchMessages: FetchMessagePageUseCase,
     private val messageFlow: Flow<ChatMessage?>,
     private val scope: CoroutineScope,
-    private val pagedTypedMessageResultUiMapper: PagedTypedMessageResultUiMapper,
+    private val uiChatMessageMapper: UiChatMessageMapper,
 ) : PagingSource<PagingLoadResult, UiChatMessage>() {
 
     override fun getRefreshKey(state: PagingState<PagingLoadResult, UiChatMessage>): PagingLoadResult? {
@@ -52,7 +51,7 @@ class ChatMessagePagingSource(
         val typedMessages = scope.async {
             Timber.d("Paging fetch messages called with chat id: $chatId")
             val messageResponse = runCatching {
-                fetchMessages(messageFlow)
+                fetchMessages.invoke(messageFlow, pagingLoadResult?.nextMessageUserHandle)
             }.onFailure { exception ->
                 Timber.e(exception, "Paging fetchMessages failed with an exception")
             }.getOrDefault(emptyList())
@@ -70,20 +69,17 @@ class ChatMessagePagingSource(
         val messages = typedMessages.await()
         val historyLoadStatus = status.await()
 
-        val prevKey =
+        val nextKey =
             PagingLoadResult(
                 loadStatus = historyLoadStatus,
-                nextMessageUserHandle = messages.firstOrNull()?.userHandle,
-                nexMessageIsMine = messages.firstOrNull()?.isMine,
+                nextMessageUserHandle = messages.lastOrNull()?.userHandle,
+                nexMessageIsMine = messages.lastOrNull()?.isMine,
             )
 
         return LoadResult.Page(
-            data = pagedTypedMessageResultUiMapper(
-                pagingLoadResult = pagingLoadResult,
-                typedMessages = messages,
-            ),
-            prevKey = prevKey,
-            nextKey = null,
+            data = messages.map { uiChatMessageMapper(it) },
+            prevKey = null,
+            nextKey = nextKey,
         )
     }
 

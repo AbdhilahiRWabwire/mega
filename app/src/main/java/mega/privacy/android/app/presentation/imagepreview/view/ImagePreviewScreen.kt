@@ -2,7 +2,6 @@
 
 package mega.privacy.android.app.presentation.imagepreview.view
 
-import com.google.android.exoplayer2.ui.R as RExoPlayer
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -116,6 +115,7 @@ internal fun ImagePreviewScreen(
     viewState.currentImageNode?.let { currentImageNode ->
         val isCurrentImageNodeAvailableOffline = viewState.isCurrentImageNodeAvailableOffline
         var showRemoveLinkDialog by rememberSaveable { mutableStateOf(false) }
+        var showMoveToRubbishBinDialog by rememberSaveable { mutableStateOf(false) }
 
         val inFullScreenMode = viewState.inFullScreenMode
         val systemUiController = rememberSystemUiController()
@@ -180,11 +180,28 @@ internal fun ImagePreviewScreen(
                 cancelButtonText = stringResource(id = R.string.general_cancel),
                 onConfirm = {
                     viewModel.disableExport(currentImageNode)
+                    hideBottomSheet(coroutineScope, modalSheetState)
                     showRemoveLinkDialog = false
                 },
                 onDismiss = {
                     showRemoveLinkDialog = false
                 },
+            )
+        }
+
+        if (showMoveToRubbishBinDialog) {
+            MegaAlertDialog(
+                text = stringResource(id = R.string.confirmation_move_to_rubbish),
+                confirmButtonText = stringResource(id = R.string.general_move),
+                cancelButtonText = stringResource(id = R.string.general_cancel),
+                onConfirm = {
+                    onClickMoveToRubbishBin(currentImageNode)
+                    hideBottomSheet(coroutineScope, modalSheetState)
+                    showMoveToRubbishBinDialog = false
+                },
+                onDismiss = {
+                    showMoveToRubbishBinDialog = false
+                }
             )
         }
 
@@ -294,12 +311,15 @@ internal fun ImagePreviewScreen(
                     getImageThumbnailPath = viewModel::getLowestResolutionImagePath,
                     onClickInfo = {
                         onClickInfo(currentImageNode)
+                        hideBottomSheet(coroutineScope, modalSheetState)
                     },
                     onClickFavourite = {
                         onClickFavourite(currentImageNode)
+                        hideBottomSheet(coroutineScope, modalSheetState)
                     },
                     onClickLabel = {
                         onClickLabel(currentImageNode)
+                        hideBottomSheet(coroutineScope, modalSheetState)
                     },
                     onClickDispute = {},
                     onClickOpenWith = {
@@ -313,6 +333,7 @@ internal fun ImagePreviewScreen(
                     },
                     onClickImport = {
                         onClickImport(currentImageNode)
+                        hideBottomSheet(coroutineScope, modalSheetState)
                     },
                     onSwitchAvailableOffline = { checked ->
                         onSwitchAvailableOffline?.invoke(checked, currentImageNode)
@@ -320,6 +341,7 @@ internal fun ImagePreviewScreen(
                     },
                     onClickGetLink = {
                         onClickGetLink(currentImageNode)
+                        hideBottomSheet(coroutineScope, modalSheetState)
                     },
                     onClickRemoveLink = {
                         if (!currentImageNode.isTakenDown) {
@@ -333,20 +355,28 @@ internal fun ImagePreviewScreen(
                     },
                     onClickShare = {
                         onClickShare(currentImageNode)
+                        hideBottomSheet(coroutineScope, modalSheetState)
                     },
                     onClickRename = {
                         onClickRename(currentImageNode)
+                        hideBottomSheet(coroutineScope, modalSheetState)
                     },
                     onClickMove = {
                         onClickMove(currentImageNode)
+                        hideBottomSheet(coroutineScope, modalSheetState)
                     },
                     onClickCopy = {
                         onClickCopy(currentImageNode)
+                        hideBottomSheet(coroutineScope, modalSheetState)
                     },
-                    onClickRestore = {},
-                    onClickRemove = {},
+                    onClickRestore = {
+                        hideBottomSheet(coroutineScope, modalSheetState)
+                    },
+                    onClickRemove = {
+                        hideBottomSheet(coroutineScope, modalSheetState)
+                    },
                     onClickMoveToRubbishBin = {
-                        onClickMoveToRubbishBin(currentImageNode)
+                        showMoveToRubbishBinDialog = true
                         hideBottomSheet(coroutineScope, modalSheetState)
                     },
                 )
@@ -418,7 +448,7 @@ private fun ImagePreviewContent(
                         onClick = { onClickVideoPlay(imageNode) }
                     ) {
                         Icon(
-                            painter = painterResource(id = RExoPlayer.drawable.exo_icon_play),
+                            painter = painterResource(id = R.drawable.ic_play),
                             contentDescription = "Image Preview play video",
                             tint = Color.White,
                         )
@@ -466,7 +496,7 @@ private fun ImageContent(
     PhotoBox(
         modifier = Modifier.fillMaxSize(),
         state = photoState,
-        enabled = enableZoom,
+        enableZoom = enableZoom,
         onTap = {
             onImageTap()
         }

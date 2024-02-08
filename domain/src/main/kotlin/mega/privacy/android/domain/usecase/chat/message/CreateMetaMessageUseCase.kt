@@ -1,46 +1,61 @@
 package mega.privacy.android.domain.usecase.chat.message
 
 import mega.privacy.android.domain.entity.chat.ContainsMetaType
-import mega.privacy.android.domain.entity.chat.message.request.CreateTypedMessageRequest
 import mega.privacy.android.domain.entity.chat.messages.meta.GiphyMessage
 import mega.privacy.android.domain.entity.chat.messages.meta.InvalidMetaMessage
 import mega.privacy.android.domain.entity.chat.messages.meta.LocationMessage
 import mega.privacy.android.domain.entity.chat.messages.meta.RichPreviewMessage
+import mega.privacy.android.domain.entity.chat.messages.request.CreateTypedMessageInfo
 import javax.inject.Inject
 
-internal class CreateMetaMessageUseCase @Inject constructor() : CreateTypedMessageUseCase {
+/**
+ * Create meta message use case.
+ */
+class CreateMetaMessageUseCase @Inject constructor() : CreateTypedMessageUseCase {
 
-    override fun invoke(request: CreateTypedMessageRequest) = with(request) {
-        when (message.containsMeta?.type) {
+    override fun invoke(request: CreateTypedMessageInfo) = with(request) {
+        when (metaType) {
             ContainsMetaType.RICH_PREVIEW -> RichPreviewMessage(
-                msgId = message.msgId,
-                time = message.timestamp,
+                msgId = msgId,
+                time = timestamp,
                 isMine = isMine,
-                userHandle = message.userHandle,
-                preview = message.containsMeta.richPreview
+                userHandle = userHandle,
+                chatRichPreviewInfo = chatRichPreviewInfo,
+                shouldShowAvatar = shouldShowAvatar,
+                shouldShowTime = shouldShowTime,
+                shouldShowDate = shouldShowDate,
             )
 
             ContainsMetaType.GEOLOCATION -> LocationMessage(
-                msgId = message.msgId,
-                time = message.timestamp,
+                msgId = msgId,
+                time = timestamp,
                 isMine = isMine,
-                userHandle = message.userHandle,
-                geolocation = message.containsMeta.geolocation,
+                userHandle = userHandle,
+                chatGeolocationInfo = chatGeolocationInfo,
+                shouldShowAvatar = shouldShowAvatar,
+                shouldShowTime = shouldShowTime,
+                shouldShowDate = shouldShowDate,
             )
 
             ContainsMetaType.GIPHY -> GiphyMessage(
-                msgId = message.msgId,
-                time = message.timestamp,
+                msgId = msgId,
+                time = timestamp,
                 isMine = isMine,
-                userHandle = message.userHandle,
-                giphy = message.containsMeta.giphy
+                userHandle = userHandle,
+                chatGifInfo = chatGifInfo,
+                shouldShowAvatar = shouldShowAvatar,
+                shouldShowTime = shouldShowTime,
+                shouldShowDate = shouldShowDate,
             )
 
             else -> InvalidMetaMessage(
-                msgId = message.msgId,
-                time = message.timestamp,
+                msgId = msgId,
+                time = timestamp,
                 isMine = isMine,
-                userHandle = message.userHandle,
+                userHandle = userHandle,
+                shouldShowAvatar = shouldShowAvatar,
+                shouldShowTime = shouldShowTime,
+                shouldShowDate = shouldShowDate,
             )
         }
     }

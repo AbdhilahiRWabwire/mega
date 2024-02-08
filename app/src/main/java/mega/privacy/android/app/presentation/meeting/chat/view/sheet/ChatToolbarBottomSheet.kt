@@ -2,6 +2,7 @@ package mega.privacy.android.app.presentation.meeting.chat.view.sheet
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResult
@@ -48,10 +49,13 @@ import nz.mega.documentscanner.DocumentScannerActivity
 fun ChatToolbarBottomSheet(
     onAttachFileClicked: () -> Unit,
     onAttachContactClicked: () -> Unit,
+    onTakePicture: () -> Unit,
     onPickLocation: () -> Unit,
     isLoadingGalleryFiles: Boolean,
     modifier: Modifier = Modifier,
+    onCameraPermissionDenied: () -> Unit = {},
     sheetState: ModalBottomSheetState = rememberModalBottomSheetState(ModalBottomSheetValue.Hidden),
+    onAttachFiles: (List<Uri>) -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -60,7 +64,9 @@ fun ChatToolbarBottomSheet(
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.PickMultipleVisualMedia()
         ) {
-            //Manage gallery picked files here
+            if (it.isNotEmpty()) {
+                onAttachFiles(it)
+            }
             coroutineScope.launch { sheetState.hide() }
         }
 
@@ -85,7 +91,9 @@ fun ChatToolbarBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(4.dp),
-            sheetState = sheetState
+            sheetState = sheetState,
+            onTakePicture = onTakePicture,
+            onCameraPermissionDenied = onCameraPermissionDenied,
         )
 
         AnimatedVisibility(visible = isLoadingGalleryFiles) {
@@ -97,13 +105,15 @@ fun ChatToolbarBottomSheet(
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth().run {
-                if (isLoadingGalleryFiles) {
-                    padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 24.dp)
-                } else {
-                    padding(24.dp)
-                }
-            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .run {
+                    if (isLoadingGalleryFiles) {
+                        padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 24.dp)
+                    } else {
+                        padding(24.dp)
+                    }
+                },
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             AttachItem(
@@ -188,12 +198,19 @@ private fun openDocumentScanner(
 fun ChatGallery(
     sheetState: ModalBottomSheetState,
     modifier: Modifier = Modifier,
+    onTakePicture: () -> Unit = {},
+    onCameraPermissionDenied: () -> Unit = {},
 ) = LazyRow(
     modifier = modifier.testTag(TEST_TAG_GALLERY_LIST),
     horizontalArrangement = Arrangement.spacedBy(4.dp)
 ) {
     item("camera_button") {
-        ChatCameraButton(modifier = Modifier.size(88.dp), sheetState = sheetState)
+        ChatCameraButton(
+            modifier = Modifier.size(88.dp),
+            sheetState = sheetState,
+            onTakePicture = onTakePicture,
+            onCameraPermissionDenied = onCameraPermissionDenied,
+        )
     }
 }
 
@@ -206,6 +223,7 @@ private fun ChatToolbarBottomSheetPreview() {
             onAttachFileClicked = {},
             onAttachContactClicked = {},
             onPickLocation = {},
+            onTakePicture = {},
             isLoadingGalleryFiles = true,
             sheetState = rememberModalBottomSheetState(ModalBottomSheetValue.Expanded)
         )

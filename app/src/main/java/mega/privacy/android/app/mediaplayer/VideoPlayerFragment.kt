@@ -1,11 +1,16 @@
 package mega.privacy.android.app.mediaplayer
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.os.Environment.getExternalStoragePublicDirectory
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,6 +19,7 @@ import android.view.animation.ScaleAnimation
 import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.appcompat.app.AlertDialog
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -25,13 +31,14 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIXED_HEIGHT
+import androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
+import androidx.media3.ui.PlayerView
 import androidx.navigation.fragment.findNavController
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
-import com.google.android.exoplayer2.ui.AspectRatioFrameLayout.RESIZE_MODE_FIXED_HEIGHT
-import com.google.android.exoplayer2.ui.AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
-import com.google.android.exoplayer2.ui.StyledPlayerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -49,11 +56,14 @@ import mega.privacy.android.app.mediaplayer.model.SpeedPlaybackItem
 import mega.privacy.android.app.mediaplayer.model.VideoOptionItem
 import mega.privacy.android.app.presentation.extensions.serializable
 import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.app.utils.Constants.REQUEST_WRITE_STORAGE
 import mega.privacy.android.app.utils.RunOnUIThreadUtils
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.ViewUtils.isVisible
 import mega.privacy.android.app.utils.getScreenHeight
 import mega.privacy.android.app.utils.getScreenWidth
+import mega.privacy.android.app.utils.permission.PermissionUtils.hasPermissions
+import mega.privacy.android.app.utils.permission.PermissionUtils.requestPermission
 import mega.privacy.android.domain.entity.mediaplayer.RepeatToggleMode
 import mega.privacy.android.domain.entity.mediaplayer.SubtitleFileInfo
 import mega.privacy.mobile.analytics.event.AddSubtitlesOptionPressedEvent
@@ -66,6 +76,7 @@ import mega.privacy.mobile.analytics.event.VideoPlayerFullScreenPressedEvent
 import mega.privacy.mobile.analytics.event.VideoPlayerOriginalPressedEvent
 import org.jetbrains.anko.configuration
 import timber.log.Timber
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -94,7 +105,7 @@ class VideoPlayerFragment : Fragment() {
 
     private var delayHideToolbarCanceled = false
 
-    private var videoPlayerView: StyledPlayerView? = null
+    private var videoPlayerView: PlayerView? = null
 
     private var toolbarVisible = false
 
@@ -198,6 +209,7 @@ class VideoPlayerFragment : Fragment() {
         mediaPlayerGateway.removeListener(playerListener)
     }
 
+    @OptIn(UnstableApi::class)
     private fun observeFlow() {
         if (view != null) {
             with(viewModel) {
@@ -394,8 +406,27 @@ class VideoPlayerFragment : Fragment() {
     }
 
     private fun screenshotButtonClicked() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && !hasPermissions(
+                requireContext(),
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            )
+        ) {
+            requestPermission(
+                requireActivity(),
+                REQUEST_WRITE_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            )
+        } else {
+            captureScreenShot()
+        }
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun captureScreenShot() {
+        val rootPath =
+            getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).absolutePath
         binding.playerView.videoSurfaceView?.let { view ->
-            viewModel.screenshotWhenVideoPlaying(captureView = view) { bitmap ->
+            viewModel.screenshotWhenVideoPlaying(rootPath, captureView = view) { bitmap ->
                 viewModel.sendSnapshotButtonClickedEvent()
                 Analytics.tracker.trackEvent(SnapshotButtonPressedEvent)
                 viewLifecycleOwner.lifecycleScope.launch {
@@ -407,8 +438,21 @@ class VideoPlayerFragment : Fragment() {
                     videoPlayerActivity?.showSnackBarForVideoPlayer(
                         getString(R.string.media_player_video_snackbar_screenshot_saved)
                     )
+                    refreshGalleryWhenDeviceOSisLowerQ(rootPath)
                 }
             }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun refreshGalleryWhenDeviceOSisLowerQ(refreshPath: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            activity?.sendBroadcast(
+                Intent(
+                    Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
+                    Uri.fromFile(File(refreshPath))
+                )
+            )
         }
     }
 
@@ -493,9 +537,8 @@ class VideoPlayerFragment : Fragment() {
         layout.startAnimation(anim)
     }
 
-    private fun setupPlayerView(
-        playerView: StyledPlayerView,
-    ) {
+    @OptIn(UnstableApi::class)
+    private fun setupPlayerView(playerView: PlayerView) {
         mediaPlayerGateway.setupPlayerView(
             playerView = playerView,
             controllerHideOnTouch = true,
@@ -585,6 +628,7 @@ class VideoPlayerFragment : Fragment() {
      * @param dragToExit DragToExitSupport
      * @param activated true is activated, otherwise is false
      */
+    @OptIn(UnstableApi::class)
     fun onDragActivated(dragToExit: DragToExitSupport, activated: Boolean) {
         if (activated) {
             delayHideToolbarCanceled = true

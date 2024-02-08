@@ -18,7 +18,6 @@ import mega.privacy.android.data.extensions.failWithError
 import mega.privacy.android.data.extensions.getAllFolders
 import mega.privacy.android.data.extensions.getFileName
 import mega.privacy.android.data.extensions.getRequestListener
-import mega.privacy.android.data.gateway.AndroidDeviceGateway
 import mega.privacy.android.data.gateway.CacheGateway
 import mega.privacy.android.data.gateway.DeviceGateway
 import mega.privacy.android.data.gateway.FileAttributeGateway
@@ -100,7 +99,6 @@ internal class FileSystemRepositoryImpl @Inject constructor(
     private val deviceGateway: DeviceGateway,
     private val sdCardGateway: SDCardGateway,
     private val fileAttributeGateway: FileAttributeGateway,
-    private val androidDeviceGateway: AndroidDeviceGateway,
 ) : FileSystemRepository {
 
     override val localDCIMFolderPath: String
@@ -404,13 +402,6 @@ internal class FileSystemRepositoryImpl @Inject constructor(
         sdCardGateway.isSDCardCachePath(localPath)
     }
 
-    override suspend fun getOrCreateSDCardCacheFolder() =
-        withContext(ioDispatcher) {
-            sdCardGateway.getOrCreateCacheFolder(
-                androidDeviceGateway.getCurrentTimeInMillis().toString()
-            )
-        }
-
     override suspend fun moveFileToSd(file: File, targetPath: String, sdCardUriString: String) =
         withContext(ioDispatcher) {
             val sourceDocument = DocumentFile.fromFile(file)
@@ -466,5 +457,37 @@ internal class FileSystemRepositoryImpl @Inject constructor(
         }
         folderDocument?.findFile(fileName)?.delete()
         return folderDocument?.createFile(mimeType, fileName)
+    }
+
+    override suspend fun createNewImageUri(fileName: String): String? = withContext(ioDispatcher) {
+        fileGateway.createNewImageUri(fileName)?.toString()
+    }
+
+    override suspend fun isFileUri(uriString: String) = withContext(ioDispatcher) {
+        fileGateway.isFileUri(uriString)
+    }
+
+    override suspend fun getFileFromFileUri(uriString: String) = withContext(ioDispatcher) {
+        fileGateway.getFileFromUriFile(uriString)
+    }
+
+    override suspend fun isContentUri(uriString: String): Boolean = withContext(ioDispatcher) {
+        fileGateway.isContentUri(uriString)
+    }
+
+    override suspend fun getFileNameFromUri(uriString: String): String? =
+        withContext(ioDispatcher) {
+            fileGateway.getFileNameFromUri(uriString)
+        }
+
+    override suspend fun getFileExtensionFromUri(uriString: String) =
+        withContext(ioDispatcher) {
+            fileGateway.getFileExtensionFromUri(uriString)
+        }
+
+    override suspend fun copyContentUriToFile(uriString: String, file: File) {
+        withContext(ioDispatcher) {
+            fileGateway.copyContentUriToFile(uriString, file)
+        }
     }
 }

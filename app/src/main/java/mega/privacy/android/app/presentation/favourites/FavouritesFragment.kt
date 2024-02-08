@@ -86,6 +86,7 @@ class FavouritesFragment : Fragment(), HomepageSearchable {
 
     @Inject
     lateinit var megaNodeUtilWrapper: MegaNodeUtilWrapper
+
     /**
      * Used to access Open File functions
      */
@@ -124,7 +125,7 @@ class FavouritesFragment : Fragment(), HomepageSearchable {
         listLayoutManager = LinearLayoutManager(requireContext())
         setupAdapter()
 
-        binding.fastscroll.setUpScrollListener(object : FastScrollerScrollListener{
+        binding.fastscroll.setUpScrollListener(object : FastScrollerScrollListener {
             override fun onScrolled() {
                 hideFabButton()
             }
@@ -371,9 +372,11 @@ class FavouritesFragment : Fragment(), HomepageSearchable {
                         )
                     }
                 }
+
                 isURL -> {
                     megaUtilWrapper.manageURLNode(requireContext(), favourite.node)
                 }
+
                 isOpenableTextFile(favourite.typedNode.size) -> {
                     MegaNodeUtil.manageTextFileIntent(
                         requireContext(),
@@ -381,6 +384,7 @@ class FavouritesFragment : Fragment(), HomepageSearchable {
                         Constants.FAVOURITES_ADAPTER
                     )
                 }
+
                 else -> {
                     MegaNodeUtil.onNodeTapped(
                         context = requireActivity(),
@@ -575,6 +579,7 @@ class FavouritesFragment : Fragment(), HomepageSearchable {
                     switchToLinear()
                     adapter = listAdapter
                 }
+
                 ViewType.GRID -> {
                     switchBackToGrid()
                     adapter = gridAdapter

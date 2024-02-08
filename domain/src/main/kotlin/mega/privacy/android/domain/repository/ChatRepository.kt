@@ -1,5 +1,6 @@
 package mega.privacy.android.domain.repository
 
+import androidx.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 import mega.privacy.android.domain.entity.ChatRequest
 import mega.privacy.android.domain.entity.ChatRoomPermission
@@ -9,12 +10,16 @@ import mega.privacy.android.domain.entity.chat.ChatHistoryLoadStatus
 import mega.privacy.android.domain.entity.chat.ChatInitState
 import mega.privacy.android.domain.entity.chat.ChatListItem
 import mega.privacy.android.domain.entity.chat.ChatMessage
+import mega.privacy.android.domain.entity.chat.ChatPendingChanges
 import mega.privacy.android.domain.entity.chat.ChatPreview
 import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.CombinedChatRoom
 import mega.privacy.android.domain.entity.chat.ConnectionState
 import mega.privacy.android.domain.entity.chat.PendingMessage
 import mega.privacy.android.domain.entity.chat.RichLinkConfig
+import mega.privacy.android.domain.entity.chat.messages.TypedMessage
+import mega.privacy.android.domain.entity.chat.messages.paging.MessagePagingInfo
+import mega.privacy.android.domain.entity.chat.messages.request.CreateTypedMessageRequest
 import mega.privacy.android.domain.entity.contacts.InviteContactRequest
 import mega.privacy.android.domain.entity.node.NodeId
 
@@ -115,11 +120,8 @@ interface ChatRepository {
      * Leave chat
      *
      * @param chatId    The Chat id.
-     * @return          [ChatRequest]
      */
-    suspend fun leaveChat(
-        chatId: Long,
-    ): ChatRequest
+    suspend fun leaveChat(chatId: Long)
 
     /**
      * Update chat title.
@@ -859,4 +861,113 @@ interface ChatRepository {
      * @param enable
      */
     suspend fun enableRichPreviews(enable: Boolean)
+
+    /**
+     * Get paged messages
+     *
+     * @param chatId
+     * @return flow of paged messages
+     */
+    fun getPagedMessages(chatId: Long): PagingSource<Int, TypedMessage>
+
+    /**
+     * Store messages
+     *
+     * @param chatId
+     * @param messages
+     */
+    suspend fun storeMessages(chatId: Long, messages: List<CreateTypedMessageRequest>)
+
+    /**
+     * Get last load response
+     *
+     * @param chatId
+     * @return last history load status for the chat
+     */
+    suspend fun getLastLoadResponse(chatId: Long): ChatHistoryLoadStatus?
+
+    /**
+     * Set last load response
+     *
+     * @param chatId
+     * @param status
+     */
+    suspend fun setLastLoadResponse(chatId: Long, status: ChatHistoryLoadStatus)
+
+    /**
+     * Clear chat messages
+     *
+     * @param chatId
+     */
+    suspend fun clearChatMessages(chatId: Long)
+
+    /**
+     * Get next message
+     *
+     * @param chatId
+     * @param timestamp
+     * @return next chronological message if it exists
+     */
+    suspend fun getNextMessagePagingInfo(chatId: Long, timestamp: Long): MessagePagingInfo?
+
+    /**
+     * Returns the folder for saving chat files in user attributes, null if it's not configured yet
+     */
+    suspend fun getMyChatsFilesFolderId(): NodeId
+
+    /**
+     * Monitor if chat is in joining state.
+     */
+    fun monitorJoiningChat(chatId: Long): Flow<Boolean>
+
+    /**
+     * Monitor if chat is in leaving state.
+     */
+    fun monitorLeavingChat(chatId: Long): Flow<Boolean>
+
+    /**
+     * Share a geolocation in the specified chatroom
+     *
+     * The MegaChatMessage object returned by this function includes a message transaction id,
+     * That id is not the definitive id, which will be assigned by the server. You can obtain the
+     * temporal id with MegaChatMessage::getTempId
+     *
+     * When the server confirms the reception of the message, the MegaChatRoomListener::onMessageUpdate
+     * is called, including the definitive id and the new status: MegaChatMessage::STATUS_SERVER_RECEIVED.
+     * At this point, the app should refresh the message identified by the temporal id and move it to
+     * the final position in the history, based on the reported index in the callback.
+     *
+     * If the message is rejected by the server, the message will keep its temporal id and will have its
+     * a message id set to MEGACHAT_INVALID_HANDLE.
+     *
+     * You take the ownership of the returned value.
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param longitude from shared geolocation
+     * @param latitude from shared geolocation
+     * @param image Preview as a byte array encoded in Base64URL. It can be NULL
+     * @return [ChatMessage] that will be sent. The message id is not definitive, but temporal.
+     */
+    suspend fun sendGeolocation(
+        chatId: Long,
+        longitude: Float,
+        latitude: Float,
+        image: String,
+    ): ChatMessage
+
+    /**
+     * Set chat draft message
+     *
+     * @param chatId   Chat id
+     * @param draftMessage Draft message
+     */
+    suspend fun setChatDraftMessage(chatId: Long, draftMessage: String)
+
+    /**
+     * Monitor chat pending changes
+     *
+     * @param chatId   Chat id
+     * @return         [ChatPendingChanges]
+     */
+    fun monitorChatPendingChanges(chatId: Long): Flow<ChatPendingChanges>
 }

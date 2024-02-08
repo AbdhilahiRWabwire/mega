@@ -1,11 +1,18 @@
 package mega.privacy.android.app.mediaplayer.trackinfo
 
 import android.content.Context
+import androidx.annotation.OptIn
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import com.google.android.exoplayer2.*
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
@@ -83,6 +90,7 @@ class TrackInfoViewModel @Inject constructor(
         )
     }
 
+    @OptIn(UnstableApi::class)
     private fun loadMetadata(args: TrackInfoFragmentArgs) {
         val trackSelector = DefaultTrackSelector(context)
         val exoPlayer = ExoPlayer.Builder(context, DefaultRenderersFactory(context))

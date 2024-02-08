@@ -117,7 +117,6 @@ class DefaultCameraUploadRepositoryTest {
             context = mock(),
             cameraUploadsSettingsPreferenceGateway = cameraUploadsSettingsPreferenceGateway,
             cameraUploadsStatusInfoMapper = cameraUploadsStatusInfoMapper,
-            crashReporter = mock(),
         )
     }
 
@@ -291,7 +290,7 @@ class DefaultCameraUploadRepositoryTest {
         @ValueSource(booleans = [true, false])
         fun `test that the credentials exist or not`(credentialsExist: Boolean) = runTest {
             whenever(localStorageGateway.doCredentialsExist()).thenReturn(credentialsExist)
-            assertThat(underTest.doCredentialsExist()).isEqualTo(credentialsExist)
+            assertThat(underTest.hasCredentials()).isEqualTo(credentialsExist)
         }
     }
 
@@ -635,7 +634,7 @@ class DefaultCameraUploadRepositoryTest {
                 }
                 val workInfoFlow = flowOf(listOf(workInfo, mock()))
 
-                val expected = mock<CameraUploadsStatusInfo.Progress>()
+                val expected = mock<CameraUploadsStatusInfo.UploadProgress>()
 
                 whenever(
                     cameraUploadsStatusInfoMapper(

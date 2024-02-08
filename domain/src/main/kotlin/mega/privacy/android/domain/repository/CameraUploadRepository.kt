@@ -99,7 +99,7 @@ interface CameraUploadRepository {
      *
      * @return true if user credentials exist
      */
-    suspend fun doCredentialsExist(): Boolean
+    suspend fun hasCredentials(): Boolean
 
     /**
      * Do preferences exist
@@ -337,8 +337,10 @@ interface CameraUploadRepository {
     /**
      * Listen to new media
      *
+     * @param forceEnqueue True if the worker should be enqueued even if it is already running
+     *                     Used for enqueueing the same worker from itself
      */
-    suspend fun listenToNewMedia()
+    suspend fun listenToNewMedia(forceEnqueue: Boolean)
 
     /**
      * Get Camera upload Backup ID

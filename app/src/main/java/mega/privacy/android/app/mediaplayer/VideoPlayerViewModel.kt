@@ -20,7 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.exoplayer2.MediaItem
+import androidx.media3.common.MediaItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.reactivex.rxjava3.disposables.CompositeDisposable
@@ -101,7 +101,6 @@ import mega.privacy.android.app.utils.FileUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.app.utils.OfflineUtils
 import mega.privacy.android.app.utils.OfflineUtils.getOfflineFile
-import mega.privacy.android.app.utils.TextUtil
 import mega.privacy.android.app.utils.ThumbnailUtils
 import mega.privacy.android.app.utils.wrapper.GetOfflineThumbnailFileWrapper
 import mega.privacy.android.domain.entity.SortOrder
@@ -135,7 +134,6 @@ import mega.privacy.android.domain.usecase.mediaplayer.MegaApiFolderHttpServerSt
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunningUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStopUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.SavePlaybackTimesUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.SendStatisticsMediaPlayerUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.DeletePlaybackInformationUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetSRTSubtitleFileListUseCase
@@ -150,6 +148,7 @@ import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideoNodes
 import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideosByParentHandleFromMegaApiFolderUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetVideosBySearchTypeUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.MonitorVideoRepeatModeUseCase
+import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.SavePlaybackTimesUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.SetVideoRepeatModeUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.TrackPlaybackPositionUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorSubFolderMediaDiscoverySettingsUseCase
@@ -159,6 +158,7 @@ import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import nz.mega.sdk.MegaCancelToken
 import timber.log.Timber
 import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Collections
 import java.util.Date
@@ -280,6 +280,8 @@ class VideoPlayerViewModel @Inject constructor(
     internal var videoPlayType = VIDEO_TYPE_SHOW_PLAYBACK_POSITION_DIALOG
         private set
 
+    private var isSearchMode = false
+
     private val _metadataState = MutableStateFlow(Metadata(null, null, null, ""))
     internal val metadataState: StateFlow<Metadata> = _metadataState
 
@@ -358,6 +360,10 @@ class VideoPlayerViewModel @Inject constructor(
 
     internal fun setPlayingReverted(value: Boolean) {
         isPlayingReverted = value
+    }
+
+    internal fun setSearchMode(value: Boolean) {
+        isSearchMode = value
     }
 
     internal fun isPlayingReverted() = isPlayingReverted
@@ -577,6 +583,7 @@ class VideoPlayerViewModel @Inject constructor(
      */
     @SuppressLint("SimpleDateFormat")
     internal fun screenshotWhenVideoPlaying(
+        rootPath: String,
         captureView: View,
         successCallback: (bitmap: Bitmap) -> Unit,
     ) {
@@ -600,7 +607,11 @@ class VideoPlayerViewModel @Inject constructor(
                 { copyResult ->
                     if (copyResult == PixelCopy.SUCCESS) {
                         viewModelScope.launch {
-                            saveBitmap(fileName, screenshotBitmap, successCallback)
+                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                                saveBitmap(rootPath, screenshotBitmap, successCallback)
+                            } else {
+                                saveBitmapByMediaStore(fileName, screenshotBitmap, successCallback)
+                            }
                         }
                     }
                 },
@@ -1371,48 +1382,51 @@ class VideoPlayerViewModel @Inject constructor(
                 index in originalItems.indices
             } ?: 0
 
+            val searchQuery = playlistSearchQuery
             val recreatedItems = items.toMutableList()
 
-            val searchQuery = playlistSearchQuery
-            if (!TextUtil.isTextEmpty(searchQuery)) {
-                filterPlaylistItems(recreatedItems, searchQuery ?: return@launch)
-                return@launch
-            }
-            for ((index, item) in recreatedItems.withIndex()) {
-                val type = when {
-                    index < playingPosition -> TYPE_PREVIOUS
-                    playingPosition == index -> TYPE_PLAYING
-                    else -> TYPE_NEXT
+            if (isSearchMode && !searchQuery.isNullOrEmpty()) {
+                filterPlaylistItems(recreatedItems, searchQuery)
+            } else {
+                for ((index, item) in recreatedItems.withIndex()) {
+                    val type = when {
+                        index < playingPosition -> TYPE_PREVIOUS
+                        playingPosition == index -> TYPE_PLAYING
+                        else -> TYPE_NEXT
+                    }
+                    recreatedItems[index] =
+                        item.finalizeItem(
+                            index = index,
+                            type = type,
+                            isSelected = item.isSelected,
+                            duration = item.duration,
+                        )
                 }
-                recreatedItems[index] =
-                    item.finalizeItem(
-                        index = index,
-                        type = type,
-                        isSelected = item.isSelected,
-                        duration = item.duration,
-                    )
-            }
-            val hasPrevious = playingPosition > 0
-            var scrollPosition = playingPosition
-            if (hasPrevious) {
-                recreatedItems[0] = recreatedItems[0].copy(headerIsVisible = true)
-            }
-            recreatedItems[playingPosition] =
-                recreatedItems[playingPosition].copy(headerIsVisible = true)
+                if (playingPosition > 0) {
+                    recreatedItems[0] = recreatedItems[0].copy(headerIsVisible = true)
+                }
+                recreatedItems[playingPosition] =
+                    recreatedItems[playingPosition].copy(headerIsVisible = true)
 
-            Timber.d("recreateAndUpdatePlaylistItems post ${recreatedItems.size} items")
-            if (!isScroll) {
-                scrollPosition = -1
-            }
-            _playlistItemsState.update {
-                it.copy(recreatedItems, scrollPosition)
+                recreatedItems
+            }.let { updatedList ->
+                Timber.d("recreateAndUpdatePlaylistItems post ${updatedList.size} items")
+                val scrollPosition = if (isScroll) {
+                    playingPosition
+                } else {
+                    -1
+                }
+                _playlistItemsState.update {
+                    it.copy(updatedList, scrollPosition)
+                }
             }
         }
     }
 
-    private fun filterPlaylistItems(items: List<PlaylistItem>, filter: String) {
-        if (items.isEmpty()) return
-
+    private fun filterPlaylistItems(
+        items: List<PlaylistItem>,
+        filter: String,
+    ): MutableList<PlaylistItem> {
         val filteredItems = ArrayList<PlaylistItem>()
         items.forEachIndexed { index, item ->
             if (item.nodeName.contains(filter, true)) {
@@ -1421,10 +1435,7 @@ class VideoPlayerViewModel @Inject constructor(
                 filteredItems.add(item.finalizeItem(index, TYPE_PREVIOUS))
             }
         }
-
-        _playlistItemsState.update {
-            it.copy(filteredItems, 0)
-        }
+        return filteredItems.toMutableList()
     }
 
     /**
@@ -1434,9 +1445,7 @@ class VideoPlayerViewModel @Inject constructor(
      */
     internal fun searchQueryUpdate(newText: String?) {
         playlistSearchQuery = newText
-        recreateAndUpdatePlaylistItems(
-            originalItems = _playlistItemsState.value.first
-        )
+        recreateAndUpdatePlaylistItems()
     }
 
     /**
@@ -1737,7 +1746,7 @@ class VideoPlayerViewModel @Inject constructor(
         playlistItems.indexOfFirst {
             it.nodeHandle == item.nodeHandle
         }.takeIf { index ->
-            index in _playlistItemsState.value.first.indices
+            index in playlistItems.indices
         }
 
     /**
@@ -1824,35 +1833,66 @@ class VideoPlayerViewModel @Inject constructor(
             FileUtil.isFileAvailable(file) && file.length() == node.size
         }
 
+    @SuppressLint("SimpleDateFormat")
     private suspend fun saveBitmap(
+        rootPath: String,
+        bitmap: Bitmap,
+        successCallback: (bitmap: Bitmap) -> Unit,
+    ) = withContext(ioDispatcher) {
+        val screenshotsFolderPath =
+            "${rootPath}${File.separator}${MEGA_SCREENSHOTS_FOLDER_NAME}${File.separator}"
+        File(screenshotsFolderPath).apply {
+            if (exists().not()) {
+                mkdirs()
+            }
+        }
+        val screenshotFileName =
+            SimpleDateFormat(DATE_FORMAT_PATTERN).format(Date(System.currentTimeMillis()))
+        val filePath =
+            "$screenshotsFolderPath${SCREENSHOT_NAME_PREFIX}$screenshotFileName${SCREENSHOT_NAME_SUFFIX}"
+        val screenshotFile = File(filePath)
+        try {
+            val outputStream = FileOutputStream(screenshotFile)
+            bitmap.compress(Bitmap.CompressFormat.JPEG, QUALITY_SCREENSHOT, outputStream)
+            outputStream.flush()
+            outputStream.close()
+            successCallback(bitmap)
+        } catch (e: Exception) {
+            Timber.e("Bitmap is saved error: ${e.message}")
+        }
+    }
+
+    private suspend fun saveBitmapByMediaStore(
         fileName: String,
         bitmap: Bitmap,
         successCallback: (bitmap: Bitmap) -> Unit,
-    ) =
-        withContext(ioDispatcher) {
-            val contentValues = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
-                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                put(MediaStore.Images.Media.RELATIVE_PATH, MEGA_SCREENSHOTS_FOLDER_NAME)
-            }
+    ) = withContext(ioDispatcher) {
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+            put(MediaStore.Images.Media.MIME_TYPE, MIME_TYPE_JPEG)
+            put(
+                MediaStore.Images.Media.RELATIVE_PATH,
+                "${DCIM_FOLDER_NAME}$MEGA_SCREENSHOTS_FOLDER_NAME"
+            )
+        }
 
-            val contentResolver = context.contentResolver
-            contentResolver?.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-                ?.let { uri ->
-                    contentResolver.openOutputStream(uri)?.use { outputStream ->
-                        try {
-                            bitmap.compress(
-                                Bitmap.CompressFormat.JPEG,
-                                QUALITY_SCREENSHOT,
-                                outputStream
-                            )
-                            successCallback(bitmap)
-                        } catch (e: Exception) {
-                            Timber.e("Bitmap is saved error: ${e.message}")
-                        }
+        val contentResolver = context.contentResolver
+        contentResolver?.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+            ?.let { uri ->
+                contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    try {
+                        bitmap.compress(
+                            Bitmap.CompressFormat.JPEG,
+                            QUALITY_SCREENSHOT,
+                            outputStream
+                        )
+                        successCallback(bitmap)
+                    } catch (e: Exception) {
+                        Timber.e("Bitmap is saved error: ${e.message}")
                     }
                 }
-        }
+            }
+    }
 
     /**
      * Format milliseconds to time string
@@ -1986,7 +2026,9 @@ class VideoPlayerViewModel @Inject constructor(
     }
 
     companion object {
-        private const val MEGA_SCREENSHOTS_FOLDER_NAME = "DCIM/MEGA Screenshots/"
+        private const val MEGA_SCREENSHOTS_FOLDER_NAME = "MEGA Screenshots/"
+        private const val DCIM_FOLDER_NAME = "DCIM/"
+        private const val MIME_TYPE_JPEG = "image/jpeg"
         private const val QUALITY_SCREENSHOT = 100
         private const val DATE_FORMAT_PATTERN = "yyyyMMdd-HHmmss"
         private const val SCREENSHOT_NAME_PREFIX = "Screenshot_"

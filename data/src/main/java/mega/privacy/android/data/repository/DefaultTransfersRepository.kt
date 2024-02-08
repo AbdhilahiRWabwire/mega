@@ -32,6 +32,7 @@ import mega.privacy.android.data.extensions.isBackgroundTransfer
 import mega.privacy.android.data.gateway.AppEventGateway
 import mega.privacy.android.data.gateway.MegaLocalRoomGateway
 import mega.privacy.android.data.gateway.MegaLocalStorageGateway
+import mega.privacy.android.data.gateway.SDCardGateway
 import mega.privacy.android.data.gateway.WorkManagerGateway
 import mega.privacy.android.data.gateway.api.MegaApiGateway
 import mega.privacy.android.data.listener.OptionalMegaRequestListenerInterface
@@ -99,6 +100,7 @@ internal class DefaultTransfersRepository @Inject constructor(
     private val completedTransferMapper: CompletedTransferMapper,
     private val cancelTokenProvider: CancelTokenProvider,
     private val megaNodeMapper: MegaNodeMapper,
+    private val sdCardGateway: SDCardGateway,
 ) : TransferRepository {
 
     private val monitorPausedTransfers = MutableStateFlow(false)
@@ -123,7 +125,7 @@ internal class DefaultTransfersRepository @Inject constructor(
         parentNodeId: NodeId,
         fileName: String?,
         modificationTime: Long,
-        appData: String?,
+        appData: TransferAppData?,
         isSourceTemporary: Boolean,
         shouldStartFirst: Boolean,
     ) = callbackFlow {
@@ -136,10 +138,37 @@ internal class DefaultTransfersRepository @Inject constructor(
             parentNode = parentNode,
             fileName = fileName,
             modificationTime = modificationTime,
-            appData = appData,
+            appData = appData?.let { transferAppDataStringMapper(listOf(it)) },
             isSourceTemporary = isSourceTemporary,
             shouldStartFirst = shouldStartFirst,
-            cancelToken = null,
+            cancelToken = cancelTokenProvider.getOrCreateCancelToken(),
+            listener = listener,
+        )
+
+        awaitClose {
+            megaApiGateway.removeTransferListener(listener)
+        }
+    }
+        .flowOn(ioDispatcher)
+        .cancellable()
+
+    override fun startUploadForChat(
+        localPath: String,
+        parentNodeId: NodeId,
+        fileName: String?,
+        appData: TransferAppData.ChatTransferAppData,
+        isSourceTemporary: Boolean,
+    ) = callbackFlow {
+        val parentNode = megaApiGateway.getMegaNodeByHandle(parentNodeId.longValue)
+        requireNotNull(parentNode)
+        val listener = transferListener(channel)
+
+        megaApiGateway.startUploadForChat(
+            localPath = localPath,
+            parentNode = parentNode,
+            fileName = fileName,
+            appData = transferAppDataStringMapper(listOf(appData)),
+            isSourceTemporary = isSourceTemporary,
             listener = listener,
         )
 
@@ -461,8 +490,17 @@ internal class DefaultTransfersRepository @Inject constructor(
         workerManagerGateway.enqueueDownloadsWorkerRequest()
     }
 
+    override suspend fun startChatUploadsWorker() = withContext(ioDispatcher) {
+        workerManagerGateway.enqueueChatUploadsWorkerRequest()
+    }
+
     override fun isDownloadsWorkerEnqueuedFlow() =
         workerManagerGateway.monitorDownloadsStatusInfo().map { workInfos ->
+            workInfos.any { it.state == WorkInfo.State.ENQUEUED }
+        }
+
+    override fun isChatUploadsWorkerEnqueuedFlow() =
+        workerManagerGateway.monitorChatUploadsStatusInfo().map { workInfos ->
             workInfos.any { it.state == WorkInfo.State.ENQUEUED }
         }
 
@@ -620,6 +658,13 @@ internal class DefaultTransfersRepository @Inject constructor(
         megaApiGateway.currentDownloadSpeed
     }
 
+    override suspend fun getOrCreateSDCardTransfersCacheFolder() =
+        withContext(ioDispatcher) {
+            sdCardGateway.getOrCreateCacheFolder(
+                TRANSFERS_SD_TEMPORARY_FOLDER
+            )
+        }
+
     @Deprecated(
         "This value is deprecated in SDK. " +
                 "Replace with the corresponding value get from ActiveTransfers when ready"
@@ -650,6 +695,10 @@ internal class DefaultTransfersRepository @Inject constructor(
                     transferredBytesFlows[transferType] = it
                 }
         }
+    }
+
+    companion object {
+        internal const val TRANSFERS_SD_TEMPORARY_FOLDER = "transfersSdTempMEGA"
     }
 }
 

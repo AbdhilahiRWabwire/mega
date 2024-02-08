@@ -22,8 +22,8 @@ import mega.privacy.android.domain.entity.camerauploads.CameraUploadsTransferPro
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.transfer.Transfer
+import mega.privacy.android.domain.entity.transfer.TransferAppData
 import mega.privacy.android.domain.entity.transfer.TransferEvent
-import mega.privacy.android.domain.entity.transfer.TransferType
 import mega.privacy.android.domain.exception.NotEnoughStorageException
 import mega.privacy.android.domain.repository.FileSystemRepository
 import mega.privacy.android.domain.usecase.CreateTempFileAndRemoveCoordinatesUseCase
@@ -107,6 +107,7 @@ class UploadCameraUploadsRecordsUseCaseTest {
         tempFilePath = "tempFilePath",
         latitude = 0.0,
         longitude = 0.0,
+        generatedFileName = "generatedFileName"
     )
 
     private val existingNodeId = mock<NodeId>()
@@ -218,16 +219,16 @@ class UploadCameraUploadsRecordsUseCaseTest {
             verify(startUploadUseCase, never()).invoke(
                 localPath = record.filePath,
                 parentNodeId = uploadNodeId,
-                fileName = record.fileName,
+                fileName = record.generatedFileName,
                 modificationTime = record.timestamp / 1000,
-                appData = TransferType.CU_UPLOAD.name,
+                appData = TransferAppData.CameraUpload,
                 isSourceTemporary = false,
                 shouldStartFirst = false,
             )
             verify(copyNodeUseCase, never()).invoke(
                 nodeToCopy = existingNodeId,
                 newNodeParent = uploadNodeId,
-                newNodeName = record.fileName,
+                newNodeName = record.generatedFileName,
             )
         }
 
@@ -280,7 +281,7 @@ class UploadCameraUploadsRecordsUseCaseTest {
         ) = runTest {
             setInput(cameraUploadFolderType)
             whenever(getNodeGPSCoordinatesUseCase(existingNodeId)).thenReturn(Pair(0.0, 0.0))
-            whenever(copyNodeUseCase(existingNodeId, uploadNodeId, record.fileName))
+            whenever(copyNodeUseCase(existingNodeId, uploadNodeId, record.generatedFileName))
                 .thenReturn(newNodeId)
 
             executeUnderTest().collect()
@@ -288,7 +289,7 @@ class UploadCameraUploadsRecordsUseCaseTest {
             verify(copyNodeUseCase).invoke(
                 nodeToCopy = existingNodeId,
                 newNodeParent = uploadNodeId,
-                newNodeName = record.fileName,
+                newNodeName = record.generatedFileName,
             )
         }
 
@@ -301,7 +302,7 @@ class UploadCameraUploadsRecordsUseCaseTest {
             val (latitude, longitude) = Pair(0.0, 0.0)
             whenever(getNodeGPSCoordinatesUseCase(existingNodeId))
                 .thenReturn(Pair(latitude, longitude))
-            whenever(copyNodeUseCase(existingNodeId, uploadNodeId, record.fileName))
+            whenever(copyNodeUseCase(existingNodeId, uploadNodeId, record.generatedFileName))
                 .thenReturn(newNodeId)
 
             executeUnderTest().collect()
@@ -320,7 +321,7 @@ class UploadCameraUploadsRecordsUseCaseTest {
         ) = runTest {
             setInput(cameraUploadFolderType)
             whenever(getNodeGPSCoordinatesUseCase(existingNodeId)).thenReturn(Pair(0.0, 0.0))
-            whenever(copyNodeUseCase(existingNodeId, uploadNodeId, record.fileName))
+            whenever(copyNodeUseCase(existingNodeId, uploadNodeId, record.generatedFileName))
                 .thenReturn(newNodeId)
 
             executeUnderTest().collect()
@@ -340,7 +341,7 @@ class UploadCameraUploadsRecordsUseCaseTest {
         ) = runTest {
             setInput(cameraUploadFolderType)
             whenever(getNodeGPSCoordinatesUseCase(existingNodeId)).thenReturn(Pair(0.0, 0.0))
-            whenever(copyNodeUseCase(existingNodeId, uploadNodeId, record.fileName))
+            whenever(copyNodeUseCase(existingNodeId, uploadNodeId, record.generatedFileName))
                 .thenReturn(newNodeId)
 
             executeUnderTest().test {
@@ -397,9 +398,9 @@ class UploadCameraUploadsRecordsUseCaseTest {
                 startUploadUseCase(
                     localPath = filePath,
                     parentNodeId = uploadNodeId,
-                    fileName = record.fileName,
+                    fileName = record.generatedFileName,
                     modificationTime = record.timestamp / 1000,
-                    appData = TransferType.CU_UPLOAD.name,
+                    appData = TransferAppData.CameraUpload,
                     isSourceTemporary = false,
                     shouldStartFirst = false,
                 )
@@ -424,9 +425,9 @@ class UploadCameraUploadsRecordsUseCaseTest {
             verify(startUploadUseCase).invoke(
                 localPath = record.filePath,
                 parentNodeId = uploadNodeId,
-                fileName = record.fileName,
+                fileName = record.generatedFileName,
                 modificationTime = record.timestamp / 1000,
-                appData = TransferType.CU_UPLOAD.name,
+                appData = TransferAppData.CameraUpload,
                 isSourceTemporary = false,
                 shouldStartFirst = false,
             )
@@ -828,9 +829,9 @@ class UploadCameraUploadsRecordsUseCaseTest {
                 startUploadUseCase(
                     localPath = filePath,
                     parentNodeId = uploadNodeId,
-                    fileName = record.fileName,
+                    fileName = record.generatedFileName,
                     modificationTime = record.timestamp / 1000,
-                    appData = TransferType.CU_UPLOAD.name,
+                    appData = TransferAppData.CameraUpload,
                     isSourceTemporary = false,
                     shouldStartFirst = false,
                 )
@@ -1002,9 +1003,9 @@ class UploadCameraUploadsRecordsUseCaseTest {
             verify(startUploadUseCase, never()).invoke(
                 localPath = record.tempFilePath,
                 parentNodeId = uploadNodeId,
-                fileName = record.fileName,
+                fileName = record.generatedFileName,
                 modificationTime = record.timestamp / 1000,
-                appData = TransferType.CU_UPLOAD.name,
+                appData = TransferAppData.CameraUpload,
                 isSourceTemporary = false,
                 shouldStartFirst = false,
             )
@@ -1041,9 +1042,9 @@ class UploadCameraUploadsRecordsUseCaseTest {
                 startUploadUseCase(
                     localPath = filePath,
                     parentNodeId = uploadNodeId,
-                    fileName = record.fileName,
+                    fileName = record.generatedFileName,
                     modificationTime = record.timestamp / 1000,
-                    appData = TransferType.CU_UPLOAD.name,
+                    appData = TransferAppData.CameraUpload,
                     isSourceTemporary = false,
                     shouldStartFirst = false,
                 )
@@ -1072,9 +1073,10 @@ class UploadCameraUploadsRecordsUseCaseTest {
             cameraUploadFolderType: CameraUploadFolderType,
         ) = runTest {
             val compressionEvents: List<VideoCompressionState> =
-                (0..2).map {
-                    VideoCompressionState.Progress(it, 0, 1, "path")
-                }
+                generateSequence(0f) { it + 0.5f }
+                    .takeWhile { it <= 1f }.map {
+                        VideoCompressionState.Progress(it, 0, 1, "path")
+                    }.toList()
             setInput(cameraUploadFolderType, type = CameraUploadsRecordType.TYPE_VIDEO)
             val quality = VideoQuality.HIGH
             whenever(getUploadVideoQualityUseCase()).thenReturn(quality)
@@ -1233,9 +1235,9 @@ class UploadCameraUploadsRecordsUseCaseTest {
             verify(startUploadUseCase).invoke(
                 localPath = record.filePath,
                 parentNodeId = uploadNodeId,
-                fileName = record.fileName,
+                fileName = record.generatedFileName,
                 modificationTime = record.timestamp / 1000,
-                appData = TransferType.CU_UPLOAD.name,
+                appData = TransferAppData.CameraUpload,
                 isSourceTemporary = false,
                 shouldStartFirst = false,
             )
@@ -1250,14 +1252,14 @@ class UploadCameraUploadsRecordsUseCaseTest {
             Arguments.of(
                 CameraUploadFolderType.Primary,
                 listOf(
-                    VideoCompressionState.Progress(50, 0, 1, "path"),
+                    VideoCompressionState.Progress(0.5f, 0, 1, "path"),
                     VideoCompressionState.Finished,
                 ),
             ),
             Arguments.of(
                 CameraUploadFolderType.Secondary,
                 listOf(
-                    VideoCompressionState.Progress(50, 0, 1, "path"),
+                    VideoCompressionState.Progress(0.5f, 0, 1, "path"),
                     VideoCompressionState.Finished,
                 ),
             ),

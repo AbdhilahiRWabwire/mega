@@ -12,9 +12,9 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import androidx.media3.common.Player
+import androidx.media3.ui.PlayerView
 import androidx.navigation.fragment.findNavController
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.ui.StyledPlayerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import mega.privacy.android.app.R
@@ -198,7 +198,7 @@ class AudioPlayerFragment : Fragment() {
 
     private fun setupPlayerView(
         mediaPlayerServiceGateway: MediaPlayerServiceGateway,
-        playerView: StyledPlayerView,
+        playerView: PlayerView,
     ) {
         mediaPlayerServiceGateway.setupPlayerView(
             playerView = playerView,

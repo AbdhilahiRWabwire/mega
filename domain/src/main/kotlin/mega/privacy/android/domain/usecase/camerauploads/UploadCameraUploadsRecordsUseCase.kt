@@ -26,8 +26,8 @@ import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRecord
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRecordUploadStatus
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsTransferProgress
 import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.domain.entity.transfer.TransferAppData
 import mega.privacy.android.domain.entity.transfer.TransferEvent
-import mega.privacy.android.domain.entity.transfer.TransferType
 import mega.privacy.android.domain.exception.NotEnoughStorageException
 import mega.privacy.android.domain.repository.FileSystemRepository
 import mega.privacy.android.domain.usecase.CreateTempFileAndRemoveCoordinatesUseCase
@@ -277,9 +277,9 @@ class UploadCameraUploadsRecordsUseCase @Inject constructor(
                         startUploadUseCase(
                             localPath = path,
                             parentNodeId = parentNodeId,
-                            fileName = record.fileName,
+                            fileName = record.generatedFileName,
                             modificationTime = record.timestamp / 1000,
-                            appData = TransferType.CU_UPLOAD.name,
+                            appData = TransferAppData.CameraUpload,
                             isSourceTemporary = false,
                             shouldStartFirst = false,
                         ).collect { transferEvent ->
@@ -589,7 +589,7 @@ class UploadCameraUploadsRecordsUseCase @Inject constructor(
         copyNodeUseCase(
             nodeToCopy = existingNodeId,
             newNodeParent = parentNodeId,
-            newNodeName = record.fileName,
+            newNodeName = record.generatedFileName,
         ).let { newNodeId ->
             setGpsCoordinatesFromNode(
                 existingNodeId = existingNodeId,

@@ -33,7 +33,6 @@ import mega.privacy.android.app.main.FileExplorerActivity
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.mediaplayer.AudioPlayerActivity
 import mega.privacy.android.app.mediaplayer.VideoPlayerActivity
-import mega.privacy.android.app.presentation.advertisements.AdsViewModel
 import mega.privacy.android.app.presentation.advertisements.model.AdsSlotIDs
 import mega.privacy.android.app.presentation.clouddrive.FileLinkViewModel
 import mega.privacy.android.app.presentation.extensions.isDarkMode
@@ -165,8 +164,7 @@ class FileLinkComposeActivity : TransfersManagementActivity(),
     private fun checkForInAppAdvertisement() {
         lifecycleScope.launch {
             runCatching {
-                val isInAppAdvertisementEnabled =
-                    getFeatureFlagValueUseCase(AppFeatures.InAppAdvertisement)
+                val isInAppAdvertisementEnabled = true
                 val isAdsEnabled = getFeatureFlagValueUseCase(ABTestFeatures.ads)
 
                 if (isInAppAdvertisementEnabled && isAdsEnabled) {

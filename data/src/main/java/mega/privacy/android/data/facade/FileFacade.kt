@@ -1,5 +1,6 @@
 package mega.privacy.android.data.facade
 
+import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
 import android.media.MediaScannerConnection
@@ -13,7 +14,10 @@ import android.provider.MediaStore.MediaColumns.DISPLAY_NAME
 import android.provider.MediaStore.MediaColumns.SIZE
 import android.provider.MediaStore.VOLUME_EXTERNAL
 import android.provider.MediaStore.VOLUME_INTERNAL
+import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
+import androidx.core.net.toFile
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.exifinterface.media.ExifInterface
@@ -308,9 +312,54 @@ class FileFacade @Inject constructor(
     override suspend fun getOfflineFolder() =
         createDirectory(context.filesDir.toString() + File.separator + OFFLINE_DIR)
 
+    override suspend fun createNewImageUri(fileName: String): Uri? {
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(
+                MediaStore.Images.Media.RELATIVE_PATH,
+                "${Environment.DIRECTORY_PICTURES}/$PHOTO_DIR"
+            )
+        }
+
+        val contentResolver = context.contentResolver
+        return contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+    }
+
+    override suspend fun isFileUri(uriString: String) = uriString.toUri().scheme == "file"
+
+    override suspend fun getFileFromUriFile(uriString: String): File =
+        uriString.toUri().toFile()
+
+    override suspend fun isContentUri(uriString: String) = uriString.toUri().scheme == "content"
+
+    override suspend fun getFileNameFromUri(uriString: String): String? {
+        val cursor = context.contentResolver.query(uriString.toUri(), null, null, null, null)
+        return cursor?.use {
+            if (cursor.moveToFirst()) {
+                cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf { it >= 0 }
+                    ?.let { cursor.getString(it) }
+            } else null
+        }
+    }
+
+    override suspend fun getFileExtensionFromUri(uriString: String) =
+        MimeTypeMap.getSingleton()
+            .getExtensionFromMimeType(context.contentResolver.getType(uriString.toUri()))
+
+    override suspend fun copyContentUriToFile(uriString: String, file: File) {
+        val uri = uriString.toUri()
+        require(uri.scheme == "content")
+        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            file.outputStream().use { output ->
+                inputStream.copyTo(output)
+            }
+        }
+    }
 
     private companion object {
         const val DOWNLOAD_DIR = "MEGA Downloads"
+        const val PHOTO_DIR = "MEGA Photos"
         const val OFFLINE_DIR = "MEGA Offline"
         const val LAT_LNG = "0/1,0/1,0/1000"
         const val REF_LAT_LNG = "0"

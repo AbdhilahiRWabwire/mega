@@ -109,6 +109,24 @@ internal class MegaApiFacade @Inject constructor(
         )
     }
 
+    override fun startUploadForChat(
+        localPath: String,
+        parentNode: MegaNode,
+        fileName: String?,
+        appData: String?,
+        isSourceTemporary: Boolean,
+        listener: MegaTransferListenerInterface,
+    ) {
+        megaApi.startUploadForChat(
+            localPath,
+            parentNode,
+            appData,
+            isSourceTemporary,
+            fileName,
+            listener,
+        )
+    }
+
     override fun addTransferListener(listener: MegaTransferListenerInterface) =
         megaApi.addTransferListener(listener)
 
@@ -1464,8 +1482,11 @@ internal class MegaApiFacade @Inject constructor(
     override fun isCookieBannerEnabled() =
         megaApi.isCookieBannerEnabled
 
-    override fun getMiscFlags(listener: OptionalMegaRequestListenerInterface) =
-        megaApi.getMiscFlags(listener)
+    override fun getUserData(listener: OptionalMegaRequestListenerInterface?) =
+        if (listener == null) megaApi.getUserData() else megaApi.getUserData(listener)
+
+    override fun getMiscFlags(listener: OptionalMegaRequestListenerInterface?) =
+        if (listener == null) megaApi.getMiscFlags() else megaApi.getMiscFlags(listener)
 
     override fun getCookieSettings(
         listener: OptionalMegaRequestListenerInterface,
@@ -1491,4 +1512,8 @@ internal class MegaApiFacade @Inject constructor(
 
     override fun enableRichPreviews(enable: Boolean, listener: MegaRequestListenerInterface) =
         megaApi.enableRichPreviews(enable, listener)
+
+    override fun getSessionTransferURL(path: String, listener: MegaRequestListenerInterface) {
+        megaApi.getSessionTransferURL(path, listener)
+    }
 }

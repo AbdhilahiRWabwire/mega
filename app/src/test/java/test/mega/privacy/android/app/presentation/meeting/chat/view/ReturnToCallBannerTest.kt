@@ -12,6 +12,7 @@ import mega.privacy.android.app.presentation.meeting.chat.view.ReturnToCallBanne
 import mega.privacy.android.core.ui.controls.chat.TEST_TAG_RETURN_TO_CALL
 import mega.privacy.android.core.ui.controls.chat.TEST_TAG_RETURN_TO_CALL_CHRONOMETER
 import mega.privacy.android.domain.entity.chat.ChatCall
+import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import org.junit.Rule
 import org.junit.Test
@@ -52,8 +53,8 @@ class ReturnToCallBannerTest {
         }
         initComposeRuleContent(
             ChatUiState(
+                chat = mock<ChatRoom> { on { isGroup } doReturn false },
                 isConnected = true,
-                isGroup = false,
                 callInThisChat = callInThisChat,
             )
         )
@@ -71,9 +72,11 @@ class ReturnToCallBannerTest {
         }
         initComposeRuleContent(
             ChatUiState(
+                chat = mock<ChatRoom> {
+                    on { isGroup } doReturn true
+                    on { isMeeting } doReturn true
+                },
                 isConnected = true,
-                isGroup = true,
-                isMeeting = true,
                 callInThisChat = callInThisChat,
             )
         )
@@ -112,8 +115,8 @@ class ReturnToCallBannerTest {
         }
         initComposeRuleContent(
             ChatUiState(
+                chat = mock<ChatRoom> { on { isGroup } doReturn true },
                 isConnected = true,
-                isGroup = true,
                 callInThisChat = callInThisChat,
             )
         )
@@ -127,7 +130,7 @@ class ReturnToCallBannerTest {
     }
 
     @Test
-    fun `test that banner is shown with correct ui when there is only other chat and is answered`() {
+    fun `test that banner is shown with correct ui when there is only other chat call and is answered`() {
         val callInOtherChat = mock<ChatCall> {
             on { status } doReturn ChatCallStatus.InProgress
             on { duration } doReturn 10L
@@ -135,7 +138,7 @@ class ReturnToCallBannerTest {
         initComposeRuleContent(
             ChatUiState(
                 isConnected = true,
-                callInOtherChat = callInOtherChat,
+                callsInOtherChats = listOf(callInOtherChat),
             )
         )
         with(composeRule) {
@@ -161,7 +164,7 @@ class ReturnToCallBannerTest {
         initComposeRuleContent(
             ChatUiState(
                 isConnected = true,
-                callInOtherChat = null,
+                callsInOtherChats = emptyList(),
                 callInThisChat = null
             )
         )
@@ -172,11 +175,16 @@ class ReturnToCallBannerTest {
     }
 
     @Test
-    fun `test that banner is not shown if there is one call not answered in other chat`() {
+    fun `test that banner is not shown if there is only one call not answered in other chat`() {
         val callInOtherChat = mock<ChatCall> {
             on { status } doReturn ChatCallStatus.UserNoPresent
         }
-        initComposeRuleContent(ChatUiState(isConnected = true, callInOtherChat = callInOtherChat))
+        initComposeRuleContent(
+            ChatUiState(
+                isConnected = true,
+                callsInOtherChats = listOf(callInOtherChat)
+            )
+        )
         with(composeRule) {
             onNodeWithTag(TEST_TAG_RETURN_TO_CALL).assertDoesNotExist()
             onNodeWithTag(TEST_TAG_RETURN_TO_CALL_CHRONOMETER).assertDoesNotExist()
@@ -184,7 +192,7 @@ class ReturnToCallBannerTest {
     }
 
     @Test
-    fun `test that banner is not shown if there is one call not answered in this scheduled meeting chat`() {
+    fun `test that banner is not shown if there is only one call not answered in this scheduled meeting chat`() {
         val callInThisChat = mock<ChatCall> {
             on { status } doReturn ChatCallStatus.UserNoPresent
         }
@@ -202,14 +210,14 @@ class ReturnToCallBannerTest {
     }
 
     @Test
-    fun `test that banner is shown with correct ui if there is one call already answered in other chat`() {
+    fun `test that banner is shown with correct ui if there is only one call already answered in other chat`() {
         val callInOtherChat = mock<ChatCall> {
             on { status } doReturn ChatCallStatus.InProgress
         }
         initComposeRuleContent(
             ChatUiState(
                 isConnected = true,
-                callInOtherChat = callInOtherChat
+                callsInOtherChats = listOf(callInOtherChat)
             )
         )
         with(composeRule) {
@@ -233,7 +241,7 @@ class ReturnToCallBannerTest {
             ChatUiState(
                 isConnected = true,
                 callInThisChat = callInThisChat,
-                callInOtherChat = callInOtherChat
+                callsInOtherChats = listOf(callInOtherChat)
             )
         )
         with(composeRule) {

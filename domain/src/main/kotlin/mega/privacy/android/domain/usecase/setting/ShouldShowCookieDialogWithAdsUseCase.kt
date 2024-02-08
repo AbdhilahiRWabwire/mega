@@ -13,18 +13,19 @@ import javax.inject.Inject
  */
 class ShouldShowCookieDialogWithAdsUseCase @Inject constructor(
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
-    private val getCookieSettingsUseCase: GetCookieSettingsUseCase,
 ) {
 
     /**
      *  Check if the cookie dialog should be shown with ads.
      *
+     * @param cookieSettings Cookie settings.
      * @param inAppAdvertisementFeature Feature flag to check if in-app ads are enabled.
      * @param isAdsEnabledFeature Feature flag to check if ads are enabled.
      * @param isExternalAdsEnabledFeature Feature flag to check if external ads are enabled.
      * @return True if cookie dialog should be shown with ads, false otherwise.
      */
     suspend operator fun invoke(
+        cookieSettings: Set<CookieType>,
         inAppAdvertisementFeature: Feature,
         isAdsEnabledFeature: ABTestFeature,
         isExternalAdsEnabledFeature: ABTestFeature,
@@ -40,6 +41,6 @@ class ShouldShowCookieDialogWithAdsUseCase @Inject constructor(
         }
 
         featureFlags.all { it.await() }
-                && !getCookieSettingsUseCase().contains(CookieType.ADS_CHECK)
+                && !cookieSettings.contains(CookieType.ADS_CHECK)
     }
 }

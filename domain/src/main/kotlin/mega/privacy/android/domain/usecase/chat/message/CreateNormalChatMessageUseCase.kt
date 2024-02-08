@@ -1,10 +1,10 @@
 package mega.privacy.android.domain.usecase.chat.message
 
 import mega.privacy.android.domain.entity.RegexPatternType
-import mega.privacy.android.domain.entity.chat.message.request.CreateTypedMessageRequest
-import mega.privacy.android.domain.entity.chat.messages.normal.ContactLinkMessage
 import mega.privacy.android.domain.entity.chat.messages.normal.NormalMessage
+import mega.privacy.android.domain.entity.chat.messages.normal.TextLinkMessage
 import mega.privacy.android.domain.entity.chat.messages.normal.TextMessage
+import mega.privacy.android.domain.entity.chat.messages.request.CreateTypedMessageInfo
 import mega.privacy.android.domain.usecase.chat.GetLinkTypesUseCase
 import javax.inject.Inject
 
@@ -15,30 +15,36 @@ class CreateNormalChatMessageUseCase @Inject constructor(
     private val getLinkTypesUseCase: GetLinkTypesUseCase,
 ) : CreateTypedMessageUseCase {
     //To be implemented the different type of normal messages. Check [NormalMessage].
-    override fun invoke(request: CreateTypedMessageRequest): NormalMessage {
+    override fun invoke(request: CreateTypedMessageInfo): NormalMessage {
         with(request) {
-            val allLinks = getLinkTypesUseCase(message.content.orEmpty())
-            val contactLink = allLinks.find { it.type == RegexPatternType.CONTACT_LINK }?.link
+            val allLinks = getLinkTypesUseCase(content.orEmpty())
+            val hasSupportedLink = allLinks.any { it.type in supportedTypes }
             return when {
-                !contactLink.isNullOrBlank() ->
-                    ContactLinkMessage(
-                        msgId = message.msgId,
-                        time = message.timestamp,
+                hasSupportedLink ->
+                    TextLinkMessage(
+                        msgId = msgId,
+                        time = timestamp,
                         isMine = isMine,
-                        userHandle = message.userHandle,
-                        contactLink = contactLink,
-                        content = message.content.orEmpty(),
-                        tempId = message.tempId
+                        userHandle = userHandle,
+                        links = allLinks,
+                        content = content.orEmpty(),
+                        tempId = tempId,
+                        shouldShowAvatar = shouldShowAvatar,
+                        shouldShowTime = shouldShowTime,
+                        shouldShowDate = shouldShowDate,
                     )
 
                 else -> TextMessage(
-                    msgId = message.msgId,
-                    time = message.timestamp,
+                    msgId = msgId,
+                    time = timestamp,
                     isMine = isMine,
-                    userHandle = message.userHandle,
-                    tempId = message.tempId,
-                    content = message.content,
-                    hasOtherLink = allLinks.any { it.type !in supportedTypes }
+                    userHandle = userHandle,
+                    tempId = tempId,
+                    content = content,
+                    hasOtherLink = allLinks.any { it.type !in supportedTypes },
+                    shouldShowAvatar = shouldShowAvatar,
+                    shouldShowTime = shouldShowTime,
+                    shouldShowDate = shouldShowDate,
                 )
             }
         }

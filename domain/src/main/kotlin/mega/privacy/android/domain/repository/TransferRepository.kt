@@ -15,6 +15,7 @@ import mega.privacy.android.domain.entity.transfer.TransferEvent
 import mega.privacy.android.domain.entity.transfer.TransferType
 import mega.privacy.android.domain.entity.transfer.TransfersFinishedState
 import mega.privacy.android.domain.exception.MegaException
+import java.io.File
 
 /**
  * Transfer repository of Domain Module
@@ -256,6 +257,11 @@ interface TransferRepository {
     suspend fun startDownloadWorker()
 
     /**
+     * Starts the chat uploads worker to monitor the chat uploads transfers as a foreground service
+     */
+    suspend fun startChatUploadsWorker()
+
+    /**
      * Monitors transfers finished.
      */
     fun monitorTransfersFinished(): Flow<TransfersFinishedState>
@@ -284,7 +290,7 @@ interface TransferRepository {
      * Start downloading a node to desired destination and returns a flow to expose download progress
      *
      * @param node              The node we want to download, it can be a folder
-     * @param localPath         Full destination path of the node, including file name if it's a file node. All nested folders must exist.
+     * @param localPath         Full path to the destination folder of [node]. If this path does not exist it will try to create it.
      * @param appData           Custom app data to save in the MegaTransfer object.
      * @param shouldStartFirst  Puts the transfer on top of the download queue.
      */
@@ -324,9 +330,31 @@ interface TransferRepository {
         parentNodeId: NodeId,
         fileName: String?,
         modificationTime: Long,
-        appData: String?,
+        appData: TransferAppData?,
         isSourceTemporary: Boolean,
         shouldStartFirst: Boolean,
+    ): Flow<TransferEvent>
+
+    /**
+     * Upload a file or folder
+     *
+     * @param localPath The local path of the file or folder
+     * @param parentNodeId The parent node id for the file or folder
+     * @param fileName The custom file name for the file or folder. Leave the parameter as "null"
+     * if there are no changes
+     * @param appData The custom app data to save chat upload related information
+     * @param isSourceTemporary Whether the temporary file or folder that is created for upload
+     * should be deleted or not
+     * queue or not
+     *
+     * @return a Flow of [TransferEvent]
+     */
+    fun startUploadForChat(
+        localPath: String,
+        parentNodeId: NodeId,
+        fileName: String?,
+        appData: TransferAppData.ChatTransferAppData,
+        isSourceTemporary: Boolean,
     ): Flow<TransferEvent>
 
     /**
@@ -463,6 +491,14 @@ interface TransferRepository {
     suspend fun getCurrentDownloadSpeed(): Int
 
     /**
+     * Get or create a folder for transfers in the cache of SD Card if any
+     *
+     * @return the File corresponding to the folder in cache in the SD
+     *         Return null if the folder cannot be created or there's no SD card
+     */
+    suspend fun getOrCreateSDCardTransfersCacheFolder(): File?
+
+    /**
      * Get current downloaded bytes.
      *
      * @return Current downloaded bytes.
@@ -499,4 +535,9 @@ interface TransferRepository {
      * @return a flow that emits true if DownloadsWorker is enqueued. false otherwise
      */
     fun isDownloadsWorkerEnqueuedFlow(): Flow<Boolean>
+
+    /**
+     * @return a flow that emits true if ChatUploadsWorker is enqueued. false otherwise
+     */
+    fun isChatUploadsWorkerEnqueuedFlow(): Flow<Boolean>
 }

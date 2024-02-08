@@ -1,6 +1,7 @@
 package mega.privacy.android.app.upgradeAccount
 
 import android.content.Intent
+import android.content.Intent.ACTION_VIEW
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -29,7 +30,6 @@ import mega.privacy.android.app.upgradeAccount.view.UpgradeAccountView
 import mega.privacy.android.app.utils.AlertsAndWarnings
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.billing.PaymentUtils
-import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.android.data.qualifier.MegaApi
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.ThemeMode
@@ -37,6 +37,7 @@ import mega.privacy.android.domain.entity.billing.BillingEvent
 import mega.privacy.android.domain.entity.billing.MegaPurchase
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.shared.theme.MegaAppTheme
 import nz.mega.sdk.MegaApiAndroid
 import timber.log.Timber
 import javax.inject.Inject
@@ -105,6 +106,7 @@ class UpgradeAccountFragment : Fragment() {
                     }
                 },
                 onTOSClicked = this::redirectToTOSPage,
+                onPlayStoreLinkClicked = this::redirectToPlayStoreSubscription,
                 onPricingPageClicked = this::redirectToPricingPage,
                 onChoosingMonthlyYearlyPlan = upgradeAccountViewModel::onSelectingMonthlyPlan,
                 onChoosingPlanType = {
@@ -117,6 +119,7 @@ class UpgradeAccountFragment : Fragment() {
                         }
                     }
                 },
+                showBillingWarning = { upgradeAccountViewModel.setBillingWarningVisibility(true) },
                 hideBillingWarning = { upgradeAccountViewModel.setBillingWarningVisibility(false) },
                 onDialogConfirmButtonClicked = {
                     upgradeAccountViewModel.setShowBuyNewSubscriptionDialog(
@@ -132,6 +135,7 @@ class UpgradeAccountFragment : Fragment() {
                         showBuyNewSubscriptionDialog = false
                     )
                 },
+                showUpgradeWarningBanner = uiState.isCrossAccountMatch.not()
             )
         }
     }
@@ -210,6 +214,16 @@ class UpgradeAccountFragment : Fragment() {
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 .setData(Uri.parse(Constants.TERMS_OF_SERVICE_URL))
         )
+    }
+
+    private fun redirectToPlayStoreSubscription(link: String) {
+        val uriUrl = Uri.parse(link)
+        val launchBrowser = Intent(ACTION_VIEW, uriUrl)
+        runCatching {
+            startActivity(launchBrowser)
+        }.onFailure {
+            Timber.e("Failed to open play store subscription page with error: ${it.message}")
+        }
     }
 
     private fun redirectToPricingPage(link: String) {

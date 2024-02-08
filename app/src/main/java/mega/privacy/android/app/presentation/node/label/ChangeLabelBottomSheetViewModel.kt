@@ -11,9 +11,9 @@ import mega.privacy.android.app.presentation.node.model.mapper.NodeLabelResource
 import mega.privacy.android.data.mapper.node.label.NodeLabelMapper
 import mega.privacy.android.domain.entity.NodeLabel
 import mega.privacy.android.domain.entity.node.Node
-import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.UpdateNodeLabelUseCase
 import mega.privacy.android.domain.usecase.node.GetNodeLabelListUseCase
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
@@ -43,20 +43,35 @@ class ChangeLabelBottomSheetViewModel @Inject constructor(
      * @param node [Node]
      */
     fun loadLabelInfo(node: Node) {
-        val labelList = getNodeLabelListUseCase().map {
-            nodeLabelResourceMapper(it, nodeLabelMapper(node.label))
-        }
-        _state.update {
-            it.copy(labelList = labelList)
+        runCatching {
+            getNodeLabelListUseCase()
+        }.onFailure {
+            Timber.e(it)
+        }.onSuccess { labelList ->
+            val labels = labelList.map {
+                nodeLabelResourceMapper(it, nodeLabelMapper(node.label))
+            }
+            _state.update {
+                it.copy(
+                    labelList = labels,
+                    nodeId = node.id
+                )
+            }
         }
     }
 
     /**
      * When label change clicked
      */
-    fun onLabelSelected(nodeId: NodeId, labelColor: NodeLabel?) {
-        viewModelScope.launch {
-            changeLabelUseCase(nodeId = nodeId, label = labelColor)
+    fun onLabelSelected(labelColor: NodeLabel?) {
+        state.value.nodeId?.let {
+            viewModelScope.launch {
+                runCatching {
+                    changeLabelUseCase(nodeId = it, label = labelColor)
+                }.onFailure {
+                    Timber.e("Error changing label $it")
+                }
+            }
         }
     }
 }

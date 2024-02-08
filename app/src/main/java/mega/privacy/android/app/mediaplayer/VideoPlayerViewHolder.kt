@@ -1,18 +1,19 @@
 package mega.privacy.android.app.mediaplayer
 
 import android.content.Context
-import android.os.Build
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.annotation.DrawableRes
+import androidx.annotation.OptIn
 import androidx.compose.ui.platform.ComposeView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.isVisible
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.ui.StyledPlayerView
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.PlayerView
 import mega.privacy.android.app.R
 import mega.privacy.android.app.mediaplayer.playlist.AudioPlaylistFragment.Companion.SINGLE_PLAYLIST_SIZE
 import mega.privacy.android.app.mediaplayer.playlist.PlaylistItem
@@ -38,7 +39,7 @@ class VideoPlayerViewHolder(val container: ViewGroup) {
     private val fullScreenButton = container.findViewById<ImageButton>(R.id.full_screen)
     internal val speedPlaybackButton = container.findViewById<ImageButton>(R.id.speed_playback)
     internal val moreOptionButton = container.findViewById<ImageButton>(R.id.more_option)
-    internal val playerView = container.findViewById<StyledPlayerView>(R.id.player_view)
+    internal val playerView = container.findViewById<PlayerView>(R.id.player_view)
     internal val speedPlaybackPopup = container.findViewById<ComposeView>(R.id.speed_playback_popup)
     internal val videoOptionPopup = container.findViewById<ComposeView>(R.id.video_option_popup)
 
@@ -237,11 +238,13 @@ class VideoPlayerViewHolder(val container: ViewGroup) {
     /**
      * Hide player controller.
      */
+    @OptIn(UnstableApi::class)
     fun hideController() = playerView.hideController()
 
     /**
      * Show player controller.
      */
+    @OptIn(UnstableApi::class)
     fun showController() = playerView.showController()
 
     /**

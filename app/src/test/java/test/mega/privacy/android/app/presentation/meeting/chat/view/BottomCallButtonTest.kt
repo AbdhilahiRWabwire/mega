@@ -13,6 +13,7 @@ import mega.privacy.android.app.presentation.meeting.chat.view.TEST_TAG_BOTTOM_A
 import mega.privacy.android.app.presentation.meeting.chat.view.TEST_TAG_BOTTOM_CALL_ON_HOLD_BUTTON
 import mega.privacy.android.app.presentation.meeting.chat.view.TEST_TAG_BOTTOM_JOIN_CALL_BUTTON
 import mega.privacy.android.domain.entity.chat.ChatCall
+import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import org.junit.Rule
 import org.junit.Test
@@ -43,7 +44,7 @@ class BottomCallButtonTest {
         initComposeRuleContent(
             ChatUiState(
                 callInThisChat = callOnHold,
-                callInOtherChat = mock()
+                callsInOtherChats = mock()
             )
         )
         with(composeRule) {
@@ -57,7 +58,7 @@ class BottomCallButtonTest {
         initComposeRuleContent(
             ChatUiState(
                 callInThisChat = callOnHold,
-                callInOtherChat = mock()
+                callsInOtherChats = mock()
             )
         )
         with(composeRule) {
@@ -73,9 +74,11 @@ class BottomCallButtonTest {
     fun `test that join call button is shown if call in this group chat I am not participating yet and there is a call in other chat on hold`() {
         initComposeRuleContent(
             ChatUiState(
+                chat = mock<ChatRoom> {
+                    on { isGroup } doReturn true
+                },
                 callInThisChat = callNotParticipating,
-                callInOtherChat = callOnHold,
-                isGroup = true
+                callsInOtherChats = listOf(callOnHold),
             )
         )
         with(composeRule) {
@@ -88,9 +91,9 @@ class BottomCallButtonTest {
     fun `test that answer call button is shown if call in this 1on1 chat I am not participating yet and there is a call in other chat on hold`() {
         initComposeRuleContent(
             ChatUiState(
+                chat = mock<ChatRoom> { on { isGroup } doReturn false },
                 callInThisChat = callNotParticipating,
-                callInOtherChat = callOnHold,
-                isGroup = false
+                callsInOtherChats = listOf(callOnHold),
             )
         )
         with(composeRule) {
@@ -103,9 +106,9 @@ class BottomCallButtonTest {
     fun `test that click is invoked if join call button is clicked`() {
         initComposeRuleContent(
             ChatUiState(
+                chat = mock<ChatRoom> { on { isGroup } doReturn true },
                 callInThisChat = callNotParticipating,
-                callInOtherChat = callOnHold,
-                isGroup = true
+                callsInOtherChats = listOf(callOnHold),
             )
         )
         with(composeRule) {
@@ -122,7 +125,7 @@ class BottomCallButtonTest {
         initComposeRuleContent(
             ChatUiState(
                 callInThisChat = callNotParticipating,
-                callInOtherChat = callOnHold
+                callsInOtherChats = listOf(callOnHold)
             )
         )
         with(composeRule) {

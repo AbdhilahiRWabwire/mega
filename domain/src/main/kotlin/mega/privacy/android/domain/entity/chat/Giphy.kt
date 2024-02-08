@@ -1,5 +1,7 @@
 package mega.privacy.android.domain.entity.chat
 
+import mega.privacy.android.domain.entity.chat.messages.ChatGifInfo
+
 /**
  * Data class for storing giphy data.
  *
@@ -12,11 +14,11 @@ package mega.privacy.android.domain.entity.chat
  * @property height Height of the giphy.
  */
 data class Giphy(
-    val mp4Src: String?,
-    val webpSrc: String?,
-    val title: String?,
-    val mp4Size: Int,
-    val webpSize: Int,
-    val width: Int,
-    val height: Int,
-)
+    override val mp4Src: String?,
+    override val webpSrc: String?,
+    override val title: String?,
+    override val mp4Size: Int,
+    override val webpSize: Int,
+    override val width: Int,
+    override val height: Int,
+) : ChatGifInfo
