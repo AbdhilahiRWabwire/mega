@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.SimpleItemAnimator
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import mega.privacy.android.app.R
@@ -35,14 +36,24 @@ import mega.privacy.android.app.mediaplayer.gateway.MediaPlayerServiceGateway
 import mega.privacy.android.app.mediaplayer.gateway.PlayerServiceViewModelGateway
 import mega.privacy.android.app.mediaplayer.service.AudioPlayerService
 import mega.privacy.android.app.mediaplayer.service.MediaPlayerServiceBinder
+import mega.privacy.android.app.presentation.time.mapper.DurationInSecondsTextMapper
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_REBUILD_PLAYLIST
 import mega.privacy.android.app.utils.autoCleared
+import javax.inject.Inject
 
 /**
  * Playlist fragment for displaying the playlist of audios
  */
+@AndroidEntryPoint
 class AudioPlaylistFragment : Fragment(), PlaylistItemOperation, DragStartListener {
+
+    /**
+     * [DurationInSecondsTextMapper]
+     */
+    @Inject
+    lateinit var durationInSecondsTextMapper: DurationInSecondsTextMapper
+
     private var binding by autoCleared<FragmentMediaPlaylistBinding>()
 
     private var serviceGateway: MediaPlayerServiceGateway? = null
@@ -158,7 +169,8 @@ class AudioPlaylistFragment : Fragment(), PlaylistItemOperation, DragStartListen
                 it,
                 this,
                 dragStartListener = this,
-                isAudio = true
+                isAudio = true,
+                durationInSecondsTextMapper = durationInSecondsTextMapper,
             )
         }
         listLayoutManager =

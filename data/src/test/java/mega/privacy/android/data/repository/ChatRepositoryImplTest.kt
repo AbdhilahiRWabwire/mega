@@ -1,5 +1,6 @@
 package mega.privacy.android.data.repository
 
+import android.content.Context
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
@@ -12,8 +13,8 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import mega.privacy.android.data.R
 import mega.privacy.android.data.database.DatabaseHandler
-import mega.privacy.android.data.database.dao.ChatPendingChangesDao
 import mega.privacy.android.data.gateway.AppEventGateway
 import mega.privacy.android.data.gateway.MegaLocalRoomGateway
 import mega.privacy.android.data.gateway.MegaLocalStorageGateway
@@ -22,31 +23,25 @@ import mega.privacy.android.data.gateway.api.MegaChatApiGateway
 import mega.privacy.android.data.listener.OptionalMegaChatRequestListenerInterface
 import mega.privacy.android.data.listener.OptionalMegaRequestListenerInterface
 import mega.privacy.android.data.mapper.chat.ChatConnectionStatusMapper
-import mega.privacy.android.data.mapper.chat.ChatGeolocationMapper
 import mega.privacy.android.data.mapper.chat.ChatHistoryLoadStatusMapper
 import mega.privacy.android.data.mapper.chat.ChatInitStateMapper
 import mega.privacy.android.data.mapper.chat.ChatListItemMapper
 import mega.privacy.android.data.mapper.chat.ChatMessageMapper
-import mega.privacy.android.data.mapper.chat.ChatPermissionsMapper
 import mega.privacy.android.data.mapper.chat.ChatPreviewMapper
 import mega.privacy.android.data.mapper.chat.ChatRequestMapper
 import mega.privacy.android.data.mapper.chat.ChatRoomMapper
-import mega.privacy.android.data.mapper.chat.ChatRoomPendingChangesModelMapper
 import mega.privacy.android.data.mapper.chat.CombinedChatRoomMapper
 import mega.privacy.android.data.mapper.chat.ConnectionStateMapper
-import mega.privacy.android.data.mapper.chat.ContainsMetaMapper
-import mega.privacy.android.data.mapper.chat.GiphyMapper
 import mega.privacy.android.data.mapper.chat.MegaChatPeerListMapper
-import mega.privacy.android.data.mapper.chat.RichPreviewMapper
-import mega.privacy.android.data.mapper.handles.HandleListMapper
 import mega.privacy.android.data.mapper.notification.ChatMessageNotificationBehaviourMapper
 import mega.privacy.android.data.model.ChatRoomUpdate
 import mega.privacy.android.data.model.chat.NonContactInfo
 import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.Contact
 import mega.privacy.android.domain.entity.chat.ChatConnectionStatus
-import mega.privacy.android.domain.entity.chat.ChatPreview
+import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ChatPendingChanges
+import mega.privacy.android.domain.entity.chat.ChatPreview
 import mega.privacy.android.domain.entity.chat.ConnectionState
 import mega.privacy.android.domain.entity.contacts.InviteContactRequest
 import mega.privacy.android.domain.exception.MegaException
@@ -56,17 +51,23 @@ import nz.mega.sdk.MegaChatContainsMeta
 import nz.mega.sdk.MegaChatError
 import nz.mega.sdk.MegaChatListItem
 import nz.mega.sdk.MegaChatMessage
+import nz.mega.sdk.MegaChatNotificationListenerInterface
 import nz.mega.sdk.MegaChatRequest
 import nz.mega.sdk.MegaChatRoom
 import nz.mega.sdk.MegaError
 import nz.mega.sdk.MegaRequest
 import nz.mega.sdk.MegaUser
-import org.junit.After
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.assertThrows
+import org.mockito.Mockito
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.reset
+import org.mockito.kotlin.stub
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
@@ -75,6 +76,7 @@ import org.mockito.kotlin.whenever
 import kotlin.random.Random
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ChatRepositoryImplTest {
 
     private lateinit var underTest: ChatRepository
@@ -91,12 +93,7 @@ class ChatRepositoryImplTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private val chatConnectionStatusMapper = ChatConnectionStatusMapper()
     private val connectionStateMapper = ConnectionStateMapper()
-    private val chatMessageMapper = ChatMessageMapper(
-        ChatPermissionsMapper(),
-        mock(),
-        HandleListMapper(),
-        ContainsMetaMapper(RichPreviewMapper(), ChatGeolocationMapper(), GiphyMapper())
-    )
+    private val chatMessageMapper = mock<ChatMessageMapper>()
     private val chatInitStateMapper = mock<ChatInitStateMapper>()
     private val chatMessageNotificationBehaviourMapper = ChatMessageNotificationBehaviourMapper()
     private val chatId = Random.nextLong()
@@ -115,10 +112,9 @@ class ChatRepositoryImplTest {
     private val chatPreviewMapper = mock<ChatPreviewMapper>()
     private val databaseHandler = mock<DatabaseHandler>()
     private val megaLocalRoomGateway = mock<MegaLocalRoomGateway>()
-    private val chatRoomPendingChangesModelMapper: ChatRoomPendingChangesModelMapper = mock()
-    private val chatPendingChangesDao: ChatPendingChangesDao = mock()
+    private val context = mock<Context>()
 
-    @Before
+    @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
 
@@ -152,15 +148,29 @@ class ChatRepositoryImplTest {
             giphyEntityMapper = mock(),
             chatGeolocationEntityMapper = mock(),
             chatNodeEntityListMapper = mock(),
+            context = context,
         )
 
         whenever(chatRoom.chatId).thenReturn(chatId)
         whenever(chatRoom.title).thenReturn(chatTitle)
     }
 
-    @After
+    @AfterEach
     fun tearDown() {
         Dispatchers.resetMain()
+        Mockito.clearInvocations(
+            megaChatApiGateway,
+            megaApiGateway,
+            chatRequestMapper,
+            localStorageGateway,
+        )
+
+        reset(
+            databaseHandler,
+            megaChatApiGateway,
+            megaLocalRoomGateway,
+            chatMessageMapper,
+        )
     }
 
     @Test
@@ -762,7 +772,7 @@ class ChatRepositoryImplTest {
             verifyNoMoreInteractions(localStorageGateway)
         }
 
-    @Test(expected = MegaException::class)
+    @Test
     fun `test that clear chat history invokes megaChatApi and do not invokes localStorageGateway if request finish with error`() =
         runTest {
             val error = mock<MegaChatError> {
@@ -776,7 +786,7 @@ class ChatRepositoryImplTest {
                 )
             }
 
-            underTest.clearChatHistory(chatId)
+            assertThrows<MegaException> { underTest.clearChatHistory(chatId) }
             verify(megaChatApiGateway).clearChatHistory(eq(chatId), any())
             verifyNoMoreInteractions(megaChatApiGateway)
             verifyNoInteractions(localStorageGateway)
@@ -848,6 +858,9 @@ class ChatRepositoryImplTest {
 
     @Test
     fun `test that null messages are returned from monitor messages function`() = runTest {
+        val chatMessage = mock<ChatMessage>()
+        chatMessageMapper.stub { onBlocking { invoke(any()) }.thenReturn(chatMessage) }
+
         whenever(megaChatApiGateway.openChatRoom(any())).thenReturn(flow {
             emit(ChatRoomUpdate.OnMessageLoaded(mock()))
             emit(ChatRoomUpdate.OnMessageLoaded(null))
@@ -987,21 +1000,74 @@ class ChatRepositoryImplTest {
         val chatId = 123L
         val message = "message"
         val draftMessage = "draftMessage"
+        val editingMessageId = 456L
         val model = ChatPendingChanges(chatId, message)
         whenever(megaLocalRoomGateway.monitorChatPendingChanges(chatId)).thenReturn(flowOf(model))
-        underTest.setChatDraftMessage(chatId, draftMessage)
-        verify(megaLocalRoomGateway).setChatPendingChanges(model.copy(draftMessage = draftMessage))
+        underTest.setChatDraftMessage(chatId, draftMessage, editingMessageId)
+        verify(megaLocalRoomGateway).setChatPendingChanges(
+            model.copy(
+                draftMessage = draftMessage,
+                editingMessageId = editingMessageId
+            )
+        )
     }
 
     @Test
     fun `test that get chat room preferences returns correctly`() = runTest {
         val chatId = 123L
         val message = "message"
-        val model = ChatPendingChanges(chatId, message)
+        val editingMessageId = 456L
+        val model = ChatPendingChanges(chatId, message, editingMessageId)
         whenever(megaLocalRoomGateway.monitorChatPendingChanges(chatId)).thenReturn(flowOf(model))
         underTest.monitorChatPendingChanges(chatId).test {
             assertThat(awaitItem()).isEqualTo(model)
             awaitComplete()
         }
     }
+
+    @Test
+    fun `test that the default chat folder name is retrieved`() = runTest {
+        val expected = "Default chat folder name"
+        whenever(context.getString(R.string.my_chat_files_folder)).thenReturn(expected)
+        val actual = underTest.getDefaultChatFolderName()
+        assertThat(actual).isEqualTo(expected)
+    }
+
+    @Test
+    fun `test that null is returned from monitor chat notification if the message is null`() =
+        runTest {
+            megaChatApiGateway.stub {
+                on { registerChatNotificationListener(any()) }.thenAnswer { invocation ->
+                    val listener = invocation.arguments[0] as MegaChatNotificationListenerInterface
+                    listener.onChatNotification(mock(), 1L, null)
+                }
+            }
+
+            underTest.monitorChatMessages().test {
+                assertThat(awaitItem()).isNull()
+            }
+        }
+
+    @Test
+    internal fun `test that chat message notification is returned from monitor chat notification if message is not null`() =
+        runTest {
+            val sdkMessage = mock<MegaChatMessage>()
+            val chatMessage = mock<ChatMessage>()
+            chatMessageMapper.stub { onBlocking { invoke(sdkMessage) }.thenReturn(chatMessage) }
+
+            val chatId = 1L
+            megaChatApiGateway.stub {
+                on { registerChatNotificationListener(any()) }.thenAnswer { invocation ->
+                    val listener = invocation.arguments[0] as MegaChatNotificationListenerInterface
+                    listener.onChatNotification(mock(), chatId, sdkMessage)
+                }
+            }
+
+            underTest.monitorChatMessages().test {
+                val actual = awaitItem()
+                assertThat(actual).isNotNull()
+                assertThat(actual?.chatId).isEqualTo(chatId)
+                assertThat(actual?.message).isEqualTo(chatMessage)
+            }
+        }
 }

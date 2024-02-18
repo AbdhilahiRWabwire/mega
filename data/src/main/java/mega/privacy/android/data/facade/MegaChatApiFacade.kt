@@ -22,6 +22,7 @@ import nz.mega.sdk.MegaChatListItem
 import nz.mega.sdk.MegaChatListenerInterface
 import nz.mega.sdk.MegaChatLoggerInterface
 import nz.mega.sdk.MegaChatMessage
+import nz.mega.sdk.MegaChatNotificationListenerInterface
 import nz.mega.sdk.MegaChatPeerList
 import nz.mega.sdk.MegaChatPresenceConfig
 import nz.mega.sdk.MegaChatRequestListenerInterface
@@ -34,6 +35,7 @@ import nz.mega.sdk.MegaChatScheduledRules
 import nz.mega.sdk.MegaChatSession
 import nz.mega.sdk.MegaChatVideoListenerInterface
 import nz.mega.sdk.MegaHandleList
+import nz.mega.sdk.MegaStringList
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -747,4 +749,61 @@ internal class MegaChatApiFacade @Inject constructor(
         latitude: Float,
         image: String,
     ): MegaChatMessage = chatApi.sendGeolocation(chatId, longitude, latitude, image)
+
+    override fun mutePeers(
+        chatId: Long,
+        clientId: Long,
+        listener: MegaChatRequestListenerInterface,
+    ) {
+        chatApi.mutePeers(chatId, clientId, listener)
+    }
+
+    override fun addReaction(
+        chatId: Long,
+        msgId: Long,
+        reaction: String,
+        listener: MegaChatRequestListenerInterface,
+    ) = chatApi.addReaction(chatId, msgId, reaction, listener)
+
+    override fun registerChatNotificationListener(listener: MegaChatNotificationListenerInterface) =
+        chatApi.addChatNotificationListener(listener)
+
+    override fun deregisterChatNotificationListener(listener: MegaChatNotificationListenerInterface) =
+        chatApi.removeChatNotificationListener(listener)
+
+    override fun getMessageReactions(chatId: Long, msgId: Long): MegaStringList =
+        chatApi.getMessageReactions(chatId, msgId)
+
+    override fun getMessageReactionCount(chatId: Long, msgId: Long, reaction: String) =
+        chatApi.getMessageReactionCount(chatId, msgId, reaction)
+
+    override fun getReactionUsers(chatId: Long, msgId: Long, reaction: String): MegaHandleList =
+        chatApi.getReactionUsers(chatId, msgId, reaction)
+
+    override fun getLastMessageSeenId(chatId: Long): Long = chatApi.getLastMessageSeenId(chatId)
+
+    override fun setMessageSeen(chatId: Long, msgId: Long) =
+        chatApi.setMessageSeen(chatId, msgId)
+
+    override fun delReaction(
+        chatId: Long,
+        msgId: Long,
+        reaction: String,
+        listener: MegaChatRequestListenerInterface,
+    ) = chatApi.delReaction(chatId, msgId, reaction, listener)
+
+    override fun sendGiphy(
+        chatId: Long,
+        srcMp4: String?,
+        srcWebp: String?,
+        sizeMp4: Long,
+        sizeWebp: Long,
+        width: Int,
+        height: Int,
+        title: String?,
+    ): MegaChatMessage =
+        chatApi.sendGiphy(chatId, srcMp4, srcWebp, sizeMp4, sizeWebp, width, height, title)
+
+    override fun attachContacts(chatId: Long, contactHandles: MegaHandleList): MegaChatMessage =
+        chatApi.attachContacts(chatId, contactHandles)
 }

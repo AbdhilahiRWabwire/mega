@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalComposeUiApi::class)
-
 package mega.privacy.android.app.presentation.meeting.chat.view
 
 import android.Manifest
@@ -20,8 +18,13 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
@@ -39,7 +42,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -58,6 +60,7 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.extensions.navigateToAppSettings
 import mega.privacy.android.app.main.AddContactActivity
 import mega.privacy.android.app.main.InviteContactActivity
+import mega.privacy.android.app.objects.GifData
 import mega.privacy.android.app.presentation.meeting.chat.extension.isJoined
 import mega.privacy.android.app.presentation.meeting.chat.extension.isStarted
 import mega.privacy.android.app.presentation.meeting.chat.extension.toInfoText
@@ -91,14 +94,13 @@ import mega.privacy.android.app.utils.permission.PermissionUtils
 import mega.privacy.android.core.ui.controls.appbar.SelectModeAppBar
 import mega.privacy.android.core.ui.controls.chat.ChatObserverIndicator
 import mega.privacy.android.core.ui.controls.chat.ScrollToBottomFab
+import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
 import mega.privacy.android.core.ui.controls.layouts.MegaScaffold
 import mega.privacy.android.core.ui.controls.sheets.BottomSheet
 import mega.privacy.android.core.ui.controls.snackbars.MegaSnackbar
-import mega.privacy.android.core.ui.model.KeyboardState
 import mega.privacy.android.domain.entity.chat.ChatPushNotificationMuteOption
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
-import mega.privacy.android.legacy.core.ui.controls.keyboard.keyboardAsState
 import mega.privacy.android.shared.theme.MegaAppTheme
 
 @Composable
@@ -137,6 +139,11 @@ internal fun ChatView(
         createNewImage = viewModel::createNewImageUri,
         onSendLocationMessage = viewModel::sendLocationMessage,
         onAttachFiles = viewModel::onAttachFiles,
+        onCloseEditing = viewModel::onCloseEditing,
+        onAddReaction = viewModel::onAddReaction,
+        onDeleteReaction = viewModel::onDeleteReaction,
+        onSendGiphyMessage = viewModel::onSendGiphyMessage,
+        onAttachContacts = viewModel::onAttachContacts,
     )
 }
 
@@ -149,7 +156,7 @@ internal fun ChatView(
 @OptIn(
     ExperimentalMaterialApi::class,
     ExperimentalPermissionsApi::class,
-    ExperimentalComposeUiApi::class
+    ExperimentalLayoutApi::class
 )
 @Composable
 internal fun ChatView(
@@ -173,23 +180,27 @@ internal fun ChatView(
     onAnswerCall: () -> Unit = {},
     onEnableGeolocation: () -> Unit = {},
     onUserUpdateHandled: () -> Unit = {},
-    messageListView: @Composable (ChatUiState, LazyListState, Dp, (TypedMessage) -> Unit) -> Unit = { state, listState, bottomPadding, onMessageLongClick ->
-        MessageListView(
-            uiState = state,
-            scrollState = listState,
-            bottomPadding = bottomPadding,
-            onUserUpdateHandled = onUserUpdateHandled,
-            onMessageLongClick = onMessageLongClick,
-        )
-    },
+    messageListView: @Composable (ChatUiState, LazyListState, Dp, (TypedMessage) -> Unit, (Long) -> Unit, (Long, String, List<UIReaction>) -> Unit) -> Unit =
+        { state, listState, bottomPadding, onMessageLongClick, onMoreReactionsClick, onReactionClick ->
+            MessageListView(
+                uiState = state,
+                scrollState = listState,
+                bottomPadding = bottomPadding,
+                onUserUpdateHandled = onUserUpdateHandled,
+                onMessageLongClick = onMessageLongClick,
+                onMoreReactionsClicked = onMoreReactionsClick,
+                onReactionClicked = onReactionClick,
+            )
+        },
     bottomBar: @Composable (
         uiState: ChatUiState,
         showEmojiPicker: Boolean,
         onSendClick: (String) -> Unit,
         onAttachmentClick: () -> Unit,
         onEmojiClick: () -> Unit,
+        onCloseEditing: () -> Unit,
         interactionSourceTextInput: MutableInteractionSource,
-    ) -> Unit = { state, showEmojiPicker, onSendClicked, onAttachmentClick, onEmojiClick, interactionSourceTextInput ->
+    ) -> Unit = { state, showEmojiPicker, onSendClicked, onAttachmentClick, onEmojiClick, onCloseEditing, interactionSourceTextInput ->
         ChatBottomBar(
             uiState = state,
             showEmojiPicker = showEmojiPicker,
@@ -197,6 +208,7 @@ internal fun ChatView(
             onAttachmentClick = onAttachmentClick,
             onEmojiClick = onEmojiClick,
             interactionSourceTextInput = interactionSourceTextInput,
+            onCloseEditing = onCloseEditing
         )
     },
     onSendClick: (String) -> Unit = {},
@@ -207,6 +219,11 @@ internal fun ChatView(
     createNewImage: suspend () -> Uri? = { null },
     onSendLocationMessage: (Intent?) -> Unit = { _ -> },
     onAttachFiles: (List<Uri>) -> Unit = {},
+    onCloseEditing: () -> Unit = {},
+    onAddReaction: (Long, String) -> Unit = { _, _ -> },
+    onDeleteReaction: (Long, String) -> Unit = { _, _ -> },
+    onSendGiphyMessage: (GifData?) -> Unit = { _ -> },
+    onAttachContacts: (List<String>) -> Unit = { _ -> },
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -222,8 +239,8 @@ internal fun ChatView(
     var showJoinAnswerCallDialog by rememberSaveable { mutableStateOf(false) }
     var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
     var showReactionPicker by rememberSaveable { mutableStateOf(false) }
-    val keyboardState by keyboardAsState()
-    val isKeyboardShown = keyboardState == KeyboardState.Opened
+    var messageClicked by rememberSaveable { mutableStateOf<TypedMessage?>(null) }
+    var addingReactionTo by rememberSaveable { mutableStateOf<Long?>(null) }
     val audioPermissionState = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
     val keyboardController = LocalSoftwareKeyboardController.current
     val toolbarModalSheetState =
@@ -249,6 +266,9 @@ internal fun ChatView(
         confirmValueChange = {
             if (it != ModalBottomSheetValue.Hidden) {
                 keyboardController?.hide()
+            } else {
+                messageClicked = null
+                addingReactionTo = null
             }
             true
         }
@@ -296,7 +316,7 @@ internal fun ChatView(
             fileModalSheetState.hide()
         }
     }
-    BackHandler(enabled = isKeyboardShown) {
+    BackHandler(enabled = WindowInsets.isImeVisible) {
         keyboardController?.hide()
     }
     BackHandler(enabled = showEmojiPicker) {
@@ -344,7 +364,10 @@ internal fun ChatView(
             rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.StartActivityForResult()
             ) { result ->
-                // TODO attach contact to chat room
+                result.data?.getStringArrayListExtra(AddContactActivity.EXTRA_CONTACTS)
+                    ?.let { contactList ->
+                        onAttachContacts(contactList.toList())
+                    }
             }
         var takePictureUri by remember { mutableStateOf(Uri.EMPTY) }
         val takePictureLauncher =
@@ -362,7 +385,7 @@ internal fun ChatView(
             messageOptionsModalSheetState.currentValue != ModalBottomSheetValue.Hidden
         }
 
-        if (!isMessageOptionsModalShown) {
+        if (!isMessageOptionsModalShown && addingReactionTo == null) {
             showReactionPicker = false
         }
 
@@ -385,7 +408,9 @@ internal fun ChatView(
                         MessageOptionsBottomSheet(
                             showReactionPicker = showReactionPicker,
                             onReactionClicked = {
-                                // Add reaction
+                                messageClicked?.let { message -> onAddReaction(message.msgId, it) }
+                                addingReactionTo?.let { msgId -> onAddReaction(msgId, it) }
+                                coroutineScope.launch { messageOptionsModalSheetState.hide() }
                             },
                             onMoreReactionsClicked = { showReactionPicker = true },
                             sheetState = messageOptionsModalSheetState,
@@ -424,6 +449,7 @@ internal fun ChatView(
                                     }
                                 )
                             },
+                            onSendGiphyMessage = onSendGiphyMessage,
                             onTakePicture = {
                                 coroutineScope.launch {
                                     createNewImage()?.let {
@@ -433,7 +459,6 @@ internal fun ChatView(
                                     toolbarModalSheetState.hide()
                                 }
                             },
-                            isLoadingGalleryFiles = isLoadingGalleryFiles,
                             sheetState = toolbarModalSheetState,
                             onCameraPermissionDenied = {
                                 showPermissionNotAllowedSnackbar(
@@ -451,6 +476,10 @@ internal fun ChatView(
             sheetGesturesEnabled = !showReactionPicker,
         ) {
             MegaScaffold(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .systemBarsPadding()
+                    .imePadding(),
                 topBar = {
                     if (isSelectMode) {
                         SelectModeAppBar(
@@ -534,6 +563,7 @@ internal fun ChatView(
                                     keyboardController?.show()
                                 }
                             },
+                            onCloseEditing,
                             interactionSourceTextInput,
                         )
                     }
@@ -586,13 +616,32 @@ internal fun ChatView(
                             messageListView(
                                 uiState,
                                 scrollState,
-                                bottomPadding
-                            ) { message ->
-                                // Use message for showing correct available options
-                                coroutineScope.launch {
-                                    messageOptionsModalSheetState.show()
-                                }
-                            }
+                                bottomPadding,
+                                { message ->
+                                    messageClicked = message
+                                    // Use message for showing correct available options
+                                    coroutineScope.launch {
+                                        messageOptionsModalSheetState.show()
+                                    }
+                                },
+                                { msgId ->
+                                    addingReactionTo = msgId
+                                    showReactionPicker = true
+                                    coroutineScope.launch {
+                                        messageOptionsModalSheetState.show()
+                                    }
+                                },
+                                { msgId, clickedReaction, reactions ->
+                                    reactions.find { reaction -> reaction.reaction == clickedReaction }
+                                        ?.let {
+                                            if (it.hasMe) {
+                                                onDeleteReaction(msgId, clickedReaction)
+                                            } else {
+                                                onAddReaction(msgId, clickedReaction)
+                                            }
+                                        }
+                                },
+                            )
                         },
                     )
                 }
@@ -698,7 +747,7 @@ internal fun ChatView(
                 onConsumed = onInfoToShowConsumed
             ) { info ->
                 info?.let {
-                    getInfoToShow(info, context)?.let { snackBarHostState.showSnackbar(it) }
+                    getInfoToShow(info, context).let { snackBarHostState.showSnackbar(it) }
                 } ?: context.findActivity()?.finish()
             }
 

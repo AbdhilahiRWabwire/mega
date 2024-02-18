@@ -2,10 +2,11 @@ package mega.privacy.android.domain.entity.chat.messages.request
 
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ContainsMetaType
-import mega.privacy.android.domain.entity.chat.messages.ChatGeolocationInfo
-import mega.privacy.android.domain.entity.chat.messages.ChatGifInfo
 import mega.privacy.android.domain.entity.chat.messages.ChatMessageInfo
-import mega.privacy.android.domain.entity.chat.messages.ChatRichPreviewInfo
+import mega.privacy.android.domain.entity.chat.messages.meta.ChatGeolocationInfo
+import mega.privacy.android.domain.entity.chat.messages.meta.ChatGifInfo
+import mega.privacy.android.domain.entity.chat.messages.meta.ChatRichPreviewInfo
+import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
 import mega.privacy.android.domain.entity.node.Node
 
 /**
@@ -22,6 +23,7 @@ import mega.privacy.android.domain.entity.node.Node
  * @property chatGeolocationInfo
  * @property chatGifInfo
  * @property nodeList
+ * @property reactions
  */
 data class CreateTypedMessageRequest(
     val message: ChatMessageInfo,
@@ -35,6 +37,7 @@ data class CreateTypedMessageRequest(
     override val chatGeolocationInfo: ChatGeolocationInfo?,
     override val chatGifInfo: ChatGifInfo?,
     override val nodeList: List<Node>,
+    override val reactions: List<Reaction>,
 ) : ChatMessageInfo by message, CreateTypedMessageInfo {
     constructor(
         chatMessage: ChatMessage,
@@ -42,6 +45,7 @@ data class CreateTypedMessageRequest(
         shouldShowAvatar: Boolean,
         shouldShowTime: Boolean,
         shouldShowDate: Boolean,
+        reactions: List<Reaction>,
     ) : this(
         message = chatMessage,
         isMine = isMine,
@@ -54,5 +58,6 @@ data class CreateTypedMessageRequest(
         chatGeolocationInfo = chatMessage.containsMeta?.geolocation,
         chatGifInfo = chatMessage.containsMeta?.giphy,
         nodeList = chatMessage.nodeList,
+        reactions = reactions,
     )
 }

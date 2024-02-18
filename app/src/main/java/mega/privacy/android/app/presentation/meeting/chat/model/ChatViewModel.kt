@@ -26,6 +26,7 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.main.megachat.MapsActivity
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
+import mega.privacy.android.app.objects.GifData
 import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.extensions.isPast
 import mega.privacy.android.app.presentation.meeting.chat.extension.isJoined
@@ -51,6 +52,7 @@ import mega.privacy.android.domain.usecase.chat.ClearChatHistoryUseCase
 import mega.privacy.android.domain.usecase.chat.CloseChatPreviewUseCase
 import mega.privacy.android.domain.usecase.chat.EnableGeolocationUseCase
 import mega.privacy.android.domain.usecase.chat.EndCallUseCase
+import mega.privacy.android.domain.usecase.chat.GetChatMessageUseCase
 import mega.privacy.android.domain.usecase.chat.GetChatMuteOptionListUseCase
 import mega.privacy.android.domain.usecase.chat.GetCustomSubtitleListUseCase
 import mega.privacy.android.domain.usecase.chat.HoldChatCallUseCase
@@ -69,9 +71,13 @@ import mega.privacy.android.domain.usecase.chat.OpenChatLinkUseCase
 import mega.privacy.android.domain.usecase.chat.UnmuteChatNotificationUseCase
 import mega.privacy.android.domain.usecase.chat.link.JoinPublicChatUseCase
 import mega.privacy.android.domain.usecase.chat.link.MonitorJoiningChatUseCase
+import mega.privacy.android.domain.usecase.chat.message.AttachContactsUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendChatAttachmentsUseCase
+import mega.privacy.android.domain.usecase.chat.message.SendGiphyMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendLocationMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendTextMessageUseCase
+import mega.privacy.android.domain.usecase.chat.message.reactions.AddReactionUseCase
+import mega.privacy.android.domain.usecase.chat.message.reactions.DeleteReactionUseCase
 import mega.privacy.android.domain.usecase.contact.GetMyUserHandleUseCase
 import mega.privacy.android.domain.usecase.contact.GetParticipantFirstNameUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserOnlineStatusByHandleUseCase
@@ -179,6 +185,11 @@ class ChatViewModel @Inject constructor(
     private val sendLocationMessageUseCase: SendLocationMessageUseCase,
     private val sendChatAttachmentsUseCase: SendChatAttachmentsUseCase,
     private val monitorChatPendingChangesUseCase: MonitorChatPendingChangesUseCase,
+    private val addReactionUseCase: AddReactionUseCase,
+    private val getChatMessageUseCase: GetChatMessageUseCase,
+    private val deleteReactionUseCase: DeleteReactionUseCase,
+    private val sendGiphyMessageUseCase: SendGiphyMessageUseCase,
+    private val attachContactsUseCase: AttachContactsUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ChatUiState())
     val state = _state.asStateFlow()
@@ -220,7 +231,22 @@ class ChatViewModel @Inject constructor(
             monitorChatPendingChangesUseCase(chatId)
                 .catch { Timber.e(it) }
                 .collect { preference ->
-                    _state.update { state -> state.copy(sendingText = preference.draftMessage) }
+                    preference.editingMessageId?.let { editingMessageId ->
+                        runCatching {
+                            getChatMessageUseCase(chatId, editingMessageId)
+                        }.onFailure { Timber.e(it) }
+                            .getOrNull()?.takeIf { it.isEditable }
+                    }?.let { chatMessage ->
+                        _state.update { state ->
+                            state.copy(
+                                sendingText = preference.draftMessage,
+                                editingMessageId = chatMessage.msgId,
+                                editingMessageContent = chatMessage.content
+                            )
+                        }
+                    } ?: run {
+                        _state.update { state -> state.copy(sendingText = preference.draftMessage) }
+                    }
                 }
         }
     }
@@ -968,7 +994,7 @@ class ChatViewModel @Inject constructor(
      */
     fun sendTextMessage(message: String) {
         viewModelScope.launch {
-            val tempMessage = sendTextMessageUseCase(chatId, message)
+            sendTextMessageUseCase(chatId, message)
         }
     }
 
@@ -1078,13 +1104,78 @@ class ChatViewModel @Inject constructor(
 
             viewModelScope.launch {
                 val encodedSnapshot = Base64.encodeToString(byteArray, Base64.DEFAULT)
-                val tempMessage = sendLocationMessageUseCase(
+                sendLocationMessageUseCase(
                     chatId = chatId,
                     latitude = latitude,
                     longitude = longitude,
                     image = encodedSnapshot
                 )
             }
+        }
+    }
+
+    /**
+     * On close editing
+     *
+     */
+    fun onCloseEditing() {
+        _state.update { state -> state.copy(editingMessageId = null) }
+    }
+
+    /**
+     * Add reaction to a message.
+     *
+     * @param msgId The message id.
+     * @param reaction The reaction to add.
+     */
+    fun onAddReaction(msgId: Long, reaction: String) {
+        viewModelScope.launch {
+            runCatching { addReactionUseCase(chatId, msgId, reaction) }
+                .onFailure { Timber.e(it) }
+        }
+    }
+
+    /**
+     * Delete reaction in a message.
+     *
+     * @param msgId The message id.
+     * @param reaction The reaction to remove.
+     */
+    fun onDeleteReaction(msgId: Long, reaction: String) {
+        viewModelScope.launch {
+            runCatching { deleteReactionUseCase(chatId, msgId, reaction) }
+                .onFailure { Timber.e(it) }
+        }
+    }
+
+    /**
+     * Send giphy message.
+     */
+    fun onSendGiphyMessage(gifData: GifData?) {
+        gifData?.let {
+            with(gifData) {
+                viewModelScope.launch {
+                    sendGiphyMessageUseCase(
+                        chatId = chatId,
+                        srcMp4 = mp4Url,
+                        srcWebp = webpUrl,
+                        sizeMp4 = mp4Size,
+                        sizeWebp = webpSize,
+                        width = width,
+                        height = height,
+                        title = title
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Attach one or more contacts to the chat.
+     */
+    fun onAttachContacts(contacts: List<String>) {
+        viewModelScope.launch {
+            attachContactsUseCase(chatId, contacts)
         }
     }
 

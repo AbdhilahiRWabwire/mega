@@ -8,8 +8,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import mega.privacy.android.app.presentation.meeting.chat.mapper.DurationTextMapper
+import mega.privacy.android.app.presentation.time.mapper.DurationInSecondsTextMapper
 import mega.privacy.android.app.utils.CacheFolderManager
+import mega.privacy.android.domain.entity.Progress
 import mega.privacy.android.domain.entity.chat.ChatMessageStatus
 import mega.privacy.android.domain.entity.chat.messages.VoiceClipMessage
 import mega.privacy.android.domain.entity.node.TypedNode
@@ -22,6 +23,7 @@ import timber.log.Timber
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * View model for voice clip message. This view model manages all visible voice clip messages
@@ -37,7 +39,7 @@ class VoiceClipMessageViewModel @Inject constructor(
     private val getChatFileUseCase: GetChatFileUseCase,
     private val getCacheFileUseCase: GetCacheFileUseCase,
     private val voiceClipPlayer: VoiceClipPlayer,
-    private val durationTextMapper: DurationTextMapper,
+    private val durationInSecondsTextMapper: DurationInSecondsTextMapper,
 ) : ViewModel() {
 
     // key: msgId, value: ui state flow
@@ -72,7 +74,7 @@ class VoiceClipMessageViewModel @Inject constructor(
             message.status == ChatMessageStatus.SERVER_REJECTED ||
                     message.status == ChatMessageStatus.SENDING_MANUAL ||
                     message.status == ChatMessageStatus.SENDING ||
-                    message.duration == 0
+                    message.duration.inWholeMilliseconds == 0L
         if (hasError) {
             updateUiToErrorState(message.msgId)
             return@launch
@@ -89,7 +91,7 @@ class VoiceClipMessageViewModel @Inject constructor(
                 getMutableStateFlow(message.msgId)?.update {
                     it.copy(
                         loadProgress = null,
-                        timestamp = durationTextMapper(message.duration)
+                        timestamp = durationInSecondsTextMapper(message.duration)
                     )
                 }
                 return@launch
@@ -124,7 +126,7 @@ class VoiceClipMessageViewModel @Inject constructor(
                 getMutableStateFlow(msgId)?.update {
                     it.copy(
                         loadProgress = null,
-                        timestamp = durationTextMapper(it.voiceClipMessage?.duration ?: 0),
+                        timestamp = durationInSecondsTextMapper(it.voiceClipMessage?.duration),
                     )
                 }
             }
@@ -221,10 +223,10 @@ class VoiceClipMessageViewModel @Inject constructor(
         state: VoiceClipPlayState.Playing,
         msgId: Long,
     ) {
-        val timestamp = durationTextMapper(state.pos)
+        val timestamp = durationInSecondsTextMapper(state.pos.milliseconds)
         val playProgress =
             getUiStateFlow(msgId).value.voiceClipMessage?.duration?.let { dur ->
-                (state.pos * 100L / dur).toInt()
+                Progress(state.pos, dur.inWholeMilliseconds)
             }
         getMutableStateFlow(msgId)?.update {
             it.copy(

@@ -1,5 +1,7 @@
 package mega.privacy.android.data.repository
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
@@ -27,8 +29,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import mega.privacy.android.data.R
 import mega.privacy.android.data.database.DatabaseHandler
-import mega.privacy.android.data.database.entity.chat.ChatHistoryLoadStatusEntity
 import mega.privacy.android.data.extensions.failWithError
 import mega.privacy.android.data.extensions.getChatRequestListener
 import mega.privacy.android.data.extensions.getRequestListener
@@ -74,6 +76,7 @@ import mega.privacy.android.domain.entity.chat.CombinedChatRoom
 import mega.privacy.android.domain.entity.chat.RichLinkConfig
 import mega.privacy.android.domain.entity.chat.messages.paging.MessagePagingInfo
 import mega.privacy.android.domain.entity.chat.messages.request.CreateTypedMessageRequest
+import mega.privacy.android.domain.entity.chat.notification.ChatMessageNotification
 import mega.privacy.android.domain.entity.contacts.InviteContactRequest
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.settings.ChatSettings
@@ -86,6 +89,7 @@ import nz.mega.sdk.MegaChatApi
 import nz.mega.sdk.MegaChatContainsMeta
 import nz.mega.sdk.MegaChatError
 import nz.mega.sdk.MegaChatMessage
+import nz.mega.sdk.MegaChatNotificationListenerInterface
 import nz.mega.sdk.MegaChatRequest
 import nz.mega.sdk.MegaChatRoom
 import nz.mega.sdk.MegaError
@@ -163,6 +167,7 @@ internal class ChatRepositoryImpl @Inject constructor(
     private val giphyEntityMapper: GiphyEntityMapper,
     private val chatGeolocationEntityMapper: ChatGeolocationEntityMapper,
     private val chatNodeEntityListMapper: ChatNodeEntityListMapper,
+    @ApplicationContext private val context: Context,
 ) : ChatRepository {
     private val richLinkConfig = MutableStateFlow(RichLinkConfig())
     private var chatRoomUpdates: HashMap<Long, Flow<ChatRoomUpdate>> = hashMapOf()
@@ -1257,17 +1262,6 @@ internal class ChatRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getLastLoadResponse(chatId: Long): ChatHistoryLoadStatus? =
-        withContext(ioDispatcher) {
-            chatStorageGateway.getLastLoadResponse(chatId)?.status
-        }
-
-    override suspend fun setLastLoadResponse(chatId: Long, status: ChatHistoryLoadStatus) {
-        withContext(ioDispatcher) {
-            chatStorageGateway.setLastLoadResponse(ChatHistoryLoadStatusEntity(chatId, status))
-        }
-    }
-
     override suspend fun clearChatMessages(chatId: Long) {
         withContext(ioDispatcher) {
             chatStorageGateway.clearChatMessages(chatId)
@@ -1283,10 +1277,6 @@ internal class ChatRepositoryImpl @Inject constructor(
                 messagePagingInfoMapper(it)
             }
         }
-
-    override suspend fun getMyChatsFilesFolderId(): NodeId {
-        throw NotImplementedError("Not implemented yet")
-    }
 
     override fun monitorJoiningChat(chatId: Long) = joiningIdsFlow
         .map { it.contains(chatId) }
@@ -1307,12 +1297,17 @@ internal class ChatRepositoryImpl @Inject constructor(
         chatMessageMapper(megaChatApiGateway.sendGeolocation(chatId, longitude, latitude, image))
     }
 
-    override suspend fun setChatDraftMessage(chatId: Long, draftMessage: String) {
+    override suspend fun setChatDraftMessage(
+        chatId: Long,
+        draftMessage: String,
+        editingMessageId: Long?,
+    ) {
         val preference = megaLocalRoomGateway.monitorChatPendingChanges(chatId).firstOrNull()
-            ?: ChatPendingChanges(chatId = chatId,)
+            ?: ChatPendingChanges(chatId = chatId)
         megaLocalRoomGateway.setChatPendingChanges(
             preference.copy(
-                draftMessage = draftMessage
+                draftMessage = draftMessage,
+                editingMessageId = editingMessageId
             )
         )
     }
@@ -1321,4 +1316,20 @@ internal class ChatRepositoryImpl @Inject constructor(
         return megaLocalRoomGateway.monitorChatPendingChanges(chatId)
             .filterNotNull()
     }
+
+    override fun getDefaultChatFolderName() = context.getString(R.string.my_chat_files_folder)
+
+    override fun monitorChatMessages() =
+        callbackFlow {
+            val listener =
+                MegaChatNotificationListenerInterface { _, chatId, message ->
+                    trySend(Pair(chatId, message))
+                }
+            megaChatApiGateway.registerChatNotificationListener(listener)
+            awaitClose {
+                megaChatApiGateway.deregisterChatNotificationListener(listener)
+            }
+        }.map { (chatId, message) ->
+            message?.let { ChatMessageNotification(chatId, chatMessageMapper(it)) }
+        }.flowOn(ioDispatcher)
 }

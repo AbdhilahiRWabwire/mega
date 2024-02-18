@@ -40,7 +40,7 @@ import mega.privacy.android.core.ui.theme.tokens.TextColor
 @Composable
 internal fun FileNoPreviewMessageView(
     isMe: Boolean,
-    fileTypeResId: Int,
+    fileTypeResId: Int?,
     modifier: Modifier = Modifier,
     fileName: String = "",
     fileSize: String = "",
@@ -53,7 +53,7 @@ internal fun FileNoPreviewMessageView(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FileIcon(fileTypeResId)
+        FileIcon(fileTypeResId, isMe)
         Column {
             FileNameText(fileName, isMe)
             FileSizeText(fileSize, isMe)
@@ -86,12 +86,17 @@ private fun FileNameText(fileName: String, isMe: Boolean) {
 }
 
 @Composable
-private fun FileIcon(fileTypeResId: Int, modifier: Modifier = Modifier) {
-    Box(
-        modifier = Modifier.size(48.dp),
-        contentAlignment = Alignment.Center,
-    ) {
+private fun FileIcon(
+    fileTypeResId: Int?,
+    isMe: Boolean,
+    modifier: Modifier = Modifier,
+) = Box(
+    modifier = Modifier.size(48.dp),
+    contentAlignment = Alignment.Center,
+) {
+    fileTypeResId?.let {
         Icon(
+            tint = if (isMe) MegaTheme.colors.icon.inverse else MegaTheme.colors.icon.primary,
             imageVector = ImageVector.vectorResource(fileTypeResId),
             contentDescription = null,
             modifier = modifier.testTag(FILE_MESSAGE_VIEW_FILE_TYPE_ICON_TEST_TAG),
@@ -115,7 +120,6 @@ private fun FileNoPreviewMessageViewPreview(
                     fileSize = params.fileSize,
                 )
             },
-            imageIntrinsicSize = null,
             loadProgress = params.loadProgress,
         )
     }

@@ -14,6 +14,13 @@ import mega.privacy.android.domain.featuretoggle.FeatureFlagValueProvider
  */
 enum class AppFeatures(override val description: String, private val defaultValue: Boolean) :
     Feature {
+    /**
+     * Enables new links compose page
+     */
+    LinksCompose(
+        "Enable new Shared Links Compose page (requires app restart)",
+        false
+    ),
 
     /**
      * Enables new audio section flag
@@ -168,7 +175,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
     /**
      * Permanent logging toggle
      */
-    PermanentLogging("Permanently enable logging, removing functionality to turn it on/off", false),
+    PermanentLogging("Permanently enable logging, removing functionality to turn it on/off", true),
 
     /**
      * App Test toggle
@@ -211,13 +218,17 @@ enum class AppFeatures(override val description: String, private val defaultValu
     NewChatActivity("Enable new chat activity", false),
 
     /**
+     * Mute participant
+     */
+    MuteParticipant("Enable Mute participant", false),
+
+    /**
      * Enable new design Variant A for ChooseAccount screen
      */
     ChooseAccountScreenVariantA(
         "Enable new design (Variant A) for ChooseAccount screen (Onboarding Upselling dialog)",
         false
-    )
-    ;
+    );
 
     companion object : FeatureFlagValueProvider {
         override suspend fun isEnabled(feature: Feature) =

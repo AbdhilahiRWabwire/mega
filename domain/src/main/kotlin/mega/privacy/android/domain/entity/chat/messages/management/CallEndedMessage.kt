@@ -1,6 +1,8 @@
 package mega.privacy.android.domain.entity.chat.messages.management
 
 import mega.privacy.android.domain.entity.chat.ChatMessageTermCode
+import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
+import kotlin.time.Duration
 
 /**
  * Call ended message
@@ -16,6 +18,7 @@ data class CallEndedMessage(
     override val shouldShowAvatar: Boolean,
     override val shouldShowTime: Boolean,
     override val shouldShowDate: Boolean,
+    override val reactions: List<Reaction>,
     val termCode: ChatMessageTermCode,
-    val duration: Long,
+    val duration: Duration,
 ) : CallMessage

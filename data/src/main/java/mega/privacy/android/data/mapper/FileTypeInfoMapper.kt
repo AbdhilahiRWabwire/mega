@@ -14,6 +14,7 @@ import mega.privacy.android.domain.entity.UrlFileTypeInfo
 import mega.privacy.android.domain.entity.VideoFileTypeInfo
 import mega.privacy.android.domain.entity.ZipFileTypeInfo
 import nz.mega.sdk.MegaNode
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Map node to file type info
@@ -35,7 +36,7 @@ internal fun getFileTypeInfo(node: MegaNode, mimeTypeMapper: MimeTypeMapper): Fi
 private fun getFileExtension(node: MegaNode) =
     node.name.substringAfterLast('.', "")
 
-private fun getFileTypeInfoForExtension(
+internal fun getFileTypeInfoForExtension(
     mimeType: String,
     extension: String,
     duration: Int,
@@ -43,62 +44,73 @@ private fun getFileTypeInfoForExtension(
     mimeType.startsWith(PdfFileTypeInfo.mimeType) -> {
         PdfFileTypeInfo
     }
+
     mimeType.isZipMimeType() -> {
         ZipFileTypeInfo(
             mimeType = mimeType,
             extension = extension,
         )
     }
+
     mimeType.startsWith("web/url") -> {
         UrlFileTypeInfo
     }
+
     extension.lowercase().isGifExtension() -> {
         GifFileTypeInfo(
             mimeType = mimeType,
             extension = extension,
         )
     }
+
     extension.lowercase().isRawExtension() -> {
         RawFileTypeInfo(
             mimeType = mimeType,
             extension = extension,
         )
     }
+
     extension.lowercase().isSVGExtension() -> {
         SvgFileTypeInfo(
             mimeType = mimeType,
             extension = extension,
         )
     }
+
     mimeType.startsWith("image/") -> {
         StaticImageFileTypeInfo(
             mimeType = mimeType,
             extension = extension,
         )
     }
+
     mimeType.isAudioMimeType(extension) -> {
         AudioFileTypeInfo(
             mimeType = mimeType,
             extension = extension,
-            duration = duration
+            duration = duration.seconds
         )
     }
+
     mimeType.isTextMimeType(extension) -> {
         TextFileTypeInfo(
             mimeType = mimeType,
             extension = extension,
         )
     }
+
     mimeType.isVideoMimeType(extension) -> {
         VideoFileTypeInfo(
             mimeType = mimeType,
             extension = extension,
-            duration = duration
+            duration = duration.seconds
         )
     }
+
     mimeType.isUnMappedMimeType(extension) -> {
         UnMappedFileTypeInfo(extension = extension)
     }
+
     else -> {
         UnknownFileTypeInfo(
             mimeType = mimeType,

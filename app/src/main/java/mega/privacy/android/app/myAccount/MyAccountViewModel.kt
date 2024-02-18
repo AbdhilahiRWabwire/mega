@@ -45,13 +45,13 @@ import mega.privacy.android.app.main.dialog.storagestatus.TYPE_ANDROID_PLATFORM_
 import mega.privacy.android.app.main.dialog.storagestatus.TYPE_ITUNES
 import mega.privacy.android.app.middlelayer.iab.BillingConstant
 import mega.privacy.android.app.myAccount.usecase.CancelSubscriptionsUseCase
-import mega.privacy.android.app.myAccount.usecase.Check2FAUseCase
 import mega.privacy.android.app.myAccount.usecase.ConfirmCancelAccountUseCase
 import mega.privacy.android.app.myAccount.usecase.ConfirmChangeEmailUseCase
 import mega.privacy.android.app.myAccount.usecase.GetUserDataUseCase
-import mega.privacy.android.app.myAccount.usecase.KillSessionUseCase
 import mega.privacy.android.app.myAccount.usecase.QueryRecoveryLinkUseCase
 import mega.privacy.android.app.presentation.login.LoginActivity
+import mega.privacy.android.app.presentation.snackbar.MegaSnackbarDuration
+import mega.privacy.android.app.presentation.snackbar.SnackBarHandler
 import mega.privacy.android.app.presentation.testpassword.TestPasswordActivity
 import mega.privacy.android.app.presentation.verifytwofactor.VerifyTwoFactorActivity
 import mega.privacy.android.app.utils.CacheFolderManager
@@ -79,6 +79,7 @@ import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.entity.verification.VerifiedPhoneNumber
 import mega.privacy.android.domain.qualifier.IoDispatcher
+import mega.privacy.android.domain.usecase.account.IsMultiFactorAuthEnabledUseCase
 import mega.privacy.android.domain.usecase.GetAccountDetailsUseCase
 import mega.privacy.android.domain.usecase.GetCurrentUserFullName
 import mega.privacy.android.domain.usecase.GetExportMasterKeyUseCase
@@ -91,6 +92,7 @@ import mega.privacy.android.domain.usecase.MonitorUserUpdates
 import mega.privacy.android.domain.usecase.account.BroadcastRefreshSessionUseCase
 import mega.privacy.android.domain.usecase.account.ChangeEmail
 import mega.privacy.android.domain.usecase.account.CheckVersionsUseCase
+import mega.privacy.android.domain.usecase.account.KillOtherSessionsUseCase
 import mega.privacy.android.domain.usecase.account.UpdateCurrentUserName
 import mega.privacy.android.domain.usecase.avatar.GetMyAvatarFileUseCase
 import mega.privacy.android.domain.usecase.avatar.SetAvatarUseCase
@@ -119,9 +121,9 @@ import javax.inject.Inject
  * @property myAccountInfo
  * @property megaApi
  * @property setAvatarUseCase
- * @property check2FAUseCase
+ * @property isMultiFactorAuthEnabledUseCase [IsMultiFactorAuthEnabledUseCase]
  * @property checkVersionsUseCase
- * @property killSessionUseCase
+ * @property killOtherSessionsUseCase [KillOtherSessionsUseCase]
  * @property cancelSubscriptionsUseCase
  * @property getMyAvatarFileUseCase
  * @property checkPasswordReminderUseCase
@@ -143,6 +145,7 @@ import javax.inject.Inject
  * @property getCurrentUserEmail
  * @property monitorVerificationStatus
  * @property getFeatureFlagValueUseCase
+ * @property snackBarHandler Handler used to display a Snackbar
  */
 @HiltViewModel
 @SuppressLint("StaticFieldLeak")
@@ -151,9 +154,9 @@ class MyAccountViewModel @Inject constructor(
     private val myAccountInfo: MyAccountInfo,
     @MegaApi private val megaApi: MegaApiAndroid,
     private val setAvatarUseCase: SetAvatarUseCase,
-    private val check2FAUseCase: Check2FAUseCase,
+    private val isMultiFactorAuthEnabledUseCase: IsMultiFactorAuthEnabledUseCase,
     private val checkVersionsUseCase: CheckVersionsUseCase,
-    private val killSessionUseCase: KillSessionUseCase,
+    private val killOtherSessionsUseCase: KillOtherSessionsUseCase,
     private val cancelSubscriptionsUseCase: CancelSubscriptionsUseCase,
     private val getMyAvatarFileUseCase: GetMyAvatarFileUseCase,
     private val checkPasswordReminderUseCase: CheckPasswordReminderUseCase,
@@ -182,6 +185,7 @@ class MyAccountViewModel @Inject constructor(
     private val getFolderTreeInfo: GetFolderTreeInfo,
     private val getNodeByIdUseCase: GetNodeByIdUseCase,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    private val snackBarHandler: SnackBarHandler,
 ) : BaseRxViewModel() {
 
     companion object {
@@ -629,23 +633,24 @@ class MyAccountViewModel @Inject constructor(
     }
 
     /**
-     * Kill sessions
-     *
-     * @param action
-     * @receiver
+     * Kills all other active Sessions except the current Session
      */
-    fun killSessions(action: (Boolean) -> Unit) {
-        killSessionUseCase.kill()
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy(
-                onSuccess = { action.invoke(true) },
-                onError = { error ->
-                    Timber.w("Error when killing sessions: ${error.message}")
-                    action.invoke(false)
-                }
+    fun killOtherSessions() = viewModelScope.launch {
+        runCatching {
+            killOtherSessionsUseCase()
+        }.onSuccess {
+            Timber.d("Successfully killed all other sessions")
+            snackBarHandler.postSnackbarMessage(
+                resId = R.string.success_kill_all_sessions,
+                snackbarDuration = MegaSnackbarDuration.Long,
             )
-            .addTo(composite)
+        }.onFailure {
+            Timber.w("Error killing all other sessions: ${it.message}")
+            snackBarHandler.postSnackbarMessage(
+                resId = R.string.error_kill_all_sessions,
+                snackbarDuration = MegaSnackbarDuration.Long,
+            )
+        }
     }
 
     /**
@@ -729,22 +734,6 @@ class MyAccountViewModel @Inject constructor(
                 showResult(context.getString(R.string.error_changing_user_avatar_image_not_available))
             }
         }
-    }
-
-    /**
-     * Prepares a file to be set as avatar.
-     *
-     * @param data Intent containing the file to be set as avatar.
-     */
-    private fun prepareAvatarFile(data: Intent) {
-        filePrepareUseCase.prepareFile(data)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy(
-                onSuccess = { info -> addProfileAvatar(info.fileAbsolutePath) },
-                onError = Timber::w
-            )
-            .addTo(composite)
     }
 
     /**
@@ -923,15 +912,19 @@ class MyAccountViewModel @Inject constructor(
     }
 
     /**
-     * Check2f a
-     *
+     * Checks if Multi-Factor Authentication has been enabled or not
      */
-    fun check2FA() {
-        check2FAUseCase.check()
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy { result -> is2FaEnabled = result }
-            .addTo(composite)
+    fun checkMultiFactorAuthenticationState() {
+        viewModelScope.launch {
+            runCatching {
+                isMultiFactorAuthEnabledUseCase()
+            }.onSuccess {
+                Timber.d("Multi-Factor Authentication check successful")
+                is2FaEnabled = it
+            }.onFailure {
+                Timber.w("Error checking the Multi-Factor Authentication state: ${it.message}")
+            }
+        }
     }
 
     /**

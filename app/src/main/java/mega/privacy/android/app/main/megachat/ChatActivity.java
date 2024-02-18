@@ -36,7 +36,7 @@ import static mega.privacy.android.app.meeting.activity.MeetingActivity.MEETING_
 import static mega.privacy.android.app.meeting.activity.MeetingActivity.MEETING_CHAT_ID;
 import static mega.privacy.android.app.modalbottomsheet.ModalBottomSheetUtil.isBottomSheetDialogShown;
 import static mega.privacy.android.app.modalbottomsheet.ModalBottomSheetUtil.openWith;
-import static mega.privacy.android.app.presentation.transfers.startdownload.view.StartDownloadTransferComponentKt.createStartDownloadTransferView;
+import static mega.privacy.android.app.presentation.transfers.startdownload.view.StartDownloadComponentKt.createStartDownloadView;
 import static mega.privacy.android.app.providers.FileProviderActivity.FROM_MEGA_APP;
 import static mega.privacy.android.app.utils.AlertDialogUtil.dismissAlertDialogIfExists;
 import static mega.privacy.android.app.utils.AlertsAndWarnings.showOverDiskQuotaPaywallWarning;
@@ -368,7 +368,7 @@ import mega.privacy.android.app.namecollision.data.NameCollision;
 import mega.privacy.android.app.namecollision.usecase.CheckNameCollisionUseCase;
 import mega.privacy.android.app.objects.GifData;
 import mega.privacy.android.app.objects.PasscodeManagement;
-import mega.privacy.android.app.presentation.bottomsheet.NodeOptionsDownloadViewModel;
+import mega.privacy.android.app.presentation.transfers.startdownload.StartDownloadViewModel;
 import mega.privacy.android.app.presentation.chat.ChatViewModel;
 import mega.privacy.android.app.presentation.chat.ContactInvitation;
 import mega.privacy.android.app.presentation.chat.dialog.AddParticipantsNoContactsDialogFragment;
@@ -411,6 +411,7 @@ import mega.privacy.android.app.utils.Util;
 import mega.privacy.android.app.utils.permission.PermissionUtils;
 import mega.privacy.android.data.model.chat.AndroidMegaChatMessage;
 import mega.privacy.android.data.model.chat.AndroidMegaRichLinkMessage;
+import mega.privacy.android.domain.entity.ChatRoomPermission;
 import mega.privacy.android.domain.entity.StorageState;
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting;
 import mega.privacy.android.domain.entity.chat.FileGalleryItem;
@@ -575,7 +576,7 @@ public class ChatActivity extends PasscodeActivity
     HasMediaPermissionUseCase hasMediaPermissionUseCase;
 
     private ChatViewModel viewModel;
-    private NodeOptionsDownloadViewModel nodeOptionsDownloadViewModel;
+    private StartDownloadViewModel startDownloadViewModel;
 
     private WaitingRoomManagementViewModel waitingRoomManagementViewModel;
 
@@ -1459,7 +1460,7 @@ public class ChatActivity extends PasscodeActivity
         supportRequestWindowFeature(Window.FEATURE_NO_TITLE);
         super.onCreate(savedInstanceState);
         viewModel = new ViewModelProvider(this).get(ChatViewModel.class);
-        nodeOptionsDownloadViewModel = new ViewModelProvider(this).get(NodeOptionsDownloadViewModel.class);
+        startDownloadViewModel = new ViewModelProvider(this).get(StartDownloadViewModel.class);
         waitingRoomManagementViewModel = new ViewModelProvider(this).get(WaitingRoomManagementViewModel.class);
 
         if (shouldRefreshSessionDueToKarere()) {
@@ -1741,6 +1742,7 @@ public class ChatActivity extends PasscodeActivity
         returnCallOnHoldButton.setVisibility(View.GONE);
 
         startOrJoinMeetingBanner = findViewById(R.id.start_or_join_meeting_banner);
+
         startOrJoinMeetingBanner.setVisibility(View.GONE);
         setOnSingleClickListener(startOrJoinMeetingBanner, this);
 
@@ -2006,11 +2008,11 @@ public class ChatActivity extends PasscodeActivity
     private void addStartDownloadTransferView() {
         ViewGroup root = findViewById(R.id.fragment_container_chat);
         root.addView(
-                createStartDownloadTransferView(
+                createStartDownloadView(
                         this,
-                        nodeOptionsDownloadViewModel.getState(),
+                        startDownloadViewModel.getState(),
                         () -> {
-                            nodeOptionsDownloadViewModel.consumeDownloadEvent();
+                            startDownloadViewModel.consumeDownloadEvent();
                             return Unit.INSTANCE;
                         }
                 )
@@ -2091,18 +2093,7 @@ public class ChatActivity extends PasscodeActivity
             }
 
             ScheduledMeetingStatus schedMeetStatus = chatState.getScheduledMeetingStatus();
-
-            if (chatRoom != null && chatRoom.isActive() && !chatRoom.isArchived() && (schedMeetStatus instanceof ScheduledMeetingStatus.NotStarted ||
-                    schedMeetStatus instanceof ScheduledMeetingStatus.NotJoined)) {
-                startOrJoinMeetingBanner.setText(schedMeetStatus instanceof ScheduledMeetingStatus.NotStarted ?
-                        R.string.meetings_chat_room_start_scheduled_meeting_option :
-                        R.string.meetings_chat_room_join_scheduled_meeting_option);
-
-                startOrJoinMeetingBanner.setVisibility(View.VISIBLE);
-                callInProgressLayout.setVisibility(View.GONE);
-            } else {
-                startOrJoinMeetingBanner.setVisibility(View.GONE);
-            }
+            checkStartMeetingButtonVisibility(schedMeetStatus);
 
             long callChatId = chatState.getCurrentCallChatId();
 
@@ -5050,7 +5041,7 @@ public class ChatActivity extends PasscodeActivity
                     Long megaNodeHandle = messagesSelected.get(i).getMessage().getMsgId();
                     messageIds.add(megaNodeHandle);
                 }
-                nodeOptionsDownloadViewModel.downloadChatNodesOnlyIfFeatureFlagIsTrue(
+                startDownloadViewModel.downloadChatNodesOnlyIfFeatureFlagIsTrue(
                         idChat,
                         messageIds,
                         () -> {
@@ -5767,7 +5758,7 @@ public class ChatActivity extends PasscodeActivity
             manageTextFileIntent(this, msgId, idChat);
         } else {
             onNodeTapped(this, node, (megaNode) -> {
-                nodeOptionsDownloadViewModel.downloadChatNodesOnlyIfFeatureFlagIsTrue(
+                startDownloadViewModel.downloadChatNodesOnlyIfFeatureFlagIsTrue(
                         idChat,
                         List.of(msgId),
                         () -> {
@@ -6035,7 +6026,7 @@ public class ChatActivity extends PasscodeActivity
             Timber.d("CHANGE_TYPE_PARTICIPANTS for the chat: %s", chat.getChatId());
             setChatSubtitle();
         } else if (chat.hasChanged(MegaChatRoom.CHANGE_TYPE_OWN_PRIV)) {
-            Timber.d("CHANGE_TYPE_OWN_PRIV for the chat: %s", chat.getChatId());
+            checkStartMeetingButtonVisibility(viewModel.getState().getValue().getScheduledMeetingStatus());
             setChatSubtitle();
             supportInvalidateOptionsMenu();
             viewModel.chatRoomUpdated(chat.isWaitingRoom(), chat.getOwnPrivilege() == MegaChatRoom.PRIV_MODERATOR);
@@ -6202,6 +6193,28 @@ public class ChatActivity extends PasscodeActivity
             }
 
             LiveEventBus.get(EVENT_CHAT_OPEN_INVITE, MegaChatRoom.class).post(chat);
+        }
+    }
+
+    /**
+     * Check if start meeting button should be shown
+     *
+     * @param schedMeetStatus [ScheduledMeetingStatus]
+     */
+    private void checkStartMeetingButtonVisibility(ScheduledMeetingStatus schedMeetStatus) {
+        boolean shouldBeShown = chatRoom != null && chatRoom.isActive() && !chatRoom.isArchived() &&
+                ((schedMeetStatus instanceof ScheduledMeetingStatus.NotStarted &&
+                        chatRoom.getOwnPrivilege() != MegaChatRoom.PRIV_RO) ||
+                        schedMeetStatus instanceof ScheduledMeetingStatus.NotJoined);
+
+        if (shouldBeShown) {
+            startOrJoinMeetingBanner.setText(schedMeetStatus instanceof ScheduledMeetingStatus.NotStarted ?
+                    R.string.meetings_chat_room_start_scheduled_meeting_option :
+                    R.string.meetings_chat_room_join_scheduled_meeting_option);
+            startOrJoinMeetingBanner.setVisibility(View.VISIBLE);
+            callInProgressLayout.setVisibility(View.GONE);
+        } else {
+            startOrJoinMeetingBanner.setVisibility(View.GONE);
         }
     }
 
@@ -9303,7 +9316,7 @@ public class ChatActivity extends PasscodeActivity
                     break;
                 }
         }
-        
+
         Timber.d("Call Status in this chatRoom: %s", callStatusToString(callStatus));
         switch (callStatus) {
             case MegaChatCall.CALL_STATUS_TERMINATING_USER_PARTICIPATION:

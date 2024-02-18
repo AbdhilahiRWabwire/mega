@@ -20,6 +20,7 @@ import mega.privacy.android.domain.entity.chat.RichLinkConfig
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.chat.messages.paging.MessagePagingInfo
 import mega.privacy.android.domain.entity.chat.messages.request.CreateTypedMessageRequest
+import mega.privacy.android.domain.entity.chat.notification.ChatMessageNotification
 import mega.privacy.android.domain.entity.contacts.InviteContactRequest
 import mega.privacy.android.domain.entity.node.NodeId
 
@@ -879,22 +880,6 @@ interface ChatRepository {
     suspend fun storeMessages(chatId: Long, messages: List<CreateTypedMessageRequest>)
 
     /**
-     * Get last load response
-     *
-     * @param chatId
-     * @return last history load status for the chat
-     */
-    suspend fun getLastLoadResponse(chatId: Long): ChatHistoryLoadStatus?
-
-    /**
-     * Set last load response
-     *
-     * @param chatId
-     * @param status
-     */
-    suspend fun setLastLoadResponse(chatId: Long, status: ChatHistoryLoadStatus)
-
-    /**
      * Clear chat messages
      *
      * @param chatId
@@ -909,11 +894,6 @@ interface ChatRepository {
      * @return next chronological message if it exists
      */
     suspend fun getNextMessagePagingInfo(chatId: Long, timestamp: Long): MessagePagingInfo?
-
-    /**
-     * Returns the folder for saving chat files in user attributes, null if it's not configured yet
-     */
-    suspend fun getMyChatsFilesFolderId(): NodeId
 
     /**
      * Monitor if chat is in joining state.
@@ -960,8 +940,9 @@ interface ChatRepository {
      *
      * @param chatId   Chat id
      * @param draftMessage Draft message
+     * @param editingMessageId Editing message id
      */
-    suspend fun setChatDraftMessage(chatId: Long, draftMessage: String)
+    suspend fun setChatDraftMessage(chatId: Long, draftMessage: String, editingMessageId: Long?)
 
     /**
      * Monitor chat pending changes
@@ -970,4 +951,16 @@ interface ChatRepository {
      * @return         [ChatPendingChanges]
      */
     fun monitorChatPendingChanges(chatId: Long): Flow<ChatPendingChanges>
+
+    /**
+     * Get default folder name, localized to current device.
+     */
+    fun getDefaultChatFolderName(): String
+
+    /**
+     * Monitor chat messages
+     *
+     * @return flow of chat messages received
+     */
+    fun monitorChatMessages(): Flow<ChatMessageNotification?>
 }

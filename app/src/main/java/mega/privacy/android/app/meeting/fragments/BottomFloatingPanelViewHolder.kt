@@ -440,6 +440,7 @@ class BottomFloatingPanelViewHolder(
 
         binding.bottomFloatingPanel.participantsComposeView.apply {
             isVisible = true
+
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 val meetingState by meetingViewModel.state.collectAsStateWithLifecycle()
@@ -495,6 +496,9 @@ class BottomFloatingPanelViewHolder(
                         },
                         onRingParticipantClicked = { chatParticipant ->
                             meetingViewModel.ringParticipant(chatParticipant.handle)
+                        },
+                        onMuteAllParticipantsClick = {
+                            meetingViewModel.muteAllParticipants()
                         },
                         onRingAllParticipantsClicked = {
                             meetingViewModel.ringAllAbsentsParticipants()

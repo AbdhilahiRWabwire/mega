@@ -493,6 +493,7 @@
             android:name=".meeting.activity.MeetingActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:launchMode="singleTop"
+            android:excludeFromRecents="true"
             android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".meeting.activity.LeftMeetingActivity"
@@ -547,14 +548,6 @@
             <meta-data android:name="photopicker_activity:0:required" android:value="" />
         </service>
 
-        <receiver
-            android:name=".receivers.ChargeEventReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
-            </intent-filter>
-        </receiver>
         <receiver
             android:name=".receivers.BootEventReceiver"
             android:enabled="true"

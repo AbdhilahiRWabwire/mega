@@ -13,6 +13,8 @@ import kotlinx.coroutines.test.setMain
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.settings.camerauploads.SettingsCameraUploadsViewModel
 import mega.privacy.android.app.presentation.settings.camerauploads.model.UploadConnectionType
+import mega.privacy.android.app.presentation.snackbar.MegaSnackbarDuration
+import mega.privacy.android.app.presentation.snackbar.SnackBarHandler
 import mega.privacy.android.domain.entity.VideoQuality
 import mega.privacy.android.domain.entity.account.EnableCameraUploadsStatus
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadFolderType
@@ -87,8 +89,7 @@ import java.util.stream.Stream
  */
 @ExperimentalCoroutinesApi
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class SettingsCameraUploadsViewModelTest {
-
+internal class SettingsCameraUploadsViewModelTest {
     private lateinit var underTest: SettingsCameraUploadsViewModel
 
     private val isCameraUploadsEnabledUseCase = mock<IsCameraUploadsEnabledUseCase>()
@@ -129,17 +130,18 @@ class SettingsCameraUploadsViewModelTest {
     private val setupCameraUploadsSyncHandleUseCase: SetupCameraUploadsSyncHandleUseCase = mock()
     private val broadcastBusinessAccountExpiredUseCase =
         mock<BroadcastBusinessAccountExpiredUseCase>()
-    private val getPrimarySyncHandleUseCase: GetPrimarySyncHandleUseCase = mock()
-    private val getNodeByIdUseCase: GetNodeByIdUseCase = mock()
-    private val isSecondaryFolderEnabledUseCase: IsSecondaryFolderEnabled = mock()
-    private val isConnectedToInternetUseCase: IsConnectedToInternetUseCase = mock()
-    private val getSecondarySyncHandleUseCase: GetSecondarySyncHandleUseCase = mock()
-    private val getSecondaryFolderPathUseCase: GetSecondaryFolderPathUseCase = mock()
-    private val setupMediaUploadsSyncHandleUseCase: SetupMediaUploadsSyncHandleUseCase = mock()
-    private val isSecondaryFolderPathValidUseCase: IsSecondaryFolderPathValidUseCase = mock()
-    private val setSecondaryFolderLocalPathUseCase: SetSecondaryFolderLocalPathUseCase = mock()
-    private val clearCameraUploadsRecordUseCase: ClearCameraUploadsRecordUseCase = mock()
-    private val listenToNewMediaUseCase: ListenToNewMediaUseCase = mock()
+    private val getPrimarySyncHandleUseCase = mock<GetPrimarySyncHandleUseCase>()
+    private val getNodeByIdUseCase = mock<GetNodeByIdUseCase>()
+    private val isSecondaryFolderEnabledUseCase = mock<IsSecondaryFolderEnabled>()
+    private val isConnectedToInternetUseCase = mock<IsConnectedToInternetUseCase>()
+    private val getSecondarySyncHandleUseCase = mock<GetSecondarySyncHandleUseCase>()
+    private val getSecondaryFolderPathUseCase = mock<GetSecondaryFolderPathUseCase>()
+    private val setupMediaUploadsSyncHandleUseCase = mock<SetupMediaUploadsSyncHandleUseCase>()
+    private val isSecondaryFolderPathValidUseCase = mock<IsSecondaryFolderPathValidUseCase>()
+    private val setSecondaryFolderLocalPathUseCase = mock<SetSecondaryFolderLocalPathUseCase>()
+    private val clearCameraUploadsRecordUseCase = mock<ClearCameraUploadsRecordUseCase>()
+    private val listenToNewMediaUseCase = mock<ListenToNewMediaUseCase>()
+    private val snackBarHandler = mock<SnackBarHandler>()
 
     @BeforeAll
     fun setUp() {
@@ -198,6 +200,7 @@ class SettingsCameraUploadsViewModelTest {
             isSecondaryFolderPathValidUseCase,
             setSecondaryFolderLocalPathUseCase,
             clearCameraUploadsRecordUseCase,
+            snackBarHandler,
         )
     }
 
@@ -255,6 +258,7 @@ class SettingsCameraUploadsViewModelTest {
             setSecondaryFolderLocalPathUseCase = setSecondaryFolderLocalPathUseCase,
             clearCameraUploadsRecordUseCase = clearCameraUploadsRecordUseCase,
             listenToNewMediaUseCase = listenToNewMediaUseCase,
+            snackBarHandler = snackBarHandler,
         )
     }
 
@@ -274,7 +278,7 @@ class SettingsCameraUploadsViewModelTest {
         whenever(isSecondaryFolderEnabledUseCase()).thenReturn(true)
         whenever(isConnectedToInternetUseCase()).thenReturn(true)
         whenever(getSecondarySyncHandleUseCase()).thenReturn(2L)
-        whenever(getSecondaryFolderPathUseCase()).thenReturn("path/to/MU")
+        whenever(getSecondaryFolderPathUseCase()).thenReturn("/path/to/MU")
         whenever(isSecondaryFolderPathValidUseCase(any())).thenReturn(true)
         val cuNode = mock<TypedFolderNode> {
             on { id }.thenReturn(NodeId(1L))
@@ -294,22 +298,24 @@ class SettingsCameraUploadsViewModelTest {
 
         underTest.state.test {
             val state = awaitItem()
-            assertThat(state.accessMediaLocationRationaleText).isNull()
             assertThat(state.areLocationTagsIncluded).isTrue()
             assertThat(state.areUploadFileNamesKept).isTrue()
             assertThat(state.isCameraUploadsEnabled).isTrue()
             assertThat(state.isChargingRequiredForVideoCompression).isTrue()
-            assertThat(state.invalidFolderSelectedTextId).isNull()
             assertThat(state.primaryFolderPath).isEqualTo("/path/to/CU")
+            assertThat(state.secondaryFolderPath).isEqualTo("/path/to/MU")
             assertThat(state.shouldShowBusinessAccountPrompt).isFalse()
             assertThat(state.shouldShowMediaPermissionsRationale).isFalse()
             assertThat(state.uploadConnectionType).isEqualTo(UploadConnectionType.WIFI)
             assertThat(state.uploadOption).isEqualTo(UploadOption.PHOTOS_AND_VIDEOS)
             assertThat(state.videoCompressionSizeLimit).isEqualTo(200)
+            assertThat(state.showNewVideoCompressionSizePrompt).isFalse()
+            assertThat(state.clearNewVideoCompressionSizeInput).isFalse()
             assertThat(state.videoQuality).isEqualTo(VideoQuality.ORIGINAL)
-            assertThat(state.shouldShowError).isFalse()
             assertThat(state.primaryUploadSyncHandle).isEqualTo(1L)
             assertThat(state.primaryFolderName).isEqualTo("Camera Uploads")
+            assertThat(state.secondaryUploadSyncHandle).isEqualTo(2L)
+            assertThat(state.secondaryFolderName).isEqualTo("Media Uploads")
         }
     }
 
@@ -388,31 +394,10 @@ class SettingsCameraUploadsViewModelTest {
     }
 
     @Test
-    fun `test that accessMediaLocationRationaleText is updated correctly`() = runTest {
+    fun `test that a snackbar containing the access media location rationale is shown`() = runTest {
         setupUnderTest()
-
-        underTest.setAccessMediaLocationRationaleShown(true)
-
-        underTest.state.map { it.accessMediaLocationRationaleText }.distinctUntilChanged().test {
-            assertThat(awaitItem()).isEqualTo(R.string.on_refuse_storage_permission)
-
-            underTest.setAccessMediaLocationRationaleShown(false)
-            assertThat(awaitItem()).isNull()
-        }
-    }
-
-    @Test
-    fun `test that invalidFolderSelectedTextId is updated correctly`() = runTest {
-        setupUnderTest()
-
-        underTest.setInvalidFolderSelectedPromptShown(true)
-
-        underTest.state.map { it.invalidFolderSelectedTextId }.distinctUntilChanged().test {
-            assertThat(awaitItem()).isEqualTo(R.string.error_invalid_folder_selected)
-
-            underTest.setInvalidFolderSelectedPromptShown(false)
-            assertThat(awaitItem()).isNull()
-        }
+        underTest.showAccessMediaLocationRationale()
+        verify(snackBarHandler).postSnackbarMessage(R.string.on_refuse_storage_permission)
     }
 
     @Test
@@ -503,20 +488,6 @@ class SettingsCameraUploadsViewModelTest {
             }
         }
 
-    @Test
-    fun `test that a new maximum video compression size limit is set`() = runTest {
-        val newSize = 300
-        setupUnderTest()
-        whenever(getVideoCompressionSizeLimitUseCase()).thenReturn(newSize)
-        underTest.changeVideoCompressionSizeLimit(newSize)
-
-        verify(setVideoCompressionSizeLimitUseCase).invoke(newSize)
-        verify(stopCameraUploadsUseCase).invoke(CameraUploadsRestartMode.Stop)
-        underTest.state.test {
-            assertThat(awaitItem().videoCompressionSizeLimit).isEqualTo(newSize)
-        }
-    }
-
     @ParameterizedTest(name = "with {0}, file names should be kept {0}")
     @ValueSource(booleans = [true, false])
     fun `test that when keepUploadFileNames is invoked`(expected: Boolean) = runTest {
@@ -531,12 +502,12 @@ class SettingsCameraUploadsViewModelTest {
     }
 
     @Test
-    fun `test that the new primary folder path is set`() = runTest {
+    fun `test that the new primary folder is set`() = runTest {
         val testPath = "test/new/folder/path"
         setupUnderTest()
         whenever(isPrimaryFolderPathValidUseCase(any())).thenReturn(true)
         whenever(getPrimaryFolderPathUseCase()).thenReturn(testPath)
-        underTest.changePrimaryFolderPath(newPath = testPath)
+        underTest.setPrimaryFolder(newPath = testPath)
 
         verify(setPrimaryFolderPathUseCase).invoke(
             newFolderPath = testPath,
@@ -549,17 +520,62 @@ class SettingsCameraUploadsViewModelTest {
     }
 
     @Test
-    fun `test that the invalid folder selected prompt is shown if the new primary folder path is invalid`() =
+    fun `test that an error snackbar is shown if the new primary folder is invalid`() =
         runTest {
             val testPath = "test/invalid/folder/path"
 
             setupUnderTest()
             whenever(isPrimaryFolderPathValidUseCase(any())).thenReturn(false)
 
-            underTest.changePrimaryFolderPath(testPath)
+            underTest.setPrimaryFolder(testPath)
+            verify(snackBarHandler).postSnackbarMessage(
+                resId = R.string.error_invalid_folder_selected,
+                snackbarDuration = MegaSnackbarDuration.Long,
+            )
+        }
+
+    @Test
+    fun `test that the new cloud drive primary folder is set`() = runTest {
+        val newMegaPrimaryFolderHandle = 123456L
+        setupUnderTest()
+        underTest.setPrimaryUploadNode(newMegaPrimaryFolderHandle)
+
+        verify(setupPrimaryFolderUseCase).invoke(newMegaPrimaryFolderHandle)
+        verify(stopCameraUploadsUseCase).invoke(CameraUploadsRestartMode.Stop)
+    }
+
+    @Test
+    fun `test that an error snackbar is shown when setting the new cloud drive primary folder and the new setting is invalid`() =
+        runTest {
+            setupUnderTest()
+            val newMegaPrimaryFolderHandle = 123456L
+
+            // Set Cloud Drive Secondary Folder to be the same as the new Cloud Drive Primary Folder
+            underTest.updateSecondaryUploadNode(newMegaPrimaryFolderHandle)
+            underTest.setPrimaryUploadNode(newMegaPrimaryFolderHandle)
+
             underTest.state.test {
-                assertThat(awaitItem().invalidFolderSelectedTextId).isEqualTo(R.string.error_invalid_folder_selected)
+                assertThat(awaitItem().secondaryUploadSyncHandle).isEqualTo(
+                    newMegaPrimaryFolderHandle
+                )
             }
+            verify(snackBarHandler).postSnackbarMessage(
+                resId = R.string.error_invalid_folder_selected,
+                snackbarDuration = MegaSnackbarDuration.Long,
+            )
+        }
+
+    @Test
+    fun `test that an error snackbar is shown when an exception occurs from setting the new cloud drive primary folder`() =
+        runTest {
+            setupUnderTest()
+            whenever(setupPrimaryFolderUseCase(any())).thenThrow(RuntimeException())
+            underTest.setPrimaryUploadNode(123456L)
+
+            verify(snackBarHandler).postSnackbarMessage(
+                resId = R.string.general_error,
+                snackbarDuration = MegaSnackbarDuration.Long,
+            )
         }
 
     @Test
@@ -581,25 +597,13 @@ class SettingsCameraUploadsViewModelTest {
         }
 
     @Test
-    fun `test that setupPrimaryFolder is invoked when calling setupPrimaryCameraUploadFolder`() =
+    fun `test that the new cloud drive secondary folder is set`() =
         runTest {
             setupUnderTest()
 
             val testHandle = 69L
 
-            underTest.setupPrimaryCameraUploadFolder(testHandle)
-
-            verify(setupPrimaryFolderUseCase).invoke(testHandle)
-        }
-
-    @Test
-    fun `test that setupSecondaryFolder is invoked when calling setupSecondaryCameraUploadFolder`() =
-        runTest {
-            setupUnderTest()
-
-            val testHandle = 69L
-
-            underTest.setupSecondaryCameraUploadFolder(testHandle)
+            underTest.setSecondaryUploadNode(testHandle)
 
             verify(setupSecondaryFolderUseCase).invoke(testHandle)
         }
@@ -637,46 +641,54 @@ class SettingsCameraUploadsViewModelTest {
         }
 
     @Test
-    fun `test that shouldDisplayError is true when an exception occurs while setting up the primary folder`() =
+    fun `test that an error snackbar is shown when setting the new cloud drive secondary folder and the new setting is invalid`() =
         runTest {
             setupUnderTest()
+            val newMegaSecondaryFolderHandle = 123456L
 
-            whenever(setupPrimaryFolderUseCase(any())).thenThrow(RuntimeException())
+            // Set Cloud Drive Primary Folder to be the same as the new Cloud Drive Secondary Folder
+            underTest.updatePrimaryUploadNode(newMegaSecondaryFolderHandle)
+            underTest.setSecondaryUploadNode(newMegaSecondaryFolderHandle)
 
-            underTest.state.map { it.shouldShowError }.distinctUntilChanged().test {
-                assertThat(awaitItem()).isFalse()
-                underTest.setupPrimaryCameraUploadFolder(any())
-                assertThat(awaitItem()).isTrue()
+            underTest.state.test {
+                assertThat(awaitItem().primaryUploadSyncHandle).isEqualTo(
+                    newMegaSecondaryFolderHandle
+                )
             }
+            verify(snackBarHandler).postSnackbarMessage(
+                resId = R.string.error_invalid_folder_selected,
+                snackbarDuration = MegaSnackbarDuration.Long,
+            )
         }
 
     @Test
-    fun `test that shouldDisplayError is true when an exception occurs while setting up the secondary folder`() =
+    fun `test that an error snackbar is shown when an exception occurs from setting the new cloud drive secondary folder`() =
         runTest {
             setupUnderTest()
-
             whenever(setupSecondaryFolderUseCase(any())).thenThrow(RuntimeException())
+            underTest.setSecondaryUploadNode(any())
 
-            underTest.state.map { it.shouldShowError }.distinctUntilChanged().test {
-                assertThat(awaitItem()).isFalse()
-                underTest.setupSecondaryCameraUploadFolder(any())
-                assertThat(awaitItem()).isTrue()
-            }
+            verify(snackBarHandler).postSnackbarMessage(
+                resId = R.string.general_error,
+                snackbarDuration = MegaSnackbarDuration.Long,
+            )
         }
 
     @Test
-    fun `test that shouldDisplayError is true when an exception occurs while setting up the default secondary folder`() =
+    fun `test that an error snackbar is shown when an exception occurs while setting up the default secondary folder`() =
         runTest {
             setupUnderTest()
             whenever(isConnectedToInternetUseCase()).thenReturn(true)
             whenever(setupDefaultSecondaryFolderUseCase()).thenThrow(RuntimeException())
-            //disable it
+            // Disable Media Uploads
             underTest.toggleMediaUploads()
-            // enable it
+            // Enable Media Uploads
             underTest.toggleMediaUploads()
-            underTest.state.map { it.shouldShowError }.test {
-                assertThat(awaitItem()).isTrue()
-            }
+
+            verify(snackBarHandler).postSnackbarMessage(
+                resId = R.string.general_error,
+                snackbarDuration = MegaSnackbarDuration.Long,
+            )
         }
 
     @Test
@@ -705,14 +717,48 @@ class SettingsCameraUploadsViewModelTest {
         }
 
     @Test
-    fun `test that media uploads backup is updated when updateMediaUploadsLocalFolder is invoked`() =
+    fun `test that the new secondary folder is set`() =
         runTest {
             setupUnderTest()
             val mediaUploadsFolderPath = "/path/to/media uploads"
             whenever(isSecondaryFolderPathValidUseCase(mediaUploadsFolderPath)).thenReturn(true)
-            underTest.updateMediaUploadsLocalFolder(mediaUploadsFolderPath)
+            underTest.setSecondaryFolder(mediaUploadsFolderPath)
             verify(setSecondaryFolderLocalPathUseCase).invoke(mediaUploadsFolderPath)
             verify(stopCameraUploadsUseCase).invoke(CameraUploadsRestartMode.Stop)
+        }
+
+    @Test
+    fun `test that an error snackbar is shown when setting the new secondary folder and the new setting is invalid`() =
+        runTest {
+            setupUnderTest()
+            // Simulate an invalid setting (e.g. the new secondary folder is the same as the primary
+            // folder that was set)
+            underTest.setSecondaryFolder("/path/to/CU")
+            verify(snackBarHandler).postSnackbarMessage(
+                resId = R.string.error_invalid_folder_selected,
+                snackbarDuration = MegaSnackbarDuration.Long,
+            )
+            verifyNoInteractions(
+                isSecondaryFolderPathValidUseCase,
+                clearCameraUploadsRecordUseCase,
+                stopCameraUploadsUseCase,
+            )
+        }
+
+    @Test
+    fun `test that an error snackbar is shown when setting the new secondary folder with an invalid folder path`() =
+        runTest {
+            setupUnderTest()
+            whenever(isSecondaryFolderPathValidUseCase(any())).thenReturn(false)
+            underTest.setSecondaryFolder("new/MU/folder/path")
+            verify(snackBarHandler).postSnackbarMessage(
+                resId = R.string.error_invalid_folder_selected,
+                snackbarDuration = MegaSnackbarDuration.Long,
+            )
+            verifyNoInteractions(
+                clearCameraUploadsRecordUseCase,
+                stopCameraUploadsUseCase,
+            )
         }
 
     @Test
@@ -760,6 +806,22 @@ class SettingsCameraUploadsViewModelTest {
         }
 
     @Test
+    fun `test that the new settings are invalid when camera uploads is enabled and the new cloud drive primary folder does not exist`() =
+        runTest {
+            setupUnderTest()
+            val actual = underTest.isNewSettingValid(primaryHandle = -1L)
+            assertThat(actual).isFalse()
+        }
+
+    @Test
+    fun `test that the new settings are invalid when media uploads is enabled and the new cloud drive secondary folder does not exist`() =
+        runTest {
+            setupUnderTest()
+            val actual = underTest.isNewSettingValid(secondaryHandle = -1L)
+            assertThat(actual).isFalse()
+        }
+
+    @Test
     fun `test that the new settings are invalid when media uploads is enabled but handle and path are not set`() =
         runTest {
             setupUnderTest()
@@ -787,13 +849,13 @@ class SettingsCameraUploadsViewModelTest {
         }
 
     @Test
-    fun `test that the primary folder records are cleared when the primary folder path changes`() =
+    fun `test that the primary folder records are cleared when the primary folder changes`() =
         runTest {
             val testPath = "test/new/folder/path"
 
             setupUnderTest()
 
-            underTest.changePrimaryFolderPath(newPath = testPath)
+            underTest.setPrimaryFolder(newPath = testPath)
 
             verify(clearCameraUploadsRecordUseCase).invoke(
                 listOf(CameraUploadFolderType.Primary)
@@ -801,12 +863,12 @@ class SettingsCameraUploadsViewModelTest {
         }
 
     @Test
-    fun `test that the secondary folder records are cleared when the secondary folder path changes`() =
+    fun `test that the secondary folder records are cleared when the secondary folder changes`() =
         runTest {
             val mediaUploadsFolderPath = "/path/to/media uploads"
             setupUnderTest()
             whenever(isSecondaryFolderPathValidUseCase(mediaUploadsFolderPath)).thenReturn(true)
-            underTest.updateMediaUploadsLocalFolder(mediaUploadsFolderPath)
+            underTest.setSecondaryFolder(mediaUploadsFolderPath)
 
             verify(clearCameraUploadsRecordUseCase).invoke(
                 listOf(CameraUploadFolderType.Secondary)
@@ -834,4 +896,69 @@ class SettingsCameraUploadsViewModelTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @ParameterizedTest(name = "is new video compression size dialog shown: {0}")
+    @ValueSource(booleans = [true, false])
+    fun `test that the new video compression size dialog input has correct visibility`(showDialog: Boolean) =
+        runTest {
+            setupUnderTest()
+            underTest.showNewVideoCompressionSizeDialog(showDialog)
+            underTest.state.test {
+                assertThat(awaitItem().showNewVideoCompressionSizePrompt).isEqualTo(showDialog)
+            }
+        }
+
+    @Test
+    fun `test that the prompt to clear the new video compression size dialog input has been acknowledged`() =
+        runTest {
+            setupUnderTest()
+            underTest.onClearNewVideoCompressionSizeInputConsumed()
+            underTest.state.test {
+                assertThat(awaitItem().clearNewVideoCompressionSizeInput).isFalse()
+            }
+        }
+
+    @ParameterizedTest(name = "inputted new video compression size in MB: \"{0}\"")
+    @ValueSource(strings = ["", " "])
+    fun `test that the new video compression size prompt is dismissed when the input is empty`(
+        newVideoCompressionSize: String,
+    ) = runTest {
+        setupUnderTest()
+        underTest.setNewVideoCompressionSize(newVideoCompressionSize)
+        underTest.state.test {
+            assertThat(awaitItem().showNewVideoCompressionSizePrompt).isFalse()
+        }
+    }
+
+    @ParameterizedTest(name = "inputted new video compression size in MB: {0}")
+    @ValueSource(strings = ["99", "1001", "0", "00"])
+    fun `test that the new video compression size prompt is cleared when the input is invalid`(
+        newVideoCompressionSize: String,
+    ) = runTest {
+        setupUnderTest()
+        underTest.setNewVideoCompressionSize(newVideoCompressionSize)
+        underTest.state.test {
+            assertThat(awaitItem().clearNewVideoCompressionSizeInput).isTrue()
+        }
+    }
+
+    @ParameterizedTest(name = "inputted new video compression size in MB: {0}")
+    @ValueSource(strings = ["100", "500", "1000"])
+    fun `test that the new video compression size is set and the prompt dismissed when the input is valid`(
+        newVideoCompressionSizeString: String,
+    ) = runTest {
+        val newVideoCompressionSizeInt = newVideoCompressionSizeString.toInt()
+        setupUnderTest()
+        whenever(getVideoCompressionSizeLimitUseCase()).thenReturn(newVideoCompressionSizeInt)
+        underTest.setNewVideoCompressionSize(newVideoCompressionSizeString)
+
+        verify(setVideoCompressionSizeLimitUseCase).invoke(newVideoCompressionSizeInt)
+        verify(stopCameraUploadsUseCase).invoke(CameraUploadsRestartMode.Stop)
+
+        underTest.state.test {
+            val state = awaitItem()
+            assertThat(state.showNewVideoCompressionSizePrompt).isFalse()
+            assertThat(state.videoCompressionSizeLimit).isEqualTo(newVideoCompressionSizeInt)
+        }
+    }
 }

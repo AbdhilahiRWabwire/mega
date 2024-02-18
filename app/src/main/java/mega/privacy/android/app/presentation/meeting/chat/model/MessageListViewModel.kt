@@ -5,44 +5,40 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.ExperimentalPagingApi
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.paging.insertFooterItem
+import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.shareIn
+import mega.privacy.android.app.di.meeting.chat.paging.PagedChatMessageRemoteMediatorFactory
 import mega.privacy.android.app.presentation.meeting.chat.mapper.UiChatMessageMapper
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.UiChatMessage
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.header.ChatHeaderMessage
-import mega.privacy.android.app.presentation.meeting.chat.model.paging.ChatMessagePagingSource
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.domain.usecase.chat.message.FetchMessagePageUseCase
-import mega.privacy.android.domain.usecase.chat.message.MonitorChatRoomMessagesUseCase
-import mega.privacy.android.domain.usecase.meeting.LoadMessagesUseCase
-import timber.log.Timber
+import mega.privacy.android.domain.usecase.chat.message.paging.GetChatPagingSourceUseCase
 import javax.inject.Inject
 
 /**
  * Message list view model
  *
- * @property loadMessagesUseCase
- * @property fetchMessagePageUseCase
- * @property monitorChatRoomMessagesUseCase
  * @property uiChatMessageMapper
+ * @property getChatPagingSourceUseCase
+ * @constructor
  *
+ * @param remoteMediatorFactory
  * @param savedStateHandle
  */
+@OptIn(ExperimentalPagingApi::class)
 @HiltViewModel
 class MessageListViewModel @Inject constructor(
-    private val loadMessagesUseCase: LoadMessagesUseCase,
-    private val fetchMessagePageUseCase: FetchMessagePageUseCase,
-    private val monitorChatRoomMessagesUseCase: MonitorChatRoomMessagesUseCase,
     private val uiChatMessageMapper: UiChatMessageMapper,
+    private val getChatPagingSourceUseCase: GetChatPagingSourceUseCase,
+    remoteMediatorFactory: PagedChatMessageRemoteMediatorFactory,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -60,25 +56,25 @@ class MessageListViewModel @Inject constructor(
 
     private val pagedFlow =
         Pager(
-            PagingConfig(
+            config = PagingConfig(
                 pageSize = 32,
-                prefetchDistance = 10
-            )
-        ) {
-            ChatMessagePagingSource(
+                initialLoadSize = 32,
+            ),
+            remoteMediator = remoteMediatorFactory.create(
                 chatId = chatId,
-                loadMessages = loadMessagesUseCase,
-                fetchMessages = fetchMessagePageUseCase,
-                scope = viewModelScope,
-                messageFlow = monitorChatRoomMessagesUseCase(chatId).shareIn(
-                    scope = viewModelScope,
-                    started = SharingStarted.Eagerly,
-                ).onEach {
-                    Timber.d("Paging monitorChatRoomMessagesUseCase returned with message: $it")
-                },
-                uiChatMessageMapper = uiChatMessageMapper,
-            )
+                coroutineScope = viewModelScope,
+            ),
+        ) {
+            getChatPagingSourceUseCase(chatId)
         }.flow
+            .map { pagingData ->
+                pagingData.map {
+                    uiChatMessageMapper(it, chatId)
+                }
+                    .insertFooterItem(
+                        item = ChatHeaderMessage()
+                    )
+            }
             .cachedIn(viewModelScope)
 
 
@@ -86,11 +82,7 @@ class MessageListViewModel @Inject constructor(
      * Paged messages
      */
     val pagedMessages: Flow<PagingData<UiChatMessage>> = pagedFlow
-        .map { pagingData ->
-            pagingData.insertFooterItem(
-                item = ChatHeaderMessage()
-            )
-        }
+
 
     /**
      * Update latest message id

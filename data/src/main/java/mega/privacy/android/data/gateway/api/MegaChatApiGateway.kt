@@ -10,6 +10,7 @@ import nz.mega.sdk.MegaChatCall
 import nz.mega.sdk.MegaChatListItem
 import nz.mega.sdk.MegaChatLoggerInterface
 import nz.mega.sdk.MegaChatMessage
+import nz.mega.sdk.MegaChatNotificationListenerInterface
 import nz.mega.sdk.MegaChatPeerList
 import nz.mega.sdk.MegaChatRequestListenerInterface
 import nz.mega.sdk.MegaChatRoom
@@ -18,6 +19,7 @@ import nz.mega.sdk.MegaChatScheduledMeeting
 import nz.mega.sdk.MegaChatScheduledRules
 import nz.mega.sdk.MegaChatVideoListenerInterface
 import nz.mega.sdk.MegaHandleList
+import nz.mega.sdk.MegaStringList
 
 /**
  * Mega chat api gateway
@@ -1427,4 +1429,230 @@ interface MegaChatApiGateway {
         latitude: Float,
         image: String,
     ): MegaChatMessage
+
+    /**
+     * Mute a specific client or all of them in a call
+     * This method can be called only by users with moderator role
+     * @param chatId Id that identifies the chat room
+     * @param clientId Id that identifies the client we want to mute, or MEGACHAT_INVALID_HANDLE to mute all participants
+     * @param listener MegaChatRequestListener to track this request
+     */
+    fun mutePeers(
+        chatId: Long,
+        clientId: Long,
+        listener: MegaChatRequestListenerInterface,
+    )
+
+    /**
+     * Adds a reaction for a message in a chatroom
+     *
+     * The reactions updates will be notified one by one through the MegaChatRoomListener
+     * specified at MegaChatApi::openChatRoom (and through any other listener you may have
+     * registered by calling MegaChatApi::addChatRoomListener). The corresponding callback
+     * is MegaChatRoomListener::onReactionUpdate.
+     *
+     * Note that receiving an onRequestFinish with the error code MegaChatError::ERROR_OK, does not ensure
+     * that add reaction has been applied in chatd. As we've mentioned above, reactions updates will
+     * be notified through callback MegaChatRoomListener::onReactionUpdate.
+     *
+     * The associated request type with this request is MegaChatRequest::TYPE_MANAGE_REACTION
+     * Valid data in the MegaChatRequest object received on callbacks:
+     * - MegaChatRequest::getChatHandle - Returns the chatid that identifies the chatroom
+     * - MegaChatRequest::getUserHandle - Returns the msgid that identifies the message
+     * - MegaChatRequest::getText - Returns a UTF-8 NULL-terminated string that represents the reaction
+     * - MegaChatRequest::getFlag - Returns true indicating that requested action is add reaction
+     *
+     * On the onRequestFinish error, the error code associated to the MegaChatError can be:
+     * - MegaChatError::ERROR_ARGS - if reaction is NULL or the msgid references a management message.
+     * - MegaChatError::ERROR_NOENT - if the chatroom/message doesn't exists
+     * - MegaChatError::ERROR_ACCESS - if our own privilege is different than MegaChatPeerList::PRIV_STANDARD
+     * or MegaChatPeerList::PRIV_MODERATOR.
+     * - MegaChatError::ERROR_EXIST - if our own user has reacted previously with this reaction for this message
+     *
+     * @param chatId MegaChatHandle that identifies the chatroom
+     * @param msgId MegaChatHandle that identifies the message
+     * @param reaction UTF-8 NULL-terminated string that represents the reaction
+     * @param listener MegaChatRequestListener to track this request
+     */
+    fun addReaction(
+        chatId: Long,
+        msgId: Long,
+        reaction: String,
+        listener: MegaChatRequestListenerInterface,
+    )
+
+    /**
+     * Register chat notification listener
+     *
+     * @param listener
+     */
+    fun registerChatNotificationListener(listener: MegaChatNotificationListenerInterface)
+
+    /**
+     * Deregister chat notification listener
+     *
+     * @param listener
+     */
+    fun deregisterChatNotificationListener(listener: MegaChatNotificationListenerInterface)
+
+    /**
+     * Gets a list of reactions associated to a message
+     *
+     * You take the ownership of the returned value.
+     *
+     * @param chatId MegaChatHandle that identifies the chatroom
+     * @param msgId MegaChatHandle that identifies the message
+     * @return return a list with the reactions associated to a message.
+     */
+    fun getMessageReactions(chatId: Long, msgId: Long): MegaStringList
+
+    /**
+     * Returns the number of users that reacted to a message with a specific reaction
+     *
+     * @param chatId MegaChatHandle that identifies the chatroom
+     * @param msgId MegaChatHandle that identifies the message
+     * @param reaction UTF-8 NULL terminated string that represents the reactiongaC
+     *
+     * @return return the number of users that reacted to a message with a specific reaction,
+     * or -1 if the chatroom or message is not found.
+     */
+    fun getMessageReactionCount(chatId: Long, msgId: Long, reaction: String): Int
+
+    /**
+     * Gets a list of users that reacted to a message with a specific reaction
+     *
+     * You take the ownership of the returned value.
+     *
+     * @param chatId MegaChatHandle that identifies the chatroom
+     * @param msgId MegaChatHandle that identifies the message
+     * @param reaction UTF-8 NULL terminated string that represents the reaction
+     *
+     * @return return a list with the users that reacted to a message with a specific reaction.
+     */
+    fun getReactionUsers(chatId: Long, msgId: Long, reaction: String): MegaHandleList
+
+    /**
+     * Sets the last-seen-by-us pointer to the specified message
+     *
+     * The last-seen-by-us pointer is persisted in the account, so every client will
+     * be aware of the last-seen message.
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param msgId MegaChatHandle that identifies the message
+     *
+     * @return False if the \c chatid is invalid or the message is older
+     * than last-seen-by-us message. True if success.
+     */
+    fun setMessageSeen(chatId: Long, msgId: Long): Boolean
+
+    /**
+     * Returns message id of the last-seen-by-us message
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     *
+     * @return Message id for the last-seen-by-us, or invalid handle if \c chatid is invalid or
+     * the user has not seen any message in that chat
+     */
+    fun getLastMessageSeenId(chatId: Long): Long
+
+    /**
+     * Removes a reaction for a message in a chatroom
+     *
+     * The reactions updates will be notified one by one through the MegaChatRoomListener
+     * specified at MegaChatApi::openChatRoom (and through any other listener you may have
+     * registered by calling MegaChatApi::addChatRoomListener). The corresponding callback
+     * is MegaChatRoomListener::onReactionUpdate.
+     *
+     * Note that receiving an onRequestFinish with the error code MegaChatError::ERROR_OK, does not ensure
+     * that remove reaction has been applied in chatd. As we've mentioned above, reactions updates will
+     * be notified through callback MegaChatRoomListener::onReactionUpdate.
+     *
+     * The associated request type with this request is MegaChatRequest::TYPE_MANAGE_REACTION
+     * Valid data in the MegaChatRequest object received on callbacks:
+     * - MegaChatRequest::getChatHandle - Returns the chatid that identifies the chatroom
+     * - MegaChatRequest::getUserHandle - Returns the msgid that identifies the message
+     * - MegaChatRequest::getText - Returns a UTF-8 NULL-terminated string that represents the reaction
+     * - MegaChatRequest::getFlag - Returns false indicating that requested action is remove reaction
+     *
+     * On the onRequestFinish error, the error code associated to the MegaChatError can be:
+     * - MegaChatError::ERROR_ARGS: if reaction is NULL or the msgid references a management message.
+     * - MegaChatError::ERROR_NOENT: if the chatroom/message doesn't exists
+     * - MegaChatError::ERROR_ACCESS: if our own privilege is different than MegaChatPeerList::PRIV_STANDARD
+     * or MegaChatPeerList::PRIV_MODERATOR
+     * - MegaChatError::ERROR_EXIST - if your own user has not reacted to the message with the specified reaction.
+     *
+     * @param chatId MegaChatHandle that identifies the chatroom
+     * @param msgId MegaChatHandle that identifies the message
+     * @param reaction UTF-8 NULL-terminated string that represents the reaction
+     * @param listener MegaChatRequestListener to track this request
+     */
+    fun delReaction(
+        chatId: Long,
+        msgId: Long,
+        reaction: String,
+        listener: MegaChatRequestListenerInterface,
+    )
+
+    /**
+     * Sends a new giphy to the specified chatroom
+     *
+     * The MegaChatMessage object returned by this function includes a message transaction id,
+     * That id is not the definitive id, which will be assigned by the server. You can obtain the
+     * temporal id with MegaChatMessage::getTempId
+     *
+     * When the server confirms the reception of the message, the MegaChatRoomListener::onMessageUpdate
+     * is called, including the definitive id and the new status: MegaChatMessage::STATUS_SERVER_RECEIVED.
+     * At this point, the app should refresh the message identified by the temporal id and move it to
+     * the final position in the history, based on the reported index in the callback.
+     *
+     * If the message is rejected by the server, the message will keep its temporal id and will have its
+     * a message id set to MEGACHAT_INVALID_HANDLE.
+     *
+     * You take the ownership of the returned value.
+     *
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param srcMp4 Source location of the mp4
+     * @param srcWebp Source location of the webp
+     * @param sizeMp4 Size in bytes of the mp4
+     * @param sizeWebp Size in bytes of the webp
+     * @param width Width of the giphy
+     * @param height Height of the giphy
+     * @param title Title of the giphy
+     *
+     * @return MegaChatMessage that will be sent. The message id is not definitive, but temporal.
+     */
+    fun sendGiphy(
+        chatId: Long,
+        srcMp4: String?,
+        srcWebp: String?,
+        sizeMp4: Long,
+        sizeWebp: Long,
+        width: Int,
+        height: Int,
+        title: String?,
+    ): MegaChatMessage
+
+    /**
+     * Sends a contact or a group of contacts to the specified chatroom
+     *
+     * The MegaChatMessage object returned by this function includes a message transaction id,
+     * That id is not the definitive id, which will be assigned by the server. You can obtain the
+     * temporal id with MegaChatMessage::getTempId()
+     *
+     * When the server confirms the reception of the message, the MegaChatRoomListener::onMessageUpdate
+     * is called, including the definitive id and the new status: MegaChatMessage::STATUS_SERVER_RECEIVED.
+     * At this point, the app should refresh the message identified by the temporal id and move it to
+     * the final position in the history, based on the reported index in the callback.
+     *
+     * If the message is rejected by the server, the message will keep its temporal id and will have its
+     * a message id set to MEGACHAT_INVALID_HANDLE.
+     *
+     * You take the ownership of the returned value.
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param contactHandles MegaChatHandleList with contacts to be attached
+     * @return MegaChatMessage that will be sent. The message id is not definitive, but temporal.
+     */
+    fun attachContacts(chatId: Long, contactHandles: MegaHandleList): MegaChatMessage
 }

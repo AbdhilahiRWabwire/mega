@@ -36,22 +36,20 @@ internal fun AddReactionChip(
 ) {
     Box(
         modifier = Modifier
-            .clickable(onClick = onAddClicked)
             .size(32.dp, 24.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(
-                color = MegaTheme.colors.background.surface2,
-            )
+            .background(color = MegaTheme.colors.background.surface2)
             .border(
                 width = 1.dp,
                 color = MegaTheme.colors.border.disabled,
                 shape = RoundedCornerShape(12.dp)
             )
+            .clickable(onClick = onAddClicked)
             .testTag(TEST_TAG_CHAT_MESSAGE_ADD_REACTION_CHIP),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = ImageVector.vectorResource(R.drawable.ic_emoji_add2),
+            imageVector = ImageVector.vectorResource(R.drawable.ic_icon_add_small_regular_outline),
             contentDescription = null,
             tint = MegaTheme.colors.icon.secondary,
         )

@@ -1952,6 +1952,23 @@ interface MegaApiGateway {
     fun setMyChatFilesFolder(nodeHandle: Long, listener: MegaRequestListenerInterface)
 
     /**
+     * Gets My chat files target folder.
+     * <p>
+     * The associated request type with this request is MegaRequest::TYPE_GET_ATTR_USER
+     * Valid data in the MegaRequest object received on callbacks:
+     * - MegaRequest::getParamType - Returns the attribute type MegaApi::USER_ATTR_MY_CHAT_FILES_FOLDER
+     * <p>
+     * Valid data in the MegaRequest object received in onRequestFinish when the error code
+     * is MegaError::API_OK:
+     * - MegaRequest::getNodehandle - Returns the handle of the node where My Chat Files are stored
+     * <p>
+     * If the folder is not set, the request will fail with the error code MegaError::API_ENOENT.
+     *
+     * @param listener MegaRequestListener to track this request
+     */
+    fun getMyChatFilesFolder(listener: MegaRequestListenerInterface)
+
+    /**
      * Check if file versioning is enabled or disabled
      * <p>
      * The associated request type with this request is MegaRequest::TYPE_GET_ATTR_USER
@@ -3328,4 +3345,34 @@ interface MegaApiGateway {
      * @param listener MegaRequestListener to track this request
      */
     fun getSessionTransferURL(path: String, listener: MegaRequestListenerInterface)
+
+    /**
+     * Get binary user handle
+     * @return user handle [Long]
+     */
+    fun getMyUserHandleBinary(): Long
+
+    /**
+     * Get nodes by fingerprint
+     * @param fingerprint fingerprint of node
+     * @return list of [MegaNode]
+     */
+    fun getNodesByFingerprint(fingerprint: String): List<MegaNode>
+
+    /**
+     * Close a MEGA session.
+     *
+     * All clients using this session will be automatically logged out.
+     *
+     * You can get session information using MegaApiJava.getExtendedAccountDetails().
+     * Then use MegaAccountDetails.getNumSessions and MegaAccountDetails.getSession
+     * to get session info.
+     * MegaAccountSession.getHandle provides the handle that this function needs.
+     *
+     * If you use mega.INVALID_HANDLE, all sessions except the current one will be closed.
+     *
+     * @param sessionHandle of the session. Use mega.INVALID_HANDLE to cancel all sessions except the current one.
+     * @param listener      MegaRequestListenerInterface to track this request.
+     */
+    fun killSession(sessionHandle: Long, listener: MegaRequestListenerInterface)
 }

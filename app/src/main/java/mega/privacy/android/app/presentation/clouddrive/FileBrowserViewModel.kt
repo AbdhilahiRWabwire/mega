@@ -20,8 +20,8 @@ import mega.privacy.android.app.presentation.clouddrive.model.FileBrowserState
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.mapper.HandleOptionClickMapper
 import mega.privacy.android.app.presentation.settings.model.MediaDiscoveryViewSettings
+import mega.privacy.android.app.presentation.time.mapper.DurationInSecondsTextMapper
 import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
-import mega.privacy.android.app.utils.TimeUtils.getVideoDuration
 import mega.privacy.android.data.mapper.FileDurationMapper
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.FolderNode
@@ -90,6 +90,7 @@ class FileBrowserViewModel @Inject constructor(
     private val monitorOfflineNodeUpdatesUseCase: MonitorOfflineNodeUpdatesUseCase,
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
+    private val durationInSecondsTextMapper: DurationInSecondsTextMapper,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(FileBrowserState())
@@ -211,6 +212,7 @@ class FileBrowserViewModel @Inject constructor(
         setPendingRefreshNodes()
     }
 
+
     private fun setPendingRefreshNodes() {
         _state.update { it.copy(isPendingRefresh = true) }
     }
@@ -223,7 +225,11 @@ class FileBrowserViewModel @Inject constructor(
     fun setFileBrowserHandle(handle: Long) =
         viewModelScope.launch {
             handleStack.push(handle)
-            _state.update { it.copy(fileBrowserHandle = handle) }
+            _state.update {
+                it.copy(
+                    fileBrowserHandle = handle,
+                )
+            }
             refreshNodesState()
         }
 
@@ -238,6 +244,7 @@ class FileBrowserViewModel @Inject constructor(
             it.copy(
                 fileBrowserHandle = folderHandle,
                 accessedFolderHandle = folderHandle,
+                openedFolderNodeHandles = emptySet(),
             )
         }
         refreshNodesState()
@@ -308,6 +315,18 @@ class FileBrowserViewModel @Inject constructor(
         val rootNode = getRootNodeUseCase()?.id?.longValue
         val isRootNode = fileBrowserHandle == rootNode
 
+        /**
+         * When a folder is opened, and user clicks on cloud drive bottom drawer item, clear the openedFolderNodeHandles
+         */
+        if ((fileBrowserHandle == -1L || isRootNode) && state.value.openedFolderNodeHandles.isNotEmpty()) {
+            _state.update {
+                it.copy(
+                    isLoading = true,
+                    openedFolderNodeHandles = emptySet()
+                )
+            }
+        }
+
         val childrenNodes = getFileBrowserNodeChildrenUseCase(fileBrowserHandle)
         val showMediaDiscoveryIcon = !isRootNode && containsMediaItemUseCase(childrenNodes)
         val nodeUIItems = getNodeUiItems(childrenNodes)
@@ -318,6 +337,7 @@ class FileBrowserViewModel @Inject constructor(
             it.copy(
                 showMediaDiscoveryIcon = showMediaDiscoveryIcon,
                 nodesList = nodeUIItems,
+                isLoading = false,
                 sortOrder = sortOrder,
                 isFileBrowserEmpty = isFileBrowserEmpty,
             )
@@ -332,7 +352,7 @@ class FileBrowserViewModel @Inject constructor(
         return nodeList.mapIndexed { index, node ->
             val isSelected = state.value.selectedNodeHandles.contains(node.id.longValue)
             val fileDuration = if (node is FileNode) {
-                fileDurationMapper(node.type)?.let { getVideoDuration(it) } ?: run { null }
+                fileDurationMapper(node.type)?.let { durationInSecondsTextMapper(it) }
             } else null
             NodeUIItem(
                 node = node,
@@ -395,6 +415,7 @@ class FileBrowserViewModel @Inject constructor(
         if (performBackNavigation) {
             handleStack.pop()
             handleAccessedFolderOnBackPress()
+            removeCurrentNodeFromUiStateSet()
 
             val parentHandle =
                 getParentNodeUseCase(NodeId(_state.value.fileBrowserHandle))?.id?.longValue
@@ -414,18 +435,37 @@ class FileBrowserViewModel @Inject constructor(
     }
 
     /**
+     * Removes the current Node from the Set of opened Folder Nodes in UiState
+     */
+    private fun removeCurrentNodeFromUiStateSet() {
+        _state.update {
+            it.copy(
+                isLoading = true,
+                openedFolderNodeHandles = it.openedFolderNodeHandles.toMutableSet()
+                    .apply { remove(_state.value.fileBrowserHandle) },
+            )
+        }
+    }
+
+    /**
      * Goes back one level from the Cloud Drive hierarchy
      */
     suspend fun performBackNavigation() {
         handleAccessedFolderOnBackPress()
         getParentNodeUseCase(NodeId(_state.value.fileBrowserHandle))?.id?.longValue?.let { parentHandle ->
+            removeCurrentNodeFromUiStateSet()
             setFileBrowserHandle(parentHandle)
             handleStack.takeIf { stack -> stack.isNotEmpty() }?.pop()
             // Update the Toolbar Title
             _state.update { it.copy(updateToolbarTitleEvent = triggered) }
         } ?: run {
             // Exit File Browser if there is nothing left in the Back Stack
-            _state.update { it.copy(exitFileBrowserEvent = triggered) }
+            _state.update {
+                it.copy(
+                    openedFolderNodeHandles = emptySet(),
+                    exitFileBrowserEvent = triggered
+                )
+            }
         }
     }
 
@@ -451,6 +491,13 @@ class FileBrowserViewModel @Inject constructor(
      */
     private fun onFolderItemClicked(folderHandle: Long) {
         viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    isLoading = true,
+                    openedFolderNodeHandles = it.openedFolderNodeHandles.toMutableSet()
+                        .apply { add(_state.value.fileBrowserHandle) },
+                )
+            }
             setFileBrowserHandle(folderHandle)
             if (shouldEnterMediaDiscoveryMode(
                     folderHandle = folderHandle,

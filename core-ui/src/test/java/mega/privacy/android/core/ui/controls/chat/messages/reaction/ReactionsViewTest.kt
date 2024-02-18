@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,12 +20,12 @@ class ReactionsViewTest {
 
     @Test
     fun `test that add reaction chip is always shown when there is no reactions`() {
-        val reactions = emptyList<Reaction>()
+        val reactions = emptyList<UIReaction>()
         composeRule.setContent {
             ReactionsView(
                 modifier = Modifier,
                 reactions = reactions,
-                onAddReactionClicked = {},
+                onMoreReactionsClicked = {},
                 onReactionClicked = {},
             )
         }
@@ -34,15 +35,15 @@ class ReactionsViewTest {
     @Test
     fun `test that add reaction chip is always shown when there are reactions`() {
         val reactions = listOf(
-            Reaction("ReactionA", 1, false),
-            Reaction("ReactionB", 2, false),
-            Reaction("ReactionC", 3, false),
+            UIReaction("ReactionA", 1, false),
+            UIReaction("ReactionB", 2, false),
+            UIReaction("ReactionC", 3, false),
         )
         composeRule.setContent {
             ReactionsView(
                 modifier = Modifier,
                 reactions = reactions,
-                onAddReactionClicked = {},
+                onMoreReactionsClicked = {},
                 onReactionClicked = {},
             )
         }
@@ -51,13 +52,13 @@ class ReactionsViewTest {
 
     @Test
     fun `test that add reaction call back is invoked when it is clicked`() {
-        val reactions = emptyList<Reaction>()
+        val reactions = emptyList<UIReaction>()
         val addReactionCallBack: () -> Unit = mock()
         composeRule.setContent {
             ReactionsView(
                 modifier = Modifier,
                 reactions = reactions,
-                onAddReactionClicked = addReactionCallBack,
+                onMoreReactionsClicked = addReactionCallBack,
                 onReactionClicked = {},
             )
         }
@@ -68,7 +69,7 @@ class ReactionsViewTest {
     @Test
     fun `test that reaction chip callback is invoked when it is clicked`() {
         val reactions = listOf(
-            Reaction("ReactionA", 1, false),
+            UIReaction("ReactionA", 1, false),
         )
         val reactionChipCallback: (String) -> Unit = mock()
 
@@ -76,7 +77,7 @@ class ReactionsViewTest {
             ReactionsView(
                 modifier = Modifier,
                 reactions = reactions,
-                onAddReactionClicked = {},
+                onMoreReactionsClicked = {},
                 onReactionClicked = reactionChipCallback,
             )
         }

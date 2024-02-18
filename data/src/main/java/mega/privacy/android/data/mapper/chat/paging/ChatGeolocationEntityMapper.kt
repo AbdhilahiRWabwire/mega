@@ -1,7 +1,7 @@
 package mega.privacy.android.data.mapper.chat.paging
 
 import mega.privacy.android.data.database.entity.chat.ChatGeolocationEntity
-import mega.privacy.android.domain.entity.chat.messages.ChatGeolocationInfo
+import mega.privacy.android.domain.entity.chat.messages.meta.ChatGeolocationInfo
 import javax.inject.Inject
 
 /**
@@ -20,7 +20,6 @@ class ChatGeolocationEntityMapper @Inject constructor() {
         messageId: Long,
         info: ChatGeolocationInfo,
     ) = ChatGeolocationEntity(
-        id = 0,
         messageId = messageId,
         latitude = info.latitude,
         longitude = info.longitude,

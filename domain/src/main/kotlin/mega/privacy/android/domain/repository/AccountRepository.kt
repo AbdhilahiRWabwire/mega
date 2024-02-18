@@ -567,4 +567,14 @@ interface AccountRepository {
      * @param enabledCookieSettings Set of CookieType
      */
     suspend fun broadcastCookieSettings(enabledCookieSettings: Set<CookieType>)
+
+    /**
+     * Should show copyright
+     */
+    suspend fun shouldShowCopyright(): Boolean
+
+    /**
+     * Kills all other active Sessions except the current Session
+     */
+    suspend fun killOtherSessions()
 }

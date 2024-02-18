@@ -5,13 +5,11 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
@@ -22,15 +20,18 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import mega.privacy.android.app.R
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.settings.reportissue.ReportIssueViewModel
 import mega.privacy.android.app.presentation.settings.reportissue.model.SubmitIssueResult
 import mega.privacy.android.domain.entity.Progress
 import mega.privacy.android.domain.usecase.AreChatLogsEnabled
 import mega.privacy.android.domain.usecase.AreSdkLogsEnabled
 import mega.privacy.android.domain.usecase.GetSupportEmail
-import mega.privacy.android.domain.usecase.SubmitIssue
+import mega.privacy.android.domain.usecase.SubmitIssueUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -38,10 +39,15 @@ import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.reset
+import org.mockito.kotlin.stub
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import test.mega.privacy.android.app.InstantExecutorExtension
+import test.mega.privacy.android.app.extensions.asHotFlow
+import test.mega.privacy.android.app.extensions.withCoroutineExceptions
 
 @ExperimentalCoroutinesApi
 @ExtendWith(InstantExecutorExtension::class)
@@ -49,24 +55,21 @@ import test.mega.privacy.android.app.InstantExecutorExtension
 class ReportIssueViewModelTest {
     private lateinit var underTest: ReportIssueViewModel
 
-    private val submitIssue = mock<SubmitIssue>()
-    private val areSdkLogsEnabled = mock<AreSdkLogsEnabled> {
-        on { invoke() }.thenReturn(flowOf(false))
-    }
-    private val areChatLogsEnabled = mock<AreChatLogsEnabled> {
-        on { invoke() }.thenReturn(flowOf(false))
-    }
+    private val submitIssueUseCase = mock<SubmitIssueUseCase>()
+    private val areSdkLogsEnabled = mock<AreSdkLogsEnabled>()
+    private val areChatLogsEnabled = mock<AreChatLogsEnabled>()
 
-    private val savedStateHandle = SavedStateHandle(mapOf())
+    private var savedStateHandle = SavedStateHandle(mapOf())
 
 
     private val monitorConnectivityUseCase =
-        mock<MonitorConnectivityUseCase> { on { invoke() }.thenReturn(MutableStateFlow(true)) }
+        mock<MonitorConnectivityUseCase>()
 
     private val scheduler = TestCoroutineScheduler()
 
-    private val getSupportEmail =
-        mock<GetSupportEmail> { onBlocking { invoke() }.thenReturn("Support@Email.address") }
+    private val supportEmail = "Support@Email.address"
+    private val getSupportEmail = mock<GetSupportEmail>()
+    private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase>()
 
     @BeforeAll
     fun initialise() {
@@ -75,18 +78,44 @@ class ReportIssueViewModelTest {
 
     @BeforeEach
     fun setUp() {
-        initViewModel()
+        monitorConnectivityUseCase.stub {
+            on { invoke() } doReturn true.asHotFlow()
+        }
+        areSdkLogsEnabled.stub {
+            on { invoke() } doReturn false.asHotFlow()
+        }
+        areChatLogsEnabled.stub {
+            on { invoke() } doReturn false.asHotFlow()
+        }
+        getFeatureFlagValueUseCase.stub {
+            onBlocking { invoke(AppFeatures.PermanentLogging) } doReturn false
+        }
     }
+
 
     private fun initViewModel() {
         underTest = ReportIssueViewModel(
-            submitIssue = submitIssue,
+            submitIssueUseCase = submitIssueUseCase,
             areSdkLogsEnabled = areSdkLogsEnabled,
             areChatLogsEnabled = areChatLogsEnabled,
             savedStateHandle = savedStateHandle,
             ioDispatcher = StandardTestDispatcher(),
             monitorConnectivityUseCase = monitorConnectivityUseCase,
             getSupportEmail = getSupportEmail,
+            getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
+        )
+    }
+
+    @AfterEach
+    fun resetTests() {
+        savedStateHandle = SavedStateHandle(mapOf())
+        reset(
+            submitIssueUseCase,
+            areSdkLogsEnabled,
+            areChatLogsEnabled,
+            monitorConnectivityUseCase,
+            getSupportEmail,
+            getFeatureFlagValueUseCase,
         )
     }
 
@@ -97,6 +126,7 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that initial state is returned`() = runTest {
+        initViewModel()
         underTest.state.test {
             val initial = awaitItem()
             assertThat(initial.description).isEmpty()
@@ -112,6 +142,7 @@ class ReportIssueViewModelTest {
         savedStateHandle.set(underTest.descriptionKey, expectedDescription)
         savedStateHandle.set(underTest.includeLogsVisibleKey, true)
         savedStateHandle.set(underTest.includeLogsKey, true)
+        initViewModel()
 
         underTest.state.filter {
             it.description == expectedDescription &&
@@ -130,6 +161,7 @@ class ReportIssueViewModelTest {
         whenever(areSdkLogsEnabled()).thenReturn(flowOf(true))
         whenever(areChatLogsEnabled()).thenReturn(flowOf(true))
 
+        initViewModel()
         underTest.state.map { it.includeLogsVisible }.distinctUntilChanged()
             .test {
                 assertThat(awaitItem()).isFalse()
@@ -142,6 +174,7 @@ class ReportIssueViewModelTest {
         whenever(areSdkLogsEnabled()).thenReturn(flowOf(true))
         whenever(areChatLogsEnabled()).thenReturn(flowOf(true))
 
+        initViewModel()
         underTest.state.map { it.includeLogs }.distinctUntilChanged()
             .test {
                 assertThat(awaitItem()).isFalse()
@@ -151,6 +184,7 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that description is updated if new description is provided`() = runTest {
+        initViewModel()
         underTest.state.map { it.description }.distinctUntilChanged()
             .test {
                 val newDescription = "New description"
@@ -178,6 +212,7 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that can submit is is false by default`() = runTest {
+        initViewModel()
         underTest.state.test {
             assertThat(awaitItem().canSubmit).isFalse()
         }
@@ -185,6 +220,7 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that can submit is true when a description exists`() = runTest {
+        initViewModel()
         underTest.state.map { it.canSubmit }.distinctUntilChanged()
             .test {
                 assertThat(awaitItem()).isFalse()
@@ -195,6 +231,7 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that after setting a description can submit is true`() = runTest {
+        initViewModel()
         underTest.state.distinctUntilChangedBy { it.canSubmit }.test {
             assertThat(awaitItem().canSubmit).isFalse()
             underTest.setDescription("A Description")
@@ -204,6 +241,7 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that can submit becomes false if description is removed`() = runTest {
+        initViewModel()
         underTest.state.distinctUntilChangedBy { it.canSubmit }.test {
             assertThat(awaitItem().canSubmit).isFalse()
 
@@ -219,7 +257,7 @@ class ReportIssueViewModelTest {
     @Test
     fun `test that connection error is returned if attempting to submit and no internet available`() =
         runTest {
-            whenever(monitorConnectivityUseCase()).thenReturn(MutableStateFlow(false))
+            whenever(monitorConnectivityUseCase()).thenReturn(false.asHotFlow())
 
             initViewModel()
 
@@ -234,8 +272,8 @@ class ReportIssueViewModelTest {
     @Test
     fun `test that a success message is returned if submit report completes without an error`() =
         runTest {
-            whenever(submitIssue(any())).thenReturn(emptyFlow())
-
+            whenever(submitIssueUseCase(any())).thenReturn(emptyFlow())
+            initViewModel()
             scheduler.advanceUntilIdle()
             underTest.state.map { it.result }.distinctUntilChanged()
                 .test {
@@ -247,19 +285,29 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that an error message is returned if submit report completes with an error`() =
-        runTest {
-            whenever(submitIssue(any())).thenReturn(flow { throw Exception() })
-            scheduler.advanceUntilIdle()
-            underTest.state.map { it.result }.distinctUntilChanged()
-                .test {
-                    assertThat(awaitItem()).isNull()
-                    underTest.submit()
-                    assertThat(awaitItem()).isInstanceOf(SubmitIssueResult.Failure::class.java)
+        withCoroutineExceptions {
+            runTest {
+                submitIssueUseCase.stub {
+                    onBlocking { invoke(any()) }.thenAnswer { throw Exception() }
                 }
+                getSupportEmail.stub {
+                    onBlocking { invoke() } doReturn supportEmail
+                }
+
+                initViewModel()
+                scheduler.advanceUntilIdle()
+                underTest.state.map { it.result }.distinctUntilChanged()
+                    .test {
+                        assertThat(awaitItem()).isNull()
+                        underTest.submit()
+                        assertThat(awaitItem()).isInstanceOf(SubmitIssueResult.Failure::class.java)
+                    }
+            }
         }
 
     @Test
     fun `test that description and log setting are passed to submit use case`() = runTest {
+        initViewModel()
         scheduler.advanceUntilIdle()
         val newDescription = "Expected description"
         underTest.setDescription(newDescription)
@@ -269,12 +317,13 @@ class ReportIssueViewModelTest {
         underTest.submit()
         scheduler.advanceUntilIdle()
 
-        verify(submitIssue).invoke(argThat { description == newDescription && includeLogs })
+        verify(submitIssueUseCase).invoke(argThat { description == newDescription && includeLogs })
     }
 
     @Test
     fun `test that upload progress from 0 to 100 is returned`() = runTest {
-        whenever(submitIssue(any())).thenReturn(getProgressFlow())
+        whenever(submitIssueUseCase(any())).thenReturn(getProgressFlow())
+        initViewModel()
         scheduler.advanceUntilIdle()
         underTest.state.mapNotNull { it.uploadProgress }.distinctUntilChanged()
             .test {
@@ -287,10 +336,12 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that no progress is returned after upload is cancelled`() = runTest {
-        whenever(submitIssue(any())).thenReturn(
+        whenever(submitIssueUseCase(any())).thenReturn(
             getProgressFlow().onEach {
                 if (it.floatValue > 0.5f) underTest.cancelUpload()
             })
+
+        initViewModel()
         scheduler.advanceUntilIdle()
         underTest.state.mapNotNull { it.uploadProgress }.distinctUntilChanged()
             .test {
@@ -303,10 +354,12 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that cancelling an upload does not return an error`() = runTest {
-        whenever(submitIssue(any())).thenReturn(
+        whenever(submitIssueUseCase(any())).thenReturn(
             getProgressFlow()
                 .onEach { if (it.floatValue > 0.1f) underTest.cancelUpload() }
         )
+
+        initViewModel()
         scheduler.advanceUntilIdle()
 
         underTest.state.map { it.result }.distinctUntilChanged()
@@ -319,12 +372,14 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that cancelling upload clears progress`() = runTest {
-        whenever(submitIssue(any())).thenReturn(
+        whenever(submitIssueUseCase(any())).thenReturn(
             getProgressFlow()
                 .onEach {
                     if (it.floatValue == 0.01f) underTest.cancelUpload()
                 }
         )
+
+        initViewModel()
         scheduler.advanceUntilIdle()
         underTest.state.map { it.uploadProgress == null }.distinctUntilChanged().test {
             assertThat(awaitItem()).isTrue()
@@ -333,6 +388,29 @@ class ReportIssueViewModelTest {
             assertThat(awaitItem()).isTrue()
         }
     }
+
+    @Test
+    internal fun `test that permanent logging feature flag overrides logging enabled settings`() =
+        runTest {
+            getFeatureFlagValueUseCase.stub {
+                onBlocking { invoke(AppFeatures.PermanentLogging) } doReturn true
+            }
+
+            areSdkLogsEnabled.stub {
+                on { invoke() } doReturn flowOf(false)
+            }
+            areChatLogsEnabled.stub {
+                on { invoke() } doReturn flowOf(false)
+            }
+
+            initViewModel()
+
+            underTest.state.map { it.includeLogsVisible }.distinctUntilChanged()
+                .test {
+                    assertThat(awaitItem()).isFalse()
+                    assertThat(awaitItem()).isTrue()
+                }
+        }
 
     private fun getProgressFlow() = (0..100).map { Progress(it / 100f) }.asFlow()
 }

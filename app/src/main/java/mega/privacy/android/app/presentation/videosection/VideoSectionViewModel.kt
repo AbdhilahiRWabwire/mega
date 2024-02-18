@@ -5,11 +5,11 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.update
@@ -19,6 +19,7 @@ import mega.privacy.android.app.domain.usecase.GetNodeByHandle
 import mega.privacy.android.app.presentation.videosection.mapper.UIVideoMapper
 import mega.privacy.android.app.presentation.videosection.mapper.UIVideoPlaylistMapper
 import mega.privacy.android.app.presentation.videosection.model.UIVideo
+import mega.privacy.android.app.presentation.videosection.model.UIVideoPlaylist
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionState
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionTab
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionTabState
@@ -36,6 +37,8 @@ import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunnin
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
+import mega.privacy.android.domain.usecase.videosection.AddVideosToPlaylistUseCase
+import mega.privacy.android.domain.usecase.videosection.CreateVideoPlaylistUseCase
 import mega.privacy.android.domain.usecase.videosection.GetAllVideosUseCase
 import mega.privacy.android.domain.usecase.videosection.GetVideoPlaylistsUseCase
 import nz.mega.sdk.MegaNode
@@ -61,6 +64,8 @@ class VideoSectionViewModel @Inject constructor(
     private val getNodeByIdUseCase: GetNodeByIdUseCase,
     private val getVideoPlaylistsUseCase: GetVideoPlaylistsUseCase,
     private val uiVideoPlaylistMapper: UIVideoPlaylistMapper,
+    private val createVideoPlaylistUseCase: CreateVideoPlaylistUseCase,
+    private val addVideosToPlaylistUseCase: AddVideosToPlaylistUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(VideoSectionState())
 
@@ -78,10 +83,12 @@ class VideoSectionViewModel @Inject constructor(
 
     private var searchQuery = ""
     private val originalData = mutableListOf<UIVideo>()
+    private val originalPlaylistData = mutableListOf<UIVideoPlaylist>()
+
+    private var createVideoPlaylistJob: Job? = null
 
     init {
         refreshNodesIfAnyUpdates()
-        loadVideoPlaylists()
     }
 
     private fun refreshNodesIfAnyUpdates() {
@@ -100,17 +107,33 @@ class VideoSectionViewModel @Inject constructor(
 
     private fun loadVideoPlaylists() {
         viewModelScope.launch {
-            getVideoPlaylistsUseCase()
-                .catch { exception -> Timber.e(exception) }
-                .collectLatest { videoPlaylists ->
-                    _state.update {
-                        it.copy(videoPlaylists = videoPlaylists.map { videoPlaylist ->
-                            uiVideoPlaylistMapper(videoPlaylist)
-                        })
-                    }
-                }
+            val videoPlaylists =
+                getVideoPlaylists().updateOriginalPlaylistData().filterVideoPlaylistsBySearchQuery()
+            _state.update {
+                it.copy(
+                    videoPlaylists = videoPlaylists,
+                    isPlaylistProgressBarShown = false,
+                    scrollToTop = false
+                )
+            }
         }
     }
+
+    private suspend fun getVideoPlaylists() = getVideoPlaylistsUseCase().map { videoPlaylist ->
+        uiVideoPlaylistMapper(videoPlaylist)
+    }
+
+    private fun List<UIVideoPlaylist>.updateOriginalPlaylistData() = also { data ->
+        if (originalPlaylistData.isNotEmpty()) {
+            originalPlaylistData.clear()
+        }
+        originalPlaylistData.addAll(data)
+    }
+
+    private fun List<UIVideoPlaylist>.filterVideoPlaylistsBySearchQuery() =
+        filter { playlist ->
+            playlist.title.contains(searchQuery, true)
+        }
 
     private fun setPendingRefreshNodes() = _state.update { it.copy(isPendingRefresh = true) }
 
@@ -143,8 +166,16 @@ class VideoSectionViewModel @Inject constructor(
 
     internal fun markHandledPendingRefresh() = _state.update { it.copy(isPendingRefresh = false) }
 
-    internal fun onTabSelected(selectTab: VideoSectionTab) = _tabState.update {
-        it.copy(selectedTab = selectTab)
+    internal fun onTabSelected(selectTab: VideoSectionTab) {
+        if (selectTab == VideoSectionTab.Playlists && originalPlaylistData.isEmpty()) {
+            loadVideoPlaylists()
+        }
+        if (_state.value.searchMode) {
+            exitSearch()
+        }
+        _tabState.update {
+            it.copy(selectedTab = selectTab)
+        }
     }
 
     internal fun refreshWhenOrderChanged() =
@@ -174,13 +205,12 @@ class VideoSectionViewModel @Inject constructor(
             return
 
         searchQuery = query
-        searchNodeByQueryString()
-    }
 
-    internal fun exitSearch() {
-        _state.update { it.copy(searchMode = false) }
-        searchQuery = ""
-        refreshNodes()
+        if (_tabState.value.selectedTab == VideoSectionTab.All) {
+            searchNodeByQueryString()
+        } else {
+            searchPlaylistByQueryString()
+        }
     }
 
     private fun searchNodeByQueryString() {
@@ -192,6 +222,29 @@ class VideoSectionViewModel @Inject constructor(
                 allVideos = videos,
                 scrollToTop = true
             )
+        }
+    }
+
+    private fun searchPlaylistByQueryString() {
+        val playlists = originalPlaylistData.filter { playlist ->
+            playlist.title.contains(searchQuery, true)
+        }
+        _state.update {
+            it.copy(
+                videoPlaylists = playlists,
+                scrollToTop = true
+            )
+        }
+    }
+
+    internal fun exitSearch() {
+        _state.update { it.copy(searchMode = false) }
+        searchQuery = ""
+
+        if (_tabState.value.selectedTab == VideoSectionTab.All) {
+            refreshNodes()
+        } else {
+            loadVideoPlaylists()
         }
     }
 
@@ -324,5 +377,53 @@ class VideoSectionViewModel @Inject constructor(
             runCatching {
                 getNodeByHandle(it)
             }.getOrNull()
+        }
+
+    /**
+     * Create new video playlist
+     *
+     * @param title video playlist title
+     */
+    internal fun createNewPlaylist(title: String) {
+        if (createVideoPlaylistJob?.isActive == true) return
+        createVideoPlaylistJob = viewModelScope.launch {
+            runCatching {
+                title.trim().takeIf { it.isNotEmpty() }?.let { playlistTitle ->
+                    createVideoPlaylistUseCase(playlistTitle)
+                }
+            }.onSuccess { videoPlaylist ->
+                _state.update {
+                    it.copy(
+                        currentVideoPlaylist = videoPlaylist,
+                        isVideoPlaylistCreatedSuccessfully = true
+                    )
+                }
+                Timber.d("Current video playlist: ${videoPlaylist?.title}")
+            }.onFailure { exception ->
+                Timber.e(exception)
+                _state.update {
+                    it.copy(isVideoPlaylistCreatedSuccessfully = false)
+                }
+            }
+        }
+    }
+
+    /**
+     * Add videos to the playlist
+     *
+     * @param playlistID playlist id
+     * @param videoIDs added video ids
+     */
+    internal fun addVideosToPlaylist(playlistID: NodeId, videoIDs: List<NodeId>) =
+        viewModelScope.launch {
+            runCatching {
+                addVideosToPlaylistUseCase(playlistID, videoIDs)
+            }.onSuccess { numberOfAddedVideos ->
+                _state.update {
+                    it.copy(
+                        numberOfAddedVideos = numberOfAddedVideos
+                    )
+                }
+            }
         }
 }

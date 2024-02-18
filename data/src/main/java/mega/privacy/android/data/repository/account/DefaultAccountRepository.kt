@@ -1066,6 +1066,28 @@ internal class DefaultAccountRepository @Inject constructor(
     override fun monitorCookieSettingsSaved(): Flow<Set<CookieType>> =
         appEventGateway.monitorCookieSettings
 
+    override suspend fun shouldShowCopyright(): Boolean = withContext(ioDispatcher) {
+        localStorageGateway.shouldShowCopyright()
+    }
+
+    override suspend fun killOtherSessions() = withContext(ioDispatcher) {
+        suspendCancellableCoroutine { continuation ->
+            val listener = OptionalMegaRequestListenerInterface(
+                onRequestFinish = { _, error ->
+                    if (error.errorCode == MegaError.API_OK) {
+                        continuation.resumeWith(Result.success(Unit))
+                    } else {
+                        continuation.failWithError(error, "killOtherSessions")
+                    }
+                }
+            )
+            // INVALID_HANDLE is used to kill all other active Sessions except the current Session
+            megaApiGateway.killSession(megaApiGateway.getInvalidHandle(), listener)
+            continuation.invokeOnCancellation {
+                megaApiGateway.removeRequestListener(listener)
+            }
+        }
+    }
 
     companion object {
         private const val LAST_SYNC_TIMESTAMP_FILE = "last_sync_timestamp"

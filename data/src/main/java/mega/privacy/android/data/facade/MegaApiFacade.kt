@@ -1047,6 +1047,9 @@ internal class MegaApiFacade @Inject constructor(
             listener,
         )
 
+    override fun getMyChatFilesFolder(listener: MegaRequestListenerInterface) =
+        megaApi.getMyChatFilesFolder(listener)
+
     override fun getFileVersionsOption(listener: MegaRequestListenerInterface) {
         megaApi.getFileVersionsOption(listener)
     }
@@ -1516,4 +1519,13 @@ internal class MegaApiFacade @Inject constructor(
     override fun getSessionTransferURL(path: String, listener: MegaRequestListenerInterface) {
         megaApi.getSessionTransferURL(path, listener)
     }
+
+    override fun getMyUserHandleBinary(): Long =
+        megaApi.myUserHandleBinary
+
+    override fun getNodesByFingerprint(fingerprint: String): List<MegaNode> =
+        megaApi.getNodesByFingerprint(fingerprint)
+
+    override fun killSession(sessionHandle: Long, listener: MegaRequestListenerInterface) =
+        megaApi.killSession(sessionHandle, listener)
 }

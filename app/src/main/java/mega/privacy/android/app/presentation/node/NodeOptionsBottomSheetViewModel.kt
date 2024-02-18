@@ -11,16 +11,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import mega.privacy.android.app.presentation.chat.mapper.ChatRequestMessageMapper
+import mega.privacy.android.app.presentation.extensions.isOutShare
 import mega.privacy.android.app.presentation.movenode.mapper.MoveRequestMessageMapper
 import mega.privacy.android.app.presentation.node.model.NodeBottomSheetState
+import mega.privacy.android.app.presentation.node.model.mapper.NodeAccessPermissionIconMapper
 import mega.privacy.android.app.presentation.node.model.mapper.NodeBottomSheetActionMapper
 import mega.privacy.android.app.presentation.node.view.bottomsheetmenuitems.NodeBottomSheetMenuItem
 import mega.privacy.android.app.presentation.snackbar.SnackBarHandler
+import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
 import mega.privacy.android.app.presentation.versions.mapper.VersionHistoryRemoveMessageMapper
 import mega.privacy.android.core.ui.model.MenuActionWithIcon
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
+import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
+import mega.privacy.android.domain.entity.node.backup.BackupNodeType
+import mega.privacy.android.domain.entity.shares.AccessPermission
 import mega.privacy.android.domain.exception.NotEnoughQuotaMegaException
 import mega.privacy.android.domain.exception.QuotaExceededMegaException
 import mega.privacy.android.domain.exception.node.ForeignNodeException
@@ -29,13 +36,18 @@ import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.IsNodeInRubbish
 import mega.privacy.android.domain.usecase.account.SetCopyLatestTargetPathUseCase
 import mega.privacy.android.domain.usecase.account.SetMoveLatestTargetPathUseCase
+import mega.privacy.android.domain.usecase.chat.AttachMultipleNodesUseCase
+import mega.privacy.android.domain.usecase.contact.GetContactFromEmailUseCase
 import mega.privacy.android.domain.usecase.filenode.DeleteNodeVersionsUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodesUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInBackupsUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodesUseCase
+import mega.privacy.android.domain.usecase.node.backup.CheckBackupNodeTypeByHandleUseCase
+import mega.privacy.android.domain.usecase.shares.DefaultGetContactItemFromInShareFolder
 import mega.privacy.android.domain.usecase.shares.GetNodeAccessPermission
+import mega.privacy.android.domain.usecase.shares.GetOutShareByNodeIdUseCase
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -75,6 +87,13 @@ class NodeOptionsBottomSheetViewModel @Inject constructor(
     private val snackBarHandler: SnackBarHandler,
     private val moveRequestMessageMapper: MoveRequestMessageMapper,
     private val versionHistoryRemoveMessageMapper: VersionHistoryRemoveMessageMapper,
+    private val nodeAccessPermissionIconMapper: NodeAccessPermissionIconMapper,
+    private val getContactItemFromInShareFolder: DefaultGetContactItemFromInShareFolder,
+    private val getOutShareByNodeIdUseCase: GetOutShareByNodeIdUseCase,
+    private val getContactFromEmailUseCase: GetContactFromEmailUseCase,
+    private val checkBackupNodeTypeByHandleUseCase: CheckBackupNodeTypeByHandleUseCase,
+    private val attachMultipleNodesUseCase: AttachMultipleNodesUseCase,
+    private val chatRequestMessageMapper: ChatRequestMessageMapper,
     @ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -102,6 +121,12 @@ class NodeOptionsBottomSheetViewModel @Inject constructor(
      * @return state
      */
     fun getBottomSheetOptions(nodeId: Long) = viewModelScope.launch {
+        _state.update {
+            it.copy(
+                actions = emptyList(),
+                node = null
+            )
+        }
         val node = async { runCatching { getNodeByIdUseCase(NodeId(nodeId)) }.getOrNull() }
         val isNodeInRubbish =
             async { runCatching { isNodeInRubbish(nodeId) }.getOrDefault(false) }
@@ -110,27 +135,81 @@ class NodeOptionsBottomSheetViewModel @Inject constructor(
         val isInBackUps =
             async { runCatching { isNodeInBackupsUseCase(nodeId) }.getOrDefault(false) }
         val typedNode = node.await()
+        val permission = accessPermission.await()
         typedNode?.let {
             val bottomSheetItems = nodeBottomSheetActionMapper(
                 toolbarOptions = bottomSheetOptions,
                 selectedNode = typedNode,
                 isNodeInRubbish = isNodeInRubbish.await(),
-                accessPermission = accessPermission.await(),
+                accessPermission = permission,
                 isInBackUps = isInBackUps.await(),
                 isConnected = state.value.isOnline,
             )
+            val accessPermissionIcon =
+                getAccessPermissionIcon(permission ?: AccessPermission.UNKNOWN, typedNode)
             _state.update {
                 it.copy(
                     name = typedNode.name,
                     actions = bottomSheetItems,
                     node = typedNode,
-                    error = if (bottomSheetItems.isEmpty()) triggered(Exception("No actions available")) else consumed()
+                    error = if (bottomSheetItems.isEmpty()) triggered(Exception("No actions available")) else consumed(),
+                    accessPermissionIcon = accessPermissionIcon,
                 )
             }
+            getShareInfo(typedNode)
         } ?: run {
             _state.update {
                 it.copy(error = triggered(Exception("Node is null")))
             }
+        }
+    }
+
+    private fun getShareInfo(typedNode: TypedNode) {
+        if (typedNode.isIncomingShare && typedNode is TypedFolderNode) {
+            viewModelScope.launch {
+                runCatching {
+                    getContactItemFromInShareFolder(typedNode, true)
+                }.onSuccess { contact ->
+                    _state.update {
+                        it.copy(
+                            shareInfo = contact?.contactData?.fullName ?: contact?.email
+                        )
+                    }
+                }.onFailure {
+                    Timber.e(it)
+                }
+            }
+        }
+        if (typedNode.isOutShare()) {
+            viewModelScope.launch {
+                runCatching {
+                    getOutShareByNodeIdUseCase(typedNode.id)
+                }.onSuccess { outShares ->
+                    if (outShares.size == 1) {
+                        outShares.first().user?.let { getShareUserInfo(it) }
+                    } else {
+                        _state.update {
+                            it.copy(outgoingShares = outShares)
+                        }
+                    }
+                }.onFailure {
+                    Timber.e(it)
+                }
+            }
+        }
+    }
+
+    private fun getShareUserInfo(user: String) = viewModelScope.launch {
+        runCatching {
+            getContactFromEmailUseCase(user, true)
+        }.onSuccess { contact ->
+            _state.update {
+                it.copy(
+                    shareInfo = contact?.contactData?.fullName ?: contact?.email
+                )
+            }
+        }.onFailure {
+            Timber.e(it)
         }
     }
 
@@ -271,4 +350,115 @@ class NodeOptionsBottomSheetViewModel @Inject constructor(
         _state.update { it.copy(showQuotaDialog = consumed()) }
     }
 
+    /**
+     * Get access permission icon
+     * Access permission icon is only shown for incoming shares
+     *
+     * @return icon
+     */
+    private fun getAccessPermissionIcon(accessPermission: AccessPermission, node: TypedNode): Int? =
+        nodeAccessPermissionIconMapper(accessPermission).takeIf { node.isIncomingShare }
+
+    /**
+     * Contact selected for folder share
+     */
+    fun contactSelectedForShareFolder(contactsData: List<String>) {
+        state.value.node?.let {
+            viewModelScope.launch {
+                val isFromBackUps = checkBackupNodeTypeByHandleUseCase(it)
+                _state.update {
+                    it.copy(
+                        contactsData = triggered(
+                            Pair(
+                                contactsData,
+                                isFromBackUps != BackupNodeType.NonBackupNode
+                            )
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * attach node to chat
+     *
+     * @param nodeHandles [LongArray] on which node is attached
+     * @param chatIds [LongArray] chat ids
+     */
+    fun attachNodeToChats(
+        nodeHandles: LongArray?,
+        chatIds: LongArray?,
+    ) {
+        if (nodeHandles != null && chatIds != null) {
+            val nodeIds = nodeHandles.map {
+                NodeId(it)
+            }
+            viewModelScope.launch {
+                val attachNodeRequest =
+                    attachMultipleNodesUseCase(
+                        nodeIds = nodeIds,
+                        chatIds = chatIds
+                    )
+                val message = chatRequestMessageMapper(attachNodeRequest)
+                message?.let {
+                    snackBarHandler.postSnackbarMessage(it)
+                }
+            }
+        }
+    }
+
+    /**
+     * Contact selected for folder share
+     */
+    fun markShareFolderAccessDialogShown() {
+        _state.update {
+            it.copy(contactsData = consumed())
+        }
+    }
+
+    /**
+     * Download node
+     * Triggers TransferTriggerEvent.StartDownloadNode with parameter [TypedNode]
+     */
+    fun downloadNode() {
+        state.value.node?.let { node ->
+            _state.update {
+                it.copy(downloadEvent = triggered(TransferTriggerEvent.StartDownloadNode(listOf(node))))
+            }
+        }
+    }
+
+    /**
+     * Download node for offline
+     * Triggers TransferTriggerEvent.StartDownloadNode with parameter [TypedNode]
+     */
+    fun downloadNodeForOffline() {
+        state.value.node?.let { node ->
+            _state.update {
+                it.copy(downloadEvent = triggered(TransferTriggerEvent.StartDownloadForOffline(node)))
+            }
+        }
+    }
+
+    /**
+     * Download node for preview
+     * Triggers TransferTriggerEvent.StartDownloadNode with parameter [TypedNode]
+     */
+    fun downloadNodeForPreview() {
+        state.value.node?.let { node ->
+            _state.update {
+                it.copy(downloadEvent = triggered(TransferTriggerEvent.StartDownloadForPreview(node)))
+            }
+        }
+    }
+
+    /**
+     * Mark download event consumed
+     */
+    fun markDownloadEventConsumed() {
+        _state.update {
+            it.copy(downloadEvent = consumed())
+        }
+    }
 }

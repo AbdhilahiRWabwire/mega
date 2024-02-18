@@ -10,12 +10,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import mega.privacy.android.app.R
-import mega.privacy.android.app.presentation.contact.view.getLastSeenString
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.InvalidUiMessage
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.normal.TextUiMessage
-import mega.privacy.android.app.presentation.meeting.chat.view.ChatView
 import mega.privacy.android.app.presentation.meeting.chat.view.appbar.ChatAppBar
 import mega.privacy.android.app.presentation.meeting.chat.view.appbar.TEST_TAG_NOTIFICATION_MUTE
 import mega.privacy.android.app.presentation.meeting.chat.view.appbar.TEST_TAG_PRIVATE_ICON
@@ -561,18 +559,6 @@ class ChatAppBarTest {
         )
         composeTestRule.onNodeWithText(composeTestRule.activity.getString(R.string.offline_status))
             .assertIsDisplayed()
-    }
-
-    @Test
-    fun `test that last green label shows if the chat is 1to1 and the contacts last green is not null`() {
-        val lastGreen = initComposeRuleContentWithLastGreen(
-            ChatUiState(
-                chat = mock<ChatRoom> { on { isGroup } doReturn false },
-                isConnected = true,
-                userLastGreen = 123456
-            )
-        )
-        composeTestRule.onNodeWithText(lastGreen).assertIsDisplayed()
     }
 
     @Test
@@ -1304,9 +1290,7 @@ class ChatAppBarTest {
     @Ignore("Need to implement a new solution that works with paged loading")
     @Test
     fun `test that select menu action is available if messages contains text message`() {
-        val textMessage = mock<TextUiMessage> {
-            on { message }.thenReturn(mock())
-        }
+        val textMessage = TextUiMessage(mock(), mock())
         initComposeRuleContent(
             ChatUiState(
                 chat = mock<ChatRoom> { on { isPreview } doReturn false },
@@ -1359,19 +1343,5 @@ class ChatAppBarTest {
                 showGroupOrContactInfoActivity = showGroupOrContactInfoActivity
             )
         }
-    }
-
-    private fun initComposeRuleContentWithLastGreen(state: ChatUiState): String {
-        var lastGreen = "last green"
-        composeTestRule.setContent {
-            ChatView(
-                uiState = state,
-                onBackPressed = {},
-                onMenuActionPressed = actionPressed,
-                messageListView = { _, _, _, _ -> },
-            )
-            lastGreen = getLastSeenString(lastGreen = state.userLastGreen) ?: ""
-        }
-        return lastGreen
     }
 }

@@ -29,15 +29,16 @@ class MetaTypedEntityTypedMessageMapper @Inject constructor(
         val request = CreateTypedMessageRequest(
             message = entity.typedMessageEntity,
             isMine = entity.typedMessageEntity.isMine,
-            shouldShowAvatar = entity.typedMessageEntity.shouldShowTime,
-            shouldShowTime = entity.typedMessageEntity.shouldShowDate,
-            shouldShowDate = entity.typedMessageEntity.shouldShowAvatar,
+            shouldShowAvatar = entity.typedMessageEntity.shouldShowAvatar,
+            shouldShowTime = entity.typedMessageEntity.shouldShowTime,
+            shouldShowDate = entity.typedMessageEntity.shouldShowDate,
             metaType = getMetaType(entity),
             textMessage = entity.typedMessageEntity.textMessage,
             chatRichPreviewInfo = entity.richPreviewEntity,
             chatGeolocationInfo = entity.geolocationEntity,
             chatGifInfo = entity.giphyEntity,
             nodeList = entity.nodeList,
+            reactions = entity.typedMessageEntity.reactions,
         )
 
         return createTypedMessageUseCases[entity.typedMessageEntity.type]?.invoke(request)

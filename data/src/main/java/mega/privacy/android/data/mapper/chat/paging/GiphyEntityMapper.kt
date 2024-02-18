@@ -1,7 +1,7 @@
 package mega.privacy.android.data.mapper.chat.paging
 
 import mega.privacy.android.data.database.entity.chat.GiphyEntity
-import mega.privacy.android.domain.entity.chat.messages.ChatGifInfo
+import mega.privacy.android.domain.entity.chat.messages.meta.ChatGifInfo
 import javax.inject.Inject
 
 /**
@@ -20,7 +20,6 @@ class GiphyEntityMapper @Inject constructor() {
         messageId: Long,
         info: ChatGifInfo,
     ) = GiphyEntity(
-        id = 0,
         messageId = messageId,
         mp4Src = info.mp4Src,
         webpSrc = info.webpSrc,

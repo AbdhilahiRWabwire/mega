@@ -28,13 +28,13 @@ class SaveChatMessagesUseCase @Inject constructor(
                 chatRepository.getNextMessagePagingInfo(chatId, it.timestamp)
             }
             val requestList = createSaveMessageRequestUseCase(
+                chatId = chatId,
                 chatMessages = messages,
                 currentUserHandle = currentUserHandle,
                 nextMessageUserHandle = nextMessage?.userHandle
             )
 
             chatRepository.storeMessages(chatId, requestList)
-            chatRepository.setLastLoadResponse(chatId, loadResponse)
         }
     }
 }

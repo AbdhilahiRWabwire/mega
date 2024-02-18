@@ -1,18 +1,26 @@
 package mega.privacy.android.app.presentation.clouddrive.ui
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import mega.privacy.android.app.presentation.clouddrive.model.FileBrowserState
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.view.NODES_EMPTY_VIEW_VISIBLE
 import mega.privacy.android.app.presentation.view.NodesView
 import mega.privacy.android.app.presentation.view.OverQuotaView
+import mega.privacy.android.core.ui.utils.ListGridStateMap
+import mega.privacy.android.core.ui.utils.getState
+import mega.privacy.android.core.ui.utils.sync
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
@@ -46,40 +54,59 @@ fun FileBrowserComposeView(
     onDismissClicked: () -> Unit,
     onEnterMediaDiscoveryClick: () -> Unit,
 ) {
-    val listState = rememberLazyListState()
-    val gridState = rememberLazyGridState()
 
-    if (uiState.nodesList.isNotEmpty()) {
-        Column {
-            OverQuotaView(
-                bannerTime = uiState.bannerTime,
-                shouldShowBannerVisibility = uiState.shouldShowBannerVisibility,
-                onUpgradeClicked = onUpgradeClicked,
-                onDismissClicked = onDismissClicked
-            )
+    var listStateMap by rememberSaveable(saver = ListGridStateMap.Saver) {
+        mutableStateOf(emptyMap())
+    }
 
-            NodesView(
-                nodeUIItems = uiState.nodesList,
-                onMenuClick = onMenuClick,
-                onItemClicked = onItemClick,
-                onLongClick = onLongClick,
-                sortOrder = sortOrder,
-                isListView = uiState.currentViewType == ViewType.LIST,
-                onSortOrderClick = onSortOrderClick,
-                onChangeViewTypeClick = onChangeViewTypeClick,
-                listState = listState,
-                gridState = gridState,
-                onLinkClicked = onLinkClicked,
-                onDisputeTakeDownClicked = onDisputeTakeDownClicked,
-                showMediaDiscoveryButton = uiState.showMediaDiscoveryIcon,
-                onEnterMediaDiscoveryClick = onEnterMediaDiscoveryClick,
-            )
-        }
-    } else {
-        LegacyMegaEmptyView(
-            modifier = Modifier.testTag(NODES_EMPTY_VIEW_VISIBLE),
-            imagePainter = painterResource(id = emptyState.first),
-            text = stringResource(id = emptyState.second)
+    /**
+     * When back navigation performed from a folder, remove the listState/gridState of that node handle
+     */
+    LaunchedEffect(uiState.openedFolderNodeHandles, uiState.nodesList, uiState.fileBrowserHandle) {
+        listStateMap = listStateMap.sync(
+            uiState.openedFolderNodeHandles,
+            uiState.fileBrowserHandle
         )
     }
+
+    val currentListState = listStateMap.getState(uiState.fileBrowserHandle)
+
+    if (!uiState.isLoading) {
+        if (uiState.nodesList.isNotEmpty()) {
+            Column {
+                OverQuotaView(
+                    bannerTime = uiState.bannerTime,
+                    shouldShowBannerVisibility = uiState.shouldShowBannerVisibility,
+                    onUpgradeClicked = onUpgradeClicked,
+                    onDismissClicked = onDismissClicked
+                )
+
+                NodesView(
+                    nodeUIItems = uiState.nodesList,
+                    onMenuClick = onMenuClick,
+                    onItemClicked = onItemClick,
+                    onLongClick = onLongClick,
+                    sortOrder = sortOrder,
+                    isListView = uiState.currentViewType == ViewType.LIST,
+                    onSortOrderClick = onSortOrderClick,
+                    onChangeViewTypeClick = onChangeViewTypeClick,
+                    listState = currentListState.lazyListState,
+                    gridState = currentListState.lazyGridState,
+                    onLinkClicked = onLinkClicked,
+                    onDisputeTakeDownClicked = onDisputeTakeDownClicked,
+                    showMediaDiscoveryButton = uiState.showMediaDiscoveryIcon,
+                    onEnterMediaDiscoveryClick = onEnterMediaDiscoveryClick,
+                    listContentPadding = PaddingValues(top = 18.dp)
+                )
+            }
+        } else {
+            LegacyMegaEmptyView(
+                modifier = Modifier.testTag(NODES_EMPTY_VIEW_VISIBLE),
+                imagePainter = painterResource(id = emptyState.first),
+                text = stringResource(id = emptyState.second)
+            )
+        }
+    }
 }
+
+

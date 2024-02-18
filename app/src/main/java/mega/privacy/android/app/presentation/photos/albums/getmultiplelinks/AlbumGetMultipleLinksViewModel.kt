@@ -26,6 +26,7 @@ import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.usecase.thumbnailpreview.DownloadThumbnailUseCase
 import mega.privacy.android.domain.usecase.GetAlbumPhotos
 import mega.privacy.android.domain.usecase.GetUserAlbum
+import mega.privacy.android.domain.usecase.ShouldShowCopyrightUseCase
 import mega.privacy.android.domain.usecase.photos.ExportAlbumsUseCase
 import timber.log.Timber
 import java.io.File
@@ -41,6 +42,7 @@ class AlbumGetMultipleLinksViewModel @Inject constructor(
     private val getAlbumPhotosUseCase: GetAlbumPhotos,
     private val downloadThumbnailUseCase: DownloadThumbnailUseCase,
     private val exportAlbumsUseCase: ExportAlbumsUseCase,
+    private val shouldShowCopyrightUseCase: ShouldShowCopyrightUseCase,
     @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
@@ -48,15 +50,23 @@ class AlbumGetMultipleLinksViewModel @Inject constructor(
     val stateFlow = state.asStateFlow()
 
     init {
-        fetchAlbums()
-        fetchLinks()
+        viewModelScope.launch {
+            val showCopyright = shouldShowCopyrightUseCase()
+            if (!showCopyright) {
+                fetchAlbums()
+                fetchLinks()
+            }
 
-        state.update {
-            it.copy(isInitialized = true)
+            state.update {
+                it.copy(
+                    isInitialized = true,
+                    showCopyright = showCopyright,
+                )
+            }
         }
     }
 
-    private fun fetchAlbums() =
+    fun fetchAlbums() =
         savedStateHandle.getStateFlow<LongArray?>(ALBUM_ID, null)
             .filterNotNull()
             .map(::getAlbumsSummaries)
@@ -91,7 +101,7 @@ class AlbumGetMultipleLinksViewModel @Inject constructor(
         }
     }
 
-    private fun fetchLinks() =
+    fun fetchLinks() =
         savedStateHandle.getStateFlow<LongArray?>(ALBUM_ID, null)
             .filterNotNull()
             .map(::getAlbumLinks)
@@ -119,5 +129,11 @@ class AlbumGetMultipleLinksViewModel @Inject constructor(
 
         if (File(thumbnailFilePath).exists()) callback(true)
         else downloadThumbnailUseCase(nodeId = photo.id, callback)
+    }
+
+    fun hideCopyright() {
+        state.update {
+            it.copy(showCopyright = false)
+        }
     }
 }

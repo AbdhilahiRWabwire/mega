@@ -22,7 +22,7 @@ interface TypedMessageDao {
      * @return paging source
      */
     @Transaction
-    @Query("SELECT * FROM typed_messages WHERE chatId = :chatId")
+    @Query("SELECT * FROM typed_messages WHERE chatId = :chatId ORDER BY timestamp DESC")
     fun getAllAsPagingSource(chatId: Long): PagingSource<Int, MetaTypedMessageEntity>
 
     /**
@@ -34,12 +34,28 @@ interface TypedMessageDao {
     suspend fun insertAll(messages: List<TypedMessageEntity>)
 
     /**
+     * Delete messages by temp id
+     *
+     * @param tempIds
+     */
+    @Query("DELETE FROM typed_messages WHERE tempId IN (:tempIds) AND msgId = tempId")
+    suspend fun deleteStaleMessagesByTempIds(tempIds: List<Long>)
+
+    /**
      * Delete messages by chat id
      *
      * @param chatId
      */
     @Query("DELETE FROM typed_messages WHERE chatId = :chatId")
     suspend fun deleteMessagesByChatId(chatId: Long)
+
+    /**
+     * Delete messages by msg id
+     *
+     * @param msgIds
+     */
+    @Query("SELECT msgId FROM typed_messages WHERE chatId = :chatId")
+    suspend fun getMsgIdsByChatId(chatId: Long): List<Long>
 
     /**
      * Get message with next greatest timestamp

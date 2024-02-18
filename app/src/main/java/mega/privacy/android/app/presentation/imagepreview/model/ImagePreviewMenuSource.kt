@@ -12,4 +12,6 @@ enum class ImagePreviewMenuSource {
     FILE,
     PUBLIC_FILE,
     FOLDER_LINK,
+    SHARED_ITEMS,
+    BACKUPS,
 }

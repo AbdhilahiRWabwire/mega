@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
 import mega.privacy.android.app.presentation.meeting.chat.view.ChatAvatar
 import mega.privacy.android.core.ui.controls.chat.ChatMessageContainer
+import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 
 /**
@@ -20,12 +21,8 @@ abstract class AvatarMessage : UiChatMessage {
     /**
      * Content composable
      */
-    abstract val contentComposable: @Composable() (RowScope.() -> Unit)
-
-    /**
-     * Long click
-     */
-    var longClick: ((TypedMessage) -> Unit)? = null
+    @Composable
+    abstract fun RowScope.ContentComposable(onLongClick: (TypedMessage) -> Unit)
 
     /**
      * Avatar composable
@@ -55,12 +52,16 @@ abstract class AvatarMessage : UiChatMessage {
         timeFormatter: (Long) -> String,
         dateFormatter: (Long) -> String,
         onLongClick: (TypedMessage) -> Unit,
+        onMoreReactionsClicked: (Long) -> Unit,
+        onReactionClicked: (Long, String, List<UIReaction>) -> Unit,
     ) {
-        longClick = this.getLongClickOrNull(onLongClick)
         ChatMessageContainer(
             modifier = Modifier.fillMaxWidth(),
             isMine = displayAsMine,
             showForwardIcon = canForward,
+            reactions = reactions,
+            onMoreReactionsClicked = { onMoreReactionsClicked(id) },
+            onReactionClicked = { onReactionClicked(id, it, reactions) },
             time = this.getTimeOrNull(timeFormatter),
             date = this.getDateOrNull(dateFormatter),
             avatarOrIcon = {
@@ -68,7 +69,9 @@ abstract class AvatarMessage : UiChatMessage {
                     lastUpdatedCache = lastUpdatedCache
                 )
             },
-            content = contentComposable,
+            content = {
+                ContentComposable(onLongClick)
+            },
         )
     }
 

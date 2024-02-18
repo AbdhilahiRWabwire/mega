@@ -22,6 +22,7 @@ import kotlinx.coroutines.test.setMain
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
+import mega.privacy.android.app.objects.GifData
 import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteParticipantResultMapper
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction
@@ -39,10 +40,11 @@ import mega.privacy.android.domain.entity.StorageStateEvent
 import mega.privacy.android.domain.entity.chat.ChatCall
 import mega.privacy.android.domain.entity.chat.ChatConnectionState
 import mega.privacy.android.domain.entity.chat.ChatConnectionStatus
+import mega.privacy.android.domain.entity.chat.ChatMessage
+import mega.privacy.android.domain.entity.chat.ChatPendingChanges
 import mega.privacy.android.domain.entity.chat.ChatPushNotificationMuteOption
 import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.ChatRoomChange
-import mega.privacy.android.domain.entity.chat.ChatPendingChanges
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
@@ -61,6 +63,7 @@ import mega.privacy.android.domain.usecase.chat.ClearChatHistoryUseCase
 import mega.privacy.android.domain.usecase.chat.CloseChatPreviewUseCase
 import mega.privacy.android.domain.usecase.chat.EnableGeolocationUseCase
 import mega.privacy.android.domain.usecase.chat.EndCallUseCase
+import mega.privacy.android.domain.usecase.chat.GetChatMessageUseCase
 import mega.privacy.android.domain.usecase.chat.GetChatMuteOptionListUseCase
 import mega.privacy.android.domain.usecase.chat.GetCustomSubtitleListUseCase
 import mega.privacy.android.domain.usecase.chat.HoldChatCallUseCase
@@ -79,9 +82,13 @@ import mega.privacy.android.domain.usecase.chat.OpenChatLinkUseCase
 import mega.privacy.android.domain.usecase.chat.UnmuteChatNotificationUseCase
 import mega.privacy.android.domain.usecase.chat.link.JoinPublicChatUseCase
 import mega.privacy.android.domain.usecase.chat.link.MonitorJoiningChatUseCase
+import mega.privacy.android.domain.usecase.chat.message.AttachContactsUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendChatAttachmentsUseCase
+import mega.privacy.android.domain.usecase.chat.message.SendGiphyMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendLocationMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendTextMessageUseCase
+import mega.privacy.android.domain.usecase.chat.message.reactions.AddReactionUseCase
+import mega.privacy.android.domain.usecase.chat.message.reactions.DeleteReactionUseCase
 import mega.privacy.android.domain.usecase.contact.GetMyUserHandleUseCase
 import mega.privacy.android.domain.usecase.contact.GetParticipantFirstNameUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserOnlineStatusByHandleUseCase
@@ -237,6 +244,11 @@ internal class ChatViewModelTest {
     private val monitorChatPendingChangesUseCase = mock<MonitorChatPendingChangesUseCase> {
         on { invoke(any()) } doReturn emptyFlow()
     }
+    private val addReactionUseCase = mock<AddReactionUseCase>()
+    private val getChatMessageUseCase = mock<GetChatMessageUseCase>()
+    private val deleteReactionUseCase = mock<DeleteReactionUseCase>()
+    private val sendGiphyMessageUseCase = mock<SendGiphyMessageUseCase>()
+    private val attachContactsUseCase = mock<AttachContactsUseCase>()
 
     @BeforeAll
     fun setup() {
@@ -290,6 +302,11 @@ internal class ChatViewModelTest {
             createNewImageUriUseCase,
             sendLocationMessageUseCase,
             sendChatAttachmentsUseCase,
+            addReactionUseCase,
+            getChatMessageUseCase,
+            deleteReactionUseCase,
+            sendGiphyMessageUseCase,
+            attachContactsUseCase,
         )
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         wheneverBlocking { isAnonymousModeUseCase() } doReturn false
@@ -374,7 +391,12 @@ internal class ChatViewModelTest {
             applicationScope = CoroutineScope(testDispatcher),
             sendLocationMessageUseCase = sendLocationMessageUseCase,
             sendChatAttachmentsUseCase = sendChatAttachmentsUseCase,
-            monitorChatPendingChangesUseCase = monitorChatPendingChangesUseCase
+            monitorChatPendingChangesUseCase = monitorChatPendingChangesUseCase,
+            addReactionUseCase = addReactionUseCase,
+            getChatMessageUseCase = getChatMessageUseCase,
+            deleteReactionUseCase = deleteReactionUseCase,
+            sendGiphyMessageUseCase = sendGiphyMessageUseCase,
+            attachContactsUseCase = attachContactsUseCase,
         )
     }
 
@@ -2355,6 +2377,125 @@ internal class ChatViewModelTest {
         underTest.state.test {
             assertThat(awaitItem().sendingText).isEqualTo("draft message")
         }
+    }
+
+    @Test
+    fun `test that close editing message updates state correctly`() = runTest {
+        underTest.onCloseEditing()
+        underTest.state.test {
+            assertThat(awaitItem().editingMessageId).isNull()
+        }
+    }
+
+    @Test
+    fun `test that add reaction invokes use case`() = runTest {
+        val msgId = 1234L
+        val reaction = "reaction"
+        whenever(addReactionUseCase(chatId, msgId, reaction)).thenReturn(Unit)
+        underTest.onAddReaction(msgId, reaction)
+        verify(addReactionUseCase).invoke(chatId, msgId, reaction)
+    }
+
+    @Test
+    fun `test that editing message updates state correctly when a chat message exists`() = runTest {
+        whenever(monitorChatPendingChangesUseCase(chatId))
+            .thenReturn(
+                flowOf(
+                    ChatPendingChanges(
+                        chatId = chatId,
+                        draftMessage = "draft message",
+                        editingMessageId = 1234L
+                    )
+                )
+            )
+        val message = mock<ChatMessage> {
+            on { content } doReturn "editing message"
+            on { msgId } doReturn 1234L
+            on { isEditable } doReturn true
+        }
+        whenever(getChatMessageUseCase(chatId, 1234L)).thenReturn(message)
+        initTestClass()
+        underTest.state.test {
+            val item = awaitItem()
+            assertThat(item.sendingText).isEqualTo("draft message")
+            assertThat(item.editingMessageId).isEqualTo(1234L)
+            assertThat(item.editingMessageContent).isEqualTo("editing message")
+        }
+    }
+
+    @Test
+    fun `test that editing message updates state correctly when a chat message doesn't exist`() =
+        runTest {
+            whenever(monitorChatPendingChangesUseCase(chatId))
+                .thenReturn(
+                    flowOf(
+                        ChatPendingChanges(
+                            chatId = chatId,
+                            draftMessage = "draft message",
+                            editingMessageId = 1234L
+                        )
+                    )
+                )
+            whenever(getChatMessageUseCase(chatId, 1234L)).thenReturn(null)
+            initTestClass()
+            underTest.state.test {
+                val item = awaitItem()
+                assertThat(item.sendingText).isEqualTo("draft message")
+                assertThat(item.editingMessageId).isNull()
+                assertThat(item.editingMessageContent).isNull()
+            }
+        }
+
+    @Test
+    fun `test that on send giphy message invokes use case`() = runTest {
+        val srcMp4 = "srcMp4"
+        val srcWebp = "srcWebp"
+        val sizeMp4 = 350L
+        val sizeWebp = 250L
+        val width = 250
+        val height = 500
+        val title = "title"
+        val gifData = GifData(srcMp4, srcWebp, sizeMp4, sizeWebp, width, height, title)
+        whenever(
+            sendGiphyMessageUseCase(
+                chatId,
+                srcMp4,
+                srcWebp,
+                sizeMp4,
+                sizeWebp,
+                width,
+                height,
+                title
+            )
+        ).thenReturn(Unit)
+        underTest.onSendGiphyMessage(gifData)
+        verify(sendGiphyMessageUseCase).invoke(
+            chatId,
+            srcMp4,
+            srcWebp,
+            sizeMp4,
+            sizeWebp,
+            width,
+            height,
+            title
+        )
+    }
+
+    @Test
+    fun `test that delete reaction invokes use case`() = runTest {
+        val msgId = 1234L
+        val reaction = "reaction"
+        whenever(deleteReactionUseCase(chatId, msgId, reaction)).thenReturn(Unit)
+        underTest.onDeleteReaction(msgId, reaction)
+        verify(deleteReactionUseCase).invoke(chatId, msgId, reaction)
+    }
+
+    @Test
+    fun `test that attach contacts invokes use case`() = runTest {
+        val contactList = listOf("contact1, contact2")
+        whenever(attachContactsUseCase(chatId, contactList)).thenReturn(Unit)
+        underTest.onAttachContacts(contactList)
+        verify(attachContactsUseCase).invoke(chatId, contactList)
     }
 
     private fun ChatRoom.getNumberParticipants() =

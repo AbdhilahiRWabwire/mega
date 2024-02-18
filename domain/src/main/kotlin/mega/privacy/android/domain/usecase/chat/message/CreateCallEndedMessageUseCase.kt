@@ -14,10 +14,11 @@ internal class CreateCallEndedMessageUseCase @Inject constructor() : CreateTyped
                 isMine = isMine,
                 userHandle = userHandle,
                 termCode = termCode,
-                duration = duration.toLong(),
+                duration = duration,
                 shouldShowAvatar = shouldShowAvatar,
                 shouldShowTime = shouldShowTime,
                 shouldShowDate = shouldShowDate,
+                reactions = reactions,
             )
         }
 }

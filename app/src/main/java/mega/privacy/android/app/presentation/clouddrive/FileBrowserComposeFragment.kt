@@ -57,7 +57,7 @@ import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.mapper.GetIntentToOpenFileMapper
 import mega.privacy.android.app.presentation.mapper.GetOptionsForToolbarMapper
 import mega.privacy.android.app.presentation.mapper.OptionsItemInfo
-import mega.privacy.android.app.presentation.transfers.startdownload.view.StartDownloadTransferComponent
+import mega.privacy.android.app.presentation.transfers.startdownload.view.StartDownloadComponent
 import mega.privacy.android.app.sync.fileBackups.FileBackupManager
 import mega.privacy.android.app.utils.CloudStorageOptionControlUtil
 import mega.privacy.android.app.utils.Constants
@@ -204,13 +204,14 @@ class FileBrowserComposeFragment : Fragment() {
                             )
                         },
                     )
-                    //snackbar host state should be attached to snackbar host in the scaffold, but we don't have a scaffold yet
+
+                    // Snackbar host state should be attached to snackbar host in the scaffold, but we don't have a scaffold yet
                     LaunchedEffect(snackbarHostState.currentSnackbarData) {
                         snackbarHostState.currentSnackbarData?.message?.let {
                             Util.showSnackbar(activity, it)
                         }
                     }
-                    StartDownloadTransferComponent(
+                    StartDownloadComponent(
                         uiState.downloadEvent,
                         {
                             fileBrowserViewModel.consumeDownloadEvent()

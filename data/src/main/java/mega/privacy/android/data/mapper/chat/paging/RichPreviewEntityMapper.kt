@@ -1,7 +1,7 @@
 package mega.privacy.android.data.mapper.chat.paging
 
 import mega.privacy.android.data.database.entity.chat.RichPreviewEntity
-import mega.privacy.android.domain.entity.chat.messages.ChatRichPreviewInfo
+import mega.privacy.android.domain.entity.chat.messages.meta.ChatRichPreviewInfo
 import javax.inject.Inject
 
 /**
@@ -16,7 +16,6 @@ class RichPreviewEntityMapper @Inject constructor() {
      */
     operator fun invoke(messageId: Long, info: ChatRichPreviewInfo) =
         RichPreviewEntity(
-            id = 0,
             messageId = messageId,
             title = info.title,
             description = info.description,

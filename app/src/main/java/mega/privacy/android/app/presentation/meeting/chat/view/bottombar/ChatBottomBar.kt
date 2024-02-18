@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -40,6 +41,7 @@ fun ChatBottomBar(
     onAttachmentClick: () -> Unit,
     onEmojiClick: () -> Unit,
     interactionSourceTextInput: MutableInteractionSource,
+    onCloseEditing: () -> Unit,
     viewModel: ChatBottomBarViewModel = hiltViewModel(),
 ) {
     var textFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
@@ -49,7 +51,7 @@ fun ChatBottomBar(
     }
     DisposableEffect(Unit) {
         onDispose {
-            viewModel.saveDraftMessage(textFieldValue.text)
+            viewModel.saveDraftMessage(textFieldValue.text, uiState.editingMessageId)
         }
     }
 
@@ -64,6 +66,7 @@ fun ChatBottomBar(
         onTextChange = {
             textFieldValue = it
         },
+        onCloseEditing = onCloseEditing,
     )
 }
 
@@ -89,6 +92,7 @@ fun ChatBottomBarContent(
     onEmojiClick: () -> Unit,
     onTextChange: (TextFieldValue) -> Unit,
     interactionSourceTextInput: MutableInteractionSource,
+    onCloseEditing: () -> Unit = {},
 ) {
     Column {
         UserTypingView(
@@ -111,6 +115,9 @@ fun ChatBottomBarContent(
             interactionSource = interactionSourceTextInput,
             textFieldValue = textFieldValue,
             onTextChange = onTextChange,
+            editingMessageId = uiState.editingMessageId,
+            editMessageContent = uiState.editingMessageContent,
+            onCloseEditing = onCloseEditing
         )
     }
 }
@@ -130,7 +137,7 @@ private fun ChatBottomBarPreview() {
             onAttachmentClick = {},
             onEmojiClick = {},
             onTextChange = {},
-            interactionSourceTextInput = MutableInteractionSource(),
+            interactionSourceTextInput = remember { MutableInteractionSource() },
         )
     }
 }

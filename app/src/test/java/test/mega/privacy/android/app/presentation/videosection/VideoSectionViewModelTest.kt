@@ -6,8 +6,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -17,10 +15,14 @@ import mega.privacy.android.app.presentation.videosection.VideoSectionViewModel
 import mega.privacy.android.app.presentation.videosection.mapper.UIVideoMapper
 import mega.privacy.android.app.presentation.videosection.mapper.UIVideoPlaylistMapper
 import mega.privacy.android.app.presentation.videosection.model.UIVideo
+import mega.privacy.android.app.presentation.videosection.model.UIVideoPlaylist
+import mega.privacy.android.app.presentation.videosection.model.VideoSectionTab
 import mega.privacy.android.domain.entity.Offline
 import mega.privacy.android.domain.entity.SortOrder
+import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeUpdate
 import mega.privacy.android.domain.entity.node.TypedVideoNode
+import mega.privacy.android.domain.entity.videosection.VideoPlaylist
 import mega.privacy.android.domain.usecase.GetCloudSortOrder
 import mega.privacy.android.domain.usecase.GetFileUrlByNodeHandleUseCase
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
@@ -29,6 +31,8 @@ import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunnin
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
+import mega.privacy.android.domain.usecase.videosection.AddVideosToPlaylistUseCase
+import mega.privacy.android.domain.usecase.videosection.CreateVideoPlaylistUseCase
 import mega.privacy.android.domain.usecase.videosection.GetAllVideosUseCase
 import mega.privacy.android.domain.usecase.videosection.GetVideoPlaylistsUseCase
 import org.junit.jupiter.api.AfterAll
@@ -64,6 +68,8 @@ class VideoSectionViewModelTest {
     private val getNodeByIdUseCase = mock<GetNodeByIdUseCase>()
     private val getVideoPlaylistsUseCase = mock<GetVideoPlaylistsUseCase>()
     private val uiVideoPlaylistMapper = mock<UIVideoPlaylistMapper>()
+    private val createVideoPlaylistUseCase = mock<CreateVideoPlaylistUseCase>()
+    private val addVideosToPlaylistUseCase = mock<AddVideosToPlaylistUseCase>()
 
     private val expectedVideo = mock<UIVideo> { on { name }.thenReturn("video name") }
 
@@ -78,7 +84,7 @@ class VideoSectionViewModelTest {
         wheneverBlocking { monitorOfflineNodeUpdatesUseCase() }.thenReturn(
             fakeMonitorOfflineNodeUpdatesFlow
         )
-        wheneverBlocking { getVideoPlaylistsUseCase() }.thenReturn(flowOf(listOf()))
+        wheneverBlocking { getVideoPlaylistsUseCase() }.thenReturn(listOf())
         initUnderTest()
     }
 
@@ -96,7 +102,9 @@ class VideoSectionViewModelTest {
             getFileUrlByNodeHandleUseCase = getFileUrlByNodeHandleUseCase,
             getNodeByIdUseCase = getNodeByIdUseCase,
             getVideoPlaylistsUseCase = getVideoPlaylistsUseCase,
-            uiVideoPlaylistMapper = uiVideoPlaylistMapper
+            uiVideoPlaylistMapper = uiVideoPlaylistMapper,
+            createVideoPlaylistUseCase = createVideoPlaylistUseCase,
+            addVideosToPlaylistUseCase = addVideosToPlaylistUseCase
         )
     }
 
@@ -113,7 +121,9 @@ class VideoSectionViewModelTest {
             getFileUrlByNodeHandleUseCase,
             getNodeByIdUseCase,
             getVideoPlaylistsUseCase,
-            uiVideoPlaylistMapper
+            uiVideoPlaylistMapper,
+            createVideoPlaylistUseCase,
+            addVideosToPlaylistUseCase
         )
     }
 
@@ -131,6 +141,8 @@ class VideoSectionViewModelTest {
             assertThat(initial.sortOrder).isEqualTo(SortOrder.ORDER_NONE)
             assertThat(initial.progressBarShowing).isEqualTo(true)
             assertThat(initial.videoPlaylists).isEmpty()
+            assertThat(initial.currentVideoPlaylist).isNull()
+            assertThat(initial.isVideoPlaylistCreatedSuccessfully).isFalse()
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -201,7 +213,7 @@ class VideoSectionViewModelTest {
     }
 
     @Test
-    fun `test that the result returned correctly when search query is not empty`() = runTest {
+    fun `test that the videos returned correctly when search query is not empty`() = runTest {
         val expectedTypedVideoNode = mock<TypedVideoNode> { on { name }.thenReturn("video name") }
         val videoNode = mock<TypedVideoNode> { on { name }.thenReturn("name") }
         val expectedVideo = mock<UIVideo> { on { name }.thenReturn("video name") }
@@ -306,26 +318,123 @@ class VideoSectionViewModelTest {
         }
 
     @Test
-    fun `test that an error would return an empty list`() = runTest {
-        whenever(getVideoPlaylistsUseCase()).thenReturn(flow { throw Exception("Error") })
-
-        underTest.state.test {
-            assertThat(awaitItem().videoPlaylists).isEmpty()
-        }
-    }
-
-    @Test
     fun `test that the playlists are returned correctly`() = runTest {
         initVideoPlaylistsReturned()
         initUnderTest()
 
+        underTest.onTabSelected(VideoSectionTab.Playlists)
+
         underTest.state.drop(1).test {
-            assertThat(awaitItem().videoPlaylists.size).isEqualTo(2)
+            val actual = awaitItem()
+            assertThat(actual.videoPlaylists.size).isEqualTo(2)
+            assertThat(actual.isPlaylistProgressBarShown).isFalse()
         }
     }
 
-    private fun initVideoPlaylistsReturned() {
-        whenever(getVideoPlaylistsUseCase()).thenReturn(flowOf(listOf(mock(), mock())))
-        whenever(uiVideoPlaylistMapper(any())).thenReturn(mock())
+    private suspend fun initVideoPlaylistsReturned() {
+        val uiVideoPlaylist = mock<UIVideoPlaylist> {
+            on { title }.thenReturn("playlist")
+        }
+        whenever(getVideoPlaylistsUseCase()).thenReturn(listOf(mock(), mock()))
+        whenever(uiVideoPlaylistMapper(any())).thenReturn(uiVideoPlaylist)
+    }
+
+    @Test
+    fun `test that the playlists returned correctly when search query is not empty`() = runTest {
+        val testTitle = "new playlist"
+        val expectedVideoPlaylist = mock<VideoPlaylist> { on { title }.thenReturn(testTitle) }
+        val videoPlaylist = mock<VideoPlaylist> { on { title }.thenReturn("title") }
+        val expectedUIVideoPlaylist = mock<UIVideoPlaylist> { on { title }.thenReturn(testTitle) }
+        val uiVideoPlaylist = mock<UIVideoPlaylist> { on { title }.thenReturn("title") }
+
+        whenever(getVideoPlaylistsUseCase()).thenReturn(
+            listOf(
+                expectedVideoPlaylist,
+                videoPlaylist
+            )
+        )
+        whenever(uiVideoPlaylistMapper(expectedVideoPlaylist)).thenReturn(expectedUIVideoPlaylist)
+        whenever(uiVideoPlaylistMapper(videoPlaylist)).thenReturn(uiVideoPlaylist)
+
+        underTest.onTabSelected(selectTab = VideoSectionTab.Playlists)
+
+        underTest.state.drop(1).test {
+            assertThat(awaitItem().videoPlaylists.size).isEqualTo(2)
+
+            underTest.searchQuery("playlist")
+            assertThat(awaitItem().videoPlaylists.size).isEqualTo(1)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `test that create video playlist returns a video playlist with the right title`() =
+        runTest {
+            val expectedTitle = "video playlist title"
+            val expectedVideoPlaylist = mock<VideoPlaylist> {
+                on { title }.thenReturn(expectedTitle)
+            }
+            whenever(createVideoPlaylistUseCase(expectedTitle)).thenReturn(expectedVideoPlaylist)
+
+            initUnderTest()
+
+            underTest.createNewPlaylist(expectedTitle)
+            underTest.state.drop(1).test {
+                val actual = awaitItem()
+                assertThat(actual.currentVideoPlaylist?.title).isEqualTo(expectedTitle)
+                assertThat(actual.isVideoPlaylistCreatedSuccessfully).isTrue()
+            }
+        }
+
+    @Test
+    fun `test that the correct state is returned when an error occurs in creating the video playlist`() =
+        runTest {
+            whenever(createVideoPlaylistUseCase(any())).thenAnswer { throw Exception() }
+
+            initUnderTest()
+
+            underTest.createNewPlaylist("video playlist title")
+            underTest.state.test {
+                val actual = awaitItem()
+                assertThat(actual.currentVideoPlaylist).isNull()
+                assertThat(actual.isVideoPlaylistCreatedSuccessfully).isFalse()
+            }
+        }
+
+    @Test
+    fun `test that the number of added videos is correct when adding videos to a playlist`() =
+        runTest {
+            val testPlaylistID = NodeId(1L)
+            val testVideoIDs = listOf(NodeId(1L), NodeId(2L), NodeId(3L))
+            whenever(addVideosToPlaylistUseCase(testPlaylistID, testVideoIDs)).thenReturn(
+                testVideoIDs.size
+            )
+
+            initUnderTest()
+
+            underTest.addVideosToPlaylist(testPlaylistID, testVideoIDs)
+            underTest.state.drop(1).test {
+                val actual = awaitItem()
+                assertThat(actual.numberOfAddedVideos).isEqualTo(testVideoIDs.size)
+            }
+        }
+
+    @Test
+    fun `test that the searchMode is closed when tab is switched`() = runTest {
+        initVideoPlaylistsReturned()
+        initVideosReturned()
+        initUnderTest()
+
+        underTest.state.test {
+            assertThat(awaitItem().searchMode).isFalse()
+            underTest.searchReady()
+            assertThat(awaitItem().searchMode).isTrue()
+            underTest.onTabSelected(selectTab = VideoSectionTab.Playlists)
+            assertThat(awaitItem().searchMode).isFalse()
+            underTest.searchReady()
+            assertThat(awaitItem().searchMode).isTrue()
+            underTest.onTabSelected(selectTab = VideoSectionTab.All)
+            assertThat(awaitItem().searchMode).isFalse()
+        }
     }
 }

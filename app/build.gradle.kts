@@ -346,6 +346,7 @@ dependencies {
     implementation(lib.coil)
     implementation(lib.coil.gif)
     implementation(lib.coil.svg)
+    implementation(lib.coil.video)
     implementation(lib.coil.compose)
     implementation(androidx.paging.compose)
 
@@ -423,11 +424,6 @@ dependencies {
     implementation(lib.blurry)
     implementation(lib.documentscanner)
     implementation(lib.simplestorage)
-    implementation(lib.shortcutbadger) {
-        artifact {
-            type = "aar"
-        }
-    }
     implementation(lib.compose.state.events)
     implementation(testlib.hamcrest)
     implementation(lib.mega.analytics)

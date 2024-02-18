@@ -16,6 +16,7 @@ import mega.privacy.android.domain.entity.chat.messages.management.CallStartedMe
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.time.Duration.Companion.seconds
 
 @RunWith(AndroidJUnit4::class)
 class ChatCallMessageViewTest {
@@ -35,6 +36,7 @@ class ChatCallMessageViewTest {
                 shouldShowAvatar = false,
                 shouldShowTime = false,
                 shouldShowDate = false,
+                reactions = emptyList(),
             ),
             isOneToOneChat = true
         )
@@ -51,11 +53,12 @@ class ChatCallMessageViewTest {
                 time = System.currentTimeMillis(),
                 isMine = true,
                 termCode = ChatMessageTermCode.ENDED,
-                duration = 0,
+                duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
                 shouldShowTime = false,
                 shouldShowDate = false,
+                reactions = emptyList(),
             ),
             isOneToOneChat = true
         )
@@ -72,11 +75,12 @@ class ChatCallMessageViewTest {
                 time = System.currentTimeMillis(),
                 isMine = true,
                 termCode = ChatMessageTermCode.ENDED,
-                duration = 0,
+                duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
                 shouldShowTime = false,
                 shouldShowDate = false,
+                reactions = emptyList(),
             ),
             isOneToOneChat = false
         )
@@ -97,11 +101,12 @@ class ChatCallMessageViewTest {
                 time = System.currentTimeMillis(),
                 isMine = true,
                 termCode = ChatMessageTermCode.REJECTED,
-                duration = 0,
+                duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
                 shouldShowTime = false,
                 shouldShowDate = false,
+                reactions = emptyList(),
             ),
             isOneToOneChat = true
         )
@@ -122,11 +127,12 @@ class ChatCallMessageViewTest {
                 time = System.currentTimeMillis(),
                 isMine = true,
                 termCode = ChatMessageTermCode.NO_ANSWER,
-                duration = 0,
+                duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
                 shouldShowTime = false,
                 shouldShowDate = false,
+                reactions = emptyList(),
             ),
             isOneToOneChat = true
         )
@@ -147,11 +153,12 @@ class ChatCallMessageViewTest {
                 time = System.currentTimeMillis(),
                 isMine = false,
                 termCode = ChatMessageTermCode.NO_ANSWER,
-                duration = 0,
+                duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
                 shouldShowTime = false,
                 shouldShowDate = false,
+                reactions = emptyList(),
             ),
             isOneToOneChat = true
         )
@@ -172,11 +179,12 @@ class ChatCallMessageViewTest {
                 time = System.currentTimeMillis(),
                 isMine = true,
                 termCode = ChatMessageTermCode.CANCELLED,
-                duration = 0,
+                duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
                 shouldShowTime = false,
                 shouldShowDate = false,
+                reactions = emptyList(),
             ),
             isOneToOneChat = true
         )
@@ -197,11 +205,12 @@ class ChatCallMessageViewTest {
                 time = System.currentTimeMillis(),
                 isMine = false,
                 termCode = ChatMessageTermCode.CANCELLED,
-                duration = 0,
+                duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
                 shouldShowTime = false,
                 shouldShowDate = false,
+                reactions = emptyList(),
             ),
             isOneToOneChat = true
         )
@@ -222,11 +231,12 @@ class ChatCallMessageViewTest {
                 time = System.currentTimeMillis(),
                 isMine = false,
                 termCode = ChatMessageTermCode.FAILED,
-                duration = 0,
+                duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
                 shouldShowTime = false,
                 shouldShowDate = false,
+                reactions = emptyList(),
             ),
             isOneToOneChat = true
         )

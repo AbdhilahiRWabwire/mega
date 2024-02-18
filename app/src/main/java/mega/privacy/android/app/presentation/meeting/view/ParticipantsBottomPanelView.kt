@@ -42,6 +42,8 @@ import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.android.core.ui.controls.buttons.RaisedDefaultMegaButton
 import mega.privacy.android.core.ui.controls.buttons.TextMegaButton
 import mega.privacy.android.core.ui.theme.extensions.black_white
+import mega.privacy.android.core.ui.theme.extensions.grey_020_grey_700
+import mega.privacy.android.core.ui.theme.extensions.teal_300_teal_200
 import mega.privacy.android.core.ui.theme.extensions.textColorPrimary
 import mega.privacy.android.core.ui.utils.isScreenOrientationLandscape
 import mega.privacy.android.domain.entity.ChatRoomPermission
@@ -71,17 +73,11 @@ fun ParticipantsBottomPanelView(
     onParticipantMoreOptionsClicked: (ChatParticipant) -> Unit = {},
     onRingParticipantClicked: (ChatParticipant) -> Unit = {},
     onRingAllParticipantsClicked: () -> Unit = {},
+    onMuteAllParticipantsClick: () -> Unit,
 ) {
 
     val listState = rememberLazyListState()
     val maxNumParticipantsNoSeeAllOption = 4
-
-    val shouldWaitingRoomSectionBeShown = state.hasWaitingRoom && state.hasHostPermission()
-
-    val shouldNumberOfParticipantsItemBeShown =
-        state.participantsSection == ParticipantsSection.InCallSection ||
-                (state.participantsSection == ParticipantsSection.NotInCallSection && state.chatParticipantsNotInCall.isNotEmpty()) ||
-                (state.participantsSection == ParticipantsSection.WaitingRoomSection && state.chatParticipantsInWaitingRoom.isNotEmpty())
 
     Column(
         modifier = Modifier
@@ -104,7 +100,7 @@ fun ParticipantsBottomPanelView(
                             .fillMaxWidth()
                             .padding(start = 16.dp, end = 20.dp, bottom = 10.dp)
                     ) {
-                        if (shouldWaitingRoomSectionBeShown && state.usersInWaitingRoomIDs.isNotEmpty()) {
+                        if (state.shouldWaitingRoomSectionBeShown() && state.usersInWaitingRoomIDs.isNotEmpty()) {
                             CallTextButtonChip(
                                 modifier = Modifier
                                     .padding(end = 8.dp)
@@ -116,7 +112,7 @@ fun ParticipantsBottomPanelView(
                         }
 
                         CallTextButtonChip(
-                            modifier = if (shouldWaitingRoomSectionBeShown) {
+                            modifier = if (state.shouldWaitingRoomSectionBeShown()) {
                                 Modifier
                                     .padding(end = 8.dp)
                                     .fillParentMaxWidth(0.29F)
@@ -129,7 +125,7 @@ fun ParticipantsBottomPanelView(
                         )
 
                         CallTextButtonChip(
-                            modifier = if (shouldWaitingRoomSectionBeShown) {
+                            modifier = if (state.shouldWaitingRoomSectionBeShown()) {
                                 Modifier.fillParentMaxWidth(0.29F)
                             } else {
                                 Modifier
@@ -139,7 +135,7 @@ fun ParticipantsBottomPanelView(
                             isChecked = state.participantsSection == ParticipantsSection.NotInCallSection
                         )
 
-                        if (shouldWaitingRoomSectionBeShown && state.usersInWaitingRoomIDs.isEmpty()) {
+                        if (state.shouldWaitingRoomSectionBeShown() && state.usersInWaitingRoomIDs.isEmpty()) {
                             CallTextButtonChip(
                                 modifier = Modifier
                                     .padding(start = 8.dp)
@@ -188,11 +184,10 @@ fun ParticipantsBottomPanelView(
                                 )
                             }
                         }
-
                     }
                 }
 
-                if (shouldNumberOfParticipantsItemBeShown) {
+                if (state.shouldNumberOfParticipantsItemBeShown()) {
                     item(key = "Number of participants") {
                         Row(
                             modifier = Modifier
@@ -202,32 +197,61 @@ fun ParticipantsBottomPanelView(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Row(
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .defaultMinSize(minHeight = 48.dp)
+                                    .fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(
-                                    text = when (state.participantsSection) {
-                                        ParticipantsSection.WaitingRoomSection -> stringResource(
-                                            id = R.string.meetings_bottom_panel_number_of_participants_in_the_waiting_room_label,
-                                            state.usersInWaitingRoomIDs.size
-                                        )
+                                Row(
+                                    modifier = Modifier
+                                        .weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = when (state.participantsSection) {
+                                            ParticipantsSection.WaitingRoomSection -> stringResource(
+                                                id = R.string.meetings_bottom_panel_number_of_participants_in_the_waiting_room_label,
+                                                state.usersInWaitingRoomIDs.size
+                                            )
 
-                                        ParticipantsSection.InCallSection -> stringResource(
-                                            id = R.string.participants_number,
-                                            state.chatParticipantsInCall.size
-                                        )
+                                            ParticipantsSection.InCallSection -> stringResource(
+                                                id = R.string.participants_number,
+                                                state.chatParticipantsInCall.size
+                                            )
 
-                                        ParticipantsSection.NotInCallSection -> pluralStringResource(
-                                            id = R.plurals.meetings_bottom_panel_number_of_participants_not_in_call_label,
-                                            count = state.chatParticipantsNotInCall.size,
-                                            state.chatParticipantsNotInCall.size
-                                        )
+                                            ParticipantsSection.NotInCallSection -> pluralStringResource(
+                                                id = R.plurals.meetings_bottom_panel_number_of_participants_not_in_call_label,
+                                                count = state.chatParticipantsNotInCall.size,
+                                                state.chatParticipantsNotInCall.size
+                                            )
 
-                                    },
-                                    style = MaterialTheme.typography.body2.copy(color = MaterialTheme.colors.textColorPrimary),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                        },
+                                        style = MaterialTheme.typography.body2.copy(color = MaterialTheme.colors.textColorPrimary),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (state.shouldMuteAllItemBeShown()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .wrapContentSize(Alignment.CenterEnd)
+                                            .padding(start = 22.dp)
+                                            .clickable {
+                                                onMuteAllParticipantsClick()
+                                            },
+
+                                        ) {
+                                        Text(
+                                            text = if (state.allParticipantsAreMuted)
+                                                stringResource(id = R.string.meetings_bottom_panel_in_call_participants_all_muted_label)
+                                            else
+                                                stringResource(id = R.string.meetings_bottom_panel_in_call_participants_mute_all_participants_button),
+                                            style = MaterialTheme.typography.subtitle2.copy(color = if (state.allParticipantsAreMuted) MaterialTheme.colors.grey_020_grey_700 else MaterialTheme.colors.teal_300_teal_200),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
                             }
 
                             if (state.participantsSection == ParticipantsSection.WaitingRoomSection && state.usersInWaitingRoomIDs.isNotEmpty()) {
@@ -288,7 +312,7 @@ fun ParticipantsBottomPanelView(
                 item(key = "Participants list") {
                     when (state.participantsSection) {
                         ParticipantsSection.WaitingRoomSection -> {
-                            if (shouldWaitingRoomSectionBeShown && state.chatParticipantsInWaitingRoom.isNotEmpty()) {
+                            if (state.shouldWaitingRoomSectionBeShown() && state.chatParticipantsInWaitingRoom.isNotEmpty()) {
                                 state.chatParticipantsInWaitingRoom.indices.forEach { i ->
                                     if (i < maxNumParticipantsNoSeeAllOption) {
                                         ParticipantInCallItem(
@@ -359,7 +383,7 @@ fun ParticipantsBottomPanelView(
 
                 item(key = "See all") {
                     if (
-                        (state.participantsSection == ParticipantsSection.WaitingRoomSection && shouldWaitingRoomSectionBeShown && state.chatParticipantsInWaitingRoom.size > maxNumParticipantsNoSeeAllOption) ||
+                        (state.participantsSection == ParticipantsSection.WaitingRoomSection && state.shouldWaitingRoomSectionBeShown() && state.chatParticipantsInWaitingRoom.size > maxNumParticipantsNoSeeAllOption) ||
                         (state.participantsSection == ParticipantsSection.InCallSection && state.chatParticipantsInCall.size > maxNumParticipantsNoSeeAllOption) ||
                         (state.participantsSection == ParticipantsSection.NotInCallSection && state.chatParticipantsNotInCall.size > maxNumParticipantsNoSeeAllOption)
                     ) {
@@ -534,6 +558,7 @@ fun ParticipantsBottomPanelGuestInCallSectionPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -562,6 +587,7 @@ fun ParticipantsBottomPanelGuestNotInCallSectionPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -590,6 +616,7 @@ fun ParticipantsBottomPanelGuestNotInCallSectionEmptyStatePreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -618,6 +645,7 @@ fun ParticipantsBottomPanelNonHostInCallSectionPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -647,6 +675,7 @@ fun ParticipantsBottomPanelNonHostAndOpenInviteInCallSectionPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -675,6 +704,7 @@ fun ParticipantsBottomPanelNonHostNotInCallSectionPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -703,6 +733,7 @@ fun ParticipantsBottomPanelNonHostNotInCallSectionEmptyStatePreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -730,6 +761,7 @@ fun ParticipantsBottomPanelInCallView4ParticipantsPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -757,6 +789,7 @@ fun ParticipantsBottomPanelInCallView6ParticipantsPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -784,6 +817,7 @@ fun ParticipantsBottomPanelNotInCallViewEmptyStatePreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -811,6 +845,7 @@ fun ParticipantsBottomPanelNotInCallView4ParticipantsPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -838,6 +873,7 @@ fun ParticipantsBottomPanelNotInCallView6ParticipantsPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -865,6 +901,7 @@ fun ParticipantsBottomPanelNotInCallViewLandEmptyStatePreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -893,6 +930,7 @@ fun ParticipantsBottomPanelWaitingRoomViewEmptyStatePreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -921,6 +959,7 @@ fun ParticipantsBottomPanelWaitingRoomView4ParticipantsPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -949,6 +988,7 @@ fun ParticipantsBottomPanelWaitingRoomView4ParticipantsLandPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -977,6 +1017,7 @@ fun ParticipantsBottomPanelWaitingRoomView6ParticipantsPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -1005,6 +1046,7 @@ fun ParticipantsBottomPanelWaitingRoomView6ParticipantsLandPreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }
@@ -1033,6 +1075,7 @@ fun ParticipantsBottomPanelWaitingRoomViewLandEmptyStatePreview() {
             onAllowAddParticipantsClick = {},
             onShareMeetingLinkClick = {},
             onParticipantMoreOptionsClicked = {},
+            onMuteAllParticipantsClick = {},
             onSeeAllClick = {})
     }
 }

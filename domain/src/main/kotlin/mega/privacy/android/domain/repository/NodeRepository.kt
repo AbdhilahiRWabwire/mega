@@ -62,6 +62,13 @@ interface NodeRepository {
     suspend fun getVerifiedIncomingShares(order: SortOrder): List<ShareData>
 
     /**
+     * Provides all outgoing shares from SDK with proper sorting and filtering
+     *
+     * @return List of [ShareData]
+     */
+    suspend fun getAllOutgoingShares(order: SortOrder): List<ShareData>
+
+    /**
      * check whether the node is in rubbish bin or not
      *
      * @return Boolean
@@ -94,6 +101,14 @@ interface NodeRepository {
      * @return The node if found else null
      */
     suspend fun getNodeById(nodeId: NodeId): Node?
+
+    /**
+     * Get node by its serialized data
+     *
+     * @param serializedData
+     * @return The node if can be un-serialized else null
+     */
+    suspend fun getNodeFromSerializedData(serializedData: String): UnTypedNode?
 
     /**
      * Retrieves the Node Path with the provided Node ID
@@ -252,6 +267,11 @@ interface NodeRepository {
      * Gets invalid handle
      */
     suspend fun getInvalidHandle(): Long
+
+    /**
+     * Checks if a node is valid
+     */
+    suspend fun isValidNode(nodeId: NodeId): Boolean
 
     /**
      * Creates a new share key for the node if there is no share key already created and returns a lambda that can be used to set permissions to this node
@@ -634,4 +654,32 @@ interface NodeRepository {
      * @param nodeToLeaveShare [NodeId]
      */
     suspend fun leaveShareByHandle(nodeToLeaveShare: NodeId)
+
+    /**
+     * Share Node with Email with permission
+     * @param nodeId [NodeId]
+     * @param email Users' email
+     * @param accessPermission [AccessPermission]
+     */
+    suspend fun shareFolder(nodeId: NodeId, email: String, accessPermission: AccessPermission)
+
+    /**
+     * Gets my binary user handle
+     * @return user handle [Long]
+     */
+    suspend fun getMyUserHandleBinary(): Long
+
+    /**
+     * Gets nodes from fingerprint
+     * @param fingerprint
+     * @return list of [UnTypedNode]
+     */
+    suspend fun getNodesFromFingerPrint(fingerprint: String): List<UnTypedNode>
+
+    /**
+     * Gets owner of node
+     * @param nodeId [NodeId]
+     * @return owner node [Long]
+     */
+    suspend fun getOwnerNodeHandle(nodeId: NodeId): Long?
 }

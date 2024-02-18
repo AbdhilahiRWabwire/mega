@@ -9,26 +9,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import mega.privacy.android.app.presentation.meeting.chat.extension.canForward
-import mega.privacy.android.app.presentation.meeting.chat.extension.canLongClick
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.AvatarMessage
 import mega.privacy.android.app.presentation.meeting.chat.view.message.meta.ChatLocationMessageView
+import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
+import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.chat.messages.meta.LocationMessage
 
 /**
  * Location ui message
  */
 class LocationUiMessage(
-    val message: LocationMessage,
+    private val message: LocationMessage,
+    override val reactions: List<UIReaction>,
 ) : AvatarMessage() {
     @OptIn(ExperimentalFoundationApi::class)
-    override val contentComposable: @Composable (RowScope.() -> Unit) = {
+    @Composable
+    override fun RowScope.ContentComposable(onLongClick: (TypedMessage) -> Unit) {
         ChatLocationMessageView(
             message = message,
             modifier = Modifier
                 .weight(weight = 1f, fill = false)
                 .combinedClickable(
                     onClick = {},
-                    onLongClick = { longClick?.let { it(message) } }
+                    onLongClick = { onLongClick(message) }
                 )
         )
     }
@@ -51,6 +54,5 @@ class LocationUiMessage(
     override val canForward = message.canForward
     override val timeSent = message.time
     override val userHandle = message.userHandle
-    override val canLongClick = message.canLongClick
     override val id = message.msgId
 }

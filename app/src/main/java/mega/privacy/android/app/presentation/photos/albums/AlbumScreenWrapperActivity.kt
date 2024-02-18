@@ -3,15 +3,19 @@ package mega.privacy.android.app.presentation.photos.albums
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentContainerView
 import dagger.hilt.android.AndroidEntryPoint
 import mega.privacy.android.app.BaseActivity
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.saver.NodeSaver
+import mega.privacy.android.app.getLink.GetLinkViewModel
 import mega.privacy.android.app.main.FileExplorerActivity
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.presentation.extensions.isDarkMode
@@ -52,6 +56,8 @@ class AlbumScreenWrapperActivity : BaseActivity() {
     private val albumScreen: AlbumScreen? by lazy(LazyThreadSafetyMode.NONE) {
         AlbumScreen.valueOf(intent.getStringExtra(ALBUM_SCREEN) ?: "")
     }
+
+    private val getLinkViewModel: GetLinkViewModel by viewModels()
 
     @Inject
     lateinit var albumImportPreviewProvider: AlbumImportPreviewProvider
@@ -95,6 +101,8 @@ class AlbumScreenWrapperActivity : BaseActivity() {
 
                     AlbumScreen.AlbumGetLinkScreen -> {
                         AlbumGetLinkScreen(
+                            getLinkViewModel = getLinkViewModel,
+                            createView = ::showFragment,
                             onBack = ::finish,
                             onLearnMore = {
                                 val intent = createAlbumDecryptionKeyScreen(this)
@@ -117,6 +125,7 @@ class AlbumScreenWrapperActivity : BaseActivity() {
 
                     AlbumScreen.AlbumGetMultipleLinksScreen -> {
                         AlbumGetMultipleLinksScreen(
+                            createView = ::showFragment,
                             onBack = ::finish,
                             onShareLinks = { albumLinks ->
                                 val linksString = albumLinks.joinToString(System.lineSeparator()) {
@@ -196,6 +205,19 @@ class AlbumScreenWrapperActivity : BaseActivity() {
                 }
             }
         }
+    }
+
+    private fun showFragment(fragment: Fragment): View {
+        val containerId = R.id.container
+        val containerView = FragmentContainerView(this).apply {
+            id = containerId
+        }
+
+        supportFragmentManager.beginTransaction()
+            .replace(containerId, fragment, fragment.javaClass.simpleName)
+            .commitAllowingStateLoss()
+
+        return containerView
     }
 
     /**

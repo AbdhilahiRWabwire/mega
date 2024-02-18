@@ -14,6 +14,7 @@ import androidx.core.view.isVisible
 import androidx.recyclerview.widget.ListAdapter
 import mega.privacy.android.app.R
 import mega.privacy.android.app.databinding.ItemPlaylistBinding
+import mega.privacy.android.app.presentation.time.mapper.DurationInSecondsTextMapper
 
 /**
  * RecyclerView adapter for playlist screen.
@@ -26,7 +27,8 @@ class PlaylistAdapter(
     private val context: Context,
     private val itemOperation: PlaylistItemOperation,
     val isAudio: Boolean,
-    private val dragStartListener: DragStartListener
+    private val dragStartListener: DragStartListener,
+    private val durationInSecondsTextMapper: DurationInSecondsTextMapper,
 ) : ListAdapter<PlaylistItem, PlaylistViewHolder>(PlaylistItemDiffCallback()) {
 
     private var isPaused = false
@@ -60,13 +62,16 @@ class PlaylistAdapter(
         val currentItemIndex = holder.absoluteAdapterPosition
 
         with(holder.itemView.findViewById<TextView>(R.id.duration)) {
-            isVisible = playlistItem.duration > 0L
+            isVisible = playlistItem.duration.inWholeSeconds > 0L
 
             if (playlistItem.type == TYPE_PLAYING) {
                 playingItemIndex = holder.absoluteAdapterPosition
-                text = playlistItem.formatCurrentPositionAndDuration(currentPlayingPosition)
+                text = playlistItem.formatCurrentPositionAndDuration(
+                    currentPlayingPosition,
+                    durationInSecondsTextMapper
+                )
             } else {
-                text = playlistItem.formatDuration()
+                text = durationInSecondsTextMapper(playlistItem.duration)
             }
         }
 
