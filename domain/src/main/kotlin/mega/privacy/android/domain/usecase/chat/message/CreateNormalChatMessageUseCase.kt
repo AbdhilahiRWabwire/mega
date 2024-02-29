@@ -15,14 +15,15 @@ class CreateNormalChatMessageUseCase @Inject constructor(
     private val getLinkTypesUseCase: GetLinkTypesUseCase,
 ) : CreateTypedMessageUseCase {
     //To be implemented the different type of normal messages. Check [NormalMessage].
-    override fun invoke(request: CreateTypedMessageInfo): NormalMessage {
+    override suspend fun invoke(request: CreateTypedMessageInfo): NormalMessage {
         with(request) {
             val allLinks = getLinkTypesUseCase(content.orEmpty())
             val hasSupportedLink = allLinks.any { it.type in supportedTypes }
             return when {
                 hasSupportedLink ->
                     TextLinkMessage(
-                        msgId = msgId,
+                        chatId = chatId,
+                        msgId = messageId,
                         time = timestamp,
                         isMine = isMine,
                         userHandle = userHandle,
@@ -30,21 +31,21 @@ class CreateNormalChatMessageUseCase @Inject constructor(
                         content = content.orEmpty(),
                         shouldShowAvatar = shouldShowAvatar,
                         shouldShowTime = shouldShowTime,
-                        shouldShowDate = shouldShowDate,
                         reactions = reactions,
                     )
 
                 else -> TextMessage(
-                    msgId = msgId,
+                    chatId = chatId,
+                    msgId = messageId,
                     time = timestamp,
                     isMine = isMine,
                     userHandle = userHandle,
-                    content = content,
+                    content = content.orEmpty(),
                     hasOtherLink = allLinks.any { it.type !in supportedTypes },
                     shouldShowAvatar = shouldShowAvatar,
                     shouldShowTime = shouldShowTime,
-                    shouldShowDate = shouldShowDate,
                     reactions = reactions,
+                    isEdited = isEdited,
                 )
             }
         }

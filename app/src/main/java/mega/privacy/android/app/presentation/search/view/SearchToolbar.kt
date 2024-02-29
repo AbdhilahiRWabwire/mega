@@ -4,25 +4,35 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
 import mega.privacy.android.app.R
-import mega.privacy.android.app.presentation.node.view.toolbar.ToolbarViewModel
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.app.presentation.node.NodeActionHandler
+import mega.privacy.android.app.presentation.node.view.ToolbarMenuItem
+import mega.privacy.android.app.presentation.node.view.toolbar.NodeToolbarViewModel
+import mega.privacy.android.app.presentation.search.SearchActivity
 import mega.privacy.android.core.ui.controls.appbar.SelectModeAppBar
-import mega.privacy.android.core.ui.model.MenuAction
+import mega.privacy.android.core.ui.model.MenuActionWithClick
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.node.NodeSourceType
+import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.legacy.core.ui.controls.appbar.ExpandedSearchAppBar
+import mega.privacy.android.shared.theme.MegaAppTheme
 
 /**
  * Search toolbar used in search activity
  *
- * @param selectionCount
  * @param searchQuery
  * @param updateSearchQuery
- * @param menuActions
+ * @param selectedNodes
+ * @param totalCount
+ * @param onBackPressed
+ * @param navHostController
+ * @param nodeActionHandler
+ * @param clearSelection
+ * @param nodeSourceType
  */
 @Composable
 fun SearchToolBar(
@@ -30,14 +40,18 @@ fun SearchToolBar(
     updateSearchQuery: (String) -> Unit,
     selectedNodes: Set<TypedNode>,
     totalCount: Int,
-    toolbarViewModel: ToolbarViewModel = hiltViewModel(),
     onBackPressed: () -> Unit,
+    navHostController: NavHostController,
+    nodeActionHandler: NodeActionHandler,
+    clearSelection: () -> Unit,
+    nodeSourceType: NodeSourceType,
+    toolbarViewModel: NodeToolbarViewModel = hiltViewModel(),
 ) {
     LaunchedEffect(key1 = selectedNodes.size) {
         toolbarViewModel.updateToolbarState(
             selectedNodes = selectedNodes,
             resultCount = totalCount,
-            nodeSourceType = NodeSourceType.CLOUD_DRIVE
+            nodeSourceType = nodeSourceType
         )
     }
     val toolbarState by toolbarViewModel.state.collectAsStateWithLifecycle()
@@ -45,23 +59,35 @@ fun SearchToolBar(
         searchQuery = searchQuery,
         updateSearchQuery = updateSearchQuery,
         selectedNodes = selectedNodes,
-        menuActions = toolbarState.menuActions,
-        onBackPressed = onBackPressed
+        menuActions = toolbarState.toolbarMenuItems,
+        onBackPressed = onBackPressed,
+        navHostController = navHostController,
+        handler = nodeActionHandler,
+        clearSelection = clearSelection,
     )
 }
 
 @Composable
 private fun SearchToolbarBody(
     searchQuery: String,
-    menuActions: List<MenuAction>,
+    menuActions: List<ToolbarMenuItem>,
     updateSearchQuery: (String) -> Unit,
     selectedNodes: Set<TypedNode>,
     onBackPressed: () -> Unit,
+    navHostController: NavHostController,
+    handler: NodeActionHandler,
+    clearSelection: () -> Unit,
 ) {
     if (selectedNodes.isNotEmpty()) {
+        val actions = menuActions.map {
+            MenuActionWithClick(
+                menuAction = it.action,
+                onClick = it.control(clearSelection, handler::handleAction, navHostController)
+            )
+        }
         SelectModeAppBar(
             title = "${selectedNodes.size}",
-            actions = menuActions,
+            actions = actions,
             onNavigationPressed = { onBackPressed() }
         )
     } else {
@@ -81,10 +107,16 @@ private fun PreviewSearchToolbarBody() {
     MegaAppTheme(isDark = isSystemInDarkTheme()) {
         SearchToolbarBody(
             searchQuery = "searchQuery",
+            menuActions = emptyList(),
             updateSearchQuery = {},
-            onBackPressed = {},
             selectedNodes = emptySet(),
-            menuActions = emptyList()
+            onBackPressed = {},
+            navHostController = NavHostController(LocalContext.current),
+            handler = NodeActionHandler(
+                LocalContext.current as SearchActivity,
+                hiltViewModel(),
+            ),
+            clearSelection = {}
         )
     }
 }

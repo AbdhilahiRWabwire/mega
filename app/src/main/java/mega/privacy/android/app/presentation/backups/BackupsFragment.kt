@@ -13,6 +13,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
 import androidx.core.content.FileProvider
@@ -65,6 +66,7 @@ import mega.privacy.android.app.utils.MegaNodeUtil.manageURLNode
 import mega.privacy.android.app.utils.MegaNodeUtil.onNodeTapped
 import mega.privacy.android.app.utils.MegaNodeUtil.shareNodes
 import mega.privacy.android.app.utils.Util
+import mega.privacy.android.app.utils.ViewUtils.isVisible
 import mega.privacy.android.app.utils.displayMetrics
 import mega.privacy.android.data.qualifier.MegaApi
 import mega.privacy.android.domain.entity.node.NodeId
@@ -140,6 +142,7 @@ class BackupsFragment : RotatableFragment() {
         this.binding = binding
 
         setupToolbar()
+        setupErrorBanner()
         setupAdapter()
         setupRecyclerView()
         switchViewType()
@@ -341,6 +344,18 @@ class BackupsFragment : RotatableFragment() {
     }
 
     /**
+     * Sets up the Error banner
+     */
+    private fun setupErrorBanner() {
+        binding?.backupErrorBanner?.apply {
+            viewModel.backupErrorMessage?.let { errorMessage ->
+                text = getString(errorMessage)
+                visibility = View.VISIBLE
+            } ?: run { visibility = View.GONE }
+        }
+    }
+
+    /**
      * Establishes the [MegaNodeAdapter]
      */
     private fun setupAdapter() {
@@ -507,7 +522,8 @@ class BackupsFragment : RotatableFragment() {
         if (isAdded) {
             binding?.backupsRecyclerView?.let {
                 val hasElevation = (it.canScrollVertically(-1) && it.isVisible) ||
-                        megaNodeAdapter?.isMultipleSelect == true
+                        megaNodeAdapter?.isMultipleSelect == true ||
+                        binding?.backupErrorBanner?.isVisible() == true
                 (requireActivity() as ManagerActivity).changeAppBarElevation(hasElevation)
             }
         }
@@ -996,13 +1012,22 @@ class BackupsFragment : RotatableFragment() {
         const val PARAM_BACKUPS_HANDLE = "PARAM_BACKUPS_HANDLE"
 
         /**
-         * Creates a new instance of [BackupsFragment]
+         * The message to be displayed in the error banner
          */
-        fun newInstance(backupsHandle: Long): BackupsFragment {
+        const val PARAM_ERROR_MESSAGE = "PARAM_ERROR_MESSAGE"
+
+        /**
+         * Creates a new instance of [BackupsFragment]
+         *
+         * @param backupsHandle The Node Handle to immediately access a Backups Node
+         * @param errorMessage The [StringRes] of the error message to display
+         */
+        fun newInstance(backupsHandle: Long, @StringRes errorMessage: Int?): BackupsFragment {
             Timber.d("newInstance()")
             val fragment = BackupsFragment()
             fragment.arguments = bundleOf(
                 PARAM_BACKUPS_HANDLE to backupsHandle,
+                PARAM_ERROR_MESSAGE to errorMessage,
             )
             return fragment
         }

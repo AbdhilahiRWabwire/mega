@@ -142,6 +142,7 @@ private fun AlterParticipantsMessageViewSameHandlePreview(
     MegaAppTheme(isDark = isSystemInDarkTheme()) {
         AlterParticipantsMessageView(
             message = AlterParticipantsMessage(
+                chatId = 1L,
                 userHandle = 1L,
                 handleOfAction = 1L,
                 privilege = permission,
@@ -150,7 +151,6 @@ private fun AlterParticipantsMessageViewSameHandlePreview(
                 msgId = 1L,
                 shouldShowAvatar = false,
                 shouldShowTime = false,
-                shouldShowDate = false,
                 reactions = emptyList(),
             ),
             ownerActionFullName = "Owner",
@@ -167,6 +167,7 @@ private fun AlterParticipantsMessageViewDifferentHandlePreview(
     MegaAppTheme(isDark = isSystemInDarkTheme()) {
         AlterParticipantsMessageView(
             message = AlterParticipantsMessage(
+                chatId = 1L,
                 userHandle = 1L,
                 handleOfAction = 2L,
                 privilege = permission,
@@ -175,7 +176,6 @@ private fun AlterParticipantsMessageViewDifferentHandlePreview(
                 msgId = 1L,
                 shouldShowAvatar = false,
                 shouldShowTime = false,
-                shouldShowDate = false,
                 reactions = emptyList(),
             ),
             ownerActionFullName = "Owner",

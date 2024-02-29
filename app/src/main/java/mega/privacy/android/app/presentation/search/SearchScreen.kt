@@ -10,7 +10,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
@@ -20,6 +19,7 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.presentation.data.NodeUIItem
+import mega.privacy.android.app.presentation.node.NodeActionHandler
 import mega.privacy.android.app.presentation.search.model.SearchFilter
 import mega.privacy.android.app.presentation.search.navigation.nodeBottomSheetRoute
 import mega.privacy.android.app.presentation.search.view.SearchComposeView
@@ -28,7 +28,7 @@ import mega.privacy.android.domain.entity.node.TypedNode
 /**
  * Search activity to search Nodes and display
  */
-@OptIn(ExperimentalMaterialApi::class, ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun SearchScreen(
     trackAnalytics: (SearchFilter?) -> Unit,
@@ -38,6 +38,7 @@ fun SearchScreen(
     navHostController: NavHostController,
     onBackPressed: () -> Unit,
     searchActivityViewModel: SearchActivityViewModel,
+    nodeActionHandler: NodeActionHandler,
     modifier: Modifier = Modifier,
 ) {
     val uiState by searchActivityViewModel.state.collectAsStateWithLifecycle()
@@ -80,7 +81,10 @@ fun SearchScreen(
         updateFilter = searchActivityViewModel::updateFilter,
         trackAnalytics = trackAnalytics,
         updateSearchQuery = searchActivityViewModel::updateSearchQuery,
-        onBackPressed = onBackPressed
+        clearSelection = searchActivityViewModel::clearSelection,
+        onBackPressed = onBackPressed,
+        navHostController = navHostController,
+        nodeActionHandler = nodeActionHandler,
     )
     handleClick(uiState.lastSelectedNode)
 }

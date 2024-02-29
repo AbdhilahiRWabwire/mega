@@ -577,4 +577,22 @@ interface AccountRepository {
      * Kills all other active Sessions except the current Session
      */
     suspend fun killOtherSessions()
+
+    /**
+     * Confirms an Account cancellation
+     *
+     * @param cancellationLink The Account cancellation link
+     * @param accountPassword The password of the Account to be cancelled
+     */
+    suspend fun confirmCancelAccount(cancellationLink: String, accountPassword: String)
+
+    /**
+     * Confirms the User's change of Email
+     *
+     * @param changeEmailLink The Change Email link
+     * @param accountPassword The password of the Account whose email to be changed
+     *
+     * @return The new Email Address
+     */
+    suspend fun confirmChangeEmail(changeEmailLink: String, accountPassword: String): String
 }

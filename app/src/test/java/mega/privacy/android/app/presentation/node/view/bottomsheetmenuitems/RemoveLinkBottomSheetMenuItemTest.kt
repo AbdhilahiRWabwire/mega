@@ -19,7 +19,7 @@ class RemoveLinkBottomSheetMenuItemTest {
     private val exportedData = mock<ExportedData> {
         on { publicLink } doReturn "publicLink"
     }
-    private val underTest = RemoveLinkBottomSheetMenuItem()
+    private val underTest = RemoveLinkBottomSheetMenuItem(mock())
 
     @ParameterizedTest(name = "isNodeInRubbish {0} - accessPermission {1} - isInBackups {2} - node {3} - expected {4}")
     @MethodSource("provideTestParameters")

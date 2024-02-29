@@ -12,15 +12,14 @@ class TypedMessageEntityMapper @Inject constructor() {
      * Invoke
      *
      * @param request
-     * @param chatId
      * @return TypedMessageEntity
      */
-    operator fun invoke(request: CreateTypedMessageRequest, chatId: Long) =
+    operator fun invoke(request: CreateTypedMessageRequest) =
         with(request) {
             TypedMessageEntity(
                 chatId = chatId,
                 status = status,
-                msgId = msgId,
+                messageId = messageId,
                 tempId = tempId,
                 msgIndex = msgIndex,
                 userHandle = userHandle,
@@ -48,7 +47,6 @@ class TypedMessageEntityMapper @Inject constructor() {
                 changes = changes,
                 shouldShowAvatar = shouldShowAvatar,
                 shouldShowTime = shouldShowTime,
-                shouldShowDate = shouldShowDate,
                 isMine = isMine,
                 textMessage = textMessage,
                 reactions = reactions

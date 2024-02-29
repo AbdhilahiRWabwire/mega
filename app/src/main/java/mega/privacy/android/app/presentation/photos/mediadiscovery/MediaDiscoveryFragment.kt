@@ -8,9 +8,9 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import androidx.annotation.StringRes
 import androidx.appcompat.view.ActionMode
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.os.bundleOf
 import androidx.core.view.MenuProvider
@@ -24,7 +24,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.presentation.advertisements.model.AdsSlotIDs.TAB_CLOUD_SLOT_ID
 import mega.privacy.android.app.presentation.extensions.isDarkMode
@@ -83,9 +82,7 @@ class MediaDiscoveryFragment : Fragment() {
                 val mode by getThemeMode()
                     .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
                 val uiState by mediaDiscoveryViewModel.state.collectAsStateWithLifecycle()
-                val isNewMediaDiscoveryFabEnabled by produceState(initialValue = false) {
-                    value = getFeatureFlagUseCase(AppFeatures.NewMediaDiscoveryFab)
-                }
+
                 MegaAppTheme(isDark = mode.isDarkMode()) {
                     MediaDiscoveryView(
                         mediaDiscoveryGlobalStateViewModel = mediaDiscoveryGlobalStateViewModel,
@@ -105,7 +102,6 @@ class MediaDiscoveryFragment : Fragment() {
                         onStartModalSheetShow = this@MediaDiscoveryFragment::onStartModalSheetShow,
                         onEndModalSheetHide = this@MediaDiscoveryFragment::onEndModalSheetHide,
                         onModalSheetVisibilityChange = this@MediaDiscoveryFragment::onModalSheetVisibilityChange,
-                        isNewMediaDiscoveryFabEnabled = isNewMediaDiscoveryFabEnabled
                     )
                 }
             }
@@ -324,20 +320,28 @@ class MediaDiscoveryFragment : Fragment() {
         private const val INTENT_KEY_IS_ACCESSED_BY_ICON_CLICK = "IS_ACCESSED_BY_ICON_CLICK"
 
         /**
+         * The message to be displayed in the error banner
+         */
+        internal const val PARAM_ERROR_MESSAGE = "PARAM_ERROR_MESSAGE"
+
+        /**
          * Creates a new instance of [MediaDiscoveryFragment]
          *
          * @param mediaHandle The Folder Handle used to view its Media
          * @param isAccessedByIconClick true if [MediaDiscoveryFragment] was accessed by clicking the Media
          * Discovery icon
+         * @param errorMessage The [StringRes] of the error message to display
          */
         fun newInstance(
             mediaHandle: Long,
             isAccessedByIconClick: Boolean = false,
+            @StringRes errorMessage: Int?,
         ): MediaDiscoveryFragment {
             return MediaDiscoveryFragment().apply {
                 arguments = bundleOf(
                     INTENT_KEY_CURRENT_FOLDER_ID to mediaHandle,
-                    INTENT_KEY_IS_ACCESSED_BY_ICON_CLICK to isAccessedByIconClick
+                    INTENT_KEY_IS_ACCESSED_BY_ICON_CLICK to isAccessedByIconClick,
+                    PARAM_ERROR_MESSAGE to errorMessage,
                 )
             }
         }

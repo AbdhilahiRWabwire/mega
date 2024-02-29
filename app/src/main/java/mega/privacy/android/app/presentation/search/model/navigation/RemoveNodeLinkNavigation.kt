@@ -1,52 +1,34 @@
 package mega.privacy.android.app.presentation.search.model.navigation
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.dialog
 import androidx.navigation.navArgument
 import mega.privacy.android.app.presentation.node.dialogs.removelink.RemoveNodeLinkDialog
-import mega.privacy.android.app.presentation.search.SearchActivityViewModel
+import mega.privacy.android.feature.sync.data.mapper.ListToStringWithDelimitersMapper
+import timber.log.Timber
 
 internal fun NavGraphBuilder.removeNodeLinkDialogNavigation(
     navHostController: NavHostController,
-    searchActivityViewModel: SearchActivityViewModel,
+    listToStringWithDelimitersMapper: ListToStringWithDelimitersMapper,
 ) {
     dialog(
-        route = "$removeNodeLinkRoute/{$removeNodeArgumentNodeId}/{$removeNodeArgumentIsFromToolbar}",
+        route = "$removeNodeLinkRoute/{$removeNodeArgumentNodeId}",
         arguments = listOf(
-            navArgument(removeNodeArgumentNodeId) { type = NavType.LongType },
-            navArgument(removeNodeArgumentIsFromToolbar) { type = NavType.BoolType },
+            navArgument(removeNodeArgumentNodeId) { type = NavType.StringType },
         )
     ) {
-        if (it.arguments?.getBoolean(removeNodeArgumentIsFromToolbar) == false) {
-            it.arguments?.getLong(removeNodeArgumentNodeId)?.let { nodeId ->
+        it.arguments?.getString(removeNodeArgumentNodeId)?.let { nodes ->
+            runCatching { listToStringWithDelimitersMapper<Long>(nodes) }.onSuccess { nodeHandles ->
                 RemoveNodeLinkDialog(
                     onDismiss = { navHostController.navigateUp() },
-                    nodesList = listOf(nodeId),
+                    nodesList = nodeHandles,
                 )
-            }
-        } else {
-            val searchState by searchActivityViewModel.state.collectAsStateWithLifecycle()
-            val list = remember {
-                mutableStateOf(
-                    searchState.selectedNodes.map { node ->
-                        node.id.longValue
-                    }
-                )
-            }
-            RemoveNodeLinkDialog(
-                onDismiss = { navHostController.navigateUp() },
-                nodesList = list.value,
-            )
+            }.onFailure { error -> Timber.e(error) }
         }
     }
 }
 
 internal const val removeNodeLinkRoute = "search/node_bottom_sheet/remove_node_link_dialog"
 internal const val removeNodeArgumentNodeId = "nodeId"
-internal const val removeNodeArgumentIsFromToolbar = "isFromToolbar"

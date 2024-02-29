@@ -8,15 +8,15 @@ import javax.inject.Inject
 internal class CreatePrivateModeSetMessageUseCase @Inject constructor() :
     CreateTypedMessageUseCase {
 
-    override fun invoke(request: CreateTypedMessageInfo) = with(request) {
+    override suspend fun invoke(request: CreateTypedMessageInfo) = with(request) {
         PrivateModeSetMessage(
-            msgId = msgId,
+            chatId = chatId,
+            msgId = messageId,
             time = timestamp,
             isMine = isMine,
             userHandle = userHandle,
             shouldShowAvatar = shouldShowAvatar,
             shouldShowTime = shouldShowTime,
-            shouldShowDate = shouldShowDate,
             reactions = reactions,
         )
     }

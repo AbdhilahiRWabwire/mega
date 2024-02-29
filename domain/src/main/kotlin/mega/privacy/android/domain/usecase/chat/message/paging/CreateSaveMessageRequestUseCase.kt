@@ -45,22 +45,18 @@ class CreateSaveMessageRequestUseCase @Inject constructor(
                     chatMessage,
                     previous
                 )
-                val shouldShowDate = shouldShowDate(
-                    chatMessage,
-                    previous
-                )
                 val reactions = if (chatMessage.hasConfirmedReactions) {
-                    getReactionsUseCase(chatId, chatMessage.msgId, currentUserHandle)
+                    getReactionsUseCase(chatId, chatMessage.messageId, currentUserHandle)
                 } else {
                     emptyList()
                 }
 
                 CreateTypedMessageRequest(
                     chatMessage = chatMessage,
+                    chatId = chatId,
                     isMine = isMine,
                     shouldShowAvatar = shouldShowAvatar,
                     shouldShowTime = shouldShowTime,
-                    shouldShowDate = shouldShowDate,
                     reactions = reactions,
                 )
             }
@@ -88,11 +84,6 @@ class CreateSaveMessageRequestUseCase @Inject constructor(
     private fun ChatMessage.hasSameSender(
         other: Long?,
     ) = userHandle == other
-
-    private fun shouldShowDate(
-        current: ChatMessage,
-        previous: ChatMessage?,
-    ) = previous?.getDate() != current.getDate()
 
     private fun ChatMessage.getDate() =
         Calendar.getInstance().apply {

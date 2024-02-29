@@ -34,6 +34,8 @@ interface UiChatMessage {
         onLongClick: (TypedMessage) -> Unit,
         onMoreReactionsClicked: (Long) -> Unit,
         onReactionClicked: (Long, String, List<UIReaction>) -> Unit,
+        onReactionLongClick: (String, List<UIReaction>) -> Unit,
+        onForwardClicked: (TypedMessage) -> Unit,
     )
 
     /**
@@ -45,17 +47,6 @@ interface UiChatMessage {
         if (showTime) timeSent?.let {
             timeFormatter(it)
         } else null
-
-    /**
-     * Get date or null
-     *
-     * @param dateFormatter
-     */
-    fun getDateOrNull(
-        dateFormatter: (Long) -> String,
-    ) = if (showDate) timeSent?.let {
-        dateFormatter(it)
-    } else null
 
     /**
      * Modifier
@@ -71,7 +62,7 @@ interface UiChatMessage {
     /**
      * Can forward
      */
-    val canForward: Boolean
+    val shouldDisplayForwardIcon: Boolean
 
     /**
      * Time sent
@@ -89,17 +80,17 @@ interface UiChatMessage {
     val showTime: Boolean
 
     /**
-     * Show date
-     */
-    val showDate: Boolean
-
-    /**
      * Reactions
      */
     val reactions: List<UIReaction>
 
     /**
+     * Is selectable
+     */
+    val isSelectable: Boolean
+    
+    /**
      * Key
      */
-    fun key(): String = "${id}_${showTime}_${showDate}"
+    fun key(): String = "${id}_${showTime}"
 }

@@ -2,21 +2,18 @@ package test.mega.privacy.android.app.presentation.audiosection
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import mega.privacy.android.app.domain.usecase.GetNodeByHandle
-import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.app.presentation.audiosection.AudioSectionViewModel
-import mega.privacy.android.app.presentation.audiosection.mapper.UIAudioMapper
-import mega.privacy.android.app.presentation.audiosection.model.UIAudio
+import mega.privacy.android.app.presentation.audiosection.mapper.AudioUIEntityMapper
+import mega.privacy.android.app.presentation.audiosection.model.AudioUIEntity
+import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.NodeUpdate
 import mega.privacy.android.domain.entity.node.TypedAudioNode
@@ -29,16 +26,16 @@ import mega.privacy.android.domain.usecase.file.GetFingerprintUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunningUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
+import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.viewtype.MonitorViewType
 import mega.privacy.android.domain.usecase.viewtype.SetViewType
-import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.extension.ExtendWith
+import org.junit.jupiter.api.extension.RegisterExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
@@ -53,7 +50,7 @@ class AudioSectionViewModelTest {
     private lateinit var underTest: AudioSectionViewModel
 
     private val getAllAudioUseCase = mock<GetAllAudioUseCase>()
-    private val uiAudioMapper = mock<UIAudioMapper>()
+    private val audioUIEntityMapper = mock<AudioUIEntityMapper>()
     private val getCloudSortOrder = mock<GetCloudSortOrder>()
     private val monitorNodeUpdatesUseCase = mock<MonitorNodeUpdatesUseCase>()
     private val monitorOfflineNodeUpdatesUseCase = mock<MonitorOfflineNodeUpdatesUseCase>()
@@ -67,12 +64,7 @@ class AudioSectionViewModelTest {
     private val fakeMonitorViewTypeFlow = MutableSharedFlow<ViewType>()
     private val monitorViewType = mock<MonitorViewType>()
 
-    private val expectedAudio: UIAudio = mock { on { name }.thenReturn("audio name") }
-
-    @BeforeAll
-    fun initialise() {
-        Dispatchers.setMain(StandardTestDispatcher())
-    }
+    private val expectedAudio: AudioUIEntity = mock { on { name }.thenReturn("audio name") }
 
     @BeforeEach
     fun setUp() {
@@ -81,7 +73,7 @@ class AudioSectionViewModelTest {
         wheneverBlocking { monitorViewType() }.thenReturn(fakeMonitorViewTypeFlow)
         underTest = AudioSectionViewModel(
             getAllAudioUseCase = getAllAudioUseCase,
-            uiAudioMapper = uiAudioMapper,
+            audioUIEntityMapper = audioUIEntityMapper,
             getCloudSortOrder = getCloudSortOrder,
             monitorNodeUpdatesUseCase = monitorNodeUpdatesUseCase,
             monitorOfflineNodeUpdatesUseCase = monitorOfflineNodeUpdatesUseCase,
@@ -100,7 +92,7 @@ class AudioSectionViewModelTest {
     fun resetMocks() {
         reset(
             getAllAudioUseCase,
-            uiAudioMapper,
+            audioUIEntityMapper,
             getCloudSortOrder,
             monitorNodeUpdatesUseCase,
             monitorOfflineNodeUpdatesUseCase,
@@ -113,11 +105,6 @@ class AudioSectionViewModelTest {
             setViewType,
             monitorViewType
         )
-    }
-
-    @AfterAll
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     @Test
@@ -150,7 +137,7 @@ class AudioSectionViewModelTest {
     private suspend fun initAudiosReturned() {
         whenever(getCloudSortOrder()).thenReturn(SortOrder.ORDER_MODIFICATION_DESC)
         whenever(getAllAudioUseCase()).thenReturn(listOf(mock(), mock()))
-        whenever(uiAudioMapper(any())).thenReturn(expectedAudio)
+        whenever(audioUIEntityMapper(any())).thenReturn(expectedAudio)
     }
 
     @Test
@@ -194,13 +181,13 @@ class AudioSectionViewModelTest {
     fun `test that the result returned correctly when search query is not empty`() = runTest {
         val expectedTypedAudioNode = mock<TypedAudioNode> { on { name }.thenReturn("audio name") }
         val audioNode = mock<TypedAudioNode> { on { name }.thenReturn("name") }
-        val expectedAudio = mock<UIAudio> { on { name }.thenReturn("audio name") }
-        val audio = mock<UIAudio> { on { name }.thenReturn("name") }
+        val expectedAudio = mock<AudioUIEntity> { on { name }.thenReturn("audio name") }
+        val audio = mock<AudioUIEntity> { on { name }.thenReturn("name") }
 
         whenever(getCloudSortOrder()).thenReturn(SortOrder.ORDER_MODIFICATION_DESC)
         whenever(getAllAudioUseCase()).thenReturn(listOf(expectedTypedAudioNode, audioNode))
-        whenever(uiAudioMapper(audioNode)).thenReturn(audio)
-        whenever(uiAudioMapper(expectedTypedAudioNode)).thenReturn(expectedAudio)
+        whenever(audioUIEntityMapper(audioNode)).thenReturn(audio)
+        whenever(audioUIEntityMapper(expectedTypedAudioNode)).thenReturn(expectedAudio)
 
         underTest.refreshNodes()
 
@@ -304,4 +291,10 @@ class AudioSectionViewModelTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    companion object {
+        @JvmField
+        @RegisterExtension
+        val extension = CoroutineMainDispatcherExtension(StandardTestDispatcher())
+    }
 }

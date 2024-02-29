@@ -1,6 +1,7 @@
 package mega.privacy.android.domain.usecase.chat.message
 
 import com.google.common.truth.Truth
+import kotlinx.coroutines.test.runTest
 import mega.privacy.android.domain.entity.RegexPatternType
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.LinkDetail
@@ -33,17 +34,17 @@ class CreateNormalChatMessageUseCaseTest {
     }
 
     @Test
-    fun `test that normal message is returned`() {
+    fun `test that normal message is returned`() = runTest {
         whenever(getLinkTypesUseCase(any())).thenReturn(emptyList())
         val message = mock(ChatMessage::class.java)
         Truth.assertThat(
             underTest.invoke(
                 CreateTypedMessageRequest(
                     chatMessage = message,
+                    chatId = 123L,
                     isMine = true,
                     shouldShowAvatar = true,
                     shouldShowTime = true,
-                    shouldShowDate = true,
                     reactions = emptyList(),
                 )
             )
@@ -52,7 +53,7 @@ class CreateNormalChatMessageUseCaseTest {
     }
 
     @Test
-    fun `test that contact link message is returned`() {
+    fun `test that contact link message is returned`() = runTest {
         whenever(getLinkTypesUseCase(any())).thenReturn(
             listOf(
                 LinkDetail(
@@ -66,10 +67,10 @@ class CreateNormalChatMessageUseCaseTest {
             underTest.invoke(
                 CreateTypedMessageRequest(
                     chatMessage = message,
+                    chatId = 123L,
                     isMine = true,
                     shouldShowAvatar = true,
                     shouldShowTime = true,
-                    shouldShowDate = true,
                     reactions = emptyList(),
                 )
             )

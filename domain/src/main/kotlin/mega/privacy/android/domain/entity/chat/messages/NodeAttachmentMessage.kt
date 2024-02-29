@@ -1,23 +1,25 @@
 package mega.privacy.android.domain.entity.chat.messages
 
+import kotlinx.serialization.Serializable
 import mega.privacy.android.domain.entity.VideoFileTypeInfo
 import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
-import mega.privacy.android.domain.entity.node.FileNode
+import mega.privacy.android.domain.entity.node.chat.ChatFile
 
 /**
  * Node attachment message
  * @property fileNode The attached node
  */
+@Serializable
 data class NodeAttachmentMessage(
+    override val chatId: Long,
     override val msgId: Long,
     override val time: Long,
     override val isMine: Boolean,
     override val userHandle: Long,
     override val shouldShowAvatar: Boolean,
     override val shouldShowTime: Boolean,
-    override val shouldShowDate: Boolean,
     override val reactions: List<Reaction>,
-    val fileNode: FileNode,
+    val fileNode: ChatFile,
 ) : AttachmentMessage {
     override val fileSize = fileNode.size
     override val fileName = fileNode.name

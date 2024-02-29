@@ -4,16 +4,26 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import mega.privacy.android.data.database.converter.TypedMessageEntityConverters
+import mega.privacy.android.data.database.entity.chat.PendingMessageEntity
 import mega.privacy.android.data.gateway.api.MegaApiGateway
 import mega.privacy.android.data.gateway.api.MegaChatApiGateway
+import mega.privacy.android.data.gateway.chat.ChatStorageGateway
 import mega.privacy.android.data.listener.OptionalMegaChatRequestListenerInterface
 import mega.privacy.android.data.mapper.StringListMapper
 import mega.privacy.android.data.mapper.chat.ChatMessageMapper
+import mega.privacy.android.data.mapper.chat.messages.PendingMessageEntityMapper
+import mega.privacy.android.data.mapper.chat.messages.PendingMessageMapper
 import mega.privacy.android.data.mapper.handles.HandleListMapper
 import mega.privacy.android.data.mapper.handles.MegaHandleListMapper
 import mega.privacy.android.domain.entity.chat.ChatMessage
+import mega.privacy.android.domain.entity.chat.ChatMessageType
+import mega.privacy.android.domain.entity.chat.PendingMessage
+import mega.privacy.android.domain.entity.chat.messages.pending.SavePendingMessageRequest
+import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
 import nz.mega.sdk.MegaChatError
 import nz.mega.sdk.MegaChatMessage
+import nz.mega.sdk.MegaChatRequest
 import nz.mega.sdk.MegaHandleList
 import nz.mega.sdk.MegaStringList
 import nz.mega.sdk.MegaUser
@@ -42,6 +52,10 @@ class ChatMessageRepositoryImplTest {
     private val handleListMapper = mock<HandleListMapper>()
     private val chatMessageMapper = mock<ChatMessageMapper>()
     private val megaHandleListMapper = mock<MegaHandleListMapper>()
+    private val chatStorageGateway = mock<ChatStorageGateway>()
+    private val pendingMessageEntityMapper = mock<PendingMessageEntityMapper>()
+    private val pendingMessageMapper = mock<PendingMessageMapper>()
+    private val typedMessageEntityConverters = mock<TypedMessageEntityConverters>()
 
     private val megaChatErrorSuccess = mock<MegaChatError> {
         on { errorCode }.thenReturn(MegaChatError.ERROR_OK)
@@ -49,23 +63,36 @@ class ChatMessageRepositoryImplTest {
     private val chatId = 123L
     private val msgId = 456L
 
+
     @BeforeAll
     fun setUp() {
         underTest = ChatMessageRepositoryImpl(
             megaChatApiGateway = megaChatApiGateway,
             megaApiGateway = megaApiGateway,
+            chatStorageGateway = chatStorageGateway,
             ioDispatcher = UnconfinedTestDispatcher(),
             stringListMapper = stringListMapper,
             handleListMapper = handleListMapper,
             chatMessageMapper = chatMessageMapper,
             megaHandleListMapper = megaHandleListMapper,
+            pendingMessageEntityMapper = pendingMessageEntityMapper,
+            pendingMessageMapper = pendingMessageMapper,
+            typedMessageEntityConverters = typedMessageEntityConverters,
         )
     }
 
     @BeforeEach
     fun resetMocks() {
         reset(
-            megaChatApiGateway
+            megaChatApiGateway,
+            chatStorageGateway,
+            stringListMapper,
+            handleListMapper,
+            chatMessageMapper,
+            megaHandleListMapper,
+            pendingMessageEntityMapper,
+            pendingMessageMapper,
+            typedMessageEntityConverters,
         )
     }
 
@@ -224,5 +251,112 @@ class ChatMessageRepositoryImplTest {
         verify(megaHandleListMapper).invoke(userList)
         verify(megaChatApiGateway).attachContacts(chatId, handleList)
         verify(chatMessageMapper).invoke(message)
+    }
+
+    @Test
+    fun `test that savePendingMessage saves the mapped entities`() = runTest {
+        val id = 19L
+        val savePendingMessageRequest = mock<SavePendingMessageRequest> {
+            on { state } doReturn mock()
+            on { filePath } doReturn "file"
+        }
+        val pendingMessageEntity = mock<PendingMessageEntity>()
+        whenever(pendingMessageEntityMapper(savePendingMessageRequest))
+            .thenReturn(pendingMessageEntity)
+        whenever(chatStorageGateway.storePendingMessage(pendingMessageEntity))
+            .thenReturn(id)
+        val actual = underTest.savePendingMessage(savePendingMessageRequest)
+        assertThat(actual.id).isEqualTo(id)
+    }
+
+    @Test
+    fun `test that forward contact invokes api and returns the message`() = runTest {
+        val chatMessage = mock<MegaChatMessage>()
+        val message = mock<ChatMessage>()
+        whenever(megaChatApiGateway.forwardContact(any(), any(), any())).thenReturn(chatMessage)
+        whenever(chatMessageMapper(chatMessage)).thenReturn(message)
+        assertThat(underTest.forwardContact(any(), any(), any())).isEqualTo(message)
+        verify(megaChatApiGateway).forwardContact(any(), any(), any())
+        verify(chatMessageMapper).invoke(chatMessage)
+    }
+
+    @Test
+    fun `test that attachNode invokes megaApi and returns the temp id`() = runTest {
+        val handle = 2L
+        val expectedTempId = 3L
+        val message = mock<MegaChatMessage> { on { tempId }.thenReturn(expectedTempId) }
+        val megaChatRequest = mock<MegaChatRequest> { on { megaChatMessage }.thenReturn(message) }
+        whenever(megaChatApiGateway.attachNode(any(), any(), any())).thenAnswer {
+            ((it.arguments[2]) as OptionalMegaChatRequestListenerInterface).onRequestFinish(
+                mock(),
+                megaChatRequest,
+                megaChatErrorSuccess,
+            )
+        }
+        val actual = underTest.attachNode(chatId, handle)
+        assertThat(actual).isEqualTo(expectedTempId)
+        verify(megaChatApiGateway).attachNode(any(), any(), any())
+    }
+
+    @Test
+    fun `test that attachVoiceMessage invokes megaApi returns the temp id`() = runTest {
+
+        val handle = 2L
+        val expectedTempId = 3L
+        val message = mock<MegaChatMessage> { on { tempId }.thenReturn(expectedTempId) }
+        val megaChatRequest = mock<MegaChatRequest> { on { megaChatMessage }.thenReturn(message) }
+        whenever(megaChatApiGateway.attachVoiceMessage(any(), any(), any())).thenAnswer {
+            ((it.arguments[2]) as OptionalMegaChatRequestListenerInterface).onRequestFinish(
+                mock(),
+                megaChatRequest,
+                megaChatErrorSuccess,
+            )
+        }
+        val actual = underTest.attachVoiceMessage(chatId, handle)
+        assertThat(actual).isEqualTo(expectedTempId)
+        verify(megaChatApiGateway).attachVoiceMessage(any(), any(), any())
+    }
+
+    @Test
+    fun `test that getPendingMessage returns the mapped entity`() = runTest {
+        val pendingMessageId = 2011L
+        val entity = mock<PendingMessageEntity>()
+        val expected = mock<PendingMessage>()
+        whenever(chatStorageGateway.getPendingMessage(pendingMessageId)).thenReturn(entity)
+        whenever(pendingMessageMapper(entity)).thenReturn(expected)
+        val actual = underTest.getPendingMessage(pendingMessageId)
+        assertThat(actual).isEqualTo(expected)
+    }
+
+    @Test
+    fun `test that get message ids by type invokes chat storage gateway correctly`() = runTest {
+        val type = ChatMessageType.NODE_ATTACHMENT
+        underTest.getMessageIdsByType(chatId, type)
+        verify(chatStorageGateway).getMessageIdsByType(chatId, type)
+    }
+
+    @Test
+    fun `test that get reactions invokes and returns correctly`() = runTest {
+        val reactions = "reactions"
+        val reactionsList = emptyList<Reaction>()
+        whenever(chatStorageGateway.getMessageReactions(chatId, msgId)).thenReturn(reactions)
+        whenever(typedMessageEntityConverters.convertToMessageReactionList(reactions))
+            .thenReturn(reactionsList)
+        assertThat(underTest.getReactionsFromMessage(chatId, msgId)).isEqualTo(reactionsList)
+        verify(chatStorageGateway).getMessageReactions(chatId, msgId)
+        verify(typedMessageEntityConverters).convertToMessageReactionList(reactions)
+    }
+
+    @Test
+    fun `test that update reactions invokes correctly`() = runTest {
+        val reactions = listOf<Reaction>()
+        val reactionsString = "reactions"
+        whenever(typedMessageEntityConverters.convertFromMessageReactionList(reactions))
+            .thenReturn(reactionsString)
+        whenever(chatStorageGateway.updateMessageReactions(chatId, msgId, reactionsString))
+            .thenReturn(Unit)
+        underTest.updateReactionsInMessage(chatId, msgId, reactions)
+        verify(typedMessageEntityConverters).convertFromMessageReactionList(reactions)
+        verify(chatStorageGateway).updateMessageReactions(chatId, msgId, reactionsString)
     }
 }

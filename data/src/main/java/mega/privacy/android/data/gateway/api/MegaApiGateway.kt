@@ -691,10 +691,10 @@ interface MegaApiGateway {
     /**
      * Get contact
      *
-     * @param email
-     * @return Mega user associated with the email address
+     * @param emailOrBase64Handle Email or Base64 handle of the user
+     * @return Mega user associated with the email address or Base64 handle
      */
-    suspend fun getContact(email: String): MegaUser?
+    suspend fun getContact(emailOrBase64Handle: String): MegaUser?
 
     /**
      * Get user alerts
@@ -3375,4 +3375,50 @@ interface MegaApiGateway {
      * @param listener      MegaRequestListenerInterface to track this request.
      */
     fun killSession(sessionHandle: Long, listener: MegaRequestListenerInterface)
+
+    /**
+     * Effectively parks the user's account without creating a new fresh account.
+     *
+     * If no user is logged in, you will get the error code MegaError::API_EACCESS in onRequestFinish().
+     *
+     * The contents of the account will then be purged after 60 days. Once the account is
+     * parked, the user needs to contact MEGA support to restore the account.
+     *
+     * The associated request type with this request is MegaRequest::TYPE_CONFIRM_CANCEL_LINK.
+     * Valid data in the MegaRequest object received on all callbacks:
+     * - MegaRequest::getLink - Returns the recovery link
+     * - MegaRequest::getPassword - Returns the new password
+     *
+     * Valid data in the MegaRequest object received in onRequestFinish when the error code
+     * is MegaError::API_OK:
+     * - MegaRequest::getEmail - Return the email associated with the link
+     *
+     * @param link Cancellation link sent to the user's email address;
+     * @param pwd Password for the account.
+     * @param listener MegaRequestListener to track this request
+     */
+    fun confirmCancelAccount(link: String, pwd: String, listener: MegaRequestListenerInterface)
+
+    /**
+     * Effectively changes the email address associated to the account.
+     *
+     * If no user is logged in, you will get the error code MegaError::API_EACCESS in onRequestFinish().
+     *
+     * The associated request type with this request is MegaRequest::TYPE_CONFIRM_CHANGE_EMAIL_LINK.
+     * Valid data in the MegaRequest object received on all callbacks:
+     * - MegaRequest::getLink - Returns the change-email link
+     * - MegaRequest::getPassword - Returns the password
+     *
+     * Valid data in the MegaRequest object received in onRequestFinish when the error code
+     * is MegaError::API_OK:
+     * - MegaRequest::getEmail - Return the email associated with the link
+     *
+     * If the account is logged-in into a different account than the account for which the link
+     * was generated, onRequestFinish will be called with the error code MegaError::API_EACCESS.
+     *
+     * @param link Change-email link sent to the user's email address.
+     * @param pwd Password for the account.
+     * @param listener MegaRequestListener to track this request
+     */
+    fun confirmChangeEmail(link: String, pwd: String, listener: MegaRequestListenerInterface)
 }

@@ -7,16 +7,16 @@ import javax.inject.Inject
 
 internal class CreateTitleChangeMessageUseCase @Inject constructor() : CreateTypedMessageUseCase {
 
-    override fun invoke(request: CreateTypedMessageInfo) = with(request) {
+    override suspend fun invoke(request: CreateTypedMessageInfo) = with(request) {
         TitleChangeMessage(
-            msgId = msgId,
+            chatId = chatId,
+            msgId = messageId,
             time = timestamp,
             isMine = isMine,
             userHandle = userHandle,
             content = content.orEmpty(),
             shouldShowAvatar = shouldShowAvatar,
             shouldShowTime = shouldShowTime,
-            shouldShowDate = shouldShowDate,
             reactions = reactions,
         )
     }

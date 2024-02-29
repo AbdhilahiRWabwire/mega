@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.meeting.chat.model
 
+import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import mega.privacy.android.domain.entity.chat.ChatPushNotificationMuteOption
 
@@ -13,6 +14,15 @@ sealed class InfoToShow {
      * @property stringId String id.
      */
     data class SimpleString(@StringRes val stringId: Int) : InfoToShow()
+
+
+    /**
+     * Show quantity string.
+     *
+     * @property stringId String id.
+     * @property count Quantity.
+     */
+    data class QuantityString(@PluralsRes val stringId: Int, val count: Int) : InfoToShow()
 
     /**
      * Show string with params.
@@ -41,5 +51,14 @@ sealed class InfoToShow {
      */
     data class MuteOptionResult(
         val result: ChatPushNotificationMuteOption,
+    ) : InfoToShow()
+
+    /**
+     * Show result of forwarding messages.
+     *
+     * @property result [ForwardMessagesResult]
+     */
+    data class ForwardMessagesResult(
+        val result: ForwardMessagesToChatsResult,
     ) : InfoToShow()
 }

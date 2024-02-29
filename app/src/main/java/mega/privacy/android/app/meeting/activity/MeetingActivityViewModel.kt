@@ -54,6 +54,7 @@ import mega.privacy.android.app.meeting.listeners.OpenVideoDeviceListener
 import mega.privacy.android.app.presentation.chat.model.AnswerCallResult
 import mega.privacy.android.app.presentation.contactinfo.model.ContactInfoState
 import mega.privacy.android.app.presentation.extensions.getState
+import mega.privacy.android.app.presentation.mapper.GetStringFromStringResMapper
 import mega.privacy.android.app.presentation.meeting.mapper.ChatParticipantMapper
 import mega.privacy.android.app.presentation.meeting.model.MeetingState
 import mega.privacy.android.app.usecase.call.GetCallUseCase
@@ -89,6 +90,7 @@ import mega.privacy.android.domain.usecase.QueryChatLink
 import mega.privacy.android.domain.usecase.RemoveFromChat
 import mega.privacy.android.domain.usecase.SetOpenInvite
 import mega.privacy.android.domain.usecase.UpdateChatPermissions
+import mega.privacy.android.domain.usecase.account.GetCurrentSubscriptionPlanUseCase
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.chat.IsEphemeralPlusPlusUseCase
 import mega.privacy.android.domain.usecase.chat.StartConversationUseCase
@@ -108,6 +110,8 @@ import mega.privacy.android.domain.usecase.meeting.MonitorCallEndedUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorScheduledMeetingUpdatesUseCase
+import mega.privacy.android.domain.usecase.meeting.MuteAllPeersUseCase
+import mega.privacy.android.domain.usecase.meeting.MutePeersUseCase
 import mega.privacy.android.domain.usecase.meeting.RingIndividualInACallUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
@@ -163,6 +167,10 @@ import javax.inject.Inject
  * @property monitorUserUpdates                             [MonitorUserUpdates]
  * @property ringIndividualInACallUseCase                   [RingIndividualInACallUseCase]
  * @property allowUsersJoinCallUseCase                      [AllowUsersJoinCallUseCase]
+ * @property mutePeersUseCase                               [MutePeersUseCase]
+ * @property muteAllPeersUseCase                            [MuteAllPeersUseCase]
+ * @property getStringFromStringResMapper                   [GetStringFromStringResMapper]
+ * @property getCurrentSubscriptionPlanUseCase              [GetCurrentSubscriptionPlanUseCase]
  * @property state                                          Current view state as [MeetingState]
  */
 @HiltViewModel
@@ -206,7 +214,10 @@ class MeetingActivityViewModel @Inject constructor(
     private val deviceGateway: DeviceGateway,
     private val ringIndividualInACallUseCase: RingIndividualInACallUseCase,
     private val allowUsersJoinCallUseCase: AllowUsersJoinCallUseCase,
-    private var getFeatureFlagUseCase: GetFeatureFlagValueUseCase,
+    private val mutePeersUseCase: MutePeersUseCase,
+    private val muteAllPeersUseCase: MuteAllPeersUseCase,
+    private val getStringFromStringResMapper: GetStringFromStringResMapper,
+    private val getCurrentSubscriptionPlanUseCase: GetCurrentSubscriptionPlanUseCase,
     @ApplicationContext private val context: Context,
 ) : BaseRxViewModel(), OpenVideoDeviceListener.OnOpenVideoDeviceCallback,
     DisableAudioVideoCallListener.OnDisableAudioVideoCallback {
@@ -334,6 +345,13 @@ class MeetingActivityViewModel @Inject constructor(
                 }
             }
         }
+
+        viewModelScope.launch {
+            getCurrentSubscriptionPlanUseCase()?.let { currentSubscriptionPlan ->
+                _state.update { it.copy(subscriptionPlan = currentSubscriptionPlan) }
+            }
+        }
+
         LiveEventBus.get(EVENT_AUDIO_OUTPUT_CHANGE, AppRTCAudioManager.AudioDevice::class.java)
             .observeForever(audioOutputStateObserver)
 
@@ -734,6 +752,20 @@ class MeetingActivityViewModel @Inject constructor(
                                 false -> context.getString(
                                     R.string.general_mic_mute
                                 )
+                            }
+
+                            call.auxHandle?.let { auxClientId ->
+                                if (auxClientId != 0L) {
+                                    state.value.usersInCall.find { it.clientId == auxClientId }
+                                        ?.let {
+                                            showSnackBar(
+                                                context.getString(
+                                                    R.string.meetings_muted_by_a_participant_snackbar_message,
+                                                    it.name
+                                                )
+                                            )
+                                        }
+                                }
                             }
                         }
 
@@ -1946,7 +1978,22 @@ class MeetingActivityViewModel @Inject constructor(
      * Mute all participants
      */
     fun muteAllParticipants() {
-
+        viewModelScope.launch {
+            runCatching {
+                muteAllPeersUseCase(
+                    chatId = state.value.chatId
+                )
+            }.onSuccess {
+                showSnackBar(
+                    context.getString(
+                        R.string.meetings_muted_all_participants_snackbar_message,
+                    )
+                )
+                triggerSnackbarMessage(getStringFromStringResMapper(R.string.meetings_muted_all_participants_snackbar_message))
+            }.onFailure { exception ->
+                Timber.e(exception)
+            }
+        }
     }
 
     /**
@@ -1964,7 +2011,30 @@ class MeetingActivityViewModel @Inject constructor(
      * @param clientId   Client id of a participant
      */
     fun muteParticipant(clientId: Long) {
-
+        viewModelScope.launch {
+            runCatching {
+                mutePeersUseCase(
+                    chatId = state.value.chatId, clientId = clientId
+                )
+            }.onSuccess {
+                state.value.usersInCall.find { it.clientId == clientId }?.let {
+                    showSnackBar(
+                        context.getString(
+                            R.string.meetings_muted_a_participant_snackbar_message,
+                            it.name
+                        )
+                    )
+                    triggerSnackbarMessage(
+                        getStringFromStringResMapper(
+                            R.string.meetings_muted_a_participant_snackbar_message,
+                            it.name
+                        )
+                    )
+                }
+            }.onFailure { exception ->
+                Timber.e(exception)
+            }
+        }
     }
 
     /**
@@ -1989,6 +2059,22 @@ class MeetingActivityViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Trigger event to show Snackbar message
+     *
+     * @param message     Content for snack bar
+     */
+    fun triggerSnackbarMessage(message: String) =
+        _state.update { it.copy(snackbarMsg = triggered(message)) }
+
+    /**
+     * Reset and notify that snackbarMessage is consumed
+     */
+    fun onSnackbarMessageConsumed() =
+        _state.update {
+            it.copy(snackbarMsg = consumed())
+        }
 
     companion object {
         private const val INVALID_CHAT_HANDLE = -1L

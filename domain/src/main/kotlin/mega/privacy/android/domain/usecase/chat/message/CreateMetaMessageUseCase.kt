@@ -13,52 +13,55 @@ import javax.inject.Inject
  */
 class CreateMetaMessageUseCase @Inject constructor() : CreateTypedMessageUseCase {
 
-    override fun invoke(request: CreateTypedMessageInfo) = with(request) {
+    override suspend fun invoke(request: CreateTypedMessageInfo) = with(request) {
         when (metaType) {
             ContainsMetaType.RICH_PREVIEW -> RichPreviewMessage(
-                msgId = msgId,
+                chatId = chatId,
+                msgId = messageId,
                 time = timestamp,
                 isMine = isMine,
                 userHandle = userHandle,
                 chatRichPreviewInfo = chatRichPreviewInfo,
                 shouldShowAvatar = shouldShowAvatar,
                 shouldShowTime = shouldShowTime,
-                shouldShowDate = shouldShowDate,
                 reactions = reactions,
+                content = content.orEmpty(),
+                isEdited = isEdited,
             )
 
             ContainsMetaType.GEOLOCATION -> LocationMessage(
-                msgId = msgId,
+                chatId = chatId,
+                msgId = messageId,
                 time = timestamp,
                 isMine = isMine,
                 userHandle = userHandle,
                 chatGeolocationInfo = chatGeolocationInfo,
                 shouldShowAvatar = shouldShowAvatar,
                 shouldShowTime = shouldShowTime,
-                shouldShowDate = shouldShowDate,
                 reactions = reactions,
+                isEdited = isEdited,
             )
 
             ContainsMetaType.GIPHY -> GiphyMessage(
-                msgId = msgId,
+                chatId = chatId,
+                msgId = messageId,
                 time = timestamp,
                 isMine = isMine,
                 userHandle = userHandle,
                 chatGifInfo = chatGifInfo,
                 shouldShowAvatar = shouldShowAvatar,
                 shouldShowTime = shouldShowTime,
-                shouldShowDate = shouldShowDate,
                 reactions = reactions,
             )
 
             else -> InvalidMetaMessage(
-                msgId = msgId,
+                chatId = chatId,
+                msgId = messageId,
                 time = timestamp,
                 isMine = isMine,
                 userHandle = userHandle,
                 shouldShowAvatar = shouldShowAvatar,
                 shouldShowTime = shouldShowTime,
-                shouldShowDate = shouldShowDate,
                 reactions = reactions,
             )
         }

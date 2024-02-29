@@ -44,8 +44,10 @@ import mega.privacy.android.domain.entity.chat.PendingMessage
 import mega.privacy.android.domain.entity.chat.RichLinkConfig
 import mega.privacy.android.domain.entity.chat.ScheduledMeetingChanges
 import mega.privacy.android.domain.entity.contacts.ContactLink
+import mega.privacy.android.domain.entity.meeting.CallNotificationType
 import mega.privacy.android.domain.entity.meeting.ChatCallChanges
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
+import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
 import mega.privacy.android.domain.entity.meeting.ChatSessionChanges
 import mega.privacy.android.domain.entity.meeting.ScheduledMeetingStatus
 import mega.privacy.android.domain.entity.statistics.EndCallEmptyCall
@@ -598,18 +600,68 @@ class ChatViewModel @Inject constructor(
                                 ChatCallStatus.InProgress,
                                 -> ScheduledMeetingStatus.Joined(call.duration)
 
+                                ChatCallStatus.TerminatingUserParticipation -> {
+                                    Timber.d("Terminating user participation and call code ${call.termCode}")
+                                    when (call.termCode) {
+                                        ChatCallTermCodeType.TooManyParticipants -> {
+                                            ScheduledMeetingStatus.NotJoined(call.duration)
+                                        }
+
+                                        ChatCallTermCodeType.CallUsersLimit -> {
+                                            _state.update {
+                                                it.copy(snackbarMessage = R.string.call_error_too_many_participants)
+                                            }
+                                            ScheduledMeetingStatus.NotJoined(call.duration)
+                                        }
+
+                                        ChatCallTermCodeType.ProtocolVersion -> {
+                                            showForceUpdateDialog()
+                                            ScheduledMeetingStatus.NotStarted
+                                        }
+
+                                        else -> {
+                                            ScheduledMeetingStatus.NotStarted
+                                        }
+                                    }
+                                }
+
                                 else -> ScheduledMeetingStatus.NotStarted
                             }
-
                             _state.update {
                                 it.copy(
                                     scheduledMeetingStatus = scheduledMeetingStatus
                                 )
                             }
+                        } else if (contains(ChatCallChanges.GenericNotification)) {
+                            if (call.notificationType == CallNotificationType.SFUError && call.termCode == ChatCallTermCodeType.ProtocolVersion) {
+                                showForceUpdateDialog()
+                            }
                         }
                     }
                 }
         }
+
+    /**
+     * Show force update dialog
+     */
+    private fun showForceUpdateDialog() {
+        _state.update {
+            it.copy(
+                showForceUpdateDialog = true
+            )
+        }
+    }
+
+    /**
+     * Set to consumed when showForceUpdateDialog event is processed.
+     */
+    fun onForceUpdateDialogConsumed() {
+        _state.update {
+            it.copy(
+                showForceUpdateDialog = false
+            )
+        }
+    }
 
     /**
      * Start call

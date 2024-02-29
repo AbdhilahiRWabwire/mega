@@ -7,9 +7,10 @@ import javax.inject.Inject
 internal class CreateAlterParticipantsMessageUseCase @Inject constructor() :
     CreateTypedMessageUseCase {
 
-    override fun invoke(request: CreateTypedMessageInfo) = with(request) {
+    override suspend fun invoke(request: CreateTypedMessageInfo) = with(request) {
         AlterParticipantsMessage(
-            msgId = msgId,
+            chatId = chatId,
+            msgId = messageId,
             time = timestamp,
             isMine = isMine,
             userHandle = userHandle,
@@ -17,7 +18,6 @@ internal class CreateAlterParticipantsMessageUseCase @Inject constructor() :
             handleOfAction = handleOfAction,
             shouldShowAvatar = shouldShowAvatar,
             shouldShowTime = shouldShowTime,
-            shouldShowDate = shouldShowDate,
             reactions = reactions,
         )
     }

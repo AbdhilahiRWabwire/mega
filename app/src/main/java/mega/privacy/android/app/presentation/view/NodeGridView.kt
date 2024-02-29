@@ -1,6 +1,7 @@
 package mega.privacy.android.app.presentation.view
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -9,10 +10,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
 import mega.privacy.android.app.presentation.data.NodeUIItem
-import mega.privacy.android.legacy.core.ui.controls.lists.HeaderViewItem
 import mega.privacy.android.domain.entity.node.TypedNode
+import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
+import mega.privacy.android.legacy.core.ui.controls.lists.HeaderViewItem
 
 /**
 This method will show [NodeUIItem] in Grid manner based on span and getting thumbnail using [ThumbnailRequest]
@@ -49,13 +50,15 @@ fun <T : TypedNode> NodeGridView(
     spanCount: Int = 2,
     showChangeViewType: Boolean = true,
     isPublicNode: Boolean = false,
+    listContentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
     LazyVerticalGrid(
         state = gridState,
         columns = GridCells.Fixed(spanCount),
         modifier = modifier.padding(horizontal = 2.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        contentPadding = listContentPadding
     ) {
         if (showSortOrder || showChangeViewType) {
             item(
@@ -82,7 +85,7 @@ fun <T : TypedNode> NodeGridView(
                 if (nodeUIItems[it].isInvisible) {
                     it
                 } else {
-                    nodeUIItems[it].node.id.longValue
+                    nodeUIItems[it].uniqueKey
                 }
             }) {
             NodeGridViewItem(

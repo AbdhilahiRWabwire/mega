@@ -127,6 +127,7 @@ private fun PermissionChangeMessageViewPreview(
 ) {
     PermissionChangeMessageView(
         message = PermissionChangeMessage(
+            chatId = 1L,
             msgId = 0,
             time = 0,
             isMine = true,
@@ -135,7 +136,6 @@ private fun PermissionChangeMessageViewPreview(
             handleOfAction = 0,
             shouldShowAvatar = false,
             shouldShowTime = false,
-            shouldShowDate = false,
             reactions = emptyList(),
         ),
         ownerActionFullName = "Owner",

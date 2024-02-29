@@ -5,6 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
@@ -12,6 +15,7 @@ import androidx.appcompat.view.ActionMode
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.FileProvider
+import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
@@ -22,6 +26,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MimeTypeList
+import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.databinding.FragmentVideoSectionBinding
 import mega.privacy.android.app.fragments.homepage.EventObserver
@@ -32,7 +37,10 @@ import mega.privacy.android.app.mediaplayer.miniplayer.MiniAudioPlayerController
 import mega.privacy.android.app.presentation.bottomsheet.NodeOptionsBottomSheetDialogFragment
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.mapper.GetOptionsForToolbarMapper
-import mega.privacy.android.app.presentation.videosection.model.UIVideo
+import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
+import mega.privacy.android.app.presentation.videosection.view.VideoSectionFeatureScreen
+import mega.privacy.android.app.presentation.videosection.view.playlist.videoPlaylistDetailRoute
+import mega.privacy.android.app.presentation.videosection.view.videoSectionRoute
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.AUTHORITY_STRING_FILE_PROVIDER
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE
@@ -75,6 +83,14 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
     private val binding get() = _binding!!
 
     private var actionMode: ActionMode? = null
+
+    private val playlistMenuMoreProvider = object : MenuProvider {
+        override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+            menuInflater.inflate(R.menu.fragment_playlist_menu_more, menu)
+        }
+
+        override fun onMenuItemSelected(menuItem: MenuItem): Boolean = true
+    }
 
     /**
      * onCreateView
@@ -137,7 +153,7 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
                     .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
                 val uiState by videoSectionViewModel.state.collectAsStateWithLifecycle()
                 MegaAppTheme(isDark = themeMode.isDarkMode()) {
-                    VideoSectionComposeView(
+                    VideoSectionFeatureScreen(
                         onSortOrderClick = { showSortByPanel() },
                         videoSectionViewModel = videoSectionViewModel,
                         onClick = { item, index ->
@@ -157,6 +173,9 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
                         },
                         onMenuClick = { item ->
                             showOptionsMenuForItem(item)
+                        },
+                        onDestinationChanged = { route ->
+                            route?.let { updateToolbarWhenDestinationChanged(it) }
                         }
                     )
                 }
@@ -171,7 +190,7 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
 
     private fun openVideoFile(
         activity: Activity,
-        item: UIVideo,
+        item: VideoUIEntity,
         index: Int,
     ) {
         viewLifecycleOwner.lifecycleScope.launch {
@@ -209,7 +228,7 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
     }
 
     private fun getIntent(
-        item: UIVideo,
+        item: VideoUIEntity,
         index: Int,
     ) = Util.getMediaIntent(activity, item.name).apply {
         putExtra(INTENT_EXTRA_KEY_POSITION, index)
@@ -250,11 +269,28 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
         }
     }
 
-    private fun showOptionsMenuForItem(item: UIVideo) {
+    private fun showOptionsMenuForItem(item: VideoUIEntity) {
         (requireActivity() as ManagerActivity).showNodeOptionsPanel(
             nodeId = item.id,
             mode = NodeOptionsBottomSheetDialogFragment.CLOUD_DRIVE_MODE
         )
+    }
+
+    private fun updateToolbarWhenDestinationChanged(route: String) {
+        (activity as? ManagerActivity)?.let { managerActivity ->
+            when (route) {
+                videoSectionRoute -> {
+                    managerActivity.setToolbarTitle(getString(R.string.sortby_type_video_first))
+                    managerActivity.removeMenuProvider(playlistMenuMoreProvider)
+                }
+
+                videoPlaylistDetailRoute -> {
+                    managerActivity.addMenuProvider(playlistMenuMoreProvider)
+                    managerActivity.setToolbarTitle("")
+                }
+            }
+            managerActivity.invalidateOptionsMenu()
+        }
     }
 
     private fun disableSelectMode() {

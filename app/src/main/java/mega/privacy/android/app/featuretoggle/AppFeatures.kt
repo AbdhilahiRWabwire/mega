@@ -14,6 +14,26 @@ import mega.privacy.android.domain.featuretoggle.FeatureFlagValueProvider
  */
 enum class AppFeatures(override val description: String, private val defaultValue: Boolean) :
     Feature {
+
+    /**
+     * Enables the Settings Camera Uploads page in Jetpack Compose
+     */
+    SettingsCameraUploadsCompose(
+        "Enables the Settings Camera Uploads in Jetpack Compose. This requires an app " +
+                "restart for the changes to take effect.",
+        false,
+    ),
+
+
+    /**
+     * Enables new outgoing shares compose page
+     */
+    OutgoingSharesCompose(
+        "Enable new Outgoing Shares Compose page (requires app restart)",
+        false
+    ),
+
+
     /**
      * Enables new links compose page
      */
@@ -52,22 +72,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     NewCU(
         "Enables revamp CU interface",
         false,
-    ),
-
-    /**
-     * Enables subfolder media discovery setting
-     */
-    SubFolderMediaDiscoverySetting(
-        "Enables subfolder media discovery  setting",
-        true,
-    ),
-
-    /**
-     * Enables new media discovery fab
-     */
-    NewMediaDiscoveryFab(
-        "Enables new media discovery fab",
-        true,
     ),
 
     /**
@@ -223,15 +227,28 @@ enum class AppFeatures(override val description: String, private val defaultValu
     MuteParticipant("Enable Mute participant", false),
 
     /**
+     * Call unlimited for pro users
+     */
+    CallUnlimitedProPlan("Call to stay unlimited when host with pro plan leaves", false),
+
+    /**
      * Enable new design Variant A for ChooseAccount screen
      */
     ChooseAccountScreenVariantA(
         "Enable new design (Variant A) for ChooseAccount screen (Onboarding Upselling dialog)",
         false
+    ),
+
+    /**
+     * To show promotional dynamic messages in Notifications
+     */
+    NotificationCenter(
+        "To show promotional dynamic messages in Notifications",
+        false
     );
 
     companion object : FeatureFlagValueProvider {
         override suspend fun isEnabled(feature: Feature) =
-            values().firstOrNull { it == feature }?.defaultValue
+            entries.firstOrNull { it == feature }?.defaultValue
     }
 }

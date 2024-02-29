@@ -29,7 +29,6 @@ import mega.privacy.android.data.mapper.MegaPurchaseMapper
 import mega.privacy.android.data.mapper.MegaSkuMapper
 import mega.privacy.android.data.mapper.MimeTypeMapper
 import mega.privacy.android.data.mapper.NodeUpdateMapper
-import mega.privacy.android.data.mapper.OfflineNodeInformationMapper
 import mega.privacy.android.data.mapper.PaymentMethodTypeMapper
 import mega.privacy.android.data.mapper.PaymentPlatformTypeMapper
 import mega.privacy.android.data.mapper.PricingMapper
@@ -52,6 +51,7 @@ import mega.privacy.android.data.mapper.camerauploads.UploadOptionIntMapper
 import mega.privacy.android.data.mapper.camerauploads.UploadOptionIntMapperImpl
 import mega.privacy.android.data.mapper.changepassword.PasswordStrengthMapper
 import mega.privacy.android.data.mapper.changepassword.PasswordStrengthMapperImpl
+import mega.privacy.android.data.mapper.chat.ChatMessageMapper
 import mega.privacy.android.data.mapper.getFileTypeInfo
 import mega.privacy.android.data.mapper.getMimeType
 import mega.privacy.android.data.mapper.mapBooleanPreference
@@ -75,7 +75,6 @@ import mega.privacy.android.data.mapper.toMediaStoreFileTypeUri
 import mega.privacy.android.data.mapper.toMegaAchievement
 import mega.privacy.android.data.mapper.toMegaPurchase
 import mega.privacy.android.data.mapper.toMegaSku
-import mega.privacy.android.data.mapper.toOfflineNodeInformation
 import mega.privacy.android.data.mapper.toPaymentMethodType
 import mega.privacy.android.data.mapper.toPaymentPlatformType
 import mega.privacy.android.data.mapper.toPricing
@@ -90,7 +89,9 @@ import mega.privacy.android.data.mapper.verification.SmsPermissionMapperImpl
 import mega.privacy.android.data.mapper.viewtype.ViewTypeMapper
 import mega.privacy.android.data.mapper.viewtype.ViewTypeMapperImpl
 import mega.privacy.android.domain.entity.Currency
+import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.preference.StartScreen
+import nz.mega.sdk.MegaChatMessage
 
 /**
  * Module for providing mapper dependencies
@@ -275,10 +276,6 @@ internal abstract class MapperModule {
         @Provides
         fun provideSubscriptionStatusMapper(): SubscriptionStatusMapper = ::toSubscriptionStatus
 
-        @Provides
-        fun provideOfflineNodeInformationMapper(): OfflineNodeInformationMapper =
-            ::toOfflineNodeInformation
-
         /**
          * Provide [CountryMapper] mapper
          */
@@ -348,5 +345,9 @@ internal abstract class MapperModule {
          */
         @Provides
         fun provideGsonBuilder(): GsonBuilder = GsonBuilder()
+
+        @Provides
+        fun provideChatMessageMapper(mapper: ChatMessageMapper): @JvmSuppressWildcards suspend (@JvmSuppressWildcards MegaChatMessage) -> @JvmSuppressWildcards ChatMessage =
+            mapper::invoke
     }
 }

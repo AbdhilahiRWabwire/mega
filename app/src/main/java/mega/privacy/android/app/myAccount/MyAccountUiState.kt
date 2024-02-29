@@ -1,5 +1,6 @@
 package mega.privacy.android.app.myAccount
 
+import androidx.annotation.StringRes
 import mega.privacy.android.domain.entity.Feature
 
 /**
@@ -17,6 +18,8 @@ import mega.privacy.android.domain.entity.Feature
  * @property isBusinessAccount
  * @property enabledFeatureFlags
  * @property backupStorageSize
+ * @property errorMessage The Error Message to be displayed
+ * @property errorMessageRes A [StringRes] version of the Error Message to be displayed
  */
 data class MyAccountUiState(
     val isFileVersioningEnabled: Boolean = true,
@@ -31,4 +34,6 @@ data class MyAccountUiState(
     val isBusinessAccount: Boolean = false,
     val enabledFeatureFlags: Set<Feature> = emptySet(),
     val backupStorageSize: Long = 0L,
+    val errorMessage: String = "",
+    @StringRes val errorMessageRes: Int? = null,
 )

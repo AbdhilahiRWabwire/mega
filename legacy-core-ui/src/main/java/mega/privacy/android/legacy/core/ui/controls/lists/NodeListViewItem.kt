@@ -96,6 +96,7 @@ fun NodeListViewItem(
     applySecondaryColorIconTint: Boolean = false,
     infoColor: Color? = null,
     @DrawableRes infoIcon: Int? = null,
+    @DrawableRes sharesIcon: Int? = null,
     infoIconTint: Color? = null,
     labelColor: Color? = null,
     onLongClick: (() -> Unit)? = null,
@@ -114,6 +115,7 @@ fun NodeListViewItem(
         name = name,
         infoColor = infoColor,
         infoIcon = infoIcon,
+        sharesIcon = sharesIcon,
         infoIconTint = infoIconTint,
         labelColor = labelColor,
         showMenuButton = showMenuButton,
@@ -173,12 +175,16 @@ fun NodeListViewItem(
     applySecondaryColorIconTint: Boolean = false,
     infoColor: Color? = null,
     @DrawableRes infoIcon: Int? = null,
+    @DrawableRes sharesIcon: Int? = null,
+    @DrawableRes verifiedIcon: Int? = null,
     infoIconTint: Color? = null,
     labelColor: Color? = null,
+    sharesSubtitle: String? = null,
     onLongClick: (() -> Unit)? = null,
     isEnabled: Boolean = true,
     onMenuClick: () -> Unit = {},
     nodeAvailableOffline: Boolean = false,
+    isUnverifiedShare: Boolean = false,
 ) {
     Column(
         modifier = if (isEnabled) {
@@ -242,7 +248,7 @@ fun NodeListViewItem(
                     .padding(start = 12.dp)
                     .fillMaxWidth()
             ) {
-                val (nodeInfo, threeDots, infoRow, availableOffline) = createRefs()
+                val (nodeInfo, threeDots, infoRow, availableOffline, sharesStatus) = createRefs()
                 Image(
                     painter = painterResource(id = R.drawable.ic_dots_vertical_grey),
                     contentDescription = "3 dots",
@@ -276,7 +282,7 @@ fun NodeListViewItem(
                         text = name,
                         modifier = Modifier.widthIn(max = if (isScreenOrientationLandscape()) 275.dp else 190.dp),
                         style = MaterialTheme.typography.subtitle1,
-                        color = if (isTakenDown) MaterialTheme.colors.red_800_red_400 else MaterialTheme.colors.textColorPrimary,
+                        color = if (isTakenDown || isUnverifiedShare) MaterialTheme.colors.red_800_red_400 else MaterialTheme.colors.textColorPrimary,
                     )
                     labelColor?.let {
                         Box(
@@ -344,14 +350,42 @@ fun NodeListViewItem(
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Text(
-                        text = folderInfo ?: "$fileSize · $modifiedDate",
+                        text = sharesSubtitle ?: folderInfo ?: "$fileSize · $modifiedDate",
                         modifier = Modifier.testTag(INFO_TEXT_TEST_TAG),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.subtitle2,
                         color = infoColor ?: MaterialTheme.colors.textColorSecondary,
                     )
+                    if (verifiedIcon != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            modifier = Modifier
+                                .testTag(VERIFIED_TEST_TAG)
+                                .size(18.dp),
+                            painter = painterResource(verifiedIcon),
+                            tint = infoIconTint ?: Color.Unspecified,
+                            contentDescription = "Info Icon"
+                        )
+                    }
                 }
+                if (sharesIcon != null)
+                    Image(
+                        modifier = Modifier
+                            .constrainAs(sharesStatus) {
+                                top.linkTo(infoRow.top)
+                                bottom.linkTo(infoRow.top)
+                                end.linkTo(availableOffline.start)
+                                visibility = Visibility.Visible
+                            }
+                            .padding(end = 4.dp)
+                            .size(21.dp),
+                        colorFilter = ColorFilter.tint(
+                            MaterialTheme.colors.textColorSecondary
+                        ),
+                        painter = painterResource(id = sharesIcon),
+                        contentDescription = "Shares"
+                    )
                 Image(
                     modifier = Modifier
                         .constrainAs(availableOffline) {
@@ -375,37 +409,42 @@ fun NodeListViewItem(
 /**
  * Test tag for info text
  */
-const val INFO_TEXT_TEST_TAG = "Info Text"
+const val INFO_TEXT_TEST_TAG = "node_list_view_item:text_info"
 
 /**
  * Text tag for selected item
  */
-const val SELECTED_TEST_TAG = "Selected Tag"
+const val SELECTED_TEST_TAG = "node_list_view_item:image_selected"
 
 /**
  * Test tag for folder item
  */
-const val FOLDER_TEST_TAG = "Folder Tag"
+const val FOLDER_TEST_TAG = "node_list_view_item:image_folder"
 
 /**
  * Test tag for file item
  */
-const val FILE_TEST_TAG = "File Tag"
+const val FILE_TEST_TAG = "node_list_view_item:thumbnail_file"
 
 /**
  * Test tag for favorite item
  */
-const val FAVORITE_TEST_TAG = "favorite Tag"
+const val FAVORITE_TEST_TAG = "node_list_view_item:image_favorite"
 
 /**
  * Test tag for exported item
  */
-const val EXPORTED_TEST_TAG = "exported Tag"
+const val EXPORTED_TEST_TAG = "node_list_view_item:image_exported"
 
 /**
  * Test tag for taken item
  */
-const val TAKEN_TEST_TAG = "taken Tag"
+const val TAKEN_TEST_TAG = "node_list_view_item:image_taken"
+
+/**
+ * Test tag for verified credential badge
+ */
+const val VERIFIED_TEST_TAG = "node_list_view_item:icon_verified"
 
 /**
  * Test tag for the Info Icon
@@ -451,6 +490,7 @@ private fun FolderPreview() {
             isSelected = false,
             folderInfo = "Empty Folder",
             icon = R.drawable.ic_folder_list,
+            sharesIcon = R.drawable.ic_alert_triangle,
             fileSize = "1.2 MB",
             modifiedDate = "Dec 29, 2022",
             name = "documentation.pdf",

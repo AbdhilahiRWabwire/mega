@@ -12,22 +12,22 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.presentation.notification.model.Notification
 import mega.privacy.android.app.presentation.notification.model.NotificationState
 import mega.privacy.android.app.presentation.notification.model.mapper.NotificationMapper
-import mega.privacy.android.domain.usecase.AcknowledgeUserAlerts
-import mega.privacy.android.domain.usecase.MonitorUserAlerts
+import mega.privacy.android.domain.usecase.AcknowledgeUserAlertsUseCase
+import mega.privacy.android.domain.usecase.MonitorUserAlertsUseCase
 import javax.inject.Inject
 
 /**
  * Notification view model
  *
- * @property monitorUserAlerts
- * @property acknowledgeUserAlerts
+ * @property acknowledgeUserAlertsUseCase
+ * @property monitorUserAlertsUseCase
  * @property state
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class NotificationViewModel @Inject constructor(
-    private val monitorUserAlerts: MonitorUserAlerts,
-    private val acknowledgeUserAlerts: AcknowledgeUserAlerts,
+    private val acknowledgeUserAlertsUseCase: AcknowledgeUserAlertsUseCase,
+    private val monitorUserAlertsUseCase: MonitorUserAlertsUseCase,
     private val notificationMapper: NotificationMapper,
 ) : ViewModel() {
 
@@ -37,9 +37,9 @@ class NotificationViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            monitorUserAlerts().mapLatest { list ->
+            monitorUserAlertsUseCase().mapLatest { list ->
                 list.map { notificationMapper(it) }
-            }.collect() {
+            }.collect {
                 _state.update { (notifications) ->
                     NotificationState(
                         notifications = it,
@@ -60,6 +60,6 @@ class NotificationViewModel @Inject constructor(
      *
      */
     fun onNotificationsLoaded() {
-        viewModelScope.launch { acknowledgeUserAlerts() }
+        viewModelScope.launch { acknowledgeUserAlertsUseCase() }
     }
 }

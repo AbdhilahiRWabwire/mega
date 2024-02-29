@@ -1,29 +1,38 @@
 package mega.privacy.android.app.presentation.search.navigation
 
-import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.dialog
-import mega.privacy.android.app.presentation.node.NodeOptionsBottomSheetViewModel
+import androidx.navigation.navArgument
 import mega.privacy.android.app.presentation.node.dialogs.renamenode.RenameNodeDialog
+import mega.privacy.android.app.presentation.search.nodeListHandle
+import java.io.File
 
 internal fun NavGraphBuilder.renameDialogNavigation(
     navHostController: NavHostController,
-    nodeOptionsBottomSheetViewModel: NodeOptionsBottomSheetViewModel
 ) {
     dialog(
-        searchRenameDialog,
+        route = "$searchRenameDialog/{$nodeListHandle}",
+        arguments = listOf(
+            navArgument(nodeListHandle) {
+                type = NavType.LongType
+            }
+        )
     ) {
-        val nodeOptionsState by nodeOptionsBottomSheetViewModel.state.collectAsStateWithLifecycle()
-        nodeOptionsState.node?.let { nodeId ->
+        val nodeHandle = it.arguments?.getLong(nodeListHandle)
+
+        nodeHandle?.let { nodeId ->
             RenameNodeDialog(
-                nodeId = nodeId.id.longValue,
+                nodeId = nodeId,
                 onDismiss = {
                     navHostController.navigateUp()
                 },
                 onOpenChangeExtensionDialog = { newNodeName ->
-                    navHostController.navigate("$searchChangeExtensionNodeDialog/$newNodeName")
+                    navHostController.navigate(
+                        searchChangeExtensionNodeDialog.plus(File.separator).plus(newNodeName)
+                            .plus(File.separator).plus(nodeId)
+                    )
                 },
             )
         }

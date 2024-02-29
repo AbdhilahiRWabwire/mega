@@ -447,6 +447,17 @@ class MyAccountActivity : PasscodeActivity(),
                 }
             }
         }
+
+        collectFlow(viewModel.state) { state ->
+            state.errorMessageRes?.let {
+                showErrorAlert(getString(it))
+                viewModel.resetErrorMessageRes()
+            }
+            if (state.errorMessage.isNotBlank()) {
+                showErrorAlert(state.errorMessage)
+                viewModel.resetErrorMessage()
+            }
+        }
     }
 
     /**
@@ -725,19 +736,8 @@ class MyAccountActivity : PasscodeActivity(),
                         )
                     } else {
                         when (dialogType) {
-                            TYPE_CANCEL_ACCOUNT -> {
-                                viewModel.finishConfirmCancelAccount(password) { message ->
-                                    showErrorAlert(message)
-                                }
-                            }
-
-                            TYPE_CHANGE_EMAIL -> {
-                                viewModel.finishConfirmChangeEmail(
-                                    password,
-                                    ::showEmailChangeSuccess,
-                                    ::showErrorAlert
-                                )
-                            }
+                            TYPE_CANCEL_ACCOUNT -> viewModel.finishAccountCancellation(password)
+                            TYPE_CHANGE_EMAIL -> viewModel.finishChangeEmailConfirmation(password)
                         }
 
                         textField.hideKeyboard()
@@ -748,10 +748,6 @@ class MyAccountActivity : PasscodeActivity(),
 
             show()
         }
-    }
-
-    private fun showEmailChangeSuccess(newEmail: String) {
-        showSnackbar(getString(R.string.email_changed, newEmail))
     }
 
     private fun showConfirmResetPasswordDialog() {

@@ -1,5 +1,6 @@
 package mega.privacy.android.domain.entity.chat.messages
 
+import kotlinx.serialization.Serializable
 import mega.privacy.android.domain.entity.chat.ChatMessageStatus
 import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
 import kotlin.time.Duration
@@ -12,14 +13,15 @@ import kotlin.time.Duration
  * @property size size of the voice clip
  * @property duration duration of the voice clip in milliseconds
  */
+@Serializable
 data class VoiceClipMessage(
+    override val chatId: Long,
     override val msgId: Long,
     override val time: Long,
     override val isMine: Boolean,
     override val userHandle: Long,
     override val shouldShowAvatar: Boolean,
     override val shouldShowTime: Boolean,
-    override val shouldShowDate: Boolean,
     override val reactions: List<Reaction>,
     val status: ChatMessageStatus,
     val name: String,

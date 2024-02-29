@@ -1,5 +1,6 @@
 package mega.privacy.android.data.mapper.chat.paging
 
+import kotlinx.coroutines.test.runTest
 import mega.privacy.android.data.database.entity.chat.ChatGeolocationEntity
 import mega.privacy.android.data.database.entity.chat.ChatNodeEntity
 import mega.privacy.android.data.database.entity.chat.GiphyEntity
@@ -18,8 +19,8 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.argForWhich
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.stub
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import java.util.stream.Stream
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -39,20 +40,16 @@ class MetaTypedEntityTypedMessageMapperTest {
     @ParameterizedTest(
         name = "Test isMine {0} " +
                 "shouldShowAvatar {1} " +
-                "shouldShowTime {2} " +
-                "shouldShowDate {3} "
+                "shouldShowTime {2} "
     )
     @MethodSource("booleanParameterProvider")
     fun `test that request object is created with the correct parameters`(
         isMineParam: Boolean,
         shouldShowAvatarParam: Boolean,
         shouldShowTimeParam: Boolean,
-        shouldShowDateParam: Boolean,
-    ) {
+    ) = runTest {
         val mock = mock<TypedMessage>()
-        createTypedMessageUseCase.stub {
-            on { invoke(any()) } doReturn mock
-        }
+        whenever(createTypedMessageUseCase.invoke(any())).thenReturn(mock)
         val expectedNodeList = listOf(mock<ChatNodeEntity>())
         val expectedRichPreviewEntity = mock<RichPreviewEntity>()
         val expectedChatGeolocationEntity = mock<ChatGeolocationEntity>()
@@ -64,7 +61,6 @@ class MetaTypedEntityTypedMessageMapperTest {
             on { isMine } doReturn isMineParam
             on { shouldShowAvatar } doReturn shouldShowAvatarParam
             on { shouldShowTime } doReturn shouldShowTimeParam
-            on { shouldShowDate } doReturn shouldShowDateParam
             on { textMessage } doReturn expectedTextMessage
         }
 
@@ -86,14 +82,13 @@ class MetaTypedEntityTypedMessageMapperTest {
                     && isMine == isMineParam
                     && shouldShowAvatar == shouldShowAvatarParam
                     && shouldShowTime == shouldShowTimeParam
-                    && shouldShowDate == shouldShowDateParam
         })
     }
 
     private fun booleanParameterProvider() = Stream.of(
-        Arguments.of(true, false, false, false),
-        Arguments.of(false, true, false, false),
-        Arguments.of(false, false, true, false),
-        Arguments.of(false, false, false, true),
+        Arguments.of(true, false, false),
+        Arguments.of(false, true, false),
+        Arguments.of(false, false, true),
+        Arguments.of(false, false, false),
     )
 }

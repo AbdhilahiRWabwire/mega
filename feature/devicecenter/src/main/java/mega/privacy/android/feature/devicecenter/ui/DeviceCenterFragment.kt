@@ -79,6 +79,7 @@ class DeviceCenterFragment : Fragment() {
                                 activity = this@DeviceCenterFragment.activity
                                     ?: return@DeviceCenterScreen,
                                 backupsHandle = backupFolderUINode.rootHandle,
+                                errorMessage = backupFolderUINode.status.localizedErrorMessage,
                             )
                         },
                         onBackupFolderMenuClicked = { backupDeviceFolderUINode ->
@@ -99,6 +100,7 @@ class DeviceCenterFragment : Fragment() {
                                 activity = this@DeviceCenterFragment.activity
                                     ?: return@DeviceCenterScreen,
                                 nodeHandle = nonBackupDeviceFolderUINode.rootHandle,
+                                errorMessage = nonBackupDeviceFolderUINode.status.localizedErrorMessage,
                             )
                         },
                         onNonBackupFolderMenuClicked = { nonBackupDeviceFolderUINode ->

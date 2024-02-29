@@ -1,6 +1,7 @@
 package mega.privacy.android.domain.usecase.chat.message
 
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.test.runTest
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ChatMessageCode
 import mega.privacy.android.domain.entity.chat.ChatMessageType
@@ -21,9 +22,9 @@ class CreateInvalidMessageUseCaseTest {
     }
 
     @Test
-    fun `test that invalid type returns unrecognisable message`() {
+    fun `test that invalid type returns unrecognisable message`() = runTest {
         val message = mock<ChatMessage> {
-            on { msgId }.thenReturn(123L)
+            on { messageId }.thenReturn(123L)
             on { timestamp }.thenReturn(123L)
             on { userHandle }.thenReturn(123L)
             on { type }.thenReturn(ChatMessageType.INVALID)
@@ -32,10 +33,10 @@ class CreateInvalidMessageUseCaseTest {
             underTest.invoke(
                 CreateTypedMessageRequest(
                     chatMessage = message,
+                    chatId = 123L,
                     isMine = true,
                     shouldShowAvatar = true,
                     shouldShowTime = true,
-                    shouldShowDate = true,
                     reactions = emptyList(),
                 )
             )
@@ -43,9 +44,9 @@ class CreateInvalidMessageUseCaseTest {
     }
 
     @Test
-    fun `test that invalid format code returns invalid format message`() {
+    fun `test that invalid format code returns invalid format message`() = runTest {
         val message = mock<ChatMessage> {
-            on { msgId }.thenReturn(123L)
+            on { messageId }.thenReturn(123L)
             on { timestamp }.thenReturn(123L)
             on { userHandle }.thenReturn(123L)
             on { type }.thenReturn(ChatMessageType.NORMAL)
@@ -55,10 +56,10 @@ class CreateInvalidMessageUseCaseTest {
             underTest.invoke(
                 CreateTypedMessageRequest(
                     chatMessage = message,
+                    chatId = 123L,
                     isMine = true,
                     shouldShowAvatar = true,
                     shouldShowTime = true,
-                    shouldShowDate = true,
                     reactions = emptyList(),
                 )
             )
@@ -66,9 +67,9 @@ class CreateInvalidMessageUseCaseTest {
     }
 
     @Test
-    fun `test that invalid signature code returns invalid signature message`() {
+    fun `test that invalid signature code returns invalid signature message`() = runTest {
         val message = mock<ChatMessage> {
-            on { msgId }.thenReturn(123L)
+            on { messageId }.thenReturn(123L)
             on { timestamp }.thenReturn(123L)
             on { userHandle }.thenReturn(123L)
             on { type }.thenReturn(ChatMessageType.NORMAL)
@@ -78,10 +79,10 @@ class CreateInvalidMessageUseCaseTest {
             underTest.invoke(
                 CreateTypedMessageRequest(
                     chatMessage = message,
+                    chatId = 123L,
                     isMine = true,
                     shouldShowAvatar = true,
                     shouldShowTime = true,
-                    shouldShowDate = true,
                     reactions = emptyList(),
                 )
             )
@@ -89,9 +90,9 @@ class CreateInvalidMessageUseCaseTest {
     }
 
     @Test
-    fun `test that unrecognisable message is returned as default`() {
+    fun `test that unrecognisable message is returned as default`() = runTest {
         val message = mock<ChatMessage> {
-            on { msgId }.thenReturn(123L)
+            on { messageId }.thenReturn(123L)
             on { timestamp }.thenReturn(123L)
             on { userHandle }.thenReturn(123L)
             on { type }.thenReturn(ChatMessageType.NORMAL)
@@ -101,10 +102,10 @@ class CreateInvalidMessageUseCaseTest {
             underTest.invoke(
                 CreateTypedMessageRequest(
                     chatMessage = message,
+                    chatId = 123L,
                     isMine = true,
                     shouldShowAvatar = true,
                     shouldShowTime = true,
-                    shouldShowDate = true,
                     reactions = emptyList(),
                 )
             )

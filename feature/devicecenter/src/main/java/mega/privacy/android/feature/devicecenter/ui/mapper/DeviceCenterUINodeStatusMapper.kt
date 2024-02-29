@@ -25,15 +25,22 @@ internal class DeviceCenterUINodeStatusMapper @Inject constructor(
         DeviceCenterNodeStatus.Disabled -> DeviceCenterUINodeStatus.Disabled
         DeviceCenterNodeStatus.Offline -> DeviceCenterUINodeStatus.Offline
         DeviceCenterNodeStatus.UpToDate -> DeviceCenterUINodeStatus.UpToDate
+
+        is DeviceCenterNodeStatus.Error -> DeviceCenterUINodeStatus.Error(
+            specificErrorMessage = status.errorSubState?.let { errorSubState ->
+                deviceFolderUINodeErrorMessageMapper(errorSubState)
+            }
+        )
+
         is DeviceCenterNodeStatus.Blocked -> DeviceCenterUINodeStatus.Blocked(
-            specificErrorMessage = status.errorSubState?.let {
-                deviceFolderUINodeErrorMessageMapper(status.errorSubState)
+            specificErrorMessage = status.errorSubState?.let { errorSubState ->
+                deviceFolderUINodeErrorMessageMapper(errorSubState)
             }
         )
 
         is DeviceCenterNodeStatus.Overquota -> DeviceCenterUINodeStatus.Overquota(
-            specificErrorMessage = status.errorSubState?.let {
-                deviceFolderUINodeErrorMessageMapper(status.errorSubState)
+            specificErrorMessage = status.errorSubState?.let { errorSubState ->
+                deviceFolderUINodeErrorMessageMapper(errorSubState)
             }
         )
 

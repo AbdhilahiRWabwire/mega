@@ -2,20 +2,16 @@ package test.mega.privacy.android.app.presentation.chat.list
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
 import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.chat.list.ChatTabsViewModel
 import mega.privacy.android.app.presentation.chat.mapper.ChatRoomTimestampMapper
 import mega.privacy.android.app.usecase.chat.GetLastMessageUseCase
+import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.data.gateway.api.MegaChatApiGateway
 import mega.privacy.android.domain.entity.chat.MeetingTooltipItem
 import mega.privacy.android.domain.usecase.SignalChatPresenceActivity
@@ -33,15 +29,15 @@ import mega.privacy.android.domain.usecase.meeting.CancelScheduledMeetingUseCase
 import mega.privacy.android.domain.usecase.meeting.IsChatHistoryEmptyUseCase
 import mega.privacy.android.domain.usecase.meeting.IsParticipatingInChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.LoadMessagesUseCase
+import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorScheduledMeetingCanceledUseCase
 import mega.privacy.android.domain.usecase.meeting.OpenOrStartCallUseCase
 import mega.privacy.android.domain.usecase.meeting.StartChatCallNoRingingUseCase
 import mega.privacy.android.domain.usecase.meeting.StartMeetingInWaitingRoomChatUseCase
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.kotlin.mock
@@ -50,7 +46,7 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.mockito.kotlin.wheneverBlocking
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@ExtendWith(CoroutineMainDispatcherExtension::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 internal class ChatTabsViewModelTest {
     private lateinit var underTest: ChatTabsViewModel
@@ -80,17 +76,7 @@ internal class ChatTabsViewModelTest {
     private val getChatsUnreadStatusUseCase: GetChatsUnreadStatusUseCase = mock()
     private val startMeetingInWaitingRoomChatUseCase: StartMeetingInWaitingRoomChatUseCase = mock()
     private val monitorLeaveChatUseCase: MonitorLeaveChatUseCase = mock()
-
-
-    @BeforeAll
-    fun setup() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
-    }
-
-    @AfterAll
-    fun tearDown() {
-        Dispatchers.resetMain()
-    }
+    private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase = mock()
 
     @BeforeEach
     fun resetMocks() {
@@ -118,7 +104,8 @@ internal class ChatTabsViewModelTest {
             isParticipatingInChatCallUseCase,
             setNextMeetingTooltipUseCase,
             getChatsUnreadStatusUseCase,
-            startMeetingInWaitingRoomChatUseCase
+            startMeetingInWaitingRoomChatUseCase,
+            monitorChatCallUpdatesUseCase
         )
     }
 
@@ -146,6 +133,7 @@ internal class ChatTabsViewModelTest {
             getChatsUnreadStatusUseCase,
             startMeetingInWaitingRoomChatUseCase,
             monitorLeaveChatUseCase,
+            monitorChatCallUpdatesUseCase
         )
     }
 

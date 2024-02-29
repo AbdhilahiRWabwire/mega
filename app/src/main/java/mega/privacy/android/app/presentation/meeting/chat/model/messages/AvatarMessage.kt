@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import mega.privacy.android.app.presentation.meeting.chat.extension.isSelectable
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
 import mega.privacy.android.app.presentation.meeting.chat.view.ChatAvatar
 import mega.privacy.android.core.ui.controls.chat.ChatMessageContainer
@@ -18,6 +19,12 @@ import mega.privacy.android.domain.entity.chat.messages.TypedMessage
  * Avatar message
  */
 abstract class AvatarMessage : UiChatMessage {
+
+    /**
+     * Message
+     */
+    internal abstract val message: TypedMessage
+
     /**
      * Content composable
      */
@@ -54,16 +61,19 @@ abstract class AvatarMessage : UiChatMessage {
         onLongClick: (TypedMessage) -> Unit,
         onMoreReactionsClicked: (Long) -> Unit,
         onReactionClicked: (Long, String, List<UIReaction>) -> Unit,
+        onReactionLongClick: (String, List<UIReaction>) -> Unit,
+        onForwardClicked: (TypedMessage) -> Unit,
     ) {
         ChatMessageContainer(
             modifier = Modifier.fillMaxWidth(),
             isMine = displayAsMine,
-            showForwardIcon = canForward,
+            showForwardIcon = shouldDisplayForwardIcon,
             reactions = reactions,
-            onMoreReactionsClicked = { onMoreReactionsClicked(id) },
-            onReactionClicked = { onReactionClicked(id, it, reactions) },
+            onMoreReactionsClick = { onMoreReactionsClicked(id) },
+            onReactionClick = { onReactionClicked(id, it, reactions) },
+            onReactionLongClick = { onReactionLongClick(it, reactions) },
+            onForwardClicked = { onForwardClicked(message) },
             time = this.getTimeOrNull(timeFormatter),
-            date = this.getDateOrNull(dateFormatter),
             avatarOrIcon = {
                 MessageAvatar(
                     lastUpdatedCache = lastUpdatedCache
@@ -75,7 +85,8 @@ abstract class AvatarMessage : UiChatMessage {
         )
     }
 
-    override fun key(): String {
-        return super.key() + "_${showAvatar}"
-    }
+    override val isSelectable: Boolean
+        get() = message.isSelectable
+
+    override fun key() = super.key() + "_${showAvatar}"
 }

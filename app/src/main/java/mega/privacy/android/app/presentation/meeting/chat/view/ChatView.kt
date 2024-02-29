@@ -29,10 +29,10 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.ModalBottomSheetValue
-import androidx.compose.material.SnackbarHost
 import androidx.compose.material.SnackbarHostState
 import androidx.compose.material.SnackbarResult
 import androidx.compose.material.rememberModalBottomSheetState
+import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -61,13 +62,16 @@ import mega.privacy.android.app.extensions.navigateToAppSettings
 import mega.privacy.android.app.main.AddContactActivity
 import mega.privacy.android.app.main.InviteContactActivity
 import mega.privacy.android.app.objects.GifData
+import mega.privacy.android.app.presentation.meeting.chat.extension.getInfo
+import mega.privacy.android.app.presentation.meeting.chat.extension.getOpenChatId
 import mega.privacy.android.app.presentation.meeting.chat.extension.isJoined
 import mega.privacy.android.app.presentation.meeting.chat.extension.isStarted
-import mega.privacy.android.app.presentation.meeting.chat.extension.toInfoText
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
 import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
+import mega.privacy.android.app.presentation.meeting.chat.saver.ChatSavers
+import mega.privacy.android.app.presentation.meeting.chat.view.actions.MessageAction
 import mega.privacy.android.app.presentation.meeting.chat.view.appbar.ChatAppBar
 import mega.privacy.android.app.presentation.meeting.chat.view.bottombar.ChatBottomBar
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.AllContactsAddedDialog
@@ -80,6 +84,9 @@ import mega.privacy.android.app.presentation.meeting.chat.view.dialog.NoContactT
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.ParticipatingInACallDialog
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openAddContactActivity
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openAttachContactActivity
+import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openChatFragment
+import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openChatPicker
+import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openContactInfoActivity
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openLocationPicker
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.showGroupOrContactInfoActivity
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.startLoginActivity
@@ -88,8 +95,10 @@ import mega.privacy.android.app.presentation.meeting.chat.view.navigation.startW
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ChatAttachFileBottomSheet
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ChatToolbarBottomSheet
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.MessageOptionsBottomSheet
+import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ReactionsInfoBottomSheet
 import mega.privacy.android.app.presentation.qrcode.findActivity
 import mega.privacy.android.app.utils.CallUtil
+import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.permission.PermissionUtils
 import mega.privacy.android.core.ui.controls.appbar.SelectModeAppBar
 import mega.privacy.android.core.ui.controls.chat.ChatObserverIndicator
@@ -97,15 +106,20 @@ import mega.privacy.android.core.ui.controls.chat.ScrollToBottomFab
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
 import mega.privacy.android.core.ui.controls.layouts.MegaScaffold
 import mega.privacy.android.core.ui.controls.sheets.BottomSheet
-import mega.privacy.android.core.ui.controls.snackbars.MegaSnackbar
 import mega.privacy.android.domain.entity.chat.ChatPushNotificationMuteOption
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
+import mega.privacy.android.domain.entity.contacts.User
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
+import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.domain.entity.user.UserId
+import mega.privacy.android.domain.entity.user.UserVisibility
 import mega.privacy.android.shared.theme.MegaAppTheme
 
 @Composable
 internal fun ChatView(
     viewModel: ChatViewModel = hiltViewModel(),
+    actionsFactories: Set<(ChatViewModel) -> MessageAction>,
+    savers: ChatSavers,
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val onBackPressedDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
@@ -139,19 +153,61 @@ internal fun ChatView(
         createNewImage = viewModel::createNewImageUri,
         onSendLocationMessage = viewModel::sendLocationMessage,
         onAttachFiles = viewModel::onAttachFiles,
+        onAttachNodes = viewModel::onAttachNodes,
         onCloseEditing = viewModel::onCloseEditing,
         onAddReaction = viewModel::onAddReaction,
         onDeleteReaction = viewModel::onDeleteReaction,
         onSendGiphyMessage = viewModel::onSendGiphyMessage,
         onAttachContacts = viewModel::onAttachContacts,
+        getUserInfoIntoReactionList = viewModel::getUserInfoIntoReactionList,
+        getUser = viewModel::getUser,
+        onForwardMessages = viewModel::onForwardMessages,
+        actions = actionsFactories.map { it(viewModel) }.toSet(),
+        messageListSaver = savers.messageListSaver,
     )
 }
 
 /**
  * Chat view
  *
- * @param uiState [ChatUiState]
- * @param onBackPressed Action to perform for back button.
+ * @param uiState
+ * @param onBackPressed
+ * @param onMenuActionPressed
+ * @param inviteContactsToChat
+ * @param onClearChatHistory
+ * @param onInfoToShowConsumed
+ * @param enablePasscodeCheck
+ * @param archiveChat
+ * @param unarchiveChat
+ * @param endCallForAll
+ * @param startCall
+ * @param onCallStarted
+ * @param onWaitingRoomOpened
+ * @param onMutePushNotificationSelected
+ * @param onShowMutePushNotificationDialog
+ * @param onShowMutePushNotificationDialogConsumed
+ * @param onStartOrJoinMeeting
+ * @param onAnswerCall
+ * @param onEnableGeolocation
+ * @param onUserUpdateHandled
+ * @param messageListView
+ * @param bottomBar
+ * @param onSendClick
+ * @param onHoldAndAnswerCall
+ * @param onEndAndAnswerCall
+ * @param onJoinChat
+ * @param onSetPendingJoinLink
+ * @param createNewImage
+ * @param onSendLocationMessage
+ * @param onAttachFiles
+ * @param onCloseEditing
+ * @param onAddReaction
+ * @param onDeleteReaction
+ * @param onSendGiphyMessage
+ * @param onAttachContacts
+ * @param getUserInfoIntoReactionList
+ * @param onForwardMessages
+ * @param actions
  */
 @OptIn(
     ExperimentalMaterialApi::class,
@@ -180,8 +236,18 @@ internal fun ChatView(
     onAnswerCall: () -> Unit = {},
     onEnableGeolocation: () -> Unit = {},
     onUserUpdateHandled: () -> Unit = {},
-    messageListView: @Composable (ChatUiState, LazyListState, Dp, (TypedMessage) -> Unit, (Long) -> Unit, (Long, String, List<UIReaction>) -> Unit) -> Unit =
-        { state, listState, bottomPadding, onMessageLongClick, onMoreReactionsClick, onReactionClick ->
+    messageListView: @Composable (
+        ChatUiState,
+        LazyListState,
+        Dp,
+        (TypedMessage) -> Unit,
+        (Long) -> Unit,
+        (Long, String, List<UIReaction>) -> Unit,
+        (String, List<UIReaction>) -> Unit,
+        (TypedMessage) -> Unit,
+        (Boolean) -> Unit,
+    ) -> Unit =
+        { state, listState, bottomPadding, onMessageLongClick, onMoreReactionsClick, onReactionClick, onReactionLongClick, onForwardClick, onCanSelectChanged ->
             MessageListView(
                 uiState = state,
                 scrollState = listState,
@@ -190,6 +256,9 @@ internal fun ChatView(
                 onMessageLongClick = onMessageLongClick,
                 onMoreReactionsClicked = onMoreReactionsClick,
                 onReactionClicked = onReactionClick,
+                onReactionLongClick = onReactionLongClick,
+                onForwardClicked = onForwardClick,
+                onCanSelectChanged = onCanSelectChanged,
             )
         },
     bottomBar: @Composable (
@@ -200,7 +269,7 @@ internal fun ChatView(
         onEmojiClick: () -> Unit,
         onCloseEditing: () -> Unit,
         interactionSourceTextInput: MutableInteractionSource,
-    ) -> Unit = { state, showEmojiPicker, onSendClicked, onAttachmentClick, onEmojiClick, onCloseEditing, interactionSourceTextInput ->
+    ) -> Unit = { state, showEmojiPicker, onSendClicked, onAttachmentClick, onEmojiClick, onCloseEditingClick, interactionSourceTextInput ->
         ChatBottomBar(
             uiState = state,
             showEmojiPicker = showEmojiPicker,
@@ -208,7 +277,7 @@ internal fun ChatView(
             onAttachmentClick = onAttachmentClick,
             onEmojiClick = onEmojiClick,
             interactionSourceTextInput = interactionSourceTextInput,
-            onCloseEditing = onCloseEditing
+            onCloseEditing = onCloseEditingClick
         )
     },
     onSendClick: (String) -> Unit = {},
@@ -219,15 +288,23 @@ internal fun ChatView(
     createNewImage: suspend () -> Uri? = { null },
     onSendLocationMessage: (Intent?) -> Unit = { _ -> },
     onAttachFiles: (List<Uri>) -> Unit = {},
+    onAttachNodes: (List<NodeId>) -> Unit = {},
     onCloseEditing: () -> Unit = {},
     onAddReaction: (Long, String) -> Unit = { _, _ -> },
     onDeleteReaction: (Long, String) -> Unit = { _, _ -> },
     onSendGiphyMessage: (GifData?) -> Unit = { _ -> },
     onAttachContacts: (List<String>) -> Unit = { _ -> },
+    getUserInfoIntoReactionList: suspend (List<UIReaction>) -> List<UIReaction> = { emptyList() },
+    getUser: suspend (UserId) -> User? = { null },
+    onForwardMessages: (List<TypedMessage>, List<Long>?, List<Long>?) -> Unit = { _, _, _ -> },
+    actions: Set<MessageAction> = setOf(),
+    messageListSaver: Saver<List<TypedMessage>, String> = Saver(
+        save = { "" },
+        restore = { emptyList() }),
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val snackBarHostState = remember { SnackbarHostState() }
+    val scaffoldState = rememberScaffoldState()
     var showParticipatingInACallDialog by rememberSaveable { mutableStateOf(false) }
     var showNoContactToAddDialog by rememberSaveable { mutableStateOf(false) }
     var showAllContactsParticipateInChat by rememberSaveable { mutableStateOf(false) }
@@ -239,15 +316,23 @@ internal fun ChatView(
     var showJoinAnswerCallDialog by rememberSaveable { mutableStateOf(false) }
     var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
     var showReactionPicker by rememberSaveable { mutableStateOf(false) }
-    var messageClicked by rememberSaveable { mutableStateOf<TypedMessage?>(null) }
     var addingReactionTo by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectedReaction by rememberSaveable { mutableStateOf("") }
+    var reactionList by rememberSaveable { mutableStateOf(emptyList<UIReaction>()) }
+    var selectedMessages by rememberSaveable(stateSaver = messageListSaver) {
+        mutableStateOf(
+            emptyList()
+        )
+    }
     val audioPermissionState = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
     val keyboardController = LocalSoftwareKeyboardController.current
     val toolbarModalSheetState =
-        rememberModalBottomSheetState(initialValue = ModalBottomSheetValue.Hidden,
+        rememberModalBottomSheetState(
+            initialValue = ModalBottomSheetValue.Hidden,
             confirmValueChange = {
                 if (it != ModalBottomSheetValue.Hidden) {
                     keyboardController?.hide()
+                    showEmojiPicker = false
                 }
                 true
             }
@@ -257,6 +342,7 @@ internal fun ChatView(
         confirmValueChange = {
             if (it != ModalBottomSheetValue.Hidden) {
                 keyboardController?.hide()
+                showEmojiPicker = false
             }
             true
         }
@@ -266,9 +352,23 @@ internal fun ChatView(
         confirmValueChange = {
             if (it != ModalBottomSheetValue.Hidden) {
                 keyboardController?.hide()
+                showEmojiPicker = false
             } else {
-                messageClicked = null
+                selectedMessages = emptyList()
                 addingReactionTo = null
+            }
+            true
+        }
+    )
+    val reactionInfoBottomSheetState = rememberModalBottomSheetState(
+        initialValue = ModalBottomSheetValue.Hidden,
+        confirmValueChange = {
+            if (it != ModalBottomSheetValue.Hidden) {
+                keyboardController?.hide()
+                showEmojiPicker = false
+            } else {
+                selectedReaction = ""
+                reactionList = emptyList()
             }
             true
         }
@@ -293,7 +393,7 @@ internal fun ChatView(
             showPermissionNotAllowedSnackbar(
                 context,
                 coroutineScope,
-                snackBarHostState,
+                scaffoldState.snackbarHostState,
                 R.string.chat_attach_location_deny_permission
             )
         }
@@ -306,6 +406,10 @@ internal fun ChatView(
     }
     val interactionSourceTextInput = remember { MutableInteractionSource() }
     val isTextInputPressed by interactionSourceTextInput.collectIsPressedAsState()
+    var canSelect by remember {
+        mutableStateOf(false)
+    }
+
     BackHandler(enabled = toolbarModalSheetState.isVisible) {
         coroutineScope.launch {
             toolbarModalSheetState.hide()
@@ -338,11 +442,25 @@ internal fun ChatView(
             showPermissionNotAllowedSnackbar(
                 context,
                 coroutineScope,
-                snackBarHostState,
+                scaffoldState.snackbarHostState,
                 R.string.allow_acces_calls_subtitle_microphone
             )
         }
     }
+    val chatPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            selectedMessages.takeUnless { it.isEmpty() }?.let { messages ->
+                result.data?.let {
+                    val chatHandles = it.getLongArrayExtra(Constants.SELECTED_CHATS)?.toList()
+                    val contactHandles = it.getLongArrayExtra(Constants.SELECTED_USERS)?.toList()
+                    onForwardMessages(messages, chatHandles, contactHandles)
+                }
+            }
+
+            selectedMessages = emptyList()
+        }
 
     with(uiState) {
         val addContactLauncher =
@@ -380,10 +498,19 @@ internal fun ChatView(
                 takePictureUri = Uri.EMPTY
             }
 
-        val isFileModalShown by derivedStateOf { fileModalSheetState.currentValue != ModalBottomSheetValue.Hidden }
+        val isFileModalShown by derivedStateOf {
+            fileModalSheetState.currentValue != ModalBottomSheetValue.Hidden
+        }
         val isMessageOptionsModalShown by derivedStateOf {
             messageOptionsModalSheetState.currentValue != ModalBottomSheetValue.Hidden
         }
+        val isReactionInfoModalShown by derivedStateOf {
+            reactionInfoBottomSheetState.currentValue != ModalBottomSheetValue.Hidden
+        }
+        val isToolbarModalShown by derivedStateOf {
+            toolbarModalSheetState.currentValue != ModalBottomSheetValue.Hidden
+        }
+        val noBottomSheetState = rememberModalBottomSheetState(ModalBottomSheetValue.Hidden)
 
         if (!isMessageOptionsModalShown && addingReactionTo == null) {
             showReactionPicker = false
@@ -393,13 +520,16 @@ internal fun ChatView(
             modalSheetState = when {
                 isFileModalShown -> fileModalSheetState
                 isMessageOptionsModalShown -> messageOptionsModalSheetState
-                else -> toolbarModalSheetState
+                isReactionInfoModalShown -> reactionInfoBottomSheetState
+                isToolbarModalShown -> toolbarModalSheetState
+                else -> noBottomSheetState
             },
             sheetBody = {
                 when {
                     isFileModalShown -> {
                         ChatAttachFileBottomSheet(
                             onAttachFiles = onAttachFiles,
+                            onAttachNodes = onAttachNodes,
                             sheetState = fileModalSheetState,
                         )
                     }
@@ -408,16 +538,53 @@ internal fun ChatView(
                         MessageOptionsBottomSheet(
                             showReactionPicker = showReactionPicker,
                             onReactionClicked = {
-                                messageClicked?.let { message -> onAddReaction(message.msgId, it) }
+                                selectedMessages.firstOrNull()
+                                    ?.let { message -> onAddReaction(message.msgId, it) }
                                 addingReactionTo?.let { msgId -> onAddReaction(msgId, it) }
                                 coroutineScope.launch { messageOptionsModalSheetState.hide() }
                             },
                             onMoreReactionsClicked = { showReactionPicker = true },
+                            actions = actions.filter { action ->
+                                action.appliesTo(selectedMessages)
+                            }.map {
+                                it.bottomSheetMenuItem(
+                                    messages = selectedMessages,
+                                    chatId = chatId,
+                                    context = context
+                                )
+                            },
                             sheetState = messageOptionsModalSheetState,
                         )
                     }
 
-                    else -> {
+                    isReactionInfoModalShown -> {
+                        ReactionsInfoBottomSheet(
+                            selectedReaction = selectedReaction,
+                            reactions = reactionList,
+                            sheetState = reactionInfoBottomSheetState,
+                            getDetailsInReactionList = getUserInfoIntoReactionList,
+                            onUserClick = { userHandle ->
+                                coroutineScope.launch {
+                                    reactionInfoBottomSheetState.hide()
+                                    val isMe = uiState.myUserHandle == userHandle
+                                    if (isMe) {
+                                        scaffoldState.snackbarHostState
+                                            .showSnackbar(context.getString(R.string.contact_is_me))
+                                    } else {
+                                        getUser(UserId(userHandle))?.let { user ->
+                                            val isUserMyContact =
+                                                user.visibility == UserVisibility.Visible
+                                            if (isUserMyContact) {
+                                                openContactInfoActivity(context, user.email)
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                        )
+                    }
+
+                    isToolbarModalShown -> {
                         ChatToolbarBottomSheet(
                             onAttachFileClicked = {
                                 onBackPressed()
@@ -430,7 +597,8 @@ internal fun ChatView(
                                     openAttachContactActivity(context, attachContactLauncher)
                                 } else {
                                     coroutineScope.launch {
-                                        snackBarHostState.showSnackbar(context.getString(R.string.no_contacts_invite))
+                                        scaffoldState.snackbarHostState
+                                            .showSnackbar(context.getString(R.string.no_contacts_invite))
                                     }
                                 }
                             },
@@ -464,7 +632,7 @@ internal fun ChatView(
                                 showPermissionNotAllowedSnackbar(
                                     context,
                                     coroutineScope,
-                                    snackBarHostState,
+                                    scaffoldState.snackbarHostState,
                                     R.string.chat_attach_pick_from_camera_deny_permission
                                 )
                             },
@@ -480,6 +648,7 @@ internal fun ChatView(
                     .fillMaxSize()
                     .systemBarsPadding()
                     .imePadding(),
+                scaffoldState = scaffoldState,
                 topBar = {
                     if (isSelectMode) {
                         SelectModeAppBar(
@@ -492,11 +661,13 @@ internal fun ChatView(
                         Column {
                             ChatAppBar(
                                 uiState = uiState,
-                                snackBarHostState = snackBarHostState,
+                                snackBarHostState = scaffoldState.snackbarHostState,
                                 onBackPressed = onBackPressed,
-                                onMenuActionPressed = onMenuActionPressed,
                                 showParticipatingInACallDialog = {
                                     showParticipatingInACallDialog = true
+                                },
+                                showNoContactToAddDialog = {
+                                    showNoContactToAddDialog = true
                                 },
                                 showAllContactsParticipateInChat = {
                                     showAllContactsParticipateInChat = true
@@ -504,9 +675,7 @@ internal fun ChatView(
                                 showGroupOrContactInfoActivity = {
                                     showGroupOrContactInfoActivity(context, uiState)
                                 },
-                                showNoContactToAddDialog = {
-                                    showNoContactToAddDialog = true
-                                },
+                                onMenuActionPressed = onMenuActionPressed,
                                 onStartCall = { isVideoCall ->
                                     startCall(isVideoCall)
                                 },
@@ -520,15 +689,16 @@ internal fun ChatView(
                                 showClearChatConfirmationDialog = {
                                     showClearChat = true
                                 },
+                                showMutePushNotificationDialog = { onShowMutePushNotificationDialog() },
                                 archiveChat = archiveChat,
                                 unarchiveChat = unarchiveChat,
                                 showEndCallForAllDialog = {
                                     showEndCallForAllDialog = true
                                 },
-                                showMutePushNotificationDialog = { onShowMutePushNotificationDialog() },
                                 enableSelectMode = {
                                     isSelectMode = true
                                 },
+                                canSelect = canSelect,
                             )
                             ReturnToCallBanner(
                                 uiState = uiState,
@@ -536,11 +706,6 @@ internal fun ChatView(
                                 onAnswerCall = onAnswerCall
                             )
                         }
-                    }
-                },
-                snackbarHost = {
-                    SnackbarHost(hostState = snackBarHostState) { data ->
-                        MegaSnackbar(snackbarData = data)
                     }
                 },
                 bottomBar = {
@@ -618,7 +783,7 @@ internal fun ChatView(
                                 scrollState,
                                 bottomPadding,
                                 { message ->
-                                    messageClicked = message
+                                    selectedMessages = listOf(message)
                                     // Use message for showing correct available options
                                     coroutineScope.launch {
                                         messageOptionsModalSheetState.show()
@@ -641,6 +806,20 @@ internal fun ChatView(
                                             }
                                         }
                                 },
+                                { clickedReaction, reactions ->
+                                    if (clickedReaction.isNotEmpty() && reactions.isNotEmpty()) {
+                                        selectedReaction = clickedReaction
+                                        reactionList = reactions
+                                        coroutineScope.launch {
+                                            reactionInfoBottomSheetState.show()
+                                        }
+                                    }
+                                },
+                                { message ->
+                                    selectedMessages = listOf(message)
+                                    openChatPicker(context, chatId, chatPickerLauncher)
+                                },
+                                { hasSelectableMessage -> canSelect = hasSelectableMessage },
                             )
                         },
                     )
@@ -747,7 +926,21 @@ internal fun ChatView(
                 onConsumed = onInfoToShowConsumed
             ) { info ->
                 info?.let {
-                    getInfoToShow(info, context).let { snackBarHostState.showSnackbar(it) }
+                    info.getInfo(context).let { text ->
+                        if (info is InfoToShow.ForwardMessagesResult) {
+                            info.result.getOpenChatId(chatId)?.let { openChatId ->
+                                val result = scaffoldState.snackbarHostState.showSnackbar(
+                                    text,
+                                    context.getString(R.string.general_confirmation_open)
+                                )
+                                if (result == SnackbarResult.ActionPerformed) {
+                                    openChatFragment(context, openChatId, null)
+                                }
+                            } ?: scaffoldState.snackbarHostState.showSnackbar(text)
+                        } else {
+                            scaffoldState.snackbarHostState.showSnackbar(text)
+                        }
+                    }
                 } ?: context.findActivity()?.finish()
             }
 
@@ -776,15 +969,6 @@ internal fun ChatView(
             onWaitingRoomOpened()
             startWaitingRoom(context, chatId)
         }
-    }
-}
-
-private fun getInfoToShow(infoToShow: InfoToShow, context: Context) = with(infoToShow) {
-    when (this) {
-        is InfoToShow.InviteContactResult -> result.toInfoText(context)
-        is InfoToShow.MuteOptionResult -> result.toInfoText(context)
-        is InfoToShow.StringWithParams -> context.getString(stringId, *args.toTypedArray())
-        is InfoToShow.SimpleString -> context.getString(stringId)
     }
 }
 

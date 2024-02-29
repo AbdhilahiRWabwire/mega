@@ -7,9 +7,10 @@ import javax.inject.Inject
 internal class CreateContactAttachmentMessageUseCase @Inject constructor() :
     CreateTypedMessageUseCase {
 
-    override fun invoke(request: CreateTypedMessageInfo) = with(request) {
+    override suspend fun invoke(request: CreateTypedMessageInfo) = with(request) {
         ContactAttachmentMessage(
-            msgId = msgId,
+            chatId = chatId,
+            msgId = messageId,
             time = timestamp,
             isMine = isMine,
             userHandle = userHandle,
@@ -18,7 +19,6 @@ internal class CreateContactAttachmentMessageUseCase @Inject constructor() :
             contactHandle = userHandles.firstOrNull() ?: -1,
             shouldShowAvatar = shouldShowAvatar,
             shouldShowTime = shouldShowTime,
-            shouldShowDate = shouldShowDate,
             reactions = reactions,
         )
     }

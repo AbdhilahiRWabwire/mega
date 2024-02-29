@@ -12,10 +12,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import mega.privacy.android.app.MimeTypeList
+import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.view.extension.folderInfo
 import mega.privacy.android.app.presentation.view.extension.getIcon
@@ -29,7 +32,9 @@ import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
+import mega.privacy.android.domain.entity.node.shares.ShareFolderNode
 import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
+import mega.privacy.android.domain.entity.shares.AccessPermission
 import mega.privacy.android.legacy.core.ui.controls.lists.HeaderViewItem
 import mega.privacy.android.legacy.core.ui.controls.lists.NodeListViewItem
 import mega.privacy.android.shared.theme.MegaAppTheme
@@ -92,11 +97,55 @@ fun <T : TypedNode> NodeListView(
                 )
             }
         }
-        items(count = nodeUIItemList.size,
+
+        items(
+            count = nodeUIItemList.size,
             key = {
-                nodeUIItemList[it].node.id.longValue
-            }) {
+                nodeUIItemList[it].uniqueKey
+            }
+        ) {
             val nodeEntity = nodeUIItemList[it].node
+
+            var nodeName = nodeEntity.name
+            // Process data for shares
+            var shareSubtitle: String? = null
+            var isUnverifiedShare = false
+            var sharesIcon: Int? = null
+            var verifiedIcon: Int? = null
+            (nodeEntity as? ShareFolderNode)?.shareData?.let { shareData ->
+                val count = shareData.count
+                shareSubtitle = when (count) {
+                    0 -> if (!shareData.isVerified) shareData.user else null
+                    1 -> if (shareData.isVerified) shareData.userFullName else null
+                    else -> pluralStringResource(
+                        id = R.plurals.general_num_shared_with,
+                        count = count,
+                        count
+                    )
+                }
+                isUnverifiedShare = shareData.isUnverifiedDistinctNode
+                sharesIcon = if (isUnverifiedShare) {
+                    mega.privacy.android.core.R.drawable.ic_alert_triangle
+                } else if (nodeEntity.node.isIncomingShare) {
+                    when (shareData.access) {
+                        AccessPermission.FULL -> R.drawable.ic_shared_fullaccess
+                        AccessPermission.READWRITE -> R.drawable.ic_shared_read_write
+                        else -> R.drawable.ic_shared_read
+                    }
+                } else null
+
+                if (nodeEntity.isIncomingShare) {
+                    if (isUnverifiedShare && !nodeEntity.isNodeKeyDecrypted) {
+                        nodeName =
+                            stringResource(id = R.string.shared_items_verify_credentials_undecrypted_folder)
+                    }
+
+                    if (shareData.isContactCredentialsVerified) {
+                        verifiedIcon = R.drawable.ic_verified
+                    }
+                }
+            }
+
             NodeListViewItem(
                 isSelected = nodeUIItemList[it].isSelected,
                 folderInfo = nodeEntity
@@ -123,7 +172,11 @@ fun <T : TypedNode> NodeListView(
                                 fileNode.modificationTime
                         )
                     },
-                name = nodeEntity.name,
+                name = nodeName,
+                sharesSubtitle = shareSubtitle,
+                isUnverifiedShare = isUnverifiedShare,
+                sharesIcon = sharesIcon,
+                verifiedIcon = verifiedIcon,
                 showMenuButton = true,
                 showLinkIcon = showLinkIcon,
                 isTakenDown = nodeEntity.isTakenDown,

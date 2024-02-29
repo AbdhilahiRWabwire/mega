@@ -17,8 +17,10 @@ import mega.privacy.android.app.presentation.imagepreview.menu.ImagePreviewMenu
 import mega.privacy.android.app.presentation.imagepreview.menu.MediaDiscoveryImagePreviewMenu
 import mega.privacy.android.app.presentation.imagepreview.menu.OfflineImagePreviewMenu
 import mega.privacy.android.app.presentation.imagepreview.menu.PublicFileImagePreviewMenu
+import mega.privacy.android.app.presentation.imagepreview.menu.RubbishBinImagePreviewMenu
 import mega.privacy.android.app.presentation.imagepreview.menu.SharedItemsImagePreviewMenu
 import mega.privacy.android.app.presentation.imagepreview.menu.TimelineImagePreviewMenu
+import mega.privacy.android.app.presentation.imagepreview.menu.ZipImagePreviewMenu
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewMenuSource
 
 @Module
@@ -88,4 +90,14 @@ internal interface ImagePreviewMenuModule {
     @IntoMap
     @ImagePreviewMenuFeatureKey(ImagePreviewMenuSource.BACKUPS)
     fun BackupsImagePreviewMenu.bindBackupsMenu(): ImagePreviewMenu
+
+    @Binds
+    @IntoMap
+    @ImagePreviewMenuFeatureKey(ImagePreviewMenuSource.RUBBISH_BIN)
+    fun RubbishBinImagePreviewMenu.bindRubbishBinMenu(): ImagePreviewMenu
+
+    @Binds
+    @IntoMap
+    @ImagePreviewMenuFeatureKey(ImagePreviewMenuSource.ZIP)
+    fun ZipImagePreviewMenu.bindZipMenu(): ImagePreviewMenu
 }

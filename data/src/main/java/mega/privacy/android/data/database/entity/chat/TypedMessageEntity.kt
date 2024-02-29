@@ -17,9 +17,10 @@ import kotlin.time.Duration
 /**
  * Entity to store a typed message request.
  *
+ *
  * @property chatId Chat ID.
  * @property status Status of the message.
- * @property msgId Message ID.
+ * @property messageId Message ID. It comes from SDK
  * @property tempId Temporary ID.
  * @property msgIndex Message index.
  * @property userHandle User handle.
@@ -48,14 +49,13 @@ import kotlin.time.Duration
  * @property isMine True if the message is mine, false otherwise.
  * @property shouldShowAvatar True if the avatar should be shown, false otherwise.
  * @property shouldShowTime True if the time should be shown, false otherwise.
- * @property shouldShowDate True if the date should be shown, false otherwise.
  * @property textMessage Text message.
  * @property reactions list of [Reaction]
  */
 @Entity(tableName = "typed_messages")
 @TypeConverters(TypedMessageEntityConverters::class)
 data class TypedMessageEntity(
-    @PrimaryKey override val msgId: Long,
+    @PrimaryKey override val messageId: Long,
     val chatId: Long,
     override val status: ChatMessageStatus,
     override val tempId: Long,
@@ -86,7 +86,6 @@ data class TypedMessageEntity(
     val isMine: Boolean,
     val shouldShowAvatar: Boolean,
     val shouldShowTime: Boolean,
-    val shouldShowDate: Boolean,
     val textMessage: String?,
     val reactions: List<Reaction>
 ) : ChatMessageInfo

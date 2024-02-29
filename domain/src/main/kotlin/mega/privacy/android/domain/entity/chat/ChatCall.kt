@@ -1,13 +1,15 @@
 package mega.privacy.android.domain.entity.chat
 
 import mega.privacy.android.domain.entity.meeting.CallCompositionChanges
+import mega.privacy.android.domain.entity.meeting.CallNotificationType
 import mega.privacy.android.domain.entity.meeting.ChatCallChanges
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import mega.privacy.android.domain.entity.meeting.ChatSession
 import mega.privacy.android.domain.entity.meeting.ChatWaitingRoom
 import mega.privacy.android.domain.entity.meeting.EndCallReason
 import mega.privacy.android.domain.entity.meeting.NetworkQualityType
-import mega.privacy.android.domain.entity.meeting.TermCodeType
+import mega.privacy.android.domain.entity.meeting.SpeakerStatusType
+import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
 import mega.privacy.android.domain.entity.meeting.WaitingRoomStatus
 import java.time.Instant
 import kotlin.time.Duration
@@ -49,6 +51,7 @@ import kotlin.time.Duration
  * @property hasSpeakPermission True, has speaker permission. False, if not.
  * @property isSpeakRequestEnabled True, is speak request enabled. False, if not.
  * @property sessionByClientId  List of sessions by client Id.
+ * @property auxHandle  Handle of the participant who muted me
  */
 data class ChatCall(
     val status: ChatCallStatus? = null,
@@ -62,13 +65,14 @@ data class ChatCall(
     val duration: Duration? = null,
     val initialTimestamp: Long? = null,
     val finalTimestamp: Long? = null,
-    val termCode: TermCodeType? = null,
+    val termCode: ChatCallTermCodeType? = null,
     val endCallReason: EndCallReason? = null,
     val isSpeakRequestEnabled: Boolean = false,
     val isRinging: Boolean = false,
     val isOwnModerator: Boolean = false,
     val sessionsClientId: List<Long>? = emptyList(),
     val sessionByClientId: Map<Long, ChatSession> = emptyMap(),
+    val auxHandle: Long? = null,
     val peerIdCallCompositionChange: Long? = null,
     val callCompositionChange: CallCompositionChanges? = null,
     val peerIdParticipants: List<Long>? = emptyList(),
@@ -85,6 +89,9 @@ data class ChatCall(
     val hasPendingSpeakRequest: Boolean = false,
     val waitingRoomStatus: WaitingRoomStatus? = null,
     val waitingRoom: ChatWaitingRoom? = null,
+    val notificationType: CallNotificationType? = null,
+    val speakerState : SpeakerStatusType? = null,
+    val genericMsg:String? = null
 ) {
 
     /**

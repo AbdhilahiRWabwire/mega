@@ -3,10 +3,12 @@ package mega.privacy.android.app.presentation.node.view
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -15,7 +17,7 @@ import androidx.navigation.NavHostController
 import de.palm.composestateevents.EventEffect
 import mega.privacy.android.app.MimeTypeList
 import mega.privacy.android.app.R
-import mega.privacy.android.app.presentation.node.NodeBottomSheetActionHandler
+import mega.privacy.android.app.presentation.node.NodeActionHandler
 import mega.privacy.android.app.presentation.node.NodeOptionsBottomSheetViewModel
 import mega.privacy.android.app.presentation.view.extension.fileInfo
 import mega.privacy.android.app.presentation.view.extension.folderInfo
@@ -38,14 +40,19 @@ import timber.log.Timber
  */
 @Composable
 internal fun NodeOptionsBottomSheetContent(
-    handler: NodeBottomSheetActionHandler,
+    handler: NodeActionHandler,
     navHostController: NavHostController,
     onDismiss: () -> Unit,
+    nodeId: Long,
     viewModel: NodeOptionsBottomSheetViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val node: TypedNode? = uiState.node
-
+    val keyboardController = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        keyboardController?.hide()
+        viewModel.getBottomSheetOptions(nodeId)
+    }
     val sortedMap = remember(node?.id?.longValue) {
         mutableStateOf(
             uiState.actions

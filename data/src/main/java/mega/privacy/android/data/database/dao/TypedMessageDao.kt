@@ -8,6 +8,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import mega.privacy.android.data.database.entity.chat.MetaTypedMessageEntity
 import mega.privacy.android.data.database.entity.chat.TypedMessageEntity
+import mega.privacy.android.domain.entity.chat.ChatMessageType
 
 /**
  * Typed message request dao
@@ -22,7 +23,7 @@ interface TypedMessageDao {
      * @return paging source
      */
     @Transaction
-    @Query("SELECT * FROM typed_messages WHERE chatId = :chatId ORDER BY timestamp DESC")
+    @Query("SELECT * FROM typed_messages WHERE chatId = :chatId AND isDeleted = 0 ORDER BY timestamp DESC")
     fun getAllAsPagingSource(chatId: Long): PagingSource<Int, MetaTypedMessageEntity>
 
     /**
@@ -38,7 +39,7 @@ interface TypedMessageDao {
      *
      * @param tempIds
      */
-    @Query("DELETE FROM typed_messages WHERE tempId IN (:tempIds) AND msgId = tempId")
+    @Query("DELETE FROM typed_messages WHERE tempId IN (:tempIds) AND messageId = tempId")
     suspend fun deleteStaleMessagesByTempIds(tempIds: List<Long>)
 
     /**
@@ -50,11 +51,11 @@ interface TypedMessageDao {
     suspend fun deleteMessagesByChatId(chatId: Long)
 
     /**
-     * Delete messages by msg id
+     * Delete messages by chat id
      *
-     * @param msgIds
+     * @param chatId
      */
-    @Query("SELECT msgId FROM typed_messages WHERE chatId = :chatId")
+    @Query("SELECT messageId FROM typed_messages WHERE chatId = :chatId")
     suspend fun getMsgIdsByChatId(chatId: Long): List<Long>
 
     /**
@@ -70,4 +71,32 @@ interface TypedMessageDao {
         timestamp: Long,
     ): TypedMessageEntity?
 
+    /**
+     * Get all node attachments message id
+     *
+     * @param chatId
+     * @return
+     */
+    @Query("SELECT messageId FROM typed_messages WHERE chatId = :chatId AND type = :type ORDER BY timestamp DESC")
+    suspend fun getMessageIdsByType(chatId: Long, type: ChatMessageType): List<Long>
+
+    /**
+     * Get message reactions
+     *
+     * @param chatId
+     * @param msgId
+     * @return List of Reaction
+     */
+    @Query("SELECT reactions FROM typed_messages WHERE chatId = :chatId AND messageId = :msgId")
+    suspend fun getMessageReactions(chatId: Long, msgId: Long): String
+
+    /**
+     * Insert message
+     *
+     * @param chatId Chat ID
+     * @param msgId Message ID
+     * @param reactions Updated reactions
+     */
+    @Query("UPDATE typed_messages SET reactions = :reactions WHERE chatId = :chatId AND messageId = :msgId")
+    suspend fun updateMessageReactions(chatId: Long, msgId: Long, reactions: String)
 }

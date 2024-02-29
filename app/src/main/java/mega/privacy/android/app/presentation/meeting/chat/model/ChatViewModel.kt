@@ -30,20 +30,33 @@ import mega.privacy.android.app.objects.GifData
 import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.extensions.isPast
 import mega.privacy.android.app.presentation.meeting.chat.extension.isJoined
+import mega.privacy.android.app.presentation.meeting.chat.mapper.ForwardMessagesResultMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteParticipantResultMapper
+import mega.privacy.android.app.presentation.meeting.chat.mapper.ParticipantNameMapper
 import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
+import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReactionUser
 import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.chat.ChatCall
 import mega.privacy.android.domain.entity.chat.ChatConnectionStatus
 import mega.privacy.android.domain.entity.chat.ChatPushNotificationMuteOption
 import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.ChatRoomChange
+import mega.privacy.android.domain.entity.chat.messages.TypedMessage
+import mega.privacy.android.domain.entity.contacts.User
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
+import mega.privacy.android.domain.entity.node.FileNode
+import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.statistics.EndCallForAll
 import mega.privacy.android.domain.entity.transfer.MultiTransferEvent
+import mega.privacy.android.domain.entity.user.UserId
+import mega.privacy.android.domain.exception.chat.CreateChatException
 import mega.privacy.android.domain.exception.chat.ResourceDoesNotExistChatException
 import mega.privacy.android.domain.qualifier.ApplicationScope
+import mega.privacy.android.domain.usecase.AddNodeType
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
+import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
 import mega.privacy.android.domain.usecase.MonitorContactCacheUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
@@ -72,15 +85,19 @@ import mega.privacy.android.domain.usecase.chat.UnmuteChatNotificationUseCase
 import mega.privacy.android.domain.usecase.chat.link.JoinPublicChatUseCase
 import mega.privacy.android.domain.usecase.chat.link.MonitorJoiningChatUseCase
 import mega.privacy.android.domain.usecase.chat.message.AttachContactsUseCase
+import mega.privacy.android.domain.usecase.chat.message.AttachNodeUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendChatAttachmentsUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendGiphyMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendLocationMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendTextMessageUseCase
+import mega.privacy.android.domain.usecase.chat.message.forward.ForwardMessagesUseCase
 import mega.privacy.android.domain.usecase.chat.message.reactions.AddReactionUseCase
 import mega.privacy.android.domain.usecase.chat.message.reactions.DeleteReactionUseCase
 import mega.privacy.android.domain.usecase.contact.GetMyUserHandleUseCase
 import mega.privacy.android.domain.usecase.contact.GetParticipantFirstNameUseCase
+import mega.privacy.android.domain.usecase.contact.GetParticipantFullNameUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserOnlineStatusByHandleUseCase
+import mega.privacy.android.domain.usecase.contact.GetUserUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorAllContactParticipantsInChatUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorHasAnyContactUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorUserLastGreenUpdatesUseCase
@@ -190,6 +207,14 @@ class ChatViewModel @Inject constructor(
     private val deleteReactionUseCase: DeleteReactionUseCase,
     private val sendGiphyMessageUseCase: SendGiphyMessageUseCase,
     private val attachContactsUseCase: AttachContactsUseCase,
+    private val getParticipantFullNameUseCase: GetParticipantFullNameUseCase,
+    private val participantNameMapper: ParticipantNameMapper,
+    private val getUserUseCase: GetUserUseCase,
+    private val forwardMessagesUseCase: ForwardMessagesUseCase,
+    private val forwardMessagesResultMapper: ForwardMessagesResultMapper,
+    private val attachNodeUseCase: AttachNodeUseCase,
+    private val getNodeByIdUseCase: GetNodeByIdUseCase,
+    private val addNodeType: AddNodeType,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ChatUiState())
     val state = _state.asStateFlow()
@@ -208,15 +233,16 @@ class ChatViewModel @Inject constructor(
 
     private var monitorAllContactParticipantsInChatJob: Job? = null
     private var monitorChatRoomUpdatesJob: Job? = null
-    private var monitorHasAnyContactJob: Job? = null
     private var monitorCallInChatJob: Job? = null
     private var monitorParticipatingInACallInOtherChatsJob: Job? = null
     private var monitorChatConnectionStateJob: Job? = null
     private var monitorConnectivityJob: Job? = null
 
     init {
+        getMyUserHandle()
         checkGeolocation()
         monitorStorageStateEvent()
+        monitorHasAnyContact()
         loadChatOrPreview()
         checkAnonymousMode()
         monitorContactCacheUpdate()
@@ -240,7 +266,7 @@ class ChatViewModel @Inject constructor(
                         _state.update { state ->
                             state.copy(
                                 sendingText = preference.draftMessage,
-                                editingMessageId = chatMessage.msgId,
+                                editingMessageId = chatMessage.messageId,
                                 editingMessageContent = chatMessage.content
                             )
                         }
@@ -447,7 +473,6 @@ class ChatViewModel @Inject constructor(
                                 }
                             } else {
                                 monitorAllContactParticipantsInChat(peerHandlesList)
-                                monitorHasAnyContact()
                             }
                         }
                     }
@@ -523,7 +548,7 @@ class ChatViewModel @Inject constructor(
                                 }
 
                                 ChatRoomChange.UserTyping -> {
-                                    if (userTyping != getMyUserHandleUseCase()) {
+                                    if (userTyping != state.value.myUserHandle) {
                                         handleUserTyping(userTyping)
                                     }
                                 }
@@ -650,8 +675,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun monitorHasAnyContact() {
-        monitorHasAnyContactJob?.cancel()
-        monitorHasAnyContactJob = viewModelScope.launch {
+        viewModelScope.launch {
             monitorHasAnyContactUseCase().conflate()
                 .collect { hasAnyContact ->
                     _state.update { state -> state.copy(hasAnyContact = hasAnyContact) }
@@ -1071,6 +1095,29 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * Attach nodes
+     *
+     * @param nodes A list of all [NodeId] that will be attached. It should refer to [FileNode]s only, other node types will be discarded.
+     */
+    fun onAttachNodes(nodes: List<NodeId>) {
+        viewModelScope.launch {
+            val sent = nodes
+                .mapNotNull { runCatching { getNodeByIdUseCase(it) }.getOrNull() }
+                .filterIsInstance<FileNode>()
+                .map {
+                    runCatching {
+                        attachNodeUseCase(chatId, addNodeType(it) as TypedFileNode)
+                    }.isSuccess
+                }.count { it }
+            if (sent != nodes.size) {
+                _state.update { state ->
+                    state.copy(infoToShowEvent = triggered(InfoToShow.SimpleString(R.string.files_send_to_chat_error)))
+                }
+            }
+        }
+    }
+
+    /**
      * Joins a public chat.
      */
     fun onJoinChat() {
@@ -1179,6 +1226,93 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Fill the user name in the [UIReactionUser] of [UIReaction]
+     *
+     * @param reactions list of [UIReaction]
+     * @return another list of [UIReaction] in which user info has been filled.
+     */
+    suspend fun getUserInfoIntoReactionList(reactions: List<UIReaction>): List<UIReaction> {
+        return reactions.map { reaction ->
+            reaction.copy(
+                userList = reaction.userList.map { user ->
+                    user.copy(
+                        name = participantNameMapper(
+                            isMe = user.userHandle == state.value.myUserHandle,
+                            fullName = getParticipantFullNameUseCase(user.userHandle).orEmpty()
+                        ),
+                    )
+                }
+            )
+        }
+    }
+
+    /**
+     * load my user handle and save to ui state
+     */
+    private fun getMyUserHandle() {
+        viewModelScope.launch {
+            runCatching {
+                val myUserHandle = getMyUserHandleUseCase()
+                _state.update { state -> state.copy(myUserHandle = myUserHandle) }
+            }.onFailure { Timber.e(it) }
+        }
+    }
+
+    /**
+     * Get [User] by the [UserId].
+     *
+     * @param userId
+     * @return [User]
+     */
+    suspend fun getUser(userId: UserId) =
+        getUserUseCase(userId)
+
+    /**
+     * Forward messages.
+     */
+    fun onForwardMessages(
+        messages: List<TypedMessage>,
+        chatHandles: List<Long>?,
+        contactHandles: List<Long>?,
+    ) {
+        viewModelScope.launch {
+            runCatching { forwardMessagesUseCase(messages, chatHandles, contactHandles) }
+                .onSuccess { results ->
+                    val result = forwardMessagesResultMapper(results, messages.size)
+                    val infoToShow = InfoToShow.ForwardMessagesResult(result)
+                    _state.update { state ->
+                        state.copy(
+                            infoToShowEvent = triggered(infoToShow)
+                        )
+                    }
+                }
+                .onFailure {
+                    when (it) {
+                        is CreateChatException -> {
+                            _state.update { state ->
+                                state.copy(
+                                    infoToShowEvent = triggered(
+                                        InfoToShow.QuantityString(
+                                            stringId = R.plurals.num_messages_not_send,
+                                            count = contactHandles?.size ?: 0
+                                        )
+                                    )
+                                )
+                            }
+                        }
+
+                        else -> {
+                            Timber.e(it)
+                        }
+                    }
+                }
+        }
+    }
+
+    /**
+     * called when viewmodel is cleared
+     */
     override fun onCleared() {
         if (state.value.isPreviewMode) {
             applicationScope.launch {

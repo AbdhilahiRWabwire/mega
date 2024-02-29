@@ -7,12 +7,16 @@ import mega.privacy.android.core.ui.model.MenuAction
 import mega.privacy.android.core.ui.model.MenuActionWithIcon
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.shares.AccessPermission
+import mega.privacy.android.feature.sync.data.mapper.ListToStringWithDelimitersMapper
+import java.io.File
 import javax.inject.Inject
 
 /**
  * Remove link bottom sheet menu item
  */
-class RemoveLinkBottomSheetMenuItem @Inject constructor() :
+class RemoveLinkBottomSheetMenuItem @Inject constructor(
+    private val listToStringWithDelimitersMapper: ListToStringWithDelimitersMapper,
+) :
     NodeBottomSheetMenuItem<MenuActionWithIcon> {
     override suspend fun shouldDisplay(
         isNodeInRubbish: Boolean,
@@ -32,7 +36,10 @@ class RemoveLinkBottomSheetMenuItem @Inject constructor() :
         navController: NavHostController,
     ): () -> Unit = {
         onDismiss()
-        navController.navigate("$removeNodeLinkRoute/${node.id.longValue}/${false}")
+        navController.navigate(
+            removeNodeLinkRoute.plus(File.separator)
+                .plus(listToStringWithDelimitersMapper(listOf(node.id.longValue)))
+        )
     }
 
     override val menuAction = RemoveLinkMenuAction(170)

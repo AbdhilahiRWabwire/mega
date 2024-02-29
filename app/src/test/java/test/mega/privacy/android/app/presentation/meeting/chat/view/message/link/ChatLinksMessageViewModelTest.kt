@@ -1,17 +1,13 @@
 package test.mega.privacy.android.app.presentation.meeting.chat.view.message.link
 
 import com.google.common.truth.Truth
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import mega.privacy.android.app.presentation.meeting.chat.view.message.link.ChatGroupLinkContent
 import mega.privacy.android.app.presentation.meeting.chat.view.message.link.ChatLinksMessageViewModel
 import mega.privacy.android.app.presentation.meeting.chat.view.message.link.ContactLinkContent
 import mega.privacy.android.app.presentation.meeting.chat.view.message.link.FileLinkContent
 import mega.privacy.android.app.presentation.meeting.chat.view.message.link.FolderLinkContent
+import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.ChatRequest
 import mega.privacy.android.domain.entity.FolderInfo
 import mega.privacy.android.domain.entity.contacts.ContactLink
@@ -20,18 +16,17 @@ import mega.privacy.android.domain.usecase.CheckChatLinkUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactFromLinkUseCase
 import mega.privacy.android.domain.usecase.filelink.GetPublicLinkInformationUseCase
 import mega.privacy.android.domain.usecase.filelink.GetPublicNodeUseCase
-import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@ExtendWith(CoroutineMainDispatcherExtension::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 internal class ChatLinksMessageViewModelTest {
     private lateinit var underTest: ChatLinksMessageViewModel
@@ -39,16 +34,6 @@ internal class ChatLinksMessageViewModelTest {
     private val checkChatLinkUseCase: CheckChatLinkUseCase = mock()
     private val getPublicLinkInformationUseCase: GetPublicLinkInformationUseCase = mock()
     private val getPublicNodeUseCase: GetPublicNodeUseCase = mock()
-
-    @BeforeAll
-    fun setup() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
-    }
-
-    @AfterAll
-    fun tearDown() {
-        Dispatchers.resetMain()
-    }
 
     @BeforeEach
     fun resetMocks() {
@@ -63,13 +48,33 @@ internal class ChatLinksMessageViewModelTest {
     @Test
     fun `test that load contact info return correctly`() = runTest {
         val link = "link"
-        val contactLink = mock<ContactLink>()
+        val contactHandle = 1L
+        val email = "email"
+        val fullName = "fullName"
+        val contactLink = mock<ContactLink> {
+            on { this.contactHandle } doReturn contactHandle
+            on { this.email } doReturn email
+            on { this.fullName } doReturn fullName
+        }
+        val click = mock<(Long, String?, String?) -> Unit>()
+        val expectedResult = ContactLinkContent(
+            content = contactLink,
+            link = link,
+            onClick = {
+                click(
+                    contactHandle,
+                    email,
+                    fullName
+                )
+            }
+        )
         whenever(getContactFromLinkUseCase(link)).thenReturn(contactLink)
-        underTest.loadContactInfo(link)
+        underTest.loadContactInfo(link, click)
         // make sure it is called only once because the other call we load from cache
         verify(getContactFromLinkUseCase).invoke(link)
-        Truth.assertThat(underTest.loadContactInfo(link))
-            .isEqualTo(ContactLinkContent(contactLink, link))
+        val actual = underTest.loadContactInfo(link, click) as ContactLinkContent
+        Truth.assertThat(actual.content).isEqualTo(expectedResult.content)
+        Truth.assertThat(actual.link).isEqualTo(expectedResult.link)
     }
 
     @Test
@@ -77,9 +82,11 @@ internal class ChatLinksMessageViewModelTest {
         val link = "link"
         val numberOfParticipants = 1L
         val name = "name"
+        val chatId = 12L
         val request = mock<ChatRequest> {
             on { number } doReturn numberOfParticipants
             on { text } doReturn name
+            on { chatHandle } doReturn chatId
         }
         whenever(checkChatLinkUseCase(link)).thenReturn(request)
         Truth.assertThat(underTest.loadChatLinkInfo(link))
@@ -87,7 +94,8 @@ internal class ChatLinksMessageViewModelTest {
                 ChatGroupLinkContent(
                     numberOfParticipants,
                     name,
-                    link
+                    chatId,
+                    link,
                 )
             )
     }
@@ -101,7 +109,8 @@ internal class ChatLinksMessageViewModelTest {
                 ChatGroupLinkContent(
                     numberOfParticipants = -1,
                     name = "",
-                    link = link
+                    link = link,
+                    chatId = -1,
                 )
             )
     }

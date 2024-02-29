@@ -21,16 +21,18 @@ class ChatHeaderMessage : UiChatMessage {
         onLongClick: (TypedMessage) -> Unit,
         onMoreReactionsClicked: (Long) -> Unit,
         onReactionClicked: (Long, String, List<UIReaction>) -> Unit,
+        onReactionLongClick: (String, List<UIReaction>) -> Unit,
+        onForwardClicked: (TypedMessage) -> Unit,
     ) {
         FirstMessageHeader(uiState.title, uiState.scheduledMeeting)
     }
 
     override val id = -1L
     override val displayAsMine = false
-    override val canForward = false
+    override val shouldDisplayForwardIcon = false
     override val timeSent = null
     override val userHandle = -1L
     override val showTime = false
-    override val showDate = false
     override val reactions = emptyList<UIReaction>()
+    override val isSelectable = false
 }

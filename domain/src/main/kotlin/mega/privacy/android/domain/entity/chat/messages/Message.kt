@@ -1,11 +1,18 @@
 package mega.privacy.android.domain.entity.chat.messages
 
+import kotlinx.serialization.Polymorphic
 import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
 
 /**
  * Message
  */
+@Polymorphic
 interface Message {
+
+    /**
+     * Chat id
+     */
+    val chatId: Long
 
     /**
      * Msg id
@@ -36,11 +43,6 @@ interface Message {
      * Should show time
      */
     val shouldShowTime: Boolean
-
-    /**
-     * Should show date
-     */
-    val shouldShowDate: Boolean
 
     /**
      * List of reactions

@@ -15,14 +15,15 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MimeTypeList
+import mega.privacy.android.app.R
 import mega.privacy.android.app.domain.usecase.GetNodeByHandle
-import mega.privacy.android.app.presentation.videosection.mapper.UIVideoMapper
-import mega.privacy.android.app.presentation.videosection.mapper.UIVideoPlaylistMapper
-import mega.privacy.android.app.presentation.videosection.model.UIVideo
-import mega.privacy.android.app.presentation.videosection.model.UIVideoPlaylist
+import mega.privacy.android.app.presentation.videosection.mapper.VideoPlaylistUIEntityMapper
+import mega.privacy.android.app.presentation.videosection.mapper.VideoUIEntityMapper
+import mega.privacy.android.app.presentation.videosection.model.VideoPlaylistUIEntity
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionState
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionTab
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionTabState
+import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_NEED_STOP_HTTP_SERVER
 import mega.privacy.android.app.utils.FileUtil.getDownloadLocation
 import mega.privacy.android.app.utils.FileUtil.getLocalFile
@@ -37,10 +38,12 @@ import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunnin
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
+import mega.privacy.android.domain.usecase.photos.GetNextDefaultAlbumNameUseCase
 import mega.privacy.android.domain.usecase.videosection.AddVideosToPlaylistUseCase
 import mega.privacy.android.domain.usecase.videosection.CreateVideoPlaylistUseCase
 import mega.privacy.android.domain.usecase.videosection.GetAllVideosUseCase
 import mega.privacy.android.domain.usecase.videosection.GetVideoPlaylistsUseCase
+import mega.privacy.android.domain.usecase.videosection.RemoveVideoPlaylistsUseCase
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
 import java.io.File
@@ -52,7 +55,7 @@ import javax.inject.Inject
 @HiltViewModel
 class VideoSectionViewModel @Inject constructor(
     private val getAllVideosUseCase: GetAllVideosUseCase,
-    private val uiVideoMapper: UIVideoMapper,
+    private val videoUIEntityMapper: VideoUIEntityMapper,
     private val getCloudSortOrder: GetCloudSortOrder,
     private val monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase,
     private val monitorOfflineNodeUpdatesUseCase: MonitorOfflineNodeUpdatesUseCase,
@@ -63,9 +66,11 @@ class VideoSectionViewModel @Inject constructor(
     private val getFileUrlByNodeHandleUseCase: GetFileUrlByNodeHandleUseCase,
     private val getNodeByIdUseCase: GetNodeByIdUseCase,
     private val getVideoPlaylistsUseCase: GetVideoPlaylistsUseCase,
-    private val uiVideoPlaylistMapper: UIVideoPlaylistMapper,
+    private val videoPlaylistUIEntityMapper: VideoPlaylistUIEntityMapper,
     private val createVideoPlaylistUseCase: CreateVideoPlaylistUseCase,
     private val addVideosToPlaylistUseCase: AddVideosToPlaylistUseCase,
+    private val getNextDefaultAlbumNameUseCase: GetNextDefaultAlbumNameUseCase,
+    private val removeVideoPlaylistsUseCase: RemoveVideoPlaylistsUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(VideoSectionState())
 
@@ -82,8 +87,8 @@ class VideoSectionViewModel @Inject constructor(
     val tabState = _tabState.asStateFlow()
 
     private var searchQuery = ""
-    private val originalData = mutableListOf<UIVideo>()
-    private val originalPlaylistData = mutableListOf<UIVideoPlaylist>()
+    private val originalData = mutableListOf<VideoUIEntity>()
+    private val originalPlaylistData = mutableListOf<VideoPlaylistUIEntity>()
 
     private var createVideoPlaylistJob: Job? = null
 
@@ -120,17 +125,17 @@ class VideoSectionViewModel @Inject constructor(
     }
 
     private suspend fun getVideoPlaylists() = getVideoPlaylistsUseCase().map { videoPlaylist ->
-        uiVideoPlaylistMapper(videoPlaylist)
+        videoPlaylistUIEntityMapper(videoPlaylist)
     }
 
-    private fun List<UIVideoPlaylist>.updateOriginalPlaylistData() = also { data ->
+    private fun List<VideoPlaylistUIEntity>.updateOriginalPlaylistData() = also { data ->
         if (originalPlaylistData.isNotEmpty()) {
             originalPlaylistData.clear()
         }
         originalPlaylistData.addAll(data)
     }
 
-    private fun List<UIVideoPlaylist>.filterVideoPlaylistsBySearchQuery() =
+    private fun List<VideoPlaylistUIEntity>.filterVideoPlaylistsBySearchQuery() =
         filter { playlist ->
             playlist.title.contains(searchQuery, true)
         }
@@ -138,7 +143,7 @@ class VideoSectionViewModel @Inject constructor(
     private fun setPendingRefreshNodes() = _state.update { it.copy(isPendingRefresh = true) }
 
     internal fun refreshNodes() = viewModelScope.launch {
-        val videoList = getUIVideoList().updateOriginalData().filterVideosBySearchQuery()
+        val videoList = getVideoUIEntityList().updateOriginalData().filterVideosBySearchQuery()
         val sortOrder = getCloudSortOrder()
         _state.update {
             it.copy(
@@ -150,19 +155,20 @@ class VideoSectionViewModel @Inject constructor(
         }
     }
 
-    private fun List<UIVideo>.filterVideosBySearchQuery() =
+    private fun List<VideoUIEntity>.filterVideosBySearchQuery() =
         filter { video ->
             video.name.contains(searchQuery, true)
         }
 
-    private fun List<UIVideo>.updateOriginalData() = also { data ->
+    private fun List<VideoUIEntity>.updateOriginalData() = also { data ->
         if (originalData.isNotEmpty()) {
             originalData.clear()
         }
         originalData.addAll(data)
     }
 
-    private suspend fun getUIVideoList() = getAllVideosUseCase().map { uiVideoMapper(it) }
+    private suspend fun getVideoUIEntityList() =
+        getAllVideosUseCase().map { videoUIEntityMapper(it) }
 
     internal fun markHandledPendingRefresh() = _state.update { it.copy(isPendingRefresh = false) }
 
@@ -190,7 +196,8 @@ class VideoSectionViewModel @Inject constructor(
             setPendingRefreshNodes()
         }
 
-    internal fun shouldShowSearchMenu() = _state.value.allVideos.isNotEmpty()
+    internal fun shouldShowSearchMenu() =
+        _state.value.currentVideoPlaylist == null && _state.value.allVideos.isNotEmpty()
 
     internal fun searchReady() {
         if (_state.value.searchMode)
@@ -328,14 +335,14 @@ class VideoSectionViewModel @Inject constructor(
         }
     }
 
-    internal fun onItemClicked(item: UIVideo, index: Int) {
+    internal fun onItemClicked(item: VideoUIEntity, index: Int) {
         updateVideoItemInSelectionState(item = item, index = index)
     }
 
-    internal fun onLongItemClicked(item: UIVideo, index: Int) =
+    internal fun onLongItemClicked(item: VideoUIEntity, index: Int) =
         updateVideoItemInSelectionState(item = item, index = index)
 
-    private fun updateVideoItemInSelectionState(item: UIVideo, index: Int) {
+    private fun updateVideoItemInSelectionState(item: VideoUIEntity, index: Int) {
         val isSelected = !item.isSelected
         val selectedHandles = updateSelectedVideoHandles(item, isSelected)
         val videos = _state.value.allVideos.updateItemSelectedState(index, isSelected)
@@ -348,7 +355,7 @@ class VideoSectionViewModel @Inject constructor(
         }
     }
 
-    private fun List<UIVideo>.updateItemSelectedState(index: Int, isSelected: Boolean) =
+    private fun List<VideoUIEntity>.updateItemSelectedState(index: Int, isSelected: Boolean) =
         if (index in indices) {
             toMutableList().also { list ->
                 list[index] = list[index].copy(isSelected = isSelected)
@@ -356,7 +363,7 @@ class VideoSectionViewModel @Inject constructor(
         } else this
 
 
-    private fun updateSelectedVideoHandles(item: UIVideo, isSelected: Boolean) =
+    private fun updateSelectedVideoHandles(item: VideoUIEntity, isSelected: Boolean) =
         _state.value.selectedVideoHandles.toMutableList().also { selectedHandles ->
             if (isSelected) {
                 selectedHandles.add(item.id.longValue)
@@ -386,26 +393,59 @@ class VideoSectionViewModel @Inject constructor(
      */
     internal fun createNewPlaylist(title: String) {
         if (createVideoPlaylistJob?.isActive == true) return
-        createVideoPlaylistJob = viewModelScope.launch {
-            runCatching {
-                title.trim().takeIf { it.isNotEmpty() }?.let { playlistTitle ->
-                    createVideoPlaylistUseCase(playlistTitle)
+        title.ifEmpty {
+            _state.value.createVideoPlaylistPlaceholderTitle
+        }.trim()
+            .takeIf { it.isNotEmpty() && checkVideoPlaylistTitleValidity(it) }
+            ?.let { playlistTitle ->
+                createVideoPlaylistJob = viewModelScope.launch {
+                    setShowCreateVideoPlaylistDialog(false)
+                    runCatching {
+                        createVideoPlaylistUseCase(playlistTitle)
+                    }.onSuccess { videoPlaylist ->
+                        _state.update {
+                            it.copy(
+                                currentVideoPlaylist = videoPlaylistUIEntityMapper(
+                                    videoPlaylist
+                                ),
+                                isVideoPlaylistCreatedSuccessfully = true
+                            )
+                        }
+                        loadVideoPlaylists()
+                        Timber.d("Current video playlist: ${videoPlaylist.title}")
+                    }.onFailure { exception ->
+                        Timber.e(exception)
+                        _state.update {
+                            it.copy(isVideoPlaylistCreatedSuccessfully = false)
+                        }
+                    }
                 }
-            }.onSuccess { videoPlaylist ->
+            }
+    }
+
+    internal fun removeVideoPlaylists(deletedList: List<VideoPlaylistUIEntity>) =
+        viewModelScope.launch {
+            runCatching {
+                removeVideoPlaylistsUseCase(deletedList.map { it.id })
+            }.onSuccess { deletedPlaylistIDs ->
+                val deletedPlaylistTitles =
+                    getDeletedVideoPlaylistTitles(
+                        playlistIDs = deletedPlaylistIDs,
+                        deletedPlaylist = deletedList
+                    )
                 _state.update {
                     it.copy(
-                        currentVideoPlaylist = videoPlaylist,
-                        isVideoPlaylistCreatedSuccessfully = true
+                        deletedVideoPlaylistTitles = deletedPlaylistTitles
                     )
-                }
-                Timber.d("Current video playlist: ${videoPlaylist?.title}")
-            }.onFailure { exception ->
-                Timber.e(exception)
-                _state.update {
-                    it.copy(isVideoPlaylistCreatedSuccessfully = false)
                 }
             }
         }
+
+    private fun getDeletedVideoPlaylistTitles(
+        playlistIDs: List<Long>,
+        deletedPlaylist: List<VideoPlaylistUIEntity>,
+    ): List<String> = playlistIDs.mapNotNull { id ->
+        deletedPlaylist.firstOrNull { it.id.longValue == id }?.title
     }
 
     /**
@@ -426,4 +466,67 @@ class VideoSectionViewModel @Inject constructor(
                 }
             }
         }
+
+    internal fun updateCurrentVideoPlaylist(playlist: VideoPlaylistUIEntity?) {
+        _state.update {
+            it.copy(currentVideoPlaylist = playlist)
+        }
+    }
+
+    internal fun setShowCreateVideoPlaylistDialog(showCreateDialog: Boolean) = _state.update {
+        it.copy(shouldCreateVideoPlaylistDialog = showCreateDialog)
+    }
+
+    internal fun setPlaceholderTitle(placeholderTitle: String) {
+        val playlistTitles = getAllVideoPlaylistTitles()
+        _state.update {
+            it.copy(
+                createVideoPlaylistPlaceholderTitle = getNextDefaultAlbumNameUseCase(
+                    defaultName = placeholderTitle,
+                    currentNames = playlistTitles
+                )
+            )
+        }
+    }
+
+    private fun getAllVideoPlaylistTitles() = _state.value.videoPlaylists.map { it.title }
+
+    internal fun setNewPlaylistTitleValidity(valid: Boolean) = _state.update {
+        it.copy(isInputTitleValid = valid)
+    }
+
+    private fun checkVideoPlaylistTitleValidity(
+        title: String,
+    ): Boolean {
+        var errorMessage: Int? = null
+        var isTitleValid = true
+
+        if (title.isBlank()) {
+            isTitleValid = false
+            errorMessage = R.string.invalid_string
+        } else if (title in getAllVideoPlaylistTitles()) {
+            isTitleValid = false
+            errorMessage = ERROR_MESSAGE_REPEATED_TITLE
+        } else if ("[\\\\*/:<>?\"|]".toRegex().containsMatchIn(title)) {
+            isTitleValid = false
+            errorMessage = R.string.invalid_characters_defined
+        }
+
+        _state.update {
+            it.copy(
+                isInputTitleValid = isTitleValid,
+                createDialogErrorMessage = errorMessage
+            )
+        }
+
+        return isTitleValid
+    }
+
+    internal fun setIsVideoPlaylistCreatedSuccessfully(value: Boolean) = _state.update {
+        it.copy(isVideoPlaylistCreatedSuccessfully = value)
+    }
+
+    companion object {
+        private const val ERROR_MESSAGE_REPEATED_TITLE = 0
+    }
 }

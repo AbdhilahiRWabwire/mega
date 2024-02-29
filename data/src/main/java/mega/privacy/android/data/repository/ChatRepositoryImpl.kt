@@ -54,6 +54,7 @@ import mega.privacy.android.data.mapper.chat.CombinedChatRoomMapper
 import mega.privacy.android.data.mapper.chat.ConnectionStateMapper
 import mega.privacy.android.data.mapper.chat.MegaChatPeerListMapper
 import mega.privacy.android.data.mapper.chat.PendingMessageListMapper
+import mega.privacy.android.data.mapper.chat.messages.reactions.ReactionUpdateMapper
 import mega.privacy.android.data.mapper.chat.paging.ChatGeolocationEntityMapper
 import mega.privacy.android.data.mapper.chat.paging.ChatNodeEntityListMapper
 import mega.privacy.android.data.mapper.chat.paging.GiphyEntityMapper
@@ -167,6 +168,7 @@ internal class ChatRepositoryImpl @Inject constructor(
     private val giphyEntityMapper: GiphyEntityMapper,
     private val chatGeolocationEntityMapper: ChatGeolocationEntityMapper,
     private val chatNodeEntityListMapper: ChatNodeEntityListMapper,
+    private val reactionUpdateMapper: ReactionUpdateMapper,
     @ApplicationContext private val context: Context,
 ) : ChatRepository {
     private val richLinkConfig = MutableStateFlow(RichLinkConfig())
@@ -703,6 +705,29 @@ internal class ChatRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun monitorMessageUpdates(chatId: Long) = flow {
+        getChatRoomUpdates(chatId)?.let { updates ->
+            emitAll(updates.mapNotNull {
+                when (it) {
+                    is ChatRoomUpdate.OnHistoryTruncatedByRetentionTime -> it.msg
+                    is ChatRoomUpdate.OnMessageReceived -> it.msg
+                    is ChatRoomUpdate.OnMessageUpdate -> it.msg
+                    else -> null
+                }
+            }.map {
+                chatMessageMapper(it)
+            }.flowOn(ioDispatcher))
+        }
+    }
+
+    override fun monitorReactionUpdates(chatId: Long) = flow {
+        getChatRoomUpdates(chatId)?.let { updates ->
+            emitAll(updates.filterIsInstance<ChatRoomUpdate.OnReactionUpdate>()
+                .map { reactionUpdateMapper(it) }
+                .flowOn(ioDispatcher))
+        }
+    }
+
     override fun monitorChatListItemUpdates(): Flow<ChatListItem> =
         megaChatApiGateway.chatUpdates
             .filterIsInstance<ChatUpdate.OnChatListItemUpdate>()
@@ -990,6 +1015,7 @@ internal class ChatRepositoryImpl @Inject constructor(
         }
     }
 
+    @Deprecated("Deprecated. Replace with the same fun in ChatMessageRepository")
     override suspend fun attachNode(chatId: Long, nodeHandle: Long) = withContext(ioDispatcher) {
         suspendCancellableCoroutine { continuation ->
             val listener = continuation.getChatRequestListener("attachNode") {
@@ -1008,6 +1034,7 @@ internal class ChatRepositoryImpl @Inject constructor(
         }
     }
 
+    @Deprecated("Deprecated. Replace with the same fun in ChatMessageRepository")
     override suspend fun attachVoiceMessage(chatId: Long, nodeHandle: Long) =
         withContext(ioDispatcher) {
             suspendCancellableCoroutine { continuation ->
@@ -1059,7 +1086,10 @@ internal class ChatRepositoryImpl @Inject constructor(
     override suspend fun getParticipantFullName(handle: Long): String? = withContext(ioDispatcher) {
         megaLocalRoomGateway.getContactByHandle(handle)?.fullName?.takeIf { it.isNotBlank() }
             ?: databaseHandler.findNonContactByHandle(handle.toString())?.fullName?.takeIf { it.isNotBlank() }
+            ?: megaChatApiGateway.getUserAliasFromCache(handle)?.takeIf { it.isNotBlank() }
             ?: megaChatApiGateway.getUserFullNameFromCache(handle)?.takeIf { it.isNotBlank() }
+            ?: megaChatApiGateway.getUserFirstnameFromCache(handle)?.takeIf { it.isNotBlank() }
+            ?: megaChatApiGateway.getUserLastnameFromCache(handle)?.takeIf { it.isNotBlank() }
             ?: megaChatApiGateway.getUserEmailFromCache(handle)?.takeIf { it.isNotBlank() }
     }
 
@@ -1222,16 +1252,16 @@ internal class ChatRepositoryImpl @Inject constructor(
     override fun getPagedMessages(chatId: Long) =
         typedMessagePagingSourceMapper(chatStorageGateway.getTypedMessageRequestPagingSource(chatId))
 
-    override suspend fun storeMessages(chatId: Long, messages: List<CreateTypedMessageRequest>) {
+    override suspend fun storeMessages(messages: List<CreateTypedMessageRequest>) {
         withContext(ioDispatcher) {
             chatStorageGateway.storeMessages(
                 messages = messages.map {
-                    typedMessageEntityMapper(it, chatId)
+                    typedMessageEntityMapper(it)
                 },
                 richPreviews = messages.mapNotNull { request ->
                     request.chatRichPreviewInfo?.let {
                         richPreviewEntityMapper(
-                            messageId = request.msgId,
+                            messageId = request.messageId,
                             info = it,
                         )
                     }
@@ -1239,7 +1269,7 @@ internal class ChatRepositoryImpl @Inject constructor(
                 giphys = messages.mapNotNull { request ->
                     request.chatGifInfo?.let {
                         giphyEntityMapper(
-                            messageId = request.msgId,
+                            messageId = request.messageId,
                             info = it,
                         )
                     }
@@ -1247,14 +1277,14 @@ internal class ChatRepositoryImpl @Inject constructor(
                 geolocations = messages.mapNotNull { request ->
                     request.chatGeolocationInfo?.let {
                         chatGeolocationEntityMapper(
-                            messageId = request.msgId,
+                            messageId = request.messageId,
                             info = it,
                         )
                     }
                 },
                 chatNodes = messages.map { request ->
                     chatNodeEntityListMapper(
-                        messageId = request.msgId,
+                        messageId = request.messageId,
                         nodes = request.nodeList,
                     )
                 }.flatten(),

@@ -3,7 +3,7 @@ package mega.privacy.android.app.presentation.meeting.chat.model.messages
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import mega.privacy.android.app.presentation.meeting.chat.extension.canForward
+import mega.privacy.android.app.presentation.meeting.chat.extension.isSelectable
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
 import mega.privacy.android.app.presentation.meeting.chat.view.message.management.ChatCallMessageView
 import mega.privacy.android.core.ui.controls.chat.ChatMessageContainer
@@ -21,8 +21,6 @@ data class CallUiMessage(
     override val reactions: List<UIReaction>,
 ) : UiChatMessage {
 
-    override val showDate = message.shouldShowDate
-
     override val showTime: Boolean = true
 
     override val displayAsMine = false
@@ -36,16 +34,19 @@ data class CallUiMessage(
         onLongClick: (TypedMessage) -> Unit,
         onMoreReactionsClicked: (Long) -> Unit,
         onReactionClicked: (Long, String, List<UIReaction>) -> Unit,
+        onReactionLongClick: (String, List<UIReaction>) -> Unit,
+        onForwardClicked: (TypedMessage) -> Unit,
     ) {
         ChatMessageContainer(
             modifier = Modifier.fillMaxWidth(),
             isMine = displayAsMine,
-            showForwardIcon = canForward,
+            showForwardIcon = shouldDisplayForwardIcon,
             reactions = reactions,
-            onMoreReactionsClicked = { onMoreReactionsClicked(id) },
-            onReactionClicked = { onReactionClicked(id, it, reactions) },
+            onMoreReactionsClick = { onMoreReactionsClicked(id) },
+            onReactionClick = { onReactionClicked(id, it, reactions) },
+            onReactionLongClick = { onReactionLongClick(it, reactions) },
+            onForwardClicked = { onForwardClicked(message) },
             time = getTimeOrNull(timeFormatter),
-            date = getDateOrNull(dateFormatter),
             content = {
                 ChatCallMessageView(
                     message = message,
@@ -55,8 +56,9 @@ data class CallUiMessage(
         )
     }
 
-    override val canForward = message.canForward
+    override val shouldDisplayForwardIcon = false
     override val timeSent = message.time
     override val userHandle = message.userHandle
     override val id = message.msgId
+    override val isSelectable = message.isSelectable
 }

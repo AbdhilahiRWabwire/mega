@@ -10,8 +10,6 @@ import javax.inject.Inject
 
 /**
  * Remove share menu action
- *
- * @property orderInCategory
  */
 class RemoveShareMenuAction @Inject constructor(
     override val orderInCategory: Int,

@@ -1,9 +1,11 @@
 package mega.privacy.android.app.presentation.meeting.model
 
 import de.palm.composestateevents.StateEvent
+import de.palm.composestateevents.StateEventWithContent
 import de.palm.composestateevents.consumed
 import mega.privacy.android.app.meeting.activity.MeetingActivityViewModel
 import mega.privacy.android.app.meeting.adapter.Participant
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.chat.ChatParticipant
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
@@ -54,8 +56,9 @@ import mega.privacy.android.domain.entity.meeting.ParticipantsSection
  * @property chatScheduledMeeting                       [ChatScheduledMeeting]
  * @property isRingingAll                               True if is ringing for all participants or False otherwise.
  * @property newInvitedParticipants                     List of emails of the new invited participants.
- * @property allParticipantsAreMuted                    True, if all participants are muted. False, if not.
  * @property isMuteFeatureFlagEnabled                   True, if Mute feature flag enabled. False, otherwise.
+ * @property snackbarMsg                                State to show snackbar message
+ * @property subscriptionPlan                           [AccountType]
  */
 data class MeetingState(
     val chatId: Long = -1L,
@@ -98,14 +101,29 @@ data class MeetingState(
     val chatScheduledMeeting: ChatScheduledMeeting? = null,
     val isRingingAll: Boolean = false,
     val newInvitedParticipants: List<String> = emptyList(),
-    val allParticipantsAreMuted: Boolean = false,
     val isMuteFeatureFlagEnabled: Boolean = false,
+    val snackbarMsg: StateEventWithContent<String> = consumed(),
+    val subscriptionPlan: AccountType = AccountType.UNKNOWN,
 ) {
     /**
      * Check if waiting room is opened
      */
     fun isWaitingRoomOpened() =
         participantsSection == ParticipantsSection.WaitingRoomSection && (shouldWaitingRoomListBeShown || isBottomPanelExpanded)
+
+    /**
+     * Check if all participants are muted
+     *
+     * @return True, if all are muted, false if not.
+     */
+    fun areAllParticipantsMuted(): Boolean {
+        chatParticipantsInCall.find { it.callParticipantData.isAudioOn && it.callParticipantData.clientId != -1L }
+            ?.let {
+                return false
+            }
+
+        return true
+    }
 
     /**
      * Check if has host permission
@@ -117,6 +135,24 @@ data class MeetingState(
      */
     fun shouldMuteAllItemBeShown() =
         isMuteFeatureFlagEnabled && hasHostPermission() && participantsSection == ParticipantsSection.InCallSection
+
+    /**
+     * Check if Admit all item should be shown
+     */
+    fun shouldAdmitAllItemBeShown() =
+        usersInWaitingRoomIDs.isNotEmpty() && participantsSection == ParticipantsSection.WaitingRoomSection
+
+    /**
+     * Check if Call all item should be shown
+     */
+    fun shouldCallAllItemBeShown() =
+        myPermission > ChatRoomPermission.ReadOnly && participantsSection == ParticipantsSection.NotInCallSection
+
+    /**
+     * Check if Invite participants item should be shown
+     */
+    fun shouldInviteParticipantsItemBeShown() =
+        participantsSection == ParticipantsSection.InCallSection && !isGuest && (hasHostPermission() || isOpenInvite)
 
     /**
      * Check if Waiting room section should be shown

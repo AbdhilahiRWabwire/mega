@@ -233,7 +233,7 @@ object MegaNodeUtil {
             } else if (node.isExported) {
                 val intent = Intent(Intent.ACTION_SEND)
                 intent.putExtra(Intent.EXTRA_SUBJECT, node.name)
-                startShareIntent(context, intent, node.publicLink)
+                startShareIntent(context, intent, node.publicLink, title = node.name)
             } else {
                 val intent = Intent(Intent.ACTION_SEND)
                 intent.putExtra(Intent.EXTRA_SUBJECT, node.name)
@@ -320,15 +320,18 @@ object MegaNodeUtil {
                 notExportedNodes++
             }
         }
-
+        val title = nodes.singleOrNull()?.name
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            putExtra(Intent.EXTRA_SUBJECT, title)
+        }
         if (notExportedNodes == 0) {
-            startShareIntent(context, Intent(Intent.ACTION_SEND), links.toString())
+            startShareIntent(context, intent, links.toString(), null)
             return
         }
 
         val megaApi = MegaApplication.getInstance().megaApi
         val exportListener =
-            ExportListener(context, notExportedNodes, links, Intent(Intent.ACTION_SEND))
+            ExportListener(context, notExportedNodes, links, intent)
 
         for (node in nodes) {
             if (!node.isExported) {
@@ -344,8 +347,8 @@ object MegaNodeUtil {
      * @param fileLink  link to share.
      */
     @JvmStatic
-    fun shareLink(context: Context, fileLink: String?) {
-        startShareIntent(context, Intent(Intent.ACTION_SEND), fileLink)
+    fun shareLink(context: Context, fileLink: String?, title: String?) {
+        startShareIntent(context, Intent(Intent.ACTION_SEND), fileLink, title)
     }
 
     /**
@@ -356,11 +359,17 @@ object MegaNodeUtil {
      * @param link          link of the node to share.
      */
     @JvmStatic
-    fun startShareIntent(context: Context, shareIntent: Intent, link: String?) {
+    fun startShareIntent(context: Context, shareIntent: Intent, link: String?, title: String?) {
         shareIntent.type = TYPE_TEXT_PLAIN
         shareIntent.putExtra(Intent.EXTRA_TEXT, link)
-        val uniqueId = UUID.randomUUID()
-        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${uniqueId}.url")
+        if (shareIntent.getStringExtra(Intent.EXTRA_SUBJECT) == null) {
+            title?.let {
+                shareIntent.putExtra(Intent.EXTRA_SUBJECT, it)
+            } ?: run {
+                val uniqueId = UUID.randomUUID()
+                shareIntent.putExtra(Intent.EXTRA_SUBJECT, "${uniqueId}.url")
+            }
+        }
         context.startActivity(
             Intent.createChooser(
                 shareIntent,
@@ -864,7 +873,11 @@ object MegaNodeUtil {
                     leaveMultipleIncomingShares(activity, snackbarShower, handles!!)
                 }
                 MegaApplication.getInstance()
-                    .sendBroadcast(Intent(BroadcastConstants.BROADCAST_ACTION_DESTROY_ACTION_MODE).setPackage(activity.applicationContext.packageName))
+                    .sendBroadcast(
+                        Intent(BroadcastConstants.BROADCAST_ACTION_DESTROY_ACTION_MODE).setPackage(
+                            activity.applicationContext.packageName
+                        )
+                    )
             }
             .setNegativeButton(activity.getString(R.string.general_cancel), null)
             .show()

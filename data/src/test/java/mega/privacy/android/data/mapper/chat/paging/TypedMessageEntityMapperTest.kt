@@ -52,14 +52,13 @@ class TypedMessageEntityMapperTest {
         val expectedChanges = listOf(ChatMessageChange.CONTENT)
         val expectedShouldShowAvatar = false
         val expectedShouldShowTime = false
-        val expectedShouldShowDate = false
         val expectedIsMine = false
         val expectedTextMessage = "textMessage"
         val expectedReactions = emptyList<Reaction>()
 
         val chatMessage = mock<ChatMessage> {
             on { status } doReturn expectedStatus
-            on { msgId } doReturn expectedMsgId
+            on { messageId } doReturn expectedMsgId
             on { tempId } doReturn expectedTempId
             on { msgIndex } doReturn expectedMsgIndex
             on { userHandle } doReturn expectedUserHandle
@@ -96,18 +95,18 @@ class TypedMessageEntityMapperTest {
 
         val requestResolver = CreateTypedMessageRequest(
             chatMessage = chatMessage,
+            chatId = expectedChatId,
             shouldShowAvatar = expectedShouldShowAvatar,
             shouldShowTime = expectedShouldShowTime,
-            shouldShowDate = expectedShouldShowDate,
             isMine = expectedIsMine,
             reactions = expectedReactions,
         )
 
-        val actual = underTest(requestResolver, expectedChatId)
+        val actual = underTest(requestResolver)
 
         assertThat(actual.chatId).isEqualTo(expectedChatId)
         assertThat(actual.status).isEqualTo(expectedStatus)
-        assertThat(actual.msgId).isEqualTo(expectedMsgId)
+        assertThat(actual.messageId).isEqualTo(expectedMsgId)
         assertThat(actual.tempId).isEqualTo(expectedTempId)
         assertThat(actual.msgIndex).isEqualTo(expectedMsgIndex)
         assertThat(actual.userHandle).isEqualTo(expectedUserHandle)
@@ -135,7 +134,6 @@ class TypedMessageEntityMapperTest {
         assertThat(actual.changes).isEqualTo(expectedChanges)
         assertThat(actual.shouldShowAvatar).isEqualTo(expectedShouldShowAvatar)
         assertThat(actual.shouldShowTime).isEqualTo(expectedShouldShowTime)
-        assertThat(actual.shouldShowDate).isEqualTo(expectedShouldShowDate)
         assertThat(actual.isMine).isEqualTo(expectedIsMine)
         assertThat(actual.textMessage).isEqualTo(expectedTextMessage)
         assertThat(actual.reactions).isEqualTo(expectedReactions)

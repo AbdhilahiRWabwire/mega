@@ -7,7 +7,6 @@ import com.google.common.truth.Truth.assertThat
 import de.palm.composestateevents.StateEventWithContentConsumed
 import de.palm.composestateevents.StateEventWithContentTriggered
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,22 +15,26 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
 import mega.privacy.android.app.objects.GifData
 import mega.privacy.android.app.objects.PasscodeManagement
+import mega.privacy.android.app.presentation.meeting.chat.mapper.ForwardMessagesResultMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteParticipantResultMapper
+import mega.privacy.android.app.presentation.meeting.chat.mapper.ParticipantNameMapper
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
 import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_ACTION
 import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_LINK
+import mega.privacy.android.app.presentation.meeting.chat.model.ForwardMessagesToChatsResult
 import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
 import mega.privacy.android.app.presentation.meeting.chat.model.InviteContactToChatResult
 import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
+import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
+import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReactionUser
 import mega.privacy.android.domain.entity.ChatRequest
 import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.EventType
@@ -46,15 +49,22 @@ import mega.privacy.android.domain.entity.chat.ChatPushNotificationMuteOption
 import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.ChatRoomChange
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
+import mega.privacy.android.domain.entity.chat.messages.ForwardResult
+import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
+import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.entity.user.UserId
 import mega.privacy.android.domain.entity.user.UserUpdate
 import mega.privacy.android.domain.exception.MegaException
+import mega.privacy.android.domain.exception.chat.CreateChatException
 import mega.privacy.android.domain.exception.chat.ParticipantAlreadyExistsException
 import mega.privacy.android.domain.exception.chat.ResourceDoesNotExistChatException
+import mega.privacy.android.domain.usecase.AddNodeType
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
+import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
 import mega.privacy.android.domain.usecase.MonitorContactCacheUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
@@ -65,6 +75,7 @@ import mega.privacy.android.domain.usecase.chat.EnableGeolocationUseCase
 import mega.privacy.android.domain.usecase.chat.EndCallUseCase
 import mega.privacy.android.domain.usecase.chat.GetChatMessageUseCase
 import mega.privacy.android.domain.usecase.chat.GetChatMuteOptionListUseCase
+import mega.privacy.android.domain.usecase.chat.GetChatParticipantEmailUseCase
 import mega.privacy.android.domain.usecase.chat.GetCustomSubtitleListUseCase
 import mega.privacy.android.domain.usecase.chat.HoldChatCallUseCase
 import mega.privacy.android.domain.usecase.chat.InviteToChatUseCase
@@ -83,15 +94,19 @@ import mega.privacy.android.domain.usecase.chat.UnmuteChatNotificationUseCase
 import mega.privacy.android.domain.usecase.chat.link.JoinPublicChatUseCase
 import mega.privacy.android.domain.usecase.chat.link.MonitorJoiningChatUseCase
 import mega.privacy.android.domain.usecase.chat.message.AttachContactsUseCase
+import mega.privacy.android.domain.usecase.chat.message.AttachNodeUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendChatAttachmentsUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendGiphyMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendLocationMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendTextMessageUseCase
+import mega.privacy.android.domain.usecase.chat.message.forward.ForwardMessagesUseCase
 import mega.privacy.android.domain.usecase.chat.message.reactions.AddReactionUseCase
 import mega.privacy.android.domain.usecase.chat.message.reactions.DeleteReactionUseCase
 import mega.privacy.android.domain.usecase.contact.GetMyUserHandleUseCase
 import mega.privacy.android.domain.usecase.contact.GetParticipantFirstNameUseCase
+import mega.privacy.android.domain.usecase.contact.GetParticipantFullNameUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserOnlineStatusByHandleUseCase
+import mega.privacy.android.domain.usecase.contact.GetUserUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorAllContactParticipantsInChatUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorHasAnyContactUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorUserLastGreenUpdatesUseCase
@@ -109,12 +124,11 @@ import mega.privacy.android.domain.usecase.meeting.StartMeetingInWaitingRoomChat
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorUpdatePushNotificationSettingsUseCase
 import nz.mega.sdk.MegaChatError
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.extension.ExtensionContext
+import org.junit.jupiter.api.extension.RegisterExtension
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.ArgumentsProvider
@@ -240,7 +254,6 @@ internal class ChatViewModelTest {
     private val monitorLeavingChatUseCase = mock<MonitorLeavingChatUseCase>()
     private val sendLocationMessageUseCase = mock<SendLocationMessageUseCase>()
     private val sendChatAttachmentsUseCase = mock<SendChatAttachmentsUseCase>()
-    private val testDispatcher = UnconfinedTestDispatcher()
     private val monitorChatPendingChangesUseCase = mock<MonitorChatPendingChangesUseCase> {
         on { invoke(any()) } doReturn emptyFlow()
     }
@@ -249,16 +262,15 @@ internal class ChatViewModelTest {
     private val deleteReactionUseCase = mock<DeleteReactionUseCase>()
     private val sendGiphyMessageUseCase = mock<SendGiphyMessageUseCase>()
     private val attachContactsUseCase = mock<AttachContactsUseCase>()
-
-    @BeforeAll
-    fun setup() {
-        Dispatchers.setMain(testDispatcher)
-    }
-
-    @AfterAll
-    fun tearDown() {
-        Dispatchers.resetMain()
-    }
+    private val getChatParticipantEmailUseCase = mock<GetChatParticipantEmailUseCase>()
+    private val getParticipantFullNameUseCase = mock<GetParticipantFullNameUseCase>()
+    private val participantNameMapper = mock<ParticipantNameMapper>()
+    private val getUserUseCase = mock<GetUserUseCase>()
+    private val forwardMessagesUseCase = mock<ForwardMessagesUseCase>()
+    private val forwardMessagesResultMapper = mock<ForwardMessagesResultMapper>()
+    private val attachNodeUseCase = mock<AttachNodeUseCase>()
+    private val getNodeByIdUseCase = mock<GetNodeByIdUseCase>()
+    private val addNodeType = mock<AddNodeType>()
 
     @BeforeEach
     fun resetMocks() {
@@ -307,6 +319,13 @@ internal class ChatViewModelTest {
             deleteReactionUseCase,
             sendGiphyMessageUseCase,
             attachContactsUseCase,
+            getChatParticipantEmailUseCase,
+            getParticipantFullNameUseCase,
+            participantNameMapper,
+            getUserUseCase,
+            forwardMessagesUseCase,
+            forwardMessagesResultMapper,
+            addNodeType,
         )
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         wheneverBlocking { isAnonymousModeUseCase() } doReturn false
@@ -397,6 +416,14 @@ internal class ChatViewModelTest {
             deleteReactionUseCase = deleteReactionUseCase,
             sendGiphyMessageUseCase = sendGiphyMessageUseCase,
             attachContactsUseCase = attachContactsUseCase,
+            getParticipantFullNameUseCase = getParticipantFullNameUseCase,
+            participantNameMapper = participantNameMapper,
+            getUserUseCase = getUserUseCase,
+            forwardMessagesUseCase = forwardMessagesUseCase,
+            forwardMessagesResultMapper = forwardMessagesResultMapper,
+            attachNodeUseCase = attachNodeUseCase,
+            getNodeByIdUseCase = getNodeByIdUseCase,
+            addNodeType = addNodeType
         )
     }
 
@@ -2410,7 +2437,7 @@ internal class ChatViewModelTest {
             )
         val message = mock<ChatMessage> {
             on { content } doReturn "editing message"
-            on { msgId } doReturn 1234L
+            on { messageId } doReturn 1234L
             on { isEditable } doReturn true
         }
         whenever(getChatMessageUseCase(chatId, 1234L)).thenReturn(message)
@@ -2498,6 +2525,168 @@ internal class ChatViewModelTest {
         verify(attachContactsUseCase).invoke(chatId, contactList)
     }
 
+    @Test
+    fun `test that getUser invokes use case`() = runTest {
+        val userId = UserId(1234L)
+        initTestClass()
+        underTest.getUser(userId)
+        verify(getUserUseCase).invoke(userId)
+    }
+
+    @Test
+    fun `test that get user info into UIReaction list can return proper result`() = runTest {
+        val fakeMyUserHandle = 1L
+        whenever(getMyUserHandleUseCase()).thenReturn(fakeMyUserHandle)
+        val expectedFullNameForMe = "MyName(Me)"
+        val expectedFullNameForUser1 = "username 1"
+        val userHandle1 = 1L
+        val expectedFullNameForUser2 = "username 2"
+        val userHandle2 = 2L
+        whenever(getParticipantFullNameUseCase(userHandle1)).thenReturn(expectedFullNameForUser1)
+        whenever(getParticipantFullNameUseCase(userHandle2)).thenReturn(expectedFullNameForUser2)
+        whenever(participantNameMapper(true, expectedFullNameForUser1)).thenReturn(
+            expectedFullNameForMe
+        )
+        whenever(participantNameMapper(false, expectedFullNameForUser1)).thenReturn(
+            expectedFullNameForUser1
+        )
+        whenever(participantNameMapper(false, expectedFullNameForUser2)).thenReturn(
+            expectedFullNameForUser2
+        )
+
+        val input = listOf(
+            UIReaction(
+                reaction = "reaction1",
+                shortCode = ":shortcode1:",
+                count = 1,
+                hasMe = true,
+                userList = listOf(
+                    UIReactionUser(
+                        userHandle = userHandle1,
+                    ),
+                    UIReactionUser(
+                        userHandle = userHandle2,
+                    )
+                )
+            ),
+            UIReaction(
+                reaction = "reaction2",
+                shortCode = ":shortcode2:",
+                count = 2,
+                hasMe = false,
+                userList = listOf(
+                    UIReactionUser(
+                        userHandle = userHandle1,
+                    ),
+                    UIReactionUser(
+                        userHandle = userHandle2,
+                    )
+                )
+            )
+        )
+        initTestClass()
+        val result = underTest.getUserInfoIntoReactionList(input)
+        with(result[0]) {
+            assertThat(userList[0].name).isEqualTo(expectedFullNameForMe)
+            assertThat(userList[1].name).isEqualTo(expectedFullNameForUser2)
+        }
+        with(result[1]) {
+            assertThat(userList[0].name).isEqualTo(expectedFullNameForMe)
+            assertThat(userList[1].name).isEqualTo(expectedFullNameForUser2)
+        }
+    }
+
+
+    @Test
+    fun `test that forward messages invokes use case and updates state`() = runTest {
+        val message = mock<TypedMessage>()
+        val messages = listOf(message)
+        val chatId1 = 123L
+        val chatId2 = 456L
+        val contactId = 789L
+        val chatHandles = listOf(chatId1, chatId2)
+        val contactHandles = listOf(contactId)
+        val result1 = ForwardResult.Success(chatId1)
+        val result2 = ForwardResult.Success(chatId2)
+        val result3 = ForwardResult.Success(contactId)
+        val results = listOf(result1, result2, result3)
+        val forwardResult = ForwardMessagesToChatsResult.AllSucceeded(null, messages.size)
+        whenever(forwardMessagesUseCase(messages, chatHandles, contactHandles))
+            .thenReturn(results)
+        whenever(forwardMessagesResultMapper(results, messages.size)).thenReturn(forwardResult)
+        underTest.onForwardMessages(messages, chatHandles, contactHandles)
+        verify(forwardMessagesUseCase).invoke(messages, chatHandles, contactHandles)
+        underTest.state.test {
+            val result = ((awaitItem().infoToShowEvent as StateEventWithContentTriggered)
+                .content as InfoToShow.ForwardMessagesResult).result
+            assertThat(result).isEqualTo(forwardResult)
+        }
+    }
+
+    @Test
+    fun `test that forward messages updates state if CreateChatException is thrown`() = runTest {
+        val message = mock<TypedMessage>()
+        val messages = listOf(message)
+        val chatId1 = 123L
+        val chatId2 = 456L
+        val contactId = 789L
+        val chatHandles = listOf(chatId1, chatId2)
+        val contactHandles = listOf(contactId)
+        whenever(forwardMessagesUseCase(messages, chatHandles, contactHandles))
+            .thenThrow(CreateChatException::class.java)
+        underTest.onForwardMessages(messages, chatHandles, contactHandles)
+        underTest.state.test {
+            val result = ((awaitItem().infoToShowEvent as StateEventWithContentTriggered)
+                .content as InfoToShow.QuantityString).stringId
+            assertThat(result).isEqualTo(R.plurals.num_messages_not_send)
+        }
+    }
+
+    @Test
+    fun `test that on attach nodes calls attachNodeUseCase with the correct nodes`() = runTest {
+        val nodeIds = (1L..5L).map { NodeId(it) }
+        val files = nodeIds.map { mock<TypedFileNode>() }
+        nodeIds.forEachIndexed { index, nodeId ->
+            val file = files[index]
+            whenever(getNodeByIdUseCase(nodeId)).thenReturn(file)
+            whenever(addNodeType(file)).thenReturn(file)
+        }
+        underTest.onAttachNodes(nodeIds)
+        files.forEach {
+            verify(attachNodeUseCase)(chatId, it)
+        }
+    }
+
+    @Test
+    fun `test that error message is sent when on attach nodes fails`() = runTest {
+        val nodeIds = (1L..5L).map { NodeId(it) }
+        val files = nodeIds.map { mock<TypedFileNode>() }
+        val indexWithError = 1
+        nodeIds.forEachIndexed { index, nodeId ->
+            val file = files[index]
+            whenever(getNodeByIdUseCase(nodeId)).thenReturn(file)
+            whenever(addNodeType(file)).thenReturn(file)
+            if (index == indexWithError) {
+                whenever(attachNodeUseCase(chatId, file)).thenThrow(RuntimeException())
+            } else {
+                whenever(attachNodeUseCase(chatId, file)).thenReturn(Unit)
+            }
+        }
+        underTest.state.test {
+            awaitItem() //initial
+            underTest.onAttachNodes(nodeIds)
+            val actual = awaitItem().infoToShowEvent
+            assertThat(actual).isInstanceOf(StateEventWithContentTriggered::class.java)
+            val content = (actual as StateEventWithContentTriggered).content
+            assertThat(content).isInstanceOf(InfoToShow.SimpleString::class.java)
+            val simpleString = (content as InfoToShow.SimpleString)
+            assertThat(simpleString.stringId).isEqualTo(R.string.files_send_to_chat_error)
+        }
+        files.filterIndexed { index, _ -> index != indexWithError }.forEach {
+            verify(attachNodeUseCase)(chatId, it)
+        }
+    }
+
     private fun ChatRoom.getNumberParticipants() =
         (peerCount + if (ownPrivilege != ChatRoomPermission.Unknown
             && ownPrivilege != ChatRoomPermission.Removed
@@ -2520,6 +2709,14 @@ internal class ChatViewModelTest {
         Arguments.of(ChatRoomChange.Closed, true),
         Arguments.of(ChatRoomChange.Participants, true),
     )
+
+    companion object {
+        private val testDispatcher = UnconfinedTestDispatcher()
+
+        @JvmField
+        @RegisterExtension
+        val extension = CoroutineMainDispatcherExtension(testDispatcher)
+    }
 }
 
 internal class StartCallArgumentsProvider : ArgumentsProvider {

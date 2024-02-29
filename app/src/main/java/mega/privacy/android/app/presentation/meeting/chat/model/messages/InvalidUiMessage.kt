@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import mega.privacy.android.app.R
-import mega.privacy.android.app.presentation.meeting.chat.extension.canForward
 import mega.privacy.android.core.ui.controls.chat.messages.ChatErrorBubble
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
@@ -16,7 +15,6 @@ import mega.privacy.android.domain.entity.chat.messages.invalid.InvalidMessage
  * @property message
  */
 sealed class InvalidUiMessage : AvatarMessage() {
-    internal abstract val message: TypedMessage
 
     /**
      * Get error message
@@ -37,13 +35,9 @@ sealed class InvalidUiMessage : AvatarMessage() {
     override val showTime: Boolean
         get() = message.shouldShowTime
 
-    override val showDate: Boolean
-        get() = message.shouldShowDate
-
     override val displayAsMine: Boolean
         get() = message.isMine
-    override val canForward: Boolean
-        get() = message.canForward
+    override val shouldDisplayForwardIcon = false
     override val timeSent: Long
         get() = message.time
 
@@ -59,7 +53,6 @@ sealed class InvalidUiMessage : AvatarMessage() {
      * @property message
      * @property showAvatar
      * @property showTime
-     * @property showDate
      */
     data class FormatInvalidUiMessage(
         override val message: InvalidMessage,
@@ -76,7 +69,6 @@ sealed class InvalidUiMessage : AvatarMessage() {
      * @property message
      * @property showAvatar
      * @property showTime
-     * @property showDate
      */
     data class SignatureInvalidUiMessage(
         override val message: InvalidMessage,
@@ -94,7 +86,6 @@ sealed class InvalidUiMessage : AvatarMessage() {
      * @property message
      * @property showAvatar
      * @property showTime
-     * @property showDate
      */
     data class MetaInvalidUiMessage(
         override val message: TypedMessage,
@@ -112,7 +103,6 @@ sealed class InvalidUiMessage : AvatarMessage() {
      * @property message
      * @property showAvatar
      * @property showTime
-     * @property showDate
      */
     data class UnrecognizableInvalidUiMessage(
         override val message: TypedMessage,

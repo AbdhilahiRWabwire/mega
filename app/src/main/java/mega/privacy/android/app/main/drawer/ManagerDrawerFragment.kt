@@ -84,7 +84,9 @@ internal class ManagerDrawerFragment : Fragment() {
 
         override fun onDrawerStateChanged(newState: Int) {}
 
-        override fun onDrawerSlide(drawerView: View, slideOffset: Float) {}
+        override fun onDrawerSlide(drawerView: View, slideOffset: Float) {
+            managerViewModel.checkNumUnreadUserAlerts(UnreadUserAlertsCheckType.NOTIFICATIONS_TITLE)
+        }
     }
 
     override fun onAttach(context: Context) {
@@ -129,6 +131,7 @@ internal class ManagerDrawerFragment : Fragment() {
             val lineCount = binding.navigationDrawerAddPhoneNumberButton.layout?.lineCount ?: 0
             binding.navigationDrawerAddPhoneNumberIcon.isGone = lineCount > 1
         }
+        managerViewModel.checkNumUnreadUserAlerts(UnreadUserAlertsCheckType.NOTIFICATIONS_TITLE)
     }
 
     private fun collectFlows() {
@@ -160,9 +163,7 @@ internal class ManagerDrawerFragment : Fragment() {
             binding.deviceCenterSection.isVisible =
                 uiState.enabledFlags.contains(AppFeatures.DeviceCenter)
         }
-        managerViewModel.onGetNumUnreadUserAlerts().observe(
-            viewLifecycleOwner
-        ) { result: Pair<UnreadUserAlertsCheckType, Int> ->
+        viewLifecycleOwner.collectFlow(managerViewModel.numUnreadUserAlerts) { result ->
             if (result.first != UnreadUserAlertsCheckType.NAVIGATION_TOOLBAR_ICON) {
                 setNotificationsTitleSection(result.second)
             }

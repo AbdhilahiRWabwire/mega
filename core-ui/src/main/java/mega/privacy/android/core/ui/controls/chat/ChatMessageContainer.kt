@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
@@ -16,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -23,7 +25,6 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import mega.privacy.android.core.R
 import mega.privacy.android.core.ui.controls.chat.messages.ChatBubble
-import mega.privacy.android.core.ui.controls.chat.messages.DateHeader
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.ReactionsView
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.reactionsList
@@ -53,11 +54,12 @@ fun ChatMessageContainer(
     isMine: Boolean,
     showForwardIcon: Boolean,
     reactions: List<UIReaction>,
-    onMoreReactionsClicked: () -> Unit,
-    onReactionClicked: (String) -> Unit,
+    onMoreReactionsClick: () -> Unit,
+    onReactionClick: (String) -> Unit,
+    onReactionLongClick: (String) -> Unit,
+    onForwardClicked: () -> Unit,
     modifier: Modifier = Modifier,
     time: String? = null,
-    date: String? = null,
     isSendError: Boolean = false,
     onSendErrorClick: () -> Unit = {},
     avatarOrIcon: @Composable (RowScope.() -> Unit)? = null,
@@ -68,9 +70,6 @@ fun ChatMessageContainer(
         horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        date?.let {
-            DateHeader(dateString = date)
-        }
         time?.let {
             Text(
                 modifier = if (isMine) Modifier.padding(end = 16.dp) else Modifier.padding(start = 48.dp),
@@ -87,14 +86,14 @@ fun ChatMessageContainer(
         ) {
             if (isMine) {
                 if (showForwardIcon && !isSendError) {
-                    ForwardIcon()
+                    ForwardIcon(onForwardClicked)
                 }
                 content()
             } else {
                 avatarOrIcon?.let { it() }
                 content()
                 if (showForwardIcon) {
-                    ForwardIcon()
+                    ForwardIcon(onForwardClicked)
                 }
             }
         }
@@ -106,8 +105,9 @@ fun ChatMessageContainer(
                 ),
                 reactions = reactions,
                 isMine = isMine,
-                onMoreReactionsClicked = onMoreReactionsClicked,
-                onReactionClicked = onReactionClicked,
+                onMoreReactionsClick = onMoreReactionsClick,
+                onReactionClick = onReactionClick,
+                onReactionLongClick = onReactionLongClick,
             )
         }
         if (isSendError) {
@@ -125,12 +125,16 @@ fun ChatMessageContainer(
 }
 
 @Composable
-private fun RowScope.ForwardIcon() {
+private fun RowScope.ForwardIcon(
+    onForwardClicked: () -> Unit,
+) {
     Icon(
         modifier = Modifier
             .size(24.dp)
             .align(Alignment.CenterVertically)
-            .testTag(TEST_TAG_FORWARD_ICON),
+            .testTag(TEST_TAG_FORWARD_ICON)
+            .clip(CircleShape)
+            .clickable { onForwardClicked() },
         painter = painterResource(id = R.drawable.ic_forward_circle),
         contentDescription = "Icon Forward",
         tint = MegaTheme.colors.icon.secondary
@@ -147,8 +151,10 @@ private fun TextMessageContainerPreview(
             modifier = Modifier,
             isMine = isMe,
             reactions = reactionsList,
-            onMoreReactionsClicked = { },
-            onReactionClicked = { },
+            onMoreReactionsClick = { },
+            onReactionClick = { },
+            onReactionLongClick = {},
+            onForwardClicked = {},
             avatarOrIcon = {
                 Icon(
                     modifier = Modifier
@@ -160,7 +166,6 @@ private fun TextMessageContainerPreview(
                 )
             },
             time = "12:00",
-            date = "Today",
             showForwardIcon = true,
             content = {
                 ChatBubble(isMe = isMe, modifier = Modifier.weight(1f)) {
@@ -184,8 +189,10 @@ private fun TextMessageContainerSendErrorPreview(
             modifier = Modifier,
             isMine = isMe,
             reactions = emptyList(),
-            onMoreReactionsClicked = { },
-            onReactionClicked = { },
+            onMoreReactionsClick = { },
+            onReactionClick = { },
+            onReactionLongClick = {},
+            onForwardClicked = {},
             avatarOrIcon = {
                 Icon(
                     modifier = Modifier
@@ -197,7 +204,6 @@ private fun TextMessageContainerSendErrorPreview(
                 )
             },
             time = "12:00",
-            date = "Today",
             showForwardIcon = true,
             isSendError = isMe,
             content = {

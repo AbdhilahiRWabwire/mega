@@ -94,6 +94,7 @@ class PermissionChangeMessageViewTest {
         composeTestRule.setContent {
             PermissionChangeMessageView(
                 message = PermissionChangeMessage(
+                    chatId = 1,
                     privilege = privilege,
                     userHandle = userHandle,
                     handleOfAction = handleOfAction,
@@ -102,7 +103,6 @@ class PermissionChangeMessageViewTest {
                     time = System.currentTimeMillis(),
                     shouldShowAvatar = false,
                     shouldShowTime = false,
-                    shouldShowDate = false,
                     reactions = emptyList(),
                 ),
                 ownerActionFullName = ownerActionFullName,

@@ -13,6 +13,7 @@ import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeUpdate
 import mega.privacy.android.domain.entity.node.TypedFolderNode
+import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.node.UnTypedNode
 import mega.privacy.android.domain.entity.offline.OfflineFolderInfo
 import mega.privacy.android.domain.entity.offline.OfflineNodeInformation
@@ -67,6 +68,13 @@ interface NodeRepository {
      * @return List of [ShareData]
      */
     suspend fun getAllOutgoingShares(order: SortOrder): List<ShareData>
+
+    /**
+     * Provides both unverified and verified incoming shares from SDK with proper sorting and filtering
+     *
+     * @return List of [ShareData]
+     */
+    suspend fun getAllIncomingShares(order: SortOrder): List<ShareData>
 
     /**
      * check whether the node is in rubbish bin or not
@@ -342,6 +350,21 @@ interface NodeRepository {
      */
     suspend fun copyNode(
         nodeToCopy: NodeId,
+        newNodeParent: NodeId,
+        newNodeName: String?,
+    ): NodeId
+
+    /**
+     * Copy a [TypedNode] and move it to a new [Node] while updating its name if set
+     *
+     * @param nodeToCopy the [TypedNode] to copy
+     * @param newNodeParent the [NodeId] that [nodeToCopy] will be moved to
+     * @param newNodeName the new name for [nodeToCopy] once it is moved to [newNodeParent] if it's not null, if it's null the name will be the same
+     *
+     * @return the [NodeId] handle of the new [Node] that was copied
+     */
+    suspend fun copyNode(
+        nodeToCopy: TypedNode,
         newNodeParent: NodeId,
         newNodeName: String?,
     ): NodeId
@@ -682,4 +705,12 @@ interface NodeRepository {
      * @return owner node [Long]
      */
     suspend fun getOwnerNodeHandle(nodeId: NodeId): Long?
+
+    /**
+     * Get local link
+     *
+     * @param node
+     * @return local link [String]
+     */
+    suspend fun getLocalLink(node: TypedNode): String?
 }

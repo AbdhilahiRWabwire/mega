@@ -1,4 +1,7 @@
-@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterialApi::class)
+@file:OptIn(
+    ExperimentalFoundationApi::class, ExperimentalMaterialApi::class,
+    ExperimentalComposeUiApi::class
+)
 
 package mega.privacy.android.app.presentation.imagepreview.view
 
@@ -44,13 +47,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -101,6 +108,8 @@ internal fun ImagePreviewScreen(
     onClickRename: (ImageNode) -> Unit = {},
     onClickMove: (ImageNode) -> Unit = {},
     onClickCopy: (ImageNode) -> Unit = {},
+    onClickRestore: (ImageNode) -> Unit = {},
+    onClickRemove: (ImageNode) -> Unit = {},
     onClickMoveToRubbishBin: (ImageNode) -> Unit = {},
 ) {
     val viewState by viewModel.state.collectAsStateWithLifecycle()
@@ -117,6 +126,7 @@ internal fun ImagePreviewScreen(
         val isCurrentImageNodeAvailableOffline = viewState.isCurrentImageNodeAvailableOffline
         var showRemoveLinkDialog by rememberSaveable { mutableStateOf(false) }
         var showMoveToRubbishBinDialog by rememberSaveable { mutableStateOf(false) }
+        var showRemoveDialog by rememberSaveable { mutableStateOf(false) }
 
         val inFullScreenMode = viewState.inFullScreenMode
         val systemUiController = rememberSystemUiController()
@@ -129,6 +139,7 @@ internal fun ImagePreviewScreen(
 
         val scaffoldState = rememberScaffoldState()
         val isLight = MaterialTheme.colors.isLight
+        val context = LocalContext.current
         val photoState = rememberPhotoState()
         val pagerState = rememberPagerState(
             initialPage = currentImageNodeIndex,
@@ -171,6 +182,15 @@ internal fun ImagePreviewScreen(
             }
         }
 
+        if (viewState.showDeletedMessage) {
+            LaunchedEffect(Unit) {
+                scaffoldState.snackbarHostState.showSnackbar(
+                    message = context.getString(R.string.context_correctly_removed),
+                )
+                viewModel.hideDeletedMessage()
+            }
+        }
+
         if (showRemoveLinkDialog) {
             MegaAlertDialog(
                 text = pluralStringResource(
@@ -206,7 +226,24 @@ internal fun ImagePreviewScreen(
             )
         }
 
+        if (showRemoveDialog) {
+            MegaAlertDialog(
+                text = stringResource(id = R.string.confirmation_delete_from_mega),
+                confirmButtonText = stringResource(id = R.string.general_remove),
+                cancelButtonText = stringResource(id = R.string.general_cancel),
+                onConfirm = {
+                    onClickRemove(currentImageNode)
+                    showRemoveDialog = false
+                },
+                onDismiss = {
+                    showRemoveDialog = false
+                }
+            )
+        }
+
         Scaffold(
+            modifier = Modifier
+                .semantics { testTagsAsResourceId = true },
             scaffoldState = scaffoldState,
             snackbarHost = { snackBarHostState ->
                 SnackbarHost(
@@ -371,9 +408,11 @@ internal fun ImagePreviewScreen(
                         hideBottomSheet(coroutineScope, modalSheetState)
                     },
                     onClickRestore = {
+                        onClickRestore(currentImageNode)
                         hideBottomSheet(coroutineScope, modalSheetState)
                     },
                     onClickRemove = {
+                        showRemoveDialog = true
                         hideBottomSheet(coroutineScope, modalSheetState)
                     },
                     onClickMoveToRubbishBin = {
@@ -442,8 +481,20 @@ private fun ImagePreviewContent(
             Box(modifier = Modifier.fillMaxSize()) {
                 val isVideo = imageNode.type is VideoFileTypeInfo
                 ImageContent(
-                    fullSizePath = imagePath,
-                    errorImagePath = errorImagePath,
+                    fullSizePath = imageNode.run {
+                        fullSizePath.takeIf {
+                            imageNode.serializedData?.contains(
+                                "local"
+                            ) == true
+                        }
+                    } ?: imagePath,
+                    errorImagePath = imageNode.run {
+                        fullSizePath.takeIf {
+                            imageNode.serializedData?.contains(
+                                "local"
+                            ) == true
+                        }
+                    } ?: errorImagePath,
                     photoState = photoState,
                     onImageTap = onImageTap,
                     enableZoom = !isVideo
@@ -557,6 +608,7 @@ private fun ImagePreviewTopBar(
                     painter = painterResource(id = R.drawable.ic_arrow_back_white),
                     contentDescription = "Image Preview Back",
                     tint = MaterialTheme.colors.black_white,
+                    modifier = Modifier.testTag(IMAGE_PREVIEW_APP_BAR_BACK),
                 )
             }
         },
@@ -587,6 +639,7 @@ private fun ImagePreviewTopBar(
                         painter = painterResource(id = R.drawable.ic_slideshow),
                         contentDescription = null,
                         tint = MaterialTheme.colors.black_white,
+                        modifier = Modifier.testTag(IMAGE_PREVIEW_APP_BAR_SLIDESHOW),
                     )
                 }
             }
@@ -597,6 +650,7 @@ private fun ImagePreviewTopBar(
                         painter = painterResource(id = R.drawable.ic_download_white),
                         contentDescription = null,
                         tint = MaterialTheme.colors.black_white,
+                        modifier = Modifier.testTag(IMAGE_PREVIEW_APP_BAR_SAVE_TO_DEVICE),
                     )
                 }
             }
@@ -607,6 +661,7 @@ private fun ImagePreviewTopBar(
                         painter = painterResource(id = R.drawable.ic_link),
                         contentDescription = null,
                         tint = MaterialTheme.colors.black_white,
+                        modifier = Modifier.testTag(IMAGE_PREVIEW_APP_BAR_MANAGE_LINK),
                     )
                 }
             }
@@ -617,6 +672,7 @@ private fun ImagePreviewTopBar(
                         painter = painterResource(id = R.drawable.ic_send_to_contact),
                         contentDescription = null,
                         tint = MaterialTheme.colors.black_white,
+                        modifier = Modifier.testTag(IMAGE_PREVIEW_APP_BAR_SEND_TO),
                     )
                 }
             }
@@ -627,6 +683,7 @@ private fun ImagePreviewTopBar(
                         painter = painterResource(id = R.drawable.ic_dots_vertical_white),
                         contentDescription = null,
                         tint = MaterialTheme.colors.black_white,
+                        modifier = Modifier.testTag(IMAGE_PREVIEW_APP_BAR_MORE),
                     )
                 }
             }
@@ -653,10 +710,12 @@ private fun ImagePreviewBottomBar(
             MiddleEllipsisText(
                 text = imageName,
                 color = TextColor.Secondary,
+                modifier = Modifier.testTag(IMAGE_PREVIEW_BOTTOM_BAR_TEXT_IMAGE_NAME),
             )
             MiddleEllipsisText(
                 text = imageIndex,
                 color = TextColor.Secondary,
+                modifier = Modifier.testTag(IMAGE_PREVIEW_BOTTOM_BAR_TEXT_IMAGE_COUNT),
             )
         }
     }

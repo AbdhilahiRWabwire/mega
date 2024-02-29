@@ -6,10 +6,11 @@ import javax.inject.Inject
 
 internal class CreateCallEndedMessageUseCase @Inject constructor() : CreateTypedMessageUseCase {
 
-    override fun invoke(request: CreateTypedMessageInfo) =
+    override suspend fun invoke(request: CreateTypedMessageInfo) =
         with(request) {
             CallEndedMessage(
-                msgId = msgId,
+                chatId = chatId,
+                msgId = messageId,
                 time = timestamp,
                 isMine = isMine,
                 userHandle = userHandle,
@@ -17,7 +18,6 @@ internal class CreateCallEndedMessageUseCase @Inject constructor() : CreateTyped
                 duration = duration,
                 shouldShowAvatar = shouldShowAvatar,
                 shouldShowTime = shouldShowTime,
-                shouldShowDate = shouldShowDate,
                 reactions = reactions,
             )
         }

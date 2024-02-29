@@ -1,29 +1,24 @@
 package mega.privacy.android.app.presentation.node.view.toolbar
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import mega.privacy.android.app.presentation.node.model.mapper.NodeToolbarActionMapper
 import mega.privacy.android.app.presentation.node.model.menuaction.DownloadMenuAction
-import mega.privacy.android.app.presentation.node.model.toolbarmenuitems.Download
+import mega.privacy.android.app.presentation.node.model.toolbarmenuitems.DownloadToolbarMenuItem
 import mega.privacy.android.app.presentation.node.model.toolbarmenuitems.NodeToolbarMenuItem
+import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.node.NodeId
-import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.node.NodeSourceType
+import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.shares.AccessPermission
 import mega.privacy.android.domain.usecase.CheckNodeCanBeMovedToTargetNode
 import mega.privacy.android.domain.usecase.GetRubbishNodeUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInBackupsUseCase
 import mega.privacy.android.domain.usecase.shares.GetNodeAccessPermission
-import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
@@ -36,21 +31,21 @@ import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import java.util.stream.Stream
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@ExtendWith(CoroutineMainDispatcherExtension::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ToolbarViewModelTest {
 
     private val nodeToolbarActionMapper = NodeToolbarActionMapper()
     private val cloudDriveToolbarOptions: Set<@JvmSuppressWildcards NodeToolbarMenuItem<*>> =
-        setOf(Download(DownloadMenuAction()))
+        setOf(DownloadToolbarMenuItem(DownloadMenuAction()))
     private val incomingSharesToolbarOptions: Set<@JvmSuppressWildcards NodeToolbarMenuItem<*>> =
-        setOf(Download(DownloadMenuAction()))
+        setOf(DownloadToolbarMenuItem(DownloadMenuAction()))
     private val outgoingSharesToolbarOptions: Set<@JvmSuppressWildcards NodeToolbarMenuItem<*>> =
-        setOf(Download(DownloadMenuAction()))
+        setOf(DownloadToolbarMenuItem(DownloadMenuAction()))
     private val linksToolbarOptions: Set<@JvmSuppressWildcards NodeToolbarMenuItem<*>> =
-        setOf(Download(DownloadMenuAction()))
+        setOf(DownloadToolbarMenuItem(DownloadMenuAction()))
     private val rubbishBinToolbarOptions: Set<@JvmSuppressWildcards NodeToolbarMenuItem<*>> =
-        setOf(Download(DownloadMenuAction()))
+        setOf(DownloadToolbarMenuItem(DownloadMenuAction()))
     private val checkNodeCanBeMovedToTargetNode: CheckNodeCanBeMovedToTargetNode = mock()
     private val getNodeAccessPermission: GetNodeAccessPermission = mock()
     private val getRubbishBinNodeUseCase: GetRubbishNodeUseCase = mock()
@@ -71,12 +66,7 @@ class ToolbarViewModelTest {
 
     private val selectedNodes = setOf(generalNode, backUpNode, rubbishNode, accessNode)
 
-    private lateinit var underTest: ToolbarViewModel
-
-    @BeforeAll
-    fun setDispatchers() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
-    }
+    private lateinit var underTest: NodeToolbarViewModel
 
     @BeforeEach
     fun setUp() {
@@ -87,7 +77,7 @@ class ToolbarViewModelTest {
     }
 
     private fun initViewModel() {
-        underTest = ToolbarViewModel(
+        underTest = NodeToolbarViewModel(
             cloudDriveToolbarOptions = cloudDriveToolbarOptions,
             incomingSharesToolbarOptions = incomingSharesToolbarOptions,
             outgoingSharesToolbarOptions = outgoingSharesToolbarOptions,
@@ -127,17 +117,23 @@ class ToolbarViewModelTest {
             resultCount = RESULT_COUNT,
             nodeSourceType = nodeSourceType
         )
-        if (nodeSourceType == NodeSourceType.RUBBISH_BIN) {
-            verifyNoInteractions(
-                checkNodeCanBeMovedToTargetNode,
-                isNodeInBackupsUseCase,
-                getNodeAccessPermission,
-            )
-        } else if (nodeSourceType == NodeSourceType.INCOMING_SHARES) {
-            verify(isNodeInBackupsUseCase, Times(selectedNodes.size)).invoke(any())
-        } else {
-            verify(isNodeInBackupsUseCase, Times(selectedNodes.size)).invoke(any())
-            verifyNoInteractions(getNodeAccessPermission)
+        when (nodeSourceType) {
+            NodeSourceType.RUBBISH_BIN -> {
+                verifyNoInteractions(
+                    checkNodeCanBeMovedToTargetNode,
+                    isNodeInBackupsUseCase,
+                    getNodeAccessPermission,
+                )
+            }
+
+            NodeSourceType.INCOMING_SHARES -> {
+                verify(isNodeInBackupsUseCase, Times(selectedNodes.size)).invoke(any())
+            }
+
+            else -> {
+                verify(isNodeInBackupsUseCase, Times(selectedNodes.size)).invoke(any())
+                verifyNoInteractions(getNodeAccessPermission)
+            }
         }
     }
 
@@ -167,11 +163,6 @@ class ToolbarViewModelTest {
             getRubbishBinNodeUseCase,
             isNodeInBackupsUseCase,
         )
-    }
-
-    @AfterAll
-    fun resetDispatchers() {
-        Dispatchers.resetMain()
     }
 
     private suspend fun stubCommon() {

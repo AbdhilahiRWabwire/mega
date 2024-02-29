@@ -50,6 +50,7 @@ import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeUpdate
 import mega.privacy.android.domain.entity.node.TypedFolderNode
+import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.node.UnTypedNode
 import mega.privacy.android.domain.entity.node.publiclink.PublicLinkFolder
 import mega.privacy.android.domain.entity.offline.OfflineFolderInfo
@@ -158,6 +159,23 @@ internal class NodeRepositoryImpl @Inject constructor(
                     .distinctBy { it.nodeHandle }
                     .map { shareDataMapper(it, shareCount.getOrDefault(it.nodeHandle, 1)) }
             }
+    }
+
+    override suspend fun getAllIncomingShares(
+        order: SortOrder,
+    ) = withContext(ioDispatcher) {
+        val (unverifiedShares, verifiedShares) = awaitAll(
+            async { megaApiGateway.getUnverifiedIncomingShares(sortOrderIntMapper(order)) },
+            async { megaApiGateway.getVerifiedIncomingShares(sortOrderIntMapper(order)) }
+        )
+        // Set count to 0, so that UI can use it as a flag
+        val unverifiedSharesMapped = unverifiedShares
+            .filter { isValidNode(NodeId(it.nodeHandle)) && it.user != null }
+            .map { shareDataMapper(it, 0) }
+
+        unverifiedSharesMapped + verifiedShares
+            .filter { it.user != null }
+            .map { shareDataMapper(it, 1) }
     }
 
     override suspend fun getVerifiedIncomingShares(order: SortOrder) =
@@ -550,6 +568,29 @@ internal class NodeRepositoryImpl @Inject constructor(
         val node = getMegaNodeByHandle(nodeToCopy, true)
         val parent = getMegaNodeByHandle(newNodeParent, true)
         requireNotNull(node) { "Node to copy with handle $nodeToCopy not found" }
+        requireNotNull(parent) { "Destination node with handle $newNodeParent not found" }
+        suspendCancellableCoroutine { continuation ->
+            val listener = continuation.getRequestListener("copyNode") { NodeId(it.nodeHandle) }
+            megaApiGateway.copyNode(
+                nodeToCopy = node,
+                newNodeParent = parent,
+                newNodeName = newNodeName,
+                listener = listener
+            )
+            continuation.invokeOnCancellation {
+                megaApiGateway.removeRequestListener(listener)
+            }
+        }
+    }
+
+    override suspend fun copyNode(
+        nodeToCopy: TypedNode,
+        newNodeParent: NodeId,
+        newNodeName: String?,
+    ): NodeId = withContext(ioDispatcher) {
+        val node = megaNodeMapper(nodeToCopy)
+        val parent = getMegaNodeByHandle(newNodeParent, true)
+        requireNotNull(node) { "Node to copy $nodeToCopy not found" }
         requireNotNull(parent) { "Destination node with handle $newNodeParent not found" }
         suspendCancellableCoroutine { continuation ->
             val listener = continuation.getRequestListener("copyNode") { NodeId(it.nodeHandle) }
@@ -985,6 +1026,12 @@ internal class NodeRepositoryImpl @Inject constructor(
     override suspend fun getOwnerNodeHandle(nodeId: NodeId): Long? {
         return withContext(ioDispatcher) {
             megaApiGateway.getMegaNodeByHandle(nodeId.longValue)?.owner
+        }
+    }
+
+    override suspend fun getLocalLink(node: TypedNode): String? = withContext(ioDispatcher) {
+        megaNodeMapper(node)?.let { node ->
+            megaApiGateway.httpServerGetLocalLink(node)
         }
     }
 }

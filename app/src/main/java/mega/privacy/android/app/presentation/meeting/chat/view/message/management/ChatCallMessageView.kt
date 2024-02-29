@@ -166,19 +166,20 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
         get() = sequenceOf(
             PreviewParameters(
                 message = CallStartedMessage(
+                    chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
                     isMine = true,
                     userHandle = 123L,
                     shouldShowAvatar = false,
                     shouldShowTime = false,
-                    shouldShowDate = false,
                     reactions = emptyList(),
                 ),
                 isOneToOneChat = true
             ),
             PreviewParameters(
                 message = CallEndedMessage(
+                    chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
                     isMine = true,
@@ -187,13 +188,13 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     userHandle = 123L,
                     shouldShowAvatar = false,
                     shouldShowTime = false,
-                    shouldShowDate = false,
                     reactions = emptyList(),
                 ),
                 isOneToOneChat = true
             ),
             PreviewParameters(
                 message = CallEndedMessage(
+                    chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
                     isMine = true,
@@ -202,13 +203,13 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     userHandle = 123L,
                     shouldShowAvatar = false,
                     shouldShowTime = false,
-                    shouldShowDate = false,
                     reactions = emptyList(),
                 ),
                 isOneToOneChat = false
             ),
             PreviewParameters(
                 message = CallEndedMessage(
+                    chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
                     isMine = true,
@@ -217,13 +218,13 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     userHandle = 123L,
                     shouldShowAvatar = false,
                     shouldShowTime = false,
-                    shouldShowDate = false,
                     reactions = emptyList(),
                 ),
                 isOneToOneChat = true
             ),
             PreviewParameters(
                 message = CallEndedMessage(
+                    chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
                     isMine = true,
@@ -232,13 +233,13 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     userHandle = 123L,
                     shouldShowAvatar = false,
                     shouldShowTime = false,
-                    shouldShowDate = false,
                     reactions = emptyList(),
                 ),
                 isOneToOneChat = false
             ),
             PreviewParameters(
                 message = CallEndedMessage(
+                    chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
                     isMine = true,
@@ -247,13 +248,13 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     userHandle = 123L,
                     shouldShowAvatar = false,
                     shouldShowTime = false,
-                    shouldShowDate = false,
                     reactions = emptyList(),
                 ),
                 isOneToOneChat = true
             ),
             PreviewParameters(
                 message = CallEndedMessage(
+                    chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
                     isMine = true,
@@ -262,13 +263,13 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     userHandle = 123L,
                     shouldShowAvatar = false,
                     shouldShowTime = false,
-                    shouldShowDate = false,
                     reactions = emptyList(),
                 ),
                 isOneToOneChat = false
             ),
             PreviewParameters(
                 message = CallEndedMessage(
+                    chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
                     isMine = true,
@@ -277,13 +278,13 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     userHandle = 123L,
                     shouldShowAvatar = false,
                     shouldShowTime = false,
-                    shouldShowDate = false,
                     reactions = emptyList(),
                 ),
                 isOneToOneChat = true
             ),
             PreviewParameters(
                 message = CallEndedMessage(
+                    chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
                     isMine = true,
@@ -292,7 +293,6 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     userHandle = 123L,
                     shouldShowAvatar = false,
                     shouldShowTime = false,
-                    shouldShowDate = false,
                     reactions = emptyList(),
                 ),
                 isOneToOneChat = false

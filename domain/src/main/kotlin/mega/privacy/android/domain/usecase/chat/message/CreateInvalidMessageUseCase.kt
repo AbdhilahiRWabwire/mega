@@ -15,14 +15,14 @@ import javax.inject.Inject
  */
 class CreateInvalidMessageUseCase @Inject constructor() : CreateTypedMessageUseCase {
 
-    override fun invoke(request: CreateTypedMessageInfo) =
+    override suspend fun invoke(request: CreateTypedMessageInfo) =
         with(request) {
             val constructor: (
                 Long,
                 Long,
-                Boolean,
                 Long,
                 Boolean,
+                Long,
                 Boolean,
                 Boolean,
                 List<Reaction>,
@@ -45,13 +45,13 @@ class CreateInvalidMessageUseCase @Inject constructor() : CreateTypedMessageUseC
             }
 
             constructor(
-                msgId,
+                chatId,
+                messageId,
                 timestamp,
                 isMine,
                 userHandle,
                 shouldShowAvatar,
                 shouldShowTime,
-                shouldShowDate,
                 reactions,
             )
         }
