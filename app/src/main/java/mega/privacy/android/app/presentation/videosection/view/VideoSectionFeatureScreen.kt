@@ -2,9 +2,9 @@ package mega.privacy.android.app.presentation.videosection.view
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -19,7 +19,6 @@ import mega.privacy.android.app.presentation.videosection.view.playlist.videoPla
 internal fun VideoSectionFeatureScreen(
     videoSectionViewModel: VideoSectionViewModel,
     onClick: (item: VideoUIEntity, index: Int) -> Unit,
-    onDestinationChanged: (String?) -> Unit,
     onSortOrderClick: () -> Unit = {},
     onMenuClick: (VideoUIEntity) -> Unit = {},
     onLongClick: (item: VideoUIEntity, index: Int) -> Unit = { _, _ -> },
@@ -31,7 +30,7 @@ internal fun VideoSectionFeatureScreen(
     val route = navHostController.currentDestination?.route
 
     LaunchedEffect(route) {
-        route?.let(onDestinationChanged)
+        route?.let { videoSectionViewModel.setCurrentDestinationRoute(it) }
     }
 
     VideoSectionNavHost(
@@ -61,11 +60,19 @@ internal fun VideoSectionNavHost(
     modifier: Modifier,
     viewModel: VideoSectionViewModel = hiltViewModel(),
 ) {
-    if (viewModel.state.collectAsState().value.isVideoPlaylistCreatedSuccessfully) {
+    val state = viewModel.state.collectAsStateWithLifecycle().value
+    if (state.isVideoPlaylistCreatedSuccessfully) {
         viewModel.setIsVideoPlaylistCreatedSuccessfully(false)
         navHostController.navigate(
             route = videoPlaylistDetailRoute,
         )
+    }
+
+    if (state.areVideoPlaylistsRemovedSuccessfully &&
+        navHostController.currentDestination?.route == videoPlaylistDetailRoute
+    ) {
+        viewModel.setAreVideoPlaylistsRemovedSuccessfully(false)
+        navHostController.popBackStack()
     }
 
     NavHost(
@@ -96,8 +103,26 @@ internal fun VideoSectionNavHost(
             route = videoPlaylistDetailRoute
         ) {
             VideoPlaylistDetailView(
-                playlist = viewModel.state.collectAsState().value.currentVideoPlaylist,
+                playlist = state.currentVideoPlaylist,
+                isInputTitleValid = state.isInputTitleValid,
+                shouldDeleteVideoPlaylistDialog = state.shouldDeleteSingleVideoPlaylist,
+                shouldRenameVideoPlaylistDialog = state.shouldRenameVideoPlaylist,
+                shouldShowVideoPlaylistBottomSheetDetails = state.shouldShowMoreVideoPlaylistOptions,
+                setShouldDeleteVideoPlaylistDialog = viewModel::setShouldDeleteSingleVideoPlaylist,
+                setShouldRenameVideoPlaylistDialog = viewModel::setShouldRenameVideoPlaylist,
+                setShouldShowVideoPlaylistBottomSheetDetails = viewModel::setShouldShowMoreVideoPlaylistOptions,
+                inputPlaceHolderText = state.createVideoPlaylistPlaceholderTitle,
+                setInputValidity = viewModel::setNewPlaylistTitleValidity,
+                onRenameDialogPositiveButtonClicked = viewModel::updateVideoPlaylistTitle,
+                onDeleteDialogPositiveButtonClicked = { playlist ->
+                    viewModel.removeVideoPlaylists(listOf(playlist))
+                },
+                onAddElementsClicked = {
+                    //TODO navigate to elements selected page
+                },
+                errorMessage = state.createDialogErrorMessage,
                 onClick = onPlaylistDetailItemClick,
+                onMenuClick = onMenuClick
             )
         }
     }

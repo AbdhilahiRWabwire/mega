@@ -22,6 +22,7 @@ import mega.privacy.android.core.ui.model.SpanIndicator
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.core.ui.theme.tokens.TextColor
 import mega.privacy.android.domain.entity.ChatRoomPermission
+import mega.privacy.android.domain.entity.chat.ChatMessageStatus
 import mega.privacy.android.domain.entity.chat.messages.management.AlterParticipantsMessage
 import mega.privacy.android.shared.theme.MegaAppTheme
 
@@ -148,10 +149,13 @@ private fun AlterParticipantsMessageViewSameHandlePreview(
                 privilege = permission,
                 isMine = true,
                 time = System.currentTimeMillis(),
+                isDeletable = false,
+                isEditable = false,
                 msgId = 1L,
                 shouldShowAvatar = false,
-                shouldShowTime = false,
                 reactions = emptyList(),
+                status = ChatMessageStatus.UNKNOWN,
+                content = null
             ),
             ownerActionFullName = "Owner",
             targetActionFullName = "Target",
@@ -173,10 +177,13 @@ private fun AlterParticipantsMessageViewDifferentHandlePreview(
                 privilege = permission,
                 isMine = true,
                 time = System.currentTimeMillis(),
+                isDeletable = false,
+                isEditable = false,
                 msgId = 1L,
                 shouldShowAvatar = false,
-                shouldShowTime = false,
                 reactions = emptyList(),
+                status = ChatMessageStatus.UNKNOWN,
+                content = null
             ),
             ownerActionFullName = "Owner",
             targetActionFullName = "Target",

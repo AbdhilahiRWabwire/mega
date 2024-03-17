@@ -1,6 +1,7 @@
 package mega.privacy.android.domain.entity.chat.messages
 
 import kotlinx.serialization.Polymorphic
+import mega.privacy.android.domain.entity.chat.ChatMessageStatus
 import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
 
 /**
@@ -25,6 +26,16 @@ interface Message {
     val time: Long
 
     /**
+     * True if the message is deletable
+     */
+    val isDeletable: Boolean
+
+    /**
+     * True if the message is editable
+     */
+    val isEditable: Boolean
+
+    /**
      * True if the message is mine
      */
     val isMine: Boolean
@@ -40,12 +51,17 @@ interface Message {
     val shouldShowAvatar: Boolean
 
     /**
-     * Should show time
-     */
-    val shouldShowTime: Boolean
-
-    /**
      * List of reactions
      */
     val reactions: List<Reaction>
+
+    /**
+     * Status
+     */
+    val status: ChatMessageStatus
+
+    /**
+     * Content
+     */
+    val content: String?
 }

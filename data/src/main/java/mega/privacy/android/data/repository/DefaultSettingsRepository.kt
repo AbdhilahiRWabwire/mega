@@ -29,6 +29,7 @@ import mega.privacy.android.domain.entity.CallsMeetingInvitations
 import mega.privacy.android.domain.entity.CallsMeetingReminders
 import mega.privacy.android.domain.entity.CallsSoundNotifications
 import mega.privacy.android.domain.entity.ChatImageQuality
+import mega.privacy.android.domain.entity.VideoQuality
 import mega.privacy.android.domain.entity.meeting.WaitingRoomReminders
 import mega.privacy.android.domain.entity.preference.StartScreen
 import mega.privacy.android.domain.exception.EnableMultiFactorAuthException
@@ -198,13 +199,6 @@ internal class DefaultSettingsRepository @Inject constructor(
     override fun monitorOfflineWarningMessageVisibility(): Flow<Boolean?> =
         uiPreferencesGateway.monitorOfflineWarningMessageVisibility()
 
-    override suspend fun getStorageDownloadAskAlways(): Boolean {
-        return megaLocalStorageGateway.getStorageAskAlways()
-    }
-
-    override suspend fun setStorageAskAlways(isStorageAskAlways: Boolean) =
-        megaLocalStorageGateway.setStorageAskAlways(isStorageAskAlways)
-
     override suspend fun setDefaultStorageDownloadLocation() {
         val defaultDownloadLocation = fileGateway.buildDefaultDownloadDir()
         defaultDownloadLocation.mkdirs()
@@ -213,6 +207,14 @@ internal class DefaultSettingsRepository @Inject constructor(
 
     override suspend fun getStorageDownloadLocation(): String? {
         return megaLocalStorageGateway.getStorageDownloadLocation()
+    }
+
+    override suspend fun isAskDownloadLocation() = withContext(ioDispatcher) {
+        megaLocalStorageGateway.isAskDownloadLocation()
+    }
+
+    override suspend fun setAskDownloadLocation(value: Boolean) = withContext(ioDispatcher) {
+        megaLocalStorageGateway.setAskDownloadLocation(value)
     }
 
     override suspend fun setStorageDownloadLocation(storageDownloadLocation: String) =
@@ -244,6 +246,9 @@ internal class DefaultSettingsRepository @Inject constructor(
 
     override fun getChatImageQuality(): Flow<ChatImageQuality> =
         chatPreferencesGateway.getChatImageQualityPreference()
+
+    override suspend fun getChatVideoQualityPreference(): VideoQuality =
+        chatPreferencesGateway.getChatVideoQualityPreference()
 
     override suspend fun setChatImageQuality(quality: ChatImageQuality) =
         withContext(ioDispatcher) { chatPreferencesGateway.setChatImageQualityPreference(quality) }

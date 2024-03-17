@@ -1,11 +1,14 @@
 package mega.privacy.android.domain.repository.chat
 
+import androidx.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ChatMessageType
 import mega.privacy.android.domain.entity.chat.PendingMessage
+import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.chat.messages.pending.SavePendingMessageRequest
 import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
+import mega.privacy.android.domain.entity.node.NodeId
 
 /**
  * Chat message repository
@@ -200,6 +203,14 @@ interface ChatMessageRepository {
     suspend fun savePendingMessage(savePendingMessageRequest: SavePendingMessageRequest): PendingMessage
 
     /**
+     * Save pending message
+     *
+     * @param savePendingMessageRequest
+     * @return saved PendingMessage
+     */
+    suspend fun updatePendingMessage(savePendingMessageRequest: SavePendingMessageRequest)
+
+    /**
      * Monitor pending messages
      *
      * @param chatId
@@ -339,4 +350,136 @@ interface ChatMessageRepository {
      * @param reactions Updated reactions
      */
     suspend fun updateReactionsInMessage(chatId: Long, msgId: Long, reactions: List<Reaction>)
+
+    /**
+     * Deletes an existing message
+     *
+     * Message's deletions are equivalent to message's edits, but with empty content.
+     * @see \c MegaChatapi::editMessage for more information.
+     *
+     * You take the ownership of the returned value.
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param msgId MegaChatHandle that identifies the message
+     *
+     * @return ChatMessage that will be deleted. NULL if the message cannot be deleted (too old)
+     */
+    suspend fun deleteMessage(chatId: Long, msgId: Long): ChatMessage?
+
+    /**
+     * Revoke the access to a node granted by an attachment message
+     *
+     * The attachment message will be deleted as any other message. Therefore,
+     *
+     * The revoke is actually a deletion of the former message. Hence, the behavior is the
+     * same than a regular deletion.
+     * @see MegaChatApi::editMessage or MegaChatApi::deleteMessage for more information.
+     *
+     * If the revoke is rejected because the attachment message is too old, or if the message is
+     * not an attachment message, this function returns NULL.
+     *
+     * You take the ownership of the returned value.
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param msgId MegaChatHandle that identifies the message
+     *
+     * @return ChatMessage that will be modified. NULL if the message cannot be edited (too old)
+     */
+    suspend fun revokeAttachmentMessage(chatId: Long, msgId: Long): ChatMessage?
+
+
+    /**
+     * Edits an existing message
+     *
+     * Message's edits are only allowed during a short timeframe, usually 1 hour.
+     * Message's deletions are equivalent to message's edits, but with empty content.
+     *
+     * There is only one pending edit for not-yet confirmed edits. Therefore, this function will
+     * discard previous edits that haven't been notified via MegaChatRoomListener::onMessageUpdate
+     * where the message has MegaChatMessage::hasChanged(MegaChatMessage::CHANGE_TYPE_CONTENT).
+     *
+     * If the edits is rejected... // TODO:
+     *
+     * You take the ownership of the returned value.
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param msgId MegaChatHandle that identifies the message
+     * @param msg New content of the message
+     *
+     * @return ChatMessage that will be modified. NULL if the message cannot be edited (too old)
+     */
+    suspend fun editMessage(chatId: Long, msgId: Long, msg: String): ChatMessage?
+
+    /**
+     * Edit a geolocation message
+     *
+     * Message's edits are only allowed during a short timeframe, usually 1 hour.
+     * Message's deletions are equivalent to message's edits, but with empty content.
+     *
+     * There is only one pending edit for not-yet confirmed edits. Therefore, this function will
+     * discard previous edits that haven't been notified via MegaChatRoomListener::onMessageUpdate
+     * where the message has MegaChatMessage::hasChanged(MegaChatMessage::CHANGE_TYPE_CONTENT).
+     *
+     * If the edit is rejected because the original message is too old, this function return NULL.
+     *
+     * When an already delivered message (MegaChatMessage::STATUS_DELIVERED) is edited, the status
+     * of the message will change from STATUS_SENDING directly to STATUS_DELIVERED again, without
+     * the transition through STATUS_SERVER_RECEIVED. In other words, the protocol doesn't allow
+     * to know when an edit has been delivered to the target user, but only when the edit has been
+     * received by the server, so for convenience the status of the original message is kept.
+     * if MegaChatApi::isMessageReceptionConfirmationActive returns false, messages may never
+     * reach the status delivered, since the target user will not send the required acknowledge to the
+     * server upon reception.
+     *
+     * After this function, MegaChatApi::sendStopTypingNotification has to be called. To notify other clients
+     * that it isn't typing
+     *
+     * You take the ownership of the returned value.
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param msgId MegaChatHandle that identifies the message
+     * @param longitude from shared geolocation
+     * @param latitude from shared geolocation
+     * @param img Preview as a byte array encoded in Base64URL. It can be NULL
+     * @return ChatMessage that will be sent. The message id is not definitive, but temporal.
+     */
+    suspend fun editGeolocation(
+        chatId: Long,
+        msgId: Long,
+        longitude: Float,
+        latitude: Float,
+        img: String,
+    ): ChatMessage?
+
+    /**
+     * Gets the original path of this node if it has been cached during the upload before attaching the node.
+     *
+     * @param nodeId The [NodeId] of the node.
+     * @return The cached original path, or null if not cached.
+     */
+    fun getCachedOriginalPathForNode(nodeId: NodeId): String?
+
+    /**
+     * Caches the original path of this node once the original file is uploaded, just before attaching it to the chat.
+     *
+     * @param nodeId The [NodeId] of the node.
+     * @param path The original path to be cached.
+     */
+    fun cacheOriginalPathForNode(nodeId: NodeId, path: String)
+
+    /**
+     * Get paged messages
+     *
+     * @param chatId
+     * @return flow of paged messages
+     */
+    fun getPagedMessages(chatId: Long): PagingSource<Int, TypedMessage>
+
+    /**
+     * Deletes all messages in a chat that have a timestamp older than the truncate timestamp
+     *
+     * @param chatId
+     * @param truncateTimestamp
+     */
+    suspend fun truncateMessages(chatId: Long, truncateTimestamp: Long)
 }

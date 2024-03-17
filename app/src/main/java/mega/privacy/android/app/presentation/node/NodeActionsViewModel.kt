@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.node
 
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -10,28 +11,40 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.chat.mapper.ChatRequestMessageMapper
+import mega.privacy.android.app.presentation.meeting.chat.view.message.attachment.NodeContentUriIntentMapper
 import mega.privacy.android.app.presentation.movenode.mapper.MoveRequestMessageMapper
 import mega.privacy.android.app.presentation.node.model.NodeActionState
-import mega.privacy.android.app.presentation.node.model.mapper.NodeAccessPermissionIconMapper
 import mega.privacy.android.app.presentation.snackbar.SnackBarHandler
 import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
 import mega.privacy.android.app.presentation.versions.mapper.VersionHistoryRemoveMessageMapper
+import mega.privacy.android.domain.entity.AudioFileTypeInfo
+import mega.privacy.android.domain.entity.ImageFileTypeInfo
+import mega.privacy.android.domain.entity.PdfFileTypeInfo
+import mega.privacy.android.domain.entity.TextFileTypeInfo
+import mega.privacy.android.domain.entity.UrlFileTypeInfo
+import mega.privacy.android.domain.entity.VideoFileTypeInfo
+import mega.privacy.android.domain.entity.node.NodeContentUri
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
+import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.node.backup.BackupNodeType
-import mega.privacy.android.domain.entity.shares.AccessPermission
 import mega.privacy.android.domain.exception.NotEnoughQuotaMegaException
 import mega.privacy.android.domain.exception.QuotaExceededMegaException
 import mega.privacy.android.domain.exception.node.ForeignNodeException
 import mega.privacy.android.domain.qualifier.ApplicationScope
+import mega.privacy.android.domain.usecase.GetPathFromNodeContentUseCase
 import mega.privacy.android.domain.usecase.account.SetCopyLatestTargetPathUseCase
 import mega.privacy.android.domain.usecase.account.SetMoveLatestTargetPathUseCase
 import mega.privacy.android.domain.usecase.chat.AttachMultipleNodesUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.filenode.DeleteNodeVersionsUseCase
 import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodesUseCase
+import mega.privacy.android.domain.usecase.node.GetNodeContentUriUseCase
+import mega.privacy.android.domain.usecase.node.GetNodePreviewFileUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodesUseCase
 import mega.privacy.android.domain.usecase.node.backup.CheckBackupNodeTypeByHandleUseCase
 import mega.privacy.android.feature.sync.data.mapper.ListToStringWithDelimitersMapper
@@ -50,10 +63,12 @@ import javax.inject.Inject
  * @property snackBarHandler
  * @property moveRequestMessageMapper
  * @property versionHistoryRemoveMessageMapper
- * @property nodeAccessPermissionIconMapper
  * @property checkBackupNodeTypeByHandleUseCase
  * @property attachMultipleNodesUseCase
  * @property chatRequestMessageMapper
+ * @property listToStringWithDelimitersMapper
+ * @property getNodeContentUriUseCase
+ * @property nodeContentUriIntentMapper
  * @property applicationScope
  */
 @HiltViewModel
@@ -67,11 +82,15 @@ class NodeActionsViewModel @Inject constructor(
     private val snackBarHandler: SnackBarHandler,
     private val moveRequestMessageMapper: MoveRequestMessageMapper,
     private val versionHistoryRemoveMessageMapper: VersionHistoryRemoveMessageMapper,
-    private val nodeAccessPermissionIconMapper: NodeAccessPermissionIconMapper,
     private val checkBackupNodeTypeByHandleUseCase: CheckBackupNodeTypeByHandleUseCase,
     private val attachMultipleNodesUseCase: AttachMultipleNodesUseCase,
     private val chatRequestMessageMapper: ChatRequestMessageMapper,
     private val listToStringWithDelimitersMapper: ListToStringWithDelimitersMapper,
+    private val getNodeContentUriUseCase: GetNodeContentUriUseCase,
+    private val nodeContentUriIntentMapper: NodeContentUriIntentMapper,
+    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
+    private val getNodePreviewFileUseCase: GetNodePreviewFileUseCase,
+    private val getPathFromNodeContentUseCase: GetPathFromNodeContentUseCase,
     @ApplicationScope private val applicationScope: CoroutineScope,
 ) : ViewModel() {
 
@@ -212,15 +231,6 @@ class NodeActionsViewModel @Inject constructor(
     }
 
     /**
-     * Get access permission icon
-     * Access permission icon is only shown for incoming shares
-     *
-     * @return icon
-     */
-    private fun getAccessPermissionIcon(accessPermission: AccessPermission, node: TypedNode): Int? =
-        nodeAccessPermissionIconMapper(accessPermission).takeIf { node.isIncomingShare }
-
-    /**
      * Contact selected for folder share
      */
     fun contactSelectedForShareFolder(contactsData: List<String>, nodeHandle: List<Long>) {
@@ -303,6 +313,16 @@ class NodeActionsViewModel @Inject constructor(
     }
 
     /**
+     * Download node for preview
+     * Triggers TransferTriggerEvent.StartDownloadForPreview with parameter [TypedNode]
+     */
+    fun downloadNodeForPreview(fileNode: TypedFileNode) {
+        _state.update {
+            it.copy(downloadEvent = triggered(TransferTriggerEvent.StartDownloadForPreview(fileNode)))
+        }
+    }
+
+    /**
      * Download node for offline
      * Triggers TransferTriggerEvent.StartDownloadNode with parameter [TypedNode]
      */
@@ -379,5 +399,61 @@ class NodeActionsViewModel @Inject constructor(
         _state.update {
             it.copy(clearAll = consumed)
         }
+    }
+
+
+    /**
+     * Handle file node clicked
+     *
+     * @param fileNode
+     */
+    suspend fun handleFileNodeClicked(fileNode: TypedFileNode) = when {
+        fileNode.type is PdfFileTypeInfo -> FileNodeContent.Pdf(
+            uri = getNodeContentUriUseCase(fileNode)
+        )
+
+        fileNode.type is ImageFileTypeInfo -> FileNodeContent.ImageForNode(
+            getFeatureFlagValueUseCase(
+                AppFeatures.ImagePreview
+            )
+        )
+
+        fileNode.type is TextFileTypeInfo && fileNode.size <= TextFileTypeInfo.MAX_SIZE_OPENABLE_TEXT_FILE -> FileNodeContent.TextContent
+
+        fileNode.type is VideoFileTypeInfo || fileNode.type is AudioFileTypeInfo -> {
+            FileNodeContent.AudioOrVideo(
+                uri = getNodeContentUriUseCase(fileNode)
+            )
+        }
+
+        fileNode.type is UrlFileTypeInfo -> {
+            val content = getNodeContentUriUseCase(fileNode)
+            val path = getPathFromNodeContentUseCase(content)
+            FileNodeContent.UrlContent(
+                uri = content,
+                path = path
+            )
+        }
+
+        else -> FileNodeContent.Other(
+            localFile = getNodePreviewFileUseCase(fileNode)
+        )
+    }
+
+    /**
+     * Apply node content uri
+     *
+     * @param intent
+     * @param content
+     * @param mimeType
+     * @param isSupported
+     */
+    fun applyNodeContentUri(
+        intent: Intent,
+        content: NodeContentUri,
+        mimeType: String,
+        isSupported: Boolean = true,
+    ) {
+        nodeContentUriIntentMapper(intent, content, mimeType, isSupported)
     }
 }

@@ -7,12 +7,12 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction.Companion.TEST_TAG_ADD_PARTICIPANTS_ACTION
@@ -20,13 +20,17 @@ import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuActi
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction.Companion.TEST_TAG_END_CALL_FOR_ALL_ACTION
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction.Companion.TEST_TAG_VIDEO_CALL_ACTION
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
+import mega.privacy.android.app.presentation.meeting.chat.model.MessageListUiState
+import mega.privacy.android.app.presentation.meeting.chat.model.MessageListViewModel
 import mega.privacy.android.app.presentation.meeting.chat.view.ChatView
-import mega.privacy.android.app.presentation.meeting.chat.view.bottombar.ChatBottomBarContent
+import mega.privacy.android.app.presentation.meeting.chat.view.bottombar.ChatBottomBarViewModel
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.TEST_TAG_CLEAR_CHAT_CONFIRMATION_DIALOG
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.TEST_TAG_ENABLE_GEOLOCATION_DIALOG
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ChatGalleryState
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ChatGalleryViewModel
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.TEST_TAG_ATTACH_FROM_LOCATION
+import mega.privacy.android.app.presentation.transfers.startdownload.StartDownloadComponentViewModel
+import mega.privacy.android.app.presentation.transfers.startdownload.model.StartDownloadTransferViewState
 import mega.privacy.android.core.ui.controls.chat.TEST_TAG_ATTACHMENT_ICON
 import mega.privacy.android.core.ui.controls.menus.TAG_MENU_ACTIONS_SHOW_MORE
 import mega.privacy.android.domain.entity.ChatRoomPermission
@@ -51,8 +55,22 @@ class ChatViewTest {
         on { state } doReturn MutableStateFlow(ChatGalleryState())
     }
 
+    private val startDownloadComponentViewModel = mock<StartDownloadComponentViewModel> {
+        on { uiState } doReturn MutableStateFlow(StartDownloadTransferViewState())
+    }
+
+    private val messageListViewModel = mock<MessageListViewModel> {
+        on { state } doReturn MutableStateFlow(MessageListUiState())
+        on { pagedMessages } doReturn emptyFlow()
+    }
+
+    private val chatBottomBarViewModel = mock<ChatBottomBarViewModel>()
+
     private val viewModelStore = mock<ViewModelStore> {
         on { get(argThat<String> { contains(ChatGalleryViewModel::class.java.canonicalName.orEmpty()) }) } doReturn chatGalleryViewModel
+        on { get(argThat<String> { contains(StartDownloadComponentViewModel::class.java.canonicalName.orEmpty()) }) } doReturn startDownloadComponentViewModel
+        on { get(argThat<String> { contains(MessageListViewModel::class.java.canonicalName.orEmpty()) }) } doReturn messageListViewModel
+        on { get(argThat<String> { contains(ChatBottomBarViewModel::class.java.canonicalName.orEmpty()) }) } doReturn chatBottomBarViewModel
     }
     private val viewModelStoreOwner = mock<ViewModelStoreOwner> {
         on { viewModelStore } doReturn viewModelStore
@@ -215,20 +233,6 @@ class ChatViewTest {
                     uiState = state,
                     onBackPressed = {},
                     onMenuActionPressed = actionPressed,
-                    messageListView = { _, _, _, _, _, _, _, _, _ -> },
-                    bottomBar = { state, showEmojiPicker, onSendClicked, onAttachmentClick, onEmojiClick, onCloseEditing, interactionSourceTextInput ->
-                        ChatBottomBarContent(
-                            uiState = state,
-                            textFieldValue = TextFieldValue(state.sendingText),
-                            showEmojiPicker = showEmojiPicker,
-                            onSendClick = onSendClicked,
-                            onAttachmentClick = onAttachmentClick,
-                            onEmojiClick = onEmojiClick,
-                            onTextChange = {},
-                            interactionSourceTextInput = interactionSourceTextInput,
-                            onCloseEditing = onCloseEditing
-                        )
-                    }
                 )
             }
         }

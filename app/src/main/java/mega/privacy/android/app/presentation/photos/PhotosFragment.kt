@@ -41,10 +41,9 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
-import mega.privacy.android.app.activities.settingsActivities.CameraUploadsPreferencesActivity
+import mega.privacy.android.app.activities.settingsActivities.LegacyCameraUploadsPreferencesActivity
 import mega.privacy.android.app.extensions.navigateToAppSettings
 import mega.privacy.android.app.featuretoggle.AppFeatures
-import mega.privacy.android.app.imageviewer.ImageViewerActivity
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.presentation.advertisements.model.AdsSlotIDs.TAB_PHOTOS_SLOT_ID
 import mega.privacy.android.app.presentation.extensions.isDarkMode
@@ -77,6 +76,7 @@ import mega.privacy.android.app.presentation.photos.timeline.viewmodel.updateFil
 import mega.privacy.android.app.presentation.photos.timeline.viewmodel.zoomIn
 import mega.privacy.android.app.presentation.photos.timeline.viewmodel.zoomOut
 import mega.privacy.android.app.presentation.photos.view.showSortByDialog
+import mega.privacy.android.app.settings.camerauploads.SettingsCameraUploadsComposeActivity
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.permission.PermissionUtils
 import mega.privacy.android.app.utils.permission.PermissionUtils.getImagePermissionByVersion
@@ -176,6 +176,7 @@ class PhotosFragment : Fragment() {
             if (isNewCUEnabled) {
                 activity?.invalidateMenu()
                 initializeCameraUploads()
+                timelineViewModel.syncCameraUploadsStatus()
             }
         }
     }
@@ -313,10 +314,7 @@ class PhotosFragment : Fragment() {
         }
     }
 
-    private fun handleCameraUploadsMenu(
-        state: TimelineViewState,
-        isMenuVisible: Boolean = photosViewModel.state.value.isMenuShowing,
-    ) {
+    private fun handleCameraUploadsMenu(state: TimelineViewState) {
         if (!isNewCUEnabled) return
 
         // CU warning menu
@@ -332,7 +330,7 @@ class PhotosFragment : Fragment() {
         // CU complete menu
         val showCameraUploadsComplete = state.showCameraUploadsComplete
         this.menu?.findItem(R.id.action_cu_status_complete)?.isVisible =
-            showCameraUploadsComplete && isMenuVisible
+            showCameraUploadsComplete && !showCameraUploadsButton && !showCameraUploadsWarning && photosViewModel.state.value.selectedTab != PhotosTab.Albums
     }
 
     private fun handleFilterIcons(timelineViewState: TimelineViewState) {
@@ -457,7 +455,7 @@ class PhotosFragment : Fragment() {
     }
 
     internal fun handleMenuIcons(isShowing: Boolean) {
-        handleCameraUploadsMenu(timelineViewModel.state.value, isShowing)
+        handleCameraUploadsMenu(timelineViewModel.state.value)
 
         this.menu?.findItem(R.id.action_zoom_in)?.isVisible = isShowing && !isNewCUEnabled
         this.menu?.findItem(R.id.action_zoom_out)?.isVisible = isShowing && !isNewCUEnabled
@@ -472,8 +470,13 @@ class PhotosFragment : Fragment() {
     private fun openCameraUploadsSettings() {
         val context = context ?: return
 
-        val intent = Intent(context, CameraUploadsPreferencesActivity::class.java)
-        startActivity(intent)
+        val settingsCameraUploadsClass =
+            if (photosViewModel.state.value.enableSettingsCameraUploadsCompose) {
+                SettingsCameraUploadsComposeActivity::class.java
+            } else {
+                LegacyCameraUploadsPreferencesActivity::class.java
+            }
+        startActivity(Intent(context, settingsCameraUploadsClass))
     }
 
     override fun onPrepareOptionsMenu(menu: Menu) {
@@ -596,7 +599,9 @@ class PhotosFragment : Fragment() {
             }
 
             R.id.action_cu_status_complete -> {
-                /* TODO */
+                timelineViewModel.setCameraUploadsMessage(
+                    message = getString(R.string.photos_camera_uploads_updated),
+                )
                 true
             }
 

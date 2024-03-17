@@ -51,6 +51,11 @@ enum class OptionItems {
     REMOVE_SHARE_CLICKED,
 
     /**
+     * Option item Leave from incoming share Clicked
+     */
+    LEAVE_SHARE_CLICKED,
+
+    /**
      * Option item select all clicked
      */
     SELECT_ALL_CLICKED,
@@ -59,6 +64,16 @@ enum class OptionItems {
      * Option item clear all clicked
      */
     CLEAR_ALL_CLICKED,
+
+    /**
+     * Option hide clicked
+     */
+    HIDE_CLICKED,
+
+    /**
+     * Option unhide clicked
+     */
+    UNHIDE_CLICKED,
 
     /**
      * Option item copy clicked

@@ -9,14 +9,14 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import org.mockito.Mockito
+import org.mockito.Mockito.mock
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.whenever
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RemoveVideoPlaylistsUseCaseTest {
     private lateinit var underTest: RemoveVideoPlaylistsUseCase
-    private val videoSectionRepository = Mockito.mock<VideoSectionRepository>()
+    private val videoSectionRepository = mock<VideoSectionRepository>()
 
     @BeforeAll
     fun setUp() {

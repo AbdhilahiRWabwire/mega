@@ -8,6 +8,7 @@ import android.view.Menu
 import android.view.MenuInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -16,12 +17,14 @@ import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.RecyclerView
 import dagger.hilt.android.AndroidEntryPoint
 import mega.privacy.android.app.R
+import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.contacts.ContactsActivity
 import mega.privacy.android.app.contacts.list.adapter.ContactActionsListAdapter
 import mega.privacy.android.app.contacts.list.adapter.ContactListAdapter
 import mega.privacy.android.app.contacts.list.dialog.ContactBottomSheetDialogFragment
 import mega.privacy.android.app.databinding.FragmentContactListBinding
 import mega.privacy.android.app.main.InviteContactActivity
+import mega.privacy.android.app.utils.AlertDialogUtil.createForceAppUpdateDialog
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.MIN_ITEMS_SCROLLBAR
 import mega.privacy.android.app.utils.ContactUtil
@@ -47,16 +50,20 @@ class ContactListFragment : Fragment() {
         ContactActionsListAdapter(::onRequestsClick, ::onGroupsClick)
     }
     private val recentlyAddedAdapter by lazy {
-        ContactListAdapter(::onContactClick, ::onContactInfoClick, ::onContactMoreClick)
+        ContactListAdapter(viewModel::getChatRoomId, ::onContactInfoClick, ::onContactMoreClick)
     }
     private val contactsAdapter by lazy {
-        ContactListAdapter(::onContactClick, ::onContactInfoClick, ::onContactMoreClick)
+        ContactListAdapter(viewModel::getChatRoomId, ::onContactInfoClick, ::onContactMoreClick)
     }
+
+    private var contactSheet: ContactBottomSheetDialogFragment? = null
+
+    private var forceAppUpdateDialog: AlertDialog? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ): View {
         binding = FragmentContactListBinding.inflate(inflater, container, false)
         setHasOptionsMenu(true)
@@ -66,6 +73,57 @@ class ContactListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         setupView()
         setupObservers()
+        collectFlows()
+    }
+
+    /**
+     * on Start
+     */
+    override fun onStart() {
+        super.onStart()
+        viewModel.monitorSFUServerUpgrade()
+    }
+
+    /**
+     * on Stop
+     */
+    override fun onStop() {
+        viewModel.cancelMonitorSFUServerUpgrade()
+        super.onStop()
+    }
+
+
+    private fun collectFlows() {
+        viewLifecycleOwner.collectFlow(viewModel.state) { state ->
+            if (state.showForceUpdateDialog) {
+                showForceUpdateAppDialog()
+            }
+
+            state.shouldOpenChatWithId?.let { chatId ->
+                navigator.openChat(
+                    context = requireActivity(),
+                    chatId = chatId,
+                    action = Constants.ACTION_CHAT_SHOW_MESSAGES
+                )
+
+                contactSheet?.dismiss()
+
+                viewModel.onChatOpened()
+            }
+        }
+    }
+
+    /**
+     * Show Force App Update Dialog
+     */
+    private fun showForceUpdateAppDialog() {
+        if (forceAppUpdateDialog?.isShowing == true) return
+        forceAppUpdateDialog = context?.let {
+            createForceAppUpdateDialog(it) {
+                viewModel.onForceUpdateDialogDismissed()
+            }
+        }
+        forceAppUpdateDialog?.show()
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -90,8 +148,10 @@ class ContactListFragment : Fragment() {
     }
 
     private fun setupView() {
-        val adapterConfig = ConcatAdapter.Config.Builder().setStableIdMode(ConcatAdapter.Config.StableIdMode.ISOLATED_STABLE_IDS).build()
-        binding.list.adapter = ConcatAdapter(adapterConfig, actionsAdapter, recentlyAddedAdapter, contactsAdapter)
+        val adapterConfig = ConcatAdapter.Config.Builder()
+            .setStableIdMode(ConcatAdapter.Config.StableIdMode.ISOLATED_STABLE_IDS).build()
+        binding.list.adapter =
+            ConcatAdapter(adapterConfig, actionsAdapter, recentlyAddedAdapter, contactsAdapter)
         binding.list.setHasFixedSize(true)
         binding.list.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
@@ -129,22 +189,18 @@ class ContactListFragment : Fragment() {
         }
     }
 
-    private fun onContactClick(userHandle: Long) {
-        viewModel.getChatRoomId(userHandle).observe(viewLifecycleOwner) { chatId ->
-            navigator.openChat(
-                context = requireActivity(),
-                chatId = chatId,
-                action = Constants.ACTION_CHAT_SHOW_MESSAGES
-            )
-        }
-    }
-
     private fun onContactInfoClick(userEmail: String) {
         ContactUtil.openContactInfoActivity(context, userEmail)
     }
 
     private fun onContactMoreClick(userHandle: Long) {
-        ContactBottomSheetDialogFragment.newInstance(userHandle).show(childFragmentManager)
+        contactSheet = ContactBottomSheetDialogFragment.newInstance(userHandle).apply {
+            optionSendMessageClick = { handle ->
+                viewModel.getChatRoomId(handle)
+            }
+        }
+
+        contactSheet?.show(childFragmentManager)
     }
 
     private fun onRequestsClick() {

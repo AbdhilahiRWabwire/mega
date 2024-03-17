@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.domain.usecase.GetBackupsNode
+import mega.privacy.android.app.featuretoggle.ABTestFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.main.dialog.shares.RemoveShareResultMapper
@@ -465,7 +466,7 @@ class ManagerViewModel @Inject constructor(
     private suspend fun getEnabledFeatures(): Set<Feature> {
         return setOfNotNull(
             AppFeatures.QRCodeCompose.takeIf { getFeatureFlagValueUseCase(it) },
-            AppFeatures.DeviceCenter.takeIf { getFeatureFlagValueUseCase(it) },
+            ABTestFeatures.dmca.takeIf { getFeatureFlagValueUseCase(it) },
         )
     }
 
@@ -1007,7 +1008,7 @@ class ManagerViewModel @Inject constructor(
         NodeSourceType.LINKS -> linksParentHandle
         NodeSourceType.RUBBISH_BIN -> rubbishBinParentHandle
         NodeSourceType.BACKUPS -> backupsParentHandle
-        NodeSourceType.OTHER -> getRootNodeUseCase()?.id?.longValue ?: MegaApiJava.INVALID_HANDLE
+        NodeSourceType.HOME, NodeSourceType.OTHER -> getRootNodeUseCase()?.id?.longValue ?: MegaApiJava.INVALID_HANDLE
     }
 
     /**
@@ -1217,6 +1218,17 @@ class ManagerViewModel @Inject constructor(
                 isRecordingConsentAccepted = false
             )
         }
+    }
+
+    /**
+     * When navigating to Device Center, this holds the previous Bottom Navigation item, so that the
+     * User can go back to it after leaving Device Center
+     *
+     * @param previousItem The previous Bottom Navigation Item, which can be null to signify that
+     * it is not set up
+     */
+    fun setDeviceCenterPreviousBottomNavigationItem(previousItem: Int?) {
+        _state.update { it.copy(deviceCenterPreviousBottomNavigationItem = previousItem) }
     }
 
     internal companion object {

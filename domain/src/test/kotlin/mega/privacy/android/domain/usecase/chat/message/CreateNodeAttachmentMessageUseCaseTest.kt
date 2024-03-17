@@ -3,6 +3,7 @@ package mega.privacy.android.domain.usecase.chat.message
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.domain.entity.chat.ChatMessage
+import mega.privacy.android.domain.entity.chat.ChatMessageStatus
 import mega.privacy.android.domain.entity.chat.messages.NodeAttachmentMessage
 import mega.privacy.android.domain.entity.chat.messages.invalid.InvalidMessage
 import mega.privacy.android.domain.entity.chat.messages.request.CreateTypedMessageRequest
@@ -63,6 +64,7 @@ class CreateNodeAttachmentMessageUseCaseTest {
         val fileNode = mock<FileNode>()
         val message = mock<ChatMessage> {
             on { nodeList } doReturn listOf(fileNode)
+            on { status } doReturn ChatMessageStatus.UNKNOWN
         }
         val typedNode = mock<ChatImageFile>()
         val request = buildRequest(message)
@@ -71,12 +73,15 @@ class CreateNodeAttachmentMessageUseCaseTest {
                 chatId = 123L,
                 msgId = messageId,
                 time = timestamp,
+                isDeletable = false,
+                isEditable = false,
                 isMine = isMine,
                 userHandle = userHandle,
                 shouldShowAvatar = shouldShowAvatar,
-                shouldShowTime = shouldShowTime,
                 fileNode = typedNode,
                 reactions = emptyList(),
+                status = ChatMessageStatus.UNKNOWN,
+                content = null,
             )
         }
         whenever(addChatFileTypeUseCase(fileNode, request.chatId, request.messageId)).thenReturn(typedNode)
@@ -90,7 +95,6 @@ class CreateNodeAttachmentMessageUseCaseTest {
             chatId = 123L,
             isMine = true,
             shouldShowAvatar = true,
-            shouldShowTime = true,
             reactions = emptyList(),
         )
 }

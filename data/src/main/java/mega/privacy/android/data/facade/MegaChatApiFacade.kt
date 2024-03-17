@@ -780,6 +780,10 @@ internal class MegaChatApiFacade @Inject constructor(
     override fun getReactionUsers(chatId: Long, msgId: Long, reaction: String): MegaHandleList =
         chatApi.getReactionUsers(chatId, msgId, reaction)
 
+    override suspend fun setSFUid(sfuId: Int) {
+        chatApi.setSFUid(sfuId)
+    }
+
     override fun getLastMessageSeenId(chatId: Long): Long = chatApi.getLastMessageSeenId(chatId)
 
     override fun setMessageSeen(chatId: Long, msgId: Long) =
@@ -812,4 +816,21 @@ internal class MegaChatApiFacade @Inject constructor(
         msgId: Long,
         targetChatId: Long,
     ): MegaChatMessage? = chatApi.forwardContact(sourceChatId, msgId, targetChatId)
+
+    override suspend fun deleteMessage(chatId: Long, msgId: Long): MegaChatMessage? =
+        chatApi.deleteMessage(chatId, msgId)
+
+    override suspend fun revokeAttachmentMessage(chatId: Long, msgId: Long): MegaChatMessage? =
+        chatApi.revokeAttachmentMessage(chatId, msgId)
+
+    override suspend fun editMessage(chatId: Long, msgId: Long, msg: String): MegaChatMessage? =
+        chatApi.editMessage(chatId, msgId, msg)
+
+    override suspend fun editGeolocation(
+        chatId: Long,
+        msgId: Long,
+        longitude: Float,
+        latitude: Float,
+        img: String,
+    ): MegaChatMessage? = chatApi.editGeolocation(chatId, msgId, longitude, latitude, img)
 }

@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.data.gateway.AppEventGateway
 import mega.privacy.android.data.gateway.MegaLocalStorageGateway
+import mega.privacy.android.data.gateway.NotificationsGateway
 import mega.privacy.android.data.gateway.api.MegaApiGateway
 import mega.privacy.android.data.gateway.preferences.CallsPreferencesGateway
 import mega.privacy.android.data.mapper.EventMapper
@@ -17,6 +18,8 @@ import mega.privacy.android.data.mapper.UserAlertContactProvider
 import mega.privacy.android.data.mapper.UserAlertMapper
 import mega.privacy.android.data.mapper.UserAlertScheduledMeetingOccurrProvider
 import mega.privacy.android.data.mapper.UserAlertScheduledMeetingProvider
+import mega.privacy.android.data.mapper.meeting.IntegerListMapper
+import mega.privacy.android.data.mapper.notification.PromoNotificationListMapper
 import mega.privacy.android.data.model.GlobalUpdate
 import mega.privacy.android.data.model.chat.NonContactInfo
 import mega.privacy.android.domain.entity.CallsMeetingInvitations
@@ -25,15 +28,20 @@ import mega.privacy.android.domain.entity.ContactAlert
 import mega.privacy.android.domain.entity.ContactChangeContactEstablishedAlert
 import mega.privacy.android.domain.entity.EventType
 import mega.privacy.android.domain.entity.NormalEvent
+import mega.privacy.android.domain.entity.notifications.PromoNotification
 import mega.privacy.android.domain.repository.NotificationsRepository
 import mega.privacy.android.domain.usecase.meeting.FetchNumberOfScheduledMeetingOccurrencesByChat
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeeting
 import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaError
 import nz.mega.sdk.MegaEvent
+import nz.mega.sdk.MegaIntegerList
+import nz.mega.sdk.MegaNotification
+import nz.mega.sdk.MegaNotificationList
 import nz.mega.sdk.MegaPushNotificationSettings
 import nz.mega.sdk.MegaRequest
 import nz.mega.sdk.MegaRequestListenerInterface
+import nz.mega.sdk.MegaStringMap
 import nz.mega.sdk.MegaUserAlert
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -41,6 +49,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
@@ -76,6 +85,9 @@ class DefaultNotificationsRepositoryTest {
     private val getScheduledMeetingUseCase = mock<GetScheduledMeeting>()
     private val callsPreferencesGateway = mock<CallsPreferencesGateway>()
     private val appEventGateway = mock<AppEventGateway>()
+    private val notificationsGateway = mock<NotificationsGateway>()
+    private val promoNotificationListMapper = mock<PromoNotificationListMapper>()
+    private val integerListMapper = mock<IntegerListMapper>()
 
     @BeforeAll
     fun setUp() {
@@ -89,6 +101,9 @@ class DefaultNotificationsRepositoryTest {
             callsPreferencesGateway = callsPreferencesGateway,
             dispatcher = UnconfinedTestDispatcher(),
             appEventGateway = appEventGateway,
+            notificationsGateway = notificationsGateway,
+            promoNotificationListMapper = promoNotificationListMapper,
+            integerListMapper = integerListMapper,
         )
     }
 
@@ -102,6 +117,9 @@ class DefaultNotificationsRepositoryTest {
             getScheduledMeetingUseCase,
             callsPreferencesGateway,
             appEventGateway,
+            notificationsGateway,
+            promoNotificationListMapper,
+            integerListMapper
         )
 
         whenever(callsPreferencesGateway.getCallsMeetingInvitationsPreference())
@@ -286,6 +304,117 @@ class DefaultNotificationsRepositoryTest {
             awaitComplete()
         }
     }
+
+    @Test
+    fun `test that list of enabled notifications will be returned when requested`() = runTest {
+        val expectedList = listOf(1, 2, 3)
+
+        val megaIntegerList = mock<MegaIntegerList> {
+            on { size() } doReturn 3
+            on { get(0) }.thenReturn(1)
+            on { get(1) }.thenReturn(2)
+            on { get(2) }.thenReturn(3)
+
+        }
+        whenever(notificationsGateway.getEnabledNotifications()).thenReturn(megaIntegerList)
+        whenever(integerListMapper.invoke(megaIntegerList))
+            .thenReturn(expectedList)
+        val result = underTest.getEnabledNotifications()
+
+        assertThat(result).isEqualTo(expectedList)
+    }
+
+    @Test
+    fun `test that list of enabled notifications will be empty when there are no enabled notifications`() =
+        runTest {
+            val expectedList = emptyList<Int>()
+
+            val megaIntegerList = mock<MegaIntegerList> {
+                on { size() } doReturn 0
+            }
+            whenever(notificationsGateway.getEnabledNotifications()).thenReturn(megaIntegerList)
+            whenever(integerListMapper.invoke(megaIntegerList))
+                .thenReturn(expectedList)
+            val result = underTest.getEnabledNotifications()
+
+            assertThat(result).isEqualTo(expectedList)
+        }
+
+    @Test
+    fun `test that list of promo notifications is fetched`() = runTest {
+        val promoNotification = PromoNotification(
+            promoID = 1L,
+            title = "title",
+            description = "description",
+            imageName = "imageName",
+            imageURL = "imageURL",
+            startTimeStamp = 1L,
+            endTimeStamp = 2L,
+            actionName = "actionName",
+            actionURL = "actionURL"
+        )
+        val callToAction1Mock = mock<MegaStringMap> {
+            on { get("text") } doReturn promoNotification.actionName
+            on { get("link") } doReturn promoNotification.actionURL
+        }
+        val callToAction2Mock = mock<MegaStringMap> {
+            on { get("text") } doReturn "actionName1"
+            on { get("link") } doReturn "actionURL1"
+        }
+        val megaNotification = mock<MegaNotification> {
+            on { id } doReturn 1L
+            on { title } doReturn promoNotification.title
+            on { description } doReturn promoNotification.description
+            on { imageName } doReturn promoNotification.imageName
+            on { imagePath } doReturn promoNotification.imageURL
+            on { start } doReturn 1L
+            on { end } doReturn 2L
+            on { callToAction1 }.thenReturn(callToAction1Mock)
+            on { callToAction2 }.thenReturn(callToAction2Mock)
+        }
+        val megaNotificationList = mock<MegaNotificationList> {
+            on { size() } doReturn 1
+            on { get(0) }.thenReturn(megaNotification)
+        }
+        val megaApiJava = mock<MegaApiJava>()
+        val request =
+            mock<MegaRequest> { on { megaNotifications }.thenReturn(megaNotificationList) }
+        val mock = mock<MegaError> { on { errorCode }.thenReturn(MegaError.API_OK) }
+
+        whenever(notificationsGateway.getNotifications(any())).thenAnswer {
+            (it.arguments[0] as MegaRequestListenerInterface).onRequestFinish(
+                megaApiJava,
+                request,
+                mock
+            )
+        }
+        whenever(promoNotificationListMapper.invoke(megaNotificationList))
+            .thenReturn(listOf(promoNotification))
+        val result = underTest.getPromoNotifications()
+        assertThat(result).isEqualTo(listOf(promoNotification))
+    }
+
+    @Test
+    fun `test that the empty list is returned if getNotifications throws API_ENOENT error`() =
+        runTest {
+            val megaNotificationList = mock<MegaNotificationList> {
+                on { size() } doReturn 0
+            }
+            val megaApiJava = mock<MegaApiJava>()
+            val request =
+                mock<MegaRequest> { on { megaNotifications }.thenReturn(megaNotificationList) }
+            val mock = mock<MegaError> { on { errorCode }.thenReturn(MegaError.API_ENOENT) }
+
+            whenever(notificationsGateway.getNotifications(any())).thenAnswer {
+                (it.arguments[0] as MegaRequestListenerInterface).onRequestFinish(
+                    megaApiJava,
+                    request,
+                    mock
+                )
+            }
+            val result = underTest.getPromoNotifications()
+            assertThat(result).isEmpty()
+        }
 
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     @Nested

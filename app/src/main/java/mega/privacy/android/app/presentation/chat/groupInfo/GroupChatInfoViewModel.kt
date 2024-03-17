@@ -4,13 +4,11 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.viewModelScope
 import com.jeremyliao.liveeventbus.LiveEventBus
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
-import io.reactivex.rxjava3.kotlin.addTo
-import io.reactivex.rxjava3.kotlin.subscribeBy
-import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -19,10 +17,8 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.BaseRxViewModel
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.constants.EventConstants
-import mega.privacy.android.app.contacts.usecase.GetChatRoomUseCase
 import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.chat.groupInfo.model.GroupInfoState
-import mega.privacy.android.app.usecase.call.EndCallUseCase
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.CallUtil.openMeetingWithAudioOrVideo
@@ -32,6 +28,9 @@ import mega.privacy.android.domain.entity.statistics.EndCallForAll
 import mega.privacy.android.domain.usecase.SetOpenInvite
 import mega.privacy.android.domain.usecase.chat.BroadcastChatArchivedUseCase
 import mega.privacy.android.domain.usecase.chat.BroadcastLeaveChatUseCase
+import mega.privacy.android.domain.usecase.chat.EndCallUseCase
+import mega.privacy.android.domain.usecase.chat.Get1On1ChatIdUseCase
+import mega.privacy.android.domain.usecase.meeting.MonitorSFUServerUpgradeUseCase
 import mega.privacy.android.domain.usecase.meeting.SendStatisticsMeetingsUseCase
 import mega.privacy.android.domain.usecase.meeting.StartChatCall
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
@@ -45,7 +44,6 @@ import javax.inject.Inject
  *
  * @property setOpenInvite                                  [SetOpenInvite]
  * @property startChatCall                                  [StartChatCall]
- * @property getChatRoomUseCase                             [GetChatRoomUseCase]
  * @property passcodeManagement                             [PasscodeManagement]
  * @property chatApiGateway                                 [MegaChatApiGateway]
  * @property setChatVideoInDeviceUseCase                    [SetChatVideoInDeviceUseCase]
@@ -55,6 +53,7 @@ import javax.inject.Inject
  * @property monitorUpdatePushNotificationSettingsUseCase   [MonitorUpdatePushNotificationSettingsUseCase]
  * @property broadcastChatArchivedUseCase                   [BroadcastChatArchivedUseCase]
  * @property broadcastLeaveChatUseCase                      [BroadcastLeaveChatUseCase]
+ * @property get1On1ChatIdUseCase                           [Get1On1ChatIdUseCase]
  * @property state                                          Current view state as [GroupInfoState]
  */
 @HiltViewModel
@@ -62,7 +61,6 @@ class GroupChatInfoViewModel @Inject constructor(
     private val setOpenInvite: SetOpenInvite,
     monitorConnectivityUseCase: MonitorConnectivityUseCase,
     private val startChatCall: StartChatCall,
-    private val getChatRoomUseCase: GetChatRoomUseCase,
     private val passcodeManagement: PasscodeManagement,
     private val chatApiGateway: MegaChatApiGateway,
     private val setChatVideoInDeviceUseCase: SetChatVideoInDeviceUseCase,
@@ -72,12 +70,16 @@ class GroupChatInfoViewModel @Inject constructor(
     private val monitorUpdatePushNotificationSettingsUseCase: MonitorUpdatePushNotificationSettingsUseCase,
     private val broadcastChatArchivedUseCase: BroadcastChatArchivedUseCase,
     private val broadcastLeaveChatUseCase: BroadcastLeaveChatUseCase,
+    private val monitorSFUServerUpgradeUseCase: MonitorSFUServerUpgradeUseCase,
+    private val get1On1ChatIdUseCase: Get1On1ChatIdUseCase,
 ) : BaseRxViewModel() {
 
     /**
      * private UI state
      */
     private val _state = MutableStateFlow(GroupInfoState())
+
+    private var monitorSFUServerUpgradeJob: Job? = null
 
     /**
      * UI State GroupChatInfo
@@ -103,6 +105,7 @@ class GroupChatInfoViewModel @Inject constructor(
                 _state.update { it.copy(isPushNotificationSettingsUpdatedEvent = true) }
             }
         }
+        monitorSFUServerUpgrade()
     }
 
     override fun onCleared() {
@@ -155,17 +158,14 @@ class GroupChatInfoViewModel @Inject constructor(
      * @param video Start call with video on or off
      * @param audio Start call with audio on or off
      */
-    fun onCallTap(userHandle: Long, video: Boolean, audio: Boolean) {
-        getChatRoomUseCase.get(userHandle)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy(
-                onSuccess = { chatId ->
-                    startCall(chatId, video, audio)
-                },
-                onError = Timber::e
-            )
-            .addTo(composite)
+    fun onCallTap(userHandle: Long, video: Boolean, audio: Boolean) = viewModelScope.launch {
+        runCatching {
+            get1On1ChatIdUseCase(userHandle)
+        }.onSuccess { chatId ->
+            startCall(chatId, video, audio)
+        }.onFailure {
+            Timber.e(it)
+        }
     }
 
     /**
@@ -197,27 +197,25 @@ class GroupChatInfoViewModel @Inject constructor(
                 Timber.e(exception)
             }.onSuccess { resultStartCall ->
                 val resultChatId = resultStartCall.chatHandle
-                if (resultChatId != null) {
-                    val videoEnable = resultStartCall.flag
-                    val paramType = resultStartCall.paramType
-                    val audioEnable: Boolean = paramType == ChatRequestParamType.Video
+                val videoEnable = resultStartCall.flag
+                val paramType = resultStartCall.paramType
+                val audioEnable: Boolean = paramType == ChatRequestParamType.Video
 
-                    CallUtil.addChecksForACall(resultChatId, videoEnable)
+                CallUtil.addChecksForACall(resultChatId, videoEnable)
 
-                    chatApiGateway.getChatCall(resultChatId)?.let { call ->
-                        if (call.isOutgoing) {
-                            chatManagement.setRequestSentCall(call.callId, true)
-                        }
+                chatApiGateway.getChatCall(resultChatId)?.let { call ->
+                    if (call.isOutgoing) {
+                        chatManagement.setRequestSentCall(call.callId, true)
                     }
-
-                    openMeetingWithAudioOrVideo(
-                        MegaApplication.getInstance().applicationContext,
-                        resultChatId,
-                        audioEnable,
-                        videoEnable,
-                        passcodeManagement
-                    )
                 }
+
+                openMeetingWithAudioOrVideo(
+                    MegaApplication.getInstance().applicationContext,
+                    resultChatId,
+                    audioEnable,
+                    videoEnable,
+                    passcodeManagement
+                )
             }
         }
     }
@@ -225,19 +223,12 @@ class GroupChatInfoViewModel @Inject constructor(
     /**
      * End for all the current call
      */
-    fun endCallForAll() {
-        endCallUseCase.endCallForAllWithChatId(_state.value.chatId)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy(onError = { error ->
-                Timber.e(error.stackTraceToString())
-            })
-            .addTo(composite)
-
-        viewModelScope.launch {
-            kotlin.runCatching {
-                sendStatisticsMeetingsUseCase(EndCallForAll())
-            }
+    fun endCallForAll() = viewModelScope.launch {
+        runCatching {
+            endCallUseCase(_state.value.chatId)
+            sendStatisticsMeetingsUseCase(EndCallForAll())
+        }.onFailure {
+            Timber.e(it.stackTraceToString())
         }
     }
 
@@ -266,5 +257,34 @@ class GroupChatInfoViewModel @Inject constructor(
      */
     fun launchBroadcastLeaveChat(chatId: Long) = viewModelScope.launch {
         broadcastLeaveChatUseCase(chatId)
+    }
+
+    /**
+     * monitor SFU Server Upgrade
+     */
+    private fun monitorSFUServerUpgrade() {
+        monitorSFUServerUpgradeJob?.cancel()
+        monitorSFUServerUpgradeJob = viewModelScope.launch {
+            monitorSFUServerUpgradeUseCase()
+                .catch {
+                    Timber.e(it)
+                }
+                .collect { shouldUpgrade ->
+                    if (shouldUpgrade) {
+                        showForceUpdateDialog()
+                    }
+                }
+        }
+    }
+
+    private fun showForceUpdateDialog() {
+        _state.update { it.copy(showForceUpdateDialog = true) }
+    }
+
+    /**
+     * Set to false to hide the dialog
+     */
+    fun onForceUpdateDialogDismissed() {
+        _state.update { it.copy(showForceUpdateDialog = false) }
     }
 }

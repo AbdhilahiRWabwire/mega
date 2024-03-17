@@ -1,6 +1,5 @@
 package mega.privacy.android.app.presentation.meeting.chat.model.messages
 
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import mega.privacy.android.app.R
@@ -25,15 +24,15 @@ sealed class InvalidUiMessage : AvatarMessage() {
     abstract fun getErrorMessage(): String
 
     @Composable
-    override fun RowScope.ContentComposable(onLongClick: (TypedMessage) -> Unit) {
+    override fun ContentComposable(
+        onLongClick: (TypedMessage) -> Unit,
+        interactionEnabled: Boolean
+    ) {
         ChatErrorBubble(errorText = getErrorMessage())
     }
 
     override val showAvatar: Boolean
         get() = message.shouldShowAvatar
-
-    override val showTime: Boolean
-        get() = message.shouldShowTime
 
     override val displayAsMine: Boolean
         get() = message.isMine

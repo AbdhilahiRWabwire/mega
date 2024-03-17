@@ -50,8 +50,11 @@ class HandleOptionClickMapper @Inject constructor(
             R.id.cab_menu_trash -> OptionItems.MOVE_TO_RUBBISH_CLICKED
             R.id.cab_menu_select_all -> OptionItems.SELECT_ALL_CLICKED
             R.id.cab_menu_clear_selection -> OptionItems.CLEAR_ALL_CLICKED
+            R.id.cab_menu_hide -> OptionItems.HIDE_CLICKED
+            R.id.cab_menu_unhide -> OptionItems.UNHIDE_CLICKED
             R.id.cab_menu_remove_share -> OptionItems.REMOVE_SHARE_CLICKED
             R.id.cab_menu_dispute -> OptionItems.DISPUTE_CLICKED
+            R.id.cab_menu_leave_share -> OptionItems.LEAVE_SHARE_CLICKED
             else -> OptionItems.CLEAR_ALL_CLICKED
         }
         return OptionsItemInfo(

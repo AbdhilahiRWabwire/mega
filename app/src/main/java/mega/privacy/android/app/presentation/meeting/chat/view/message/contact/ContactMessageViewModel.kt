@@ -5,9 +5,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import mega.privacy.android.domain.entity.contacts.ContactItem
-import mega.privacy.android.domain.entity.user.UserId
-import mega.privacy.android.domain.entity.user.UserVisibility
 import mega.privacy.android.domain.usecase.contact.GetContactFromEmailUseCase
+import mega.privacy.android.domain.usecase.contact.GetMyUserHandleUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserUseCase
 import mega.privacy.android.domain.usecase.contact.InviteContactUseCase
 import mega.privacy.android.domain.usecase.contact.IsContactRequestSentUseCase
@@ -24,6 +23,7 @@ class ContactMessageViewModel @Inject constructor(
     private val getUserUseCase: GetUserUseCase,
     private val isContactRequestSentUseCase: IsContactRequestSentUseCase,
     private val inviteContactUseCase: InviteContactUseCase,
+    private val getMyUserHandleUseCase: GetMyUserHandleUseCase,
 ) : ViewModel() {
     /**
      * Load contact info
@@ -47,17 +47,23 @@ class ContactMessageViewModel @Inject constructor(
     fun checkUser(
         userHandle: Long,
         email: String,
-        onContactClicked: (String) -> Unit,
+        isContact: Boolean,
+        onContactClicked: () -> Unit,
         onNonContactClicked: () -> Unit,
         onNonContactAlreadyInvitedClicked: () -> Unit,
     ) {
         viewModelScope.launch {
-            runCatching {
-                getUserUseCase(UserId(userHandle))
-            }.onSuccess { it ->
-                it?.takeIf { it.visibility == UserVisibility.Visible }?.let { user ->
-                    onContactClicked(user.email)
-                } ?: run {
+            val myUserHandle = getMyUserHandleUseCase()
+            when {
+                userHandle == myUserHandle -> {
+                    return@launch
+                }
+
+                isContact -> {
+                    onContactClicked()
+                }
+
+                else -> {
                     runCatching { isContactRequestSentUseCase(email) }
                         .onSuccess { isSent ->
                             if (isSent) {
@@ -68,8 +74,6 @@ class ContactMessageViewModel @Inject constructor(
                         }
                         .onFailure { Timber.e(it) }
                 }
-            }.onFailure {
-                Timber.d(it)
             }
         }
     }

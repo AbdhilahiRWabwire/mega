@@ -12,6 +12,8 @@ import mega.privacy.android.domain.entity.SortOrder
  * @property searchMode the search mode state
  * @property scrollToTop the scroll to top state
  * @property selectedVideoHandles the selected video handles
+ * @property locationSelectedFilterOption the location selected filter option
+ * @property durationSelectedFilterOption the duration selected filter option
  * @property isInSelection if list is in selection mode or not
  * @property videoPlaylists the video playlists
  * @property currentVideoPlaylist the current video playlist
@@ -19,10 +21,16 @@ import mega.privacy.android.domain.entity.SortOrder
  * @property numberOfAddedVideos the number of added videos
  * @property isPlaylistProgressBarShown true if the playlist progress bar is being shown
  * @property isInputTitleValid true if the input title is valid
- * @property shouldCreateVideoPlaylistDialog true if there is a need to create a video playlist
+ * @property shouldCreateVideoPlaylist true if there is a need to create a video playlist
+ * @property shouldRenameVideoPlaylist true if there is a need to rename a video playlist
+ * @property shouldDeleteVideoPlaylist true if there is a need to delete video playlists
+ * @property shouldDeleteSingleVideoPlaylist true if there is a need to delete a single video playlist from detail
+ * @property shouldShowMoreVideoPlaylistOptions true if there is a need to show more options of a video playlist
  * @property createVideoPlaylistPlaceholderTitle the create video playlist placeholder title
  * @property createDialogErrorMessage the create dialog error message
  * @property deletedVideoPlaylistTitles the deleted video playlist titles
+ * @property areVideoPlaylistsRemovedSuccessfully true if the video playlists are removed successfully
+ * @property currentDestinationRoute the current destination route
  */
 data class VideoSectionState(
     val allVideos: List<VideoUIEntity> = emptyList(),
@@ -32,6 +40,8 @@ data class VideoSectionState(
     val searchMode: Boolean = false,
     val scrollToTop: Boolean = false,
     val selectedVideoHandles: List<Long> = emptyList(),
+    val locationSelectedFilterOption: LocationFilterOption? = null,
+    val durationSelectedFilterOption: DurationFilterOption? = null,
     val isInSelection: Boolean = false,
     val videoPlaylists: List<VideoPlaylistUIEntity> = emptyList(),
     val currentVideoPlaylist: VideoPlaylistUIEntity? = null,
@@ -39,8 +49,14 @@ data class VideoSectionState(
     val numberOfAddedVideos: Int = 0,
     val isPlaylistProgressBarShown: Boolean = true,
     val isInputTitleValid: Boolean = true,
-    val shouldCreateVideoPlaylistDialog: Boolean = false,
+    val shouldCreateVideoPlaylist: Boolean = false,
+    val shouldShowMoreVideoPlaylistOptions: Boolean = false,
+    val shouldDeleteSingleVideoPlaylist: Boolean = false,
     val createVideoPlaylistPlaceholderTitle: String = "",
     val createDialogErrorMessage: Int? = null,
-    val deletedVideoPlaylistTitles: List<String> = emptyList()
+    val shouldRenameVideoPlaylist: Boolean = false,
+    val shouldDeleteVideoPlaylist: Boolean = false,
+    val deletedVideoPlaylistTitles: List<String> = emptyList(),
+    val areVideoPlaylistsRemovedSuccessfully: Boolean = false,
+    val currentDestinationRoute: String? = null
 )

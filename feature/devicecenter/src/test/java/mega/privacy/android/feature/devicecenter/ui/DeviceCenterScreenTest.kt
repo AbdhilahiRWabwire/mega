@@ -15,6 +15,7 @@ import mega.privacy.android.feature.devicecenter.ui.model.icon.DeviceIconType
 import mega.privacy.android.feature.devicecenter.ui.model.icon.FolderIconType
 import mega.privacy.android.feature.devicecenter.ui.model.status.DeviceCenterUINodeStatus
 import mega.privacy.android.feature.devicecenter.ui.renamedevice.RENAME_DEVICE_DIALOG_TAG
+import mega.privacy.android.legacy.core.ui.model.SearchWidgetState
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,6 +58,9 @@ internal class DeviceCenterScreenTest {
                 onRenameDeviceSuccessful = {},
                 onRenameDeviceSuccessfulSnackbarShown = {},
                 onBackPressHandled = {},
+                onSearchQueryChanged = {},
+                onSearchCloseClicked = {},
+                onSearchClicked = {},
                 onFeatureExited = {},
             )
         }
@@ -82,6 +86,9 @@ internal class DeviceCenterScreenTest {
                 onRenameDeviceSuccessful = {},
                 onRenameDeviceSuccessfulSnackbarShown = {},
                 onBackPressHandled = {},
+                onSearchQueryChanged = {},
+                onSearchCloseClicked = {},
+                onSearchClicked = {},
                 onFeatureExited = {},
             )
         }
@@ -121,10 +128,13 @@ internal class DeviceCenterScreenTest {
                 onRenameDeviceSuccessful = {},
                 onRenameDeviceSuccessfulSnackbarShown = {},
                 onBackPressHandled = {},
+                onSearchQueryChanged = {},
+                onSearchCloseClicked = {},
+                onSearchClicked = {},
                 onFeatureExited = {},
             )
         }
-        composeTestRule.onNodeWithTag(BOTTOM_SHEET_CONTAINER).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(BOTTOM_SHEET_CONTAINER).assertExists()
     }
 
     @Test
@@ -157,6 +167,9 @@ internal class DeviceCenterScreenTest {
                 onRenameDeviceSuccessful = {},
                 onRenameDeviceSuccessfulSnackbarShown = {},
                 onBackPressHandled = {},
+                onSearchQueryChanged = {},
+                onSearchCloseClicked = {},
+                onSearchClicked = {},
                 onFeatureExited = {},
             )
         }
@@ -194,6 +207,9 @@ internal class DeviceCenterScreenTest {
                 onRenameDeviceSuccessful = {},
                 onRenameDeviceSuccessfulSnackbarShown = {},
                 onBackPressHandled = {},
+                onSearchQueryChanged = {},
+                onSearchCloseClicked = {},
+                onSearchClicked = {},
                 onFeatureExited = {},
             )
         }
@@ -238,6 +254,9 @@ internal class DeviceCenterScreenTest {
                 onRenameDeviceSuccessful = {},
                 onRenameDeviceSuccessfulSnackbarShown = {},
                 onBackPressHandled = {},
+                onSearchQueryChanged = {},
+                onSearchCloseClicked = {},
+                onSearchClicked = {},
                 onFeatureExited = {},
             )
         }
@@ -283,6 +302,9 @@ internal class DeviceCenterScreenTest {
                 onRenameDeviceSuccessful = {},
                 onRenameDeviceSuccessfulSnackbarShown = {},
                 onBackPressHandled = {},
+                onSearchQueryChanged = {},
+                onSearchCloseClicked = {},
+                onSearchClicked = {},
                 onFeatureExited = {},
             )
         }
@@ -308,6 +330,9 @@ internal class DeviceCenterScreenTest {
                 onRenameDeviceSuccessful = {},
                 onRenameDeviceSuccessfulSnackbarShown = {},
                 onBackPressHandled = {},
+                onSearchQueryChanged = {},
+                onSearchCloseClicked = {},
+                onSearchClicked = {},
                 onFeatureExited = {},
             )
         }
@@ -332,9 +357,86 @@ internal class DeviceCenterScreenTest {
                 onRenameDeviceSuccessful = {},
                 onRenameDeviceSuccessfulSnackbarShown = {},
                 onBackPressHandled = {},
+                onSearchQueryChanged = {},
+                onSearchCloseClicked = {},
+                onSearchClicked = {},
                 onFeatureExited = {},
             )
         }
         composeTestRule.onNodeWithTag(DEVICE_CENTER_NO_NETWORK_STATE).assertIsDisplayed()
+    }
+
+    @Test
+    fun `test that the nothing setup state is shown`() {
+        val ownDeviceUINode = OwnDeviceUINode(
+            id = "1234-5678",
+            name = "Own Device",
+            icon = DeviceIconType.Android,
+            status = DeviceCenterUINodeStatus.CameraUploadsDisabled,
+            folders = emptyList(),
+        )
+        val uiState = DeviceCenterState(
+            devices = listOf(ownDeviceUINode),
+            isCameraUploadsEnabled = false,
+            isInitialLoadingFinished = true,
+            selectedDevice = ownDeviceUINode,
+            isNetworkConnected = true,
+        )
+        composeTestRule.setContent {
+            DeviceCenterScreen(
+                uiState = uiState,
+                snackbarHostState = SnackbarHostState(),
+                onDeviceClicked = {},
+                onDeviceMenuClicked = {},
+                onBackupFolderClicked = {},
+                onBackupFolderMenuClicked = {},
+                onNonBackupFolderClicked = {},
+                onNonBackupFolderMenuClicked = {},
+                onCameraUploadsClicked = {},
+                onRenameDeviceOptionClicked = {},
+                onRenameDeviceCancelled = {},
+                onRenameDeviceSuccessful = {},
+                onRenameDeviceSuccessfulSnackbarShown = {},
+                onBackPressHandled = {},
+                onFeatureExited = {},
+                onSearchQueryChanged = {},
+                onSearchCloseClicked = {},
+                onSearchClicked = {},
+            )
+        }
+        composeTestRule.onNodeWithTag(DEVICE_CENTER_NOTHING_SETUP_STATE).assertIsDisplayed()
+    }
+
+
+    @Test
+    fun `test that no results found state is shown`() {
+        composeTestRule.setContent {
+            DeviceCenterScreen(
+                uiState = DeviceCenterState(
+                    isInitialLoadingFinished = true,
+                    searchQuery = "testing",
+                    filteredUiItems = emptyList(),
+                    searchWidgetState = SearchWidgetState.EXPANDED,
+                    isNetworkConnected = true
+                ),
+                snackbarHostState = SnackbarHostState(),
+                onDeviceClicked = {},
+                onDeviceMenuClicked = {},
+                onBackupFolderClicked = {},
+                onBackupFolderMenuClicked = {},
+                onNonBackupFolderClicked = {},
+                onNonBackupFolderMenuClicked = {},
+                onCameraUploadsClicked = {},
+                onRenameDeviceOptionClicked = {},
+                onRenameDeviceCancelled = {},
+                onRenameDeviceSuccessful = {},
+                onRenameDeviceSuccessfulSnackbarShown = {},
+                onBackPressHandled = {},
+                onFeatureExited = {},
+                onSearchQueryChanged = {},
+                onSearchCloseClicked = {},
+                onSearchClicked = {},
+            )
+        }
     }
 }

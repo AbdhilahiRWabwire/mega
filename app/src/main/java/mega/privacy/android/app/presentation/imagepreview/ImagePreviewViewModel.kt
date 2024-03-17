@@ -148,6 +148,9 @@ class ImagePreviewViewModel @Inject constructor(
                 val (currentImageNodeIndex, currentImageNode) = findCurrentImageNode(imageNodes)
                 val isCurrentImageNodeAvailableOffline =
                     currentImageNode?.isAvailableOffline ?: false
+
+                Timber.d("ImagePreview VM imageNodes: ${imageNodes.size}")
+
                 _state.update {
                     it.copy(
                         isInitialized = true,
@@ -392,11 +395,11 @@ class ImagePreviewViewModel @Inject constructor(
             // chat nodes are not using this screen for now
             when {
                 isFromFolderLink -> getPublicChildNodeFromIdUseCase(node.id)
-                imagePreviewMenuSource == ImagePreviewMenuSource.PUBLIC_FILE -> {
-                    node.serializedData?.let {
-                        getPublicNodeFromSerializedDataUseCase(it)
-                    }
-                }
+
+                imagePreviewMenuSource in listOf(
+                    ImagePreviewMenuSource.ALBUM_SHARING,
+                    ImagePreviewMenuSource.PUBLIC_FILE,
+                ) -> node.serializedData?.let { getPublicNodeFromSerializedDataUseCase(it) }
 
                 else -> addImageTypeUseCase(node)
             }

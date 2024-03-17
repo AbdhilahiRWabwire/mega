@@ -64,7 +64,7 @@ class AttachNodeWithPendingMessageUseCaseTest {
 
         underTest(pendingMsgId, NodeId(1L))
         verify(chatMessageRepository)
-            .savePendingMessage(
+            .updatePendingMessage(
                 eq(pendingMessage.createRequest(PendingMessageState.ATTACHING))
             )
     }
@@ -80,7 +80,7 @@ class AttachNodeWithPendingMessageUseCaseTest {
 
             underTest(pendingMsgId, NodeId(1L))
             verify(chatMessageRepository)
-                .savePendingMessage(
+                .updatePendingMessage(
                     eq(pendingMessage.createRequest(PendingMessageState.ERROR_ATTACHING))
                 )
         }
@@ -126,6 +126,31 @@ class AttachNodeWithPendingMessageUseCaseTest {
                     File(filePath),
                 )
             inOrder.verify(chatMessageRepository).attachNode(any(), any())
+        }
+
+    @Test
+    fun `test that original path is cached`() = runTest {
+        val pendingMessage = createPendingMessageMock()
+        val nodeId = NodeId(1L)
+        whenever(chatMessageRepository.getPendingMessage(pendingMsgId)).thenReturn(pendingMessage)
+
+        underTest(pendingMsgId, nodeId)
+        verify(chatMessageRepository)
+            .cacheOriginalPathForNode(nodeId, filePath)
+    }
+
+    @Test
+    fun `test that the node is attached as a voice clip when pending message type is voice clip`() =
+        runTest {
+            val pendingMessage = createPendingMessageMock()
+            whenever(pendingMessage.isVoiceClip) doReturn true
+            whenever(chatMessageRepository.getPendingMessage(pendingMsgId)).thenReturn(
+                pendingMessage
+            )
+            whenever(chatMessageRepository.attachVoiceMessage(chatId, nodeHandle)).thenReturn(null)
+
+            underTest(pendingMsgId, NodeId(nodeHandle))
+            verify(chatMessageRepository).attachVoiceMessage(chatId, nodeHandle)
         }
 
     private fun createPendingMessageMock() = mock<PendingMessage> {

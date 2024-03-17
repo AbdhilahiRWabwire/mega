@@ -3,7 +3,6 @@ package mega.privacy.android.app.presentation.meeting.chat.model.messages
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 
@@ -21,32 +20,19 @@ interface UiChatMessage {
     /**
      * Message list item
      *
-     * @param uiState
-     * @param timeFormatter
-     * @param dateFormatter
+     * @param state
      */
     @Composable
     fun MessageListItem(
-        uiState: ChatUiState,
-        lastUpdatedCache: Long,
-        timeFormatter: (Long) -> String,
-        dateFormatter: (Long) -> String,
+        state: UIMessageState,
         onLongClick: (TypedMessage) -> Unit,
         onMoreReactionsClicked: (Long) -> Unit,
         onReactionClicked: (Long, String, List<UIReaction>) -> Unit,
         onReactionLongClick: (String, List<UIReaction>) -> Unit,
         onForwardClicked: (TypedMessage) -> Unit,
+        onSelectedChanged: (Boolean) -> Unit,
+        onSendErrorClicked: (TypedMessage) -> Unit,
     )
-
-    /**
-     * Get time or null
-     *
-     * @param timeFormatter
-     */
-    fun getTimeOrNull(timeFormatter: (Long) -> String) =
-        if (showTime) timeSent?.let {
-            timeFormatter(it)
-        } else null
 
     /**
      * Modifier
@@ -75,11 +61,6 @@ interface UiChatMessage {
     val userHandle: Long
 
     /**
-     * Show time
-     */
-    val showTime: Boolean
-
-    /**
      * Reactions
      */
     val reactions: List<UIReaction>
@@ -88,9 +69,14 @@ interface UiChatMessage {
      * Is selectable
      */
     val isSelectable: Boolean
-    
+
+    /**
+     * Message
+     */
+    val message: TypedMessage?
+
     /**
      * Key
      */
-    fun key(): String = "${id}_${showTime}"
+    fun key(): String = "$id"
 }

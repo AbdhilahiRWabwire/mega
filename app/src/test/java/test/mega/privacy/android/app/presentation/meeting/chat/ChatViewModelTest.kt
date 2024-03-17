@@ -8,9 +8,11 @@ import de.palm.composestateevents.StateEventWithContentConsumed
 import de.palm.composestateevents.StateEventWithContentTriggered
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -23,7 +25,9 @@ import mega.privacy.android.app.objects.GifData
 import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.meeting.chat.mapper.ForwardMessagesResultMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteParticipantResultMapper
+import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteUserAsContactResultOptionMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.ParticipantNameMapper
+import mega.privacy.android.app.presentation.meeting.chat.model.ActionToManage
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
 import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_ACTION
@@ -31,8 +35,12 @@ import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_LINK
 import mega.privacy.android.app.presentation.meeting.chat.model.ForwardMessagesToChatsResult
 import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
 import mega.privacy.android.app.presentation.meeting.chat.model.InviteContactToChatResult
+import mega.privacy.android.app.presentation.meeting.chat.model.InviteUserAsContactResultOption
+import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
+import mega.privacy.android.app.utils.CacheFolderManager
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
+import mega.privacy.android.core.ui.controls.chat.VoiceClipRecordEvent
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReactionUser
 import mega.privacy.android.domain.entity.ChatRequest
@@ -49,15 +57,17 @@ import mega.privacy.android.domain.entity.chat.ChatPushNotificationMuteOption
 import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.ChatRoomChange
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
+import mega.privacy.android.domain.entity.chat.messages.ContactAttachmentMessage
 import mega.privacy.android.domain.entity.chat.messages.ForwardResult
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
+import mega.privacy.android.domain.entity.chat.messages.normal.NormalMessage
+import mega.privacy.android.domain.entity.contacts.InviteContactRequest
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
-import mega.privacy.android.domain.entity.user.UserChanges
+import mega.privacy.android.domain.entity.node.chat.ChatDefaultFile
 import mega.privacy.android.domain.entity.user.UserId
-import mega.privacy.android.domain.entity.user.UserUpdate
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.chat.CreateChatException
 import mega.privacy.android.domain.exception.chat.ParticipantAlreadyExistsException
@@ -66,8 +76,8 @@ import mega.privacy.android.domain.usecase.AddNodeType
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
-import mega.privacy.android.domain.usecase.MonitorContactCacheUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
+import mega.privacy.android.domain.usecase.cache.GetCacheFileUseCase
 import mega.privacy.android.domain.usecase.chat.ArchiveChatUseCase
 import mega.privacy.android.domain.usecase.chat.ClearChatHistoryUseCase
 import mega.privacy.android.domain.usecase.chat.CloseChatPreviewUseCase
@@ -90,15 +100,20 @@ import mega.privacy.android.domain.usecase.chat.MonitorParticipatingInACallInOth
 import mega.privacy.android.domain.usecase.chat.MonitorUserChatStatusByHandleUseCase
 import mega.privacy.android.domain.usecase.chat.MuteChatNotificationForChatRoomsUseCase
 import mega.privacy.android.domain.usecase.chat.OpenChatLinkUseCase
+import mega.privacy.android.domain.usecase.chat.RecordAudioUseCase
 import mega.privacy.android.domain.usecase.chat.UnmuteChatNotificationUseCase
 import mega.privacy.android.domain.usecase.chat.link.JoinPublicChatUseCase
 import mega.privacy.android.domain.usecase.chat.link.MonitorJoiningChatUseCase
 import mega.privacy.android.domain.usecase.chat.message.AttachContactsUseCase
 import mega.privacy.android.domain.usecase.chat.message.AttachNodeUseCase
+import mega.privacy.android.domain.usecase.chat.message.GetChatFromContactMessagesUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendChatAttachmentsUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendGiphyMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendLocationMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendTextMessageUseCase
+import mega.privacy.android.domain.usecase.chat.message.delete.DeleteMessagesUseCase
+import mega.privacy.android.domain.usecase.chat.message.edit.EditLocationMessageUseCase
+import mega.privacy.android.domain.usecase.chat.message.edit.EditMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.forward.ForwardMessagesUseCase
 import mega.privacy.android.domain.usecase.chat.message.reactions.AddReactionUseCase
 import mega.privacy.android.domain.usecase.chat.message.reactions.DeleteReactionUseCase
@@ -107,11 +122,13 @@ import mega.privacy.android.domain.usecase.contact.GetParticipantFirstNameUseCas
 import mega.privacy.android.domain.usecase.contact.GetParticipantFullNameUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserOnlineStatusByHandleUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserUseCase
+import mega.privacy.android.domain.usecase.contact.InviteContactUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorAllContactParticipantsInChatUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorHasAnyContactUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorUserLastGreenUpdatesUseCase
 import mega.privacy.android.domain.usecase.contact.RequestUserLastGreenUseCase
 import mega.privacy.android.domain.usecase.file.CreateNewImageUriUseCase
+import mega.privacy.android.domain.usecase.file.DeleteFileUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
@@ -124,7 +141,9 @@ import mega.privacy.android.domain.usecase.meeting.StartMeetingInWaitingRoomChat
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorUpdatePushNotificationSettingsUseCase
 import nz.mega.sdk.MegaChatError
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.extension.ExtensionContext
@@ -139,6 +158,7 @@ import org.junit.jupiter.params.provider.NullSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.verify
@@ -146,6 +166,7 @@ import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.verifyNoMoreInteractions
 import org.mockito.kotlin.whenever
 import org.mockito.kotlin.wheneverBlocking
+import java.io.File
 import java.util.stream.Stream
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -243,9 +264,6 @@ internal class ChatViewModelTest {
     private val openChatLinkUseCase = mock<OpenChatLinkUseCase>()
     private val holdChatCallUseCase = mock<HoldChatCallUseCase>()
     private val hangChatCallUseCase = mock<HangChatCallUseCase>()
-    private val monitorContactCacheUpdates: MonitorContactCacheUpdates = mock {
-        onBlocking { invoke() } doReturn emptyFlow()
-    }
     private val joinPublicChatUseCase = mock<JoinPublicChatUseCase>()
     private val isAnonymousModeUseCase = mock<IsAnonymousModeUseCase>()
     private val closeChatPreviewUseCase: CloseChatPreviewUseCase = mock()
@@ -271,6 +289,16 @@ internal class ChatViewModelTest {
     private val attachNodeUseCase = mock<AttachNodeUseCase>()
     private val getNodeByIdUseCase = mock<GetNodeByIdUseCase>()
     private val addNodeType = mock<AddNodeType>()
+    private val deleteMessagesUseCase = mock<DeleteMessagesUseCase>()
+    private val editMessageUseCase = mock<EditMessageUseCase>()
+    private val editLocationMessageUseCase = mock<EditLocationMessageUseCase>()
+    private val inviteUserAsContactResultOptionMapper =
+        mock<InviteUserAsContactResultOptionMapper>()
+    private val inviteContactUseCase = mock<InviteContactUseCase>()
+    private val getChatFromContactMessagesUseCase = mock<GetChatFromContactMessagesUseCase>()
+    private val getCacheFileUseCase = mock<GetCacheFileUseCase>()
+    private val recordAudioUseCase = mock<RecordAudioUseCase>()
+    private val deleteFileUseCase = mock<DeleteFileUseCase>()
 
     @BeforeEach
     fun resetMocks() {
@@ -326,6 +354,15 @@ internal class ChatViewModelTest {
             forwardMessagesUseCase,
             forwardMessagesResultMapper,
             addNodeType,
+            deleteMessagesUseCase,
+            editMessageUseCase,
+            editLocationMessageUseCase,
+            inviteUserAsContactResultOptionMapper,
+            inviteContactUseCase,
+            getChatFromContactMessagesUseCase,
+            getCacheFileUseCase,
+            recordAudioUseCase,
+            deleteFileUseCase,
         )
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         wheneverBlocking { isAnonymousModeUseCase() } doReturn false
@@ -349,7 +386,6 @@ internal class ChatViewModelTest {
         wheneverBlocking { monitorCallInChatUseCase(any()) } doReturn emptyFlow()
         wheneverBlocking { monitorParticipatingInACallInOtherChatsUseCase(any()) } doReturn emptyFlow()
         whenever(monitorAllContactParticipantsInChatUseCase(any())) doReturn emptyFlow()
-        wheneverBlocking { monitorContactCacheUpdates() } doReturn emptyFlow()
         wheneverBlocking { monitorJoiningChatUseCase(any()) } doReturn emptyFlow()
         wheneverBlocking { monitorLeavingChatUseCase(any()) } doReturn emptyFlow()
         whenever(monitorChatPendingChangesUseCase(any())) doReturn emptyFlow()
@@ -400,7 +436,6 @@ internal class ChatViewModelTest {
             openChatLinkUseCase = openChatLinkUseCase,
             holdChatCallUseCase = holdChatCallUseCase,
             hangChatCallUseCase = hangChatCallUseCase,
-            monitorContactCacheUpdates = monitorContactCacheUpdates,
             joinPublicChatUseCase = joinPublicChatUseCase,
             isAnonymousModeUseCase = isAnonymousModeUseCase,
             closeChatPreviewUseCase = closeChatPreviewUseCase,
@@ -423,7 +458,16 @@ internal class ChatViewModelTest {
             forwardMessagesResultMapper = forwardMessagesResultMapper,
             attachNodeUseCase = attachNodeUseCase,
             getNodeByIdUseCase = getNodeByIdUseCase,
-            addNodeType = addNodeType
+            addNodeType = addNodeType,
+            deleteMessagesUseCase = deleteMessagesUseCase,
+            editMessageUseCase = editMessageUseCase,
+            editLocationMessageUseCase = editLocationMessageUseCase,
+            inviteUserAsContactResultOptionMapper = inviteUserAsContactResultOptionMapper,
+            inviteContactUseCase = inviteContactUseCase,
+            getChatFromContactMessagesUseCase = getChatFromContactMessagesUseCase,
+            getCacheFileUseCase = getCacheFileUseCase,
+            recordAudioUseCase = recordAudioUseCase,
+            deleteFileUseCase = deleteFileUseCase,
         )
     }
 
@@ -656,7 +700,7 @@ internal class ChatViewModelTest {
             mock<ChatCall> {
                 on { chatId } doReturn isParticipatingInChatCall
             }
-        }?.let { listOf(it) } ?: emptyList<ChatCall>()
+        }?.let { listOf(it) } ?: emptyList()
         flow.emit(expected)
         underTest.state.test {
             assertThat(awaitItem().callsInOtherChats).isEqualTo(expected)
@@ -2296,36 +2340,6 @@ internal class ChatViewModelTest {
         }
 
     @Test
-    fun `test that userUpdates is updated when user updates`() = runTest {
-        val chatRoom = mock<ChatRoom> {
-            on { chatId } doReturn chatId
-            on { isGroup } doReturn true
-            on { ownPrivilege } doReturn ChatRoomPermission.Standard
-            on { peerCount } doReturn 0L
-            on { peerHandlesList } doReturn listOf(1L, 2L, 3L)
-            on { isPreview } doReturn false
-        }
-        val updateFlow = MutableSharedFlow<UserUpdate>()
-        whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
-        whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
-        whenever(monitorContactCacheUpdates()).thenReturn(updateFlow)
-        initTestClass()
-        underTest.state.test {
-            val actual = awaitItem()
-            assertThat(actual.userUpdate).isNull()
-        }
-        val userUpdate = mock<UserUpdate> {
-            on { changes } doReturn mapOf(UserId(1L) to listOf(UserChanges.Avatar))
-        }
-        updateFlow.emit(userUpdate)
-        advanceUntilIdle()
-        underTest.state.test {
-            val actual = awaitItem()
-            assertThat(actual.userUpdate).isEqualTo(userUpdate)
-        }
-    }
-
-    @Test
     fun `test that isAnonymousMode is updated`() = runTest {
         whenever(isAnonymousModeUseCase()).thenReturn(true)
         initTestClass()
@@ -2393,7 +2407,7 @@ internal class ChatViewModelTest {
             }
             val expected = files.map { it.toString() }
             underTest.onAttachFiles(files)
-            verify(sendChatAttachmentsUseCase).invoke(chatId, expected)
+            verify(sendChatAttachmentsUseCase).invoke(chatId, expected, false)
         }
 
     @Test
@@ -2600,7 +2614,7 @@ internal class ChatViewModelTest {
     @Test
     fun `test that forward messages invokes use case and updates state`() = runTest {
         val message = mock<TypedMessage>()
-        val messages = listOf(message)
+        val messages = setOf(message)
         val chatId1 = 123L
         val chatId2 = 456L
         val contactId = 789L
@@ -2611,11 +2625,11 @@ internal class ChatViewModelTest {
         val result3 = ForwardResult.Success(contactId)
         val results = listOf(result1, result2, result3)
         val forwardResult = ForwardMessagesToChatsResult.AllSucceeded(null, messages.size)
-        whenever(forwardMessagesUseCase(messages, chatHandles, contactHandles))
+        whenever(forwardMessagesUseCase(messages.toList(), chatHandles, contactHandles))
             .thenReturn(results)
         whenever(forwardMessagesResultMapper(results, messages.size)).thenReturn(forwardResult)
         underTest.onForwardMessages(messages, chatHandles, contactHandles)
-        verify(forwardMessagesUseCase).invoke(messages, chatHandles, contactHandles)
+        verify(forwardMessagesUseCase).invoke(messages.toList(), chatHandles, contactHandles)
         underTest.state.test {
             val result = ((awaitItem().infoToShowEvent as StateEventWithContentTriggered)
                 .content as InfoToShow.ForwardMessagesResult).result
@@ -2626,13 +2640,13 @@ internal class ChatViewModelTest {
     @Test
     fun `test that forward messages updates state if CreateChatException is thrown`() = runTest {
         val message = mock<TypedMessage>()
-        val messages = listOf(message)
+        val messages = setOf(message)
         val chatId1 = 123L
         val chatId2 = 456L
         val contactId = 789L
         val chatHandles = listOf(chatId1, chatId2)
         val contactHandles = listOf(contactId)
-        whenever(forwardMessagesUseCase(messages, chatHandles, contactHandles))
+        whenever(forwardMessagesUseCase(messages.toList(), chatHandles, contactHandles))
             .thenThrow(CreateChatException::class.java)
         underTest.onForwardMessages(messages, chatHandles, contactHandles)
         underTest.state.test {
@@ -2686,6 +2700,246 @@ internal class ChatViewModelTest {
             verify(attachNodeUseCase)(chatId, it)
         }
     }
+
+    @Test
+    fun `test that consumeDownloadEvent update state correctly`() = runTest {
+        initTestClass()
+        underTest.onActionToManageEventConsumed()
+        underTest.state.test {
+            assertThat(awaitItem().downloadEvent)
+                .isInstanceOf(StateEventWithContentConsumed::class.java)
+        }
+    }
+
+    @Test
+    fun `test that onDownloadChatNode updates state correctly`() = runTest {
+        val node = mock<ChatDefaultFile>()
+        initTestClass()
+        underTest.onDownloadForPreviewChatNode(node)
+        underTest.state.test {
+            val actual = awaitItem()
+            assertThat(actual.downloadEvent)
+                .isInstanceOf(StateEventWithContentTriggered::class.java)
+            val content = (actual.downloadEvent as StateEventWithContentTriggered).content
+            assertThat(content).isInstanceOf(TransferTriggerEvent.StartDownloadForPreview::class.java)
+        }
+    }
+
+    @Test
+    fun `test that delete messages invokes use case`() = runTest {
+        val message = mock<TypedMessage>()
+        val messages = setOf(message)
+        whenever(deleteMessagesUseCase(messages.toList())).thenReturn(Unit)
+        underTest.onDeletedMessages(messages)
+        verify(deleteMessagesUseCase).invoke(messages.toList())
+    }
+
+    @Test
+    fun `test that on edit message invokes and updates state correctly`() = runTest {
+        val content = "content"
+        val msgId = 1234L
+        val message = mock<NormalMessage> {
+            on { this.msgId } doReturn msgId
+            on { this.content } doReturn content
+        }
+        with(underTest) {
+            onEditMessage(message)
+            state.test {
+                val actual = awaitItem()
+                assertThat(actual.editingMessageId).isEqualTo(msgId)
+                assertThat(actual.editingMessageContent).isEqualTo(content)
+                assertThat(actual.sendingText).isEqualTo(content)
+            }
+        }
+    }
+
+    @Test
+    fun `test that on edit message shows error if cannot be edited`() = runTest {
+        val content = ""
+        val msgId = 1234L
+        val message = mock<NormalMessage> {
+            on { this.msgId } doReturn msgId
+            on { this.content } doReturn content
+        }
+        with(underTest) {
+            onEditMessage(message)
+            state.test {
+                val result = ((awaitItem().infoToShowEvent as StateEventWithContentTriggered)
+                    .content as InfoToShow.SimpleString).stringId
+                assertThat(result).isEqualTo(R.string.error_editing_message)
+            }
+        }
+    }
+
+    @Test
+    fun `test that send text message invokes and updates correctly if it is editing`() = runTest {
+        val content = "content"
+        val newContent = "newContent"
+        val msgId = 1234L
+        val message = mock<NormalMessage> {
+            on { this.msgId } doReturn msgId
+            on { this.content } doReturn content
+        }
+        whenever(editMessageUseCase(chatId, msgId, newContent)).thenReturn(mock())
+        with(underTest) {
+            onEditMessage(message)
+            sendTextMessage(newContent)
+            state.test {
+                val actual = awaitItem()
+                assertThat(actual.editingMessageId).isNull()
+                assertThat(actual.editingMessageContent).isNull()
+            }
+        }
+    }
+
+    @Test
+    fun `test that send text message invokes and updates correctly if it is editing and the edition fails`() =
+        runTest {
+            val content = "content"
+            val newContent = "newContent"
+            val msgId = 1234L
+            val message = mock<NormalMessage> {
+                on { this.msgId } doReturn msgId
+                on { this.content } doReturn content
+            }
+            whenever(editMessageUseCase(chatId, msgId, newContent)).thenReturn(null)
+            with(underTest) {
+                onEditMessage(message)
+                sendTextMessage(newContent)
+                state.test {
+                    val result = ((awaitItem().infoToShowEvent as StateEventWithContentTriggered)
+                        .content as InfoToShow.SimpleString).stringId
+                    assertThat(result).isEqualTo(R.string.error_editing_message)
+                }
+            }
+        }
+
+    @Test
+    fun `test that show successful info note when adding one new contact is sent successfully`() =
+        runTest {
+            val contactUserHandle = 1234L
+            val contactEmail = "a@b.c"
+            val contactMessage = mock<ContactAttachmentMessage> {
+                on { this.contactHandle } doReturn contactUserHandle
+                on { this.contactEmail } doReturn contactEmail
+            }
+            whenever(inviteContactUseCase(contactEmail, contactUserHandle, null)).thenReturn(
+                InviteContactRequest.Sent
+            )
+            whenever(
+                inviteUserAsContactResultOptionMapper(
+                    InviteContactRequest.Sent,
+                    contactEmail
+                )
+            ).thenReturn(
+                InviteUserAsContactResultOption.ContactInviteSent
+            )
+
+            initTestClass()
+            underTest.inviteContacts(setOf(contactMessage))
+            underTest.state.test {
+                val result = ((awaitItem().infoToShowEvent as StateEventWithContentTriggered)
+                    .content as InfoToShow.InviteUserAsContactResult).result
+                assertThat(result).isInstanceOf(InviteUserAsContactResultOption.ContactInviteSent::class.java)
+            }
+        }
+
+    @Test
+    fun `test that open chat with invokes and updates correctly`() = runTest {
+        val messages = listOf(mock<ContactAttachmentMessage>())
+        whenever(getChatFromContactMessagesUseCase(messages)).thenReturn(chatId)
+        with(underTest) {
+            onOpenChatWith(messages)
+            state.test {
+                val result =
+                    ((awaitItem().actionToManageEvent as StateEventWithContentTriggered)
+                        .content as ActionToManage.OpenChat).chatId
+                assertThat(result).isEqualTo(chatId)
+            }
+        }
+    }
+
+    @Test
+    fun `test that onActionToManageEventConsumed updates state correctly`() = runTest {
+        initTestClass()
+        underTest.onActionToManageEventConsumed()
+        underTest.state.test {
+            assertThat(awaitItem().actionToManageEvent)
+                .isInstanceOf(StateEventWithContentConsumed::class.java)
+        }
+    }
+
+    @Test
+    fun `test that onEnableSelectMode updates correctly`() = runTest {
+        with(underTest) {
+            onEnableSelectMode()
+            state.test {
+                val result =
+                    (awaitItem().actionToManageEvent as StateEventWithContentTriggered).content
+                assertThat(result).isInstanceOf(ActionToManage.EnableSelectMode::class.java)
+            }
+        }
+    }
+
+    @Test
+    fun `test that onOpenContactInfo updates correctly`() = runTest {
+        val email = "email"
+        with(underTest) {
+            onOpenContactInfo(email)
+            state.test {
+                val result =
+                    ((awaitItem().actionToManageEvent as StateEventWithContentTriggered)
+                        .content as ActionToManage.OpenContactInfo).email
+                assertThat(result).isEqualTo(email)
+            }
+        }
+    }
+
+    @Nested
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    inner class VoiceClipTests {
+        private val path = "/cache/example.m4a"
+        private val destination = File(path)
+
+        @BeforeEach
+        fun setup() {
+            whenever(
+                getCacheFileUseCase(eq(CacheFolderManager.VOICE_CLIP_FOLDER), any())
+            ) doReturn destination
+            whenever(recordAudioUseCase(destination)) doReturn flow {
+                awaitCancellation()
+            }
+        }
+
+        @AfterEach
+        fun cancel() {
+            underTest.onVoiceClipRecordEvent(VoiceClipRecordEvent.Cancel) //to cancel the recording job and don't affect other tests
+        }
+
+        @Test
+        fun `test that audio is recorded to cache file when VoiceClipRecordEvent Start event is received`() =
+            runTest {
+                underTest.onVoiceClipRecordEvent(VoiceClipRecordEvent.Start)
+                verify(recordAudioUseCase).invoke(destination)
+            }
+
+        @Test
+        fun `test that recorded audio is deleted when VoiceClipRecordEvent Cancel event is received`() =
+            runTest {
+                underTest.onVoiceClipRecordEvent(VoiceClipRecordEvent.Start)
+                underTest.onVoiceClipRecordEvent(VoiceClipRecordEvent.Cancel)
+                verify(deleteFileUseCase).invoke(path)
+            }
+
+        @Test
+        fun `test that recorded audio is sent when VoiceClipRecordEvent Finish event is received`() =
+            runTest {
+                underTest.onVoiceClipRecordEvent(VoiceClipRecordEvent.Start)
+                underTest.onVoiceClipRecordEvent(VoiceClipRecordEvent.Finish)
+                verify(sendChatAttachmentsUseCase).invoke(chatId, listOf(path), true)
+            }
+    }
+
 
     private fun ChatRoom.getNumberParticipants() =
         (peerCount + if (ownPrivilege != ChatRoomPermission.Unknown

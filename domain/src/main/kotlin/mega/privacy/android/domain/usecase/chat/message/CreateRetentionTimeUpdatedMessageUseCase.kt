@@ -13,12 +13,15 @@ internal class CreateRetentionTimeUpdatedMessageUseCase @Inject constructor() :
             chatId = chatId,
             msgId = messageId,
             time = timestamp,
+            isDeletable = isDeletable,
+            isEditable = isEditable,
             isMine = isMine,
             userHandle = userHandle,
             retentionTime = retentionTime,
             shouldShowAvatar = shouldShowAvatar,
-            shouldShowTime = shouldShowTime,
             reactions = reactions,
+            status = status,
+            content = content,
         )
     }
 }

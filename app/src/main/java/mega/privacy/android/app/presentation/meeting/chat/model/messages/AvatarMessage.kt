@@ -1,15 +1,9 @@
 package mega.privacy.android.app.presentation.meeting.chat.model.messages
 
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import mega.privacy.android.app.presentation.meeting.chat.extension.isSelectable
-import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
 import mega.privacy.android.app.presentation.meeting.chat.view.ChatAvatar
 import mega.privacy.android.core.ui.controls.chat.ChatMessageContainer
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
@@ -21,29 +15,29 @@ import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 abstract class AvatarMessage : UiChatMessage {
 
     /**
-     * Message
-     */
-    internal abstract val message: TypedMessage
-
-    /**
      * Content composable
      */
     @Composable
-    abstract fun RowScope.ContentComposable(onLongClick: (TypedMessage) -> Unit)
+    abstract fun ContentComposable(
+        onLongClick: (TypedMessage) -> Unit,
+        interactionEnabled: Boolean,
+    )
 
+    abstract override val message: TypedMessage
+    
     /**
      * Avatar composable
      */
     @Composable
-    open fun RowScope.MessageAvatar(lastUpdatedCache: Long) {
+    open fun MessageAvatar(lastUpdatedCache: Long, modifier: Modifier) {
         if (showAvatar) {
             ChatAvatar(
-                modifier = Modifier.align(Alignment.Bottom),
+                modifier = modifier,
                 handle = userHandle,
                 lastUpdatedCache = lastUpdatedCache
             )
         } else {
-            Spacer(modifier = Modifier.size(24.dp))
+            Spacer(modifier = modifier)
         }
     }
 
@@ -54,15 +48,14 @@ abstract class AvatarMessage : UiChatMessage {
 
     @Composable
     override fun MessageListItem(
-        uiState: ChatUiState,
-        lastUpdatedCache: Long,
-        timeFormatter: (Long) -> String,
-        dateFormatter: (Long) -> String,
+        state: UIMessageState,
         onLongClick: (TypedMessage) -> Unit,
         onMoreReactionsClicked: (Long) -> Unit,
         onReactionClicked: (Long, String, List<UIReaction>) -> Unit,
         onReactionLongClick: (String, List<UIReaction>) -> Unit,
         onForwardClicked: (TypedMessage) -> Unit,
+        onSelectedChanged: (Boolean) -> Unit,
+        onSendErrorClicked: (TypedMessage) -> Unit,
     ) {
         ChatMessageContainer(
             modifier = Modifier.fillMaxWidth(),
@@ -73,20 +66,23 @@ abstract class AvatarMessage : UiChatMessage {
             onReactionClick = { onReactionClicked(id, it, reactions) },
             onReactionLongClick = { onReactionLongClick(it, reactions) },
             onForwardClicked = { onForwardClicked(message) },
-            time = this.getTimeOrNull(timeFormatter),
-            avatarOrIcon = {
+            avatarOrIcon = { avatarModifier ->
                 MessageAvatar(
-                    lastUpdatedCache = lastUpdatedCache
+                    lastUpdatedCache = state.lastUpdatedCache,
+                    avatarModifier,
                 )
             },
-            content = {
-                ContentComposable(onLongClick)
+            content = { interactionEnabled ->
+                ContentComposable(onLongClick, interactionEnabled)
             },
+            isSelectMode = state.isInSelectMode,
+            isSelected = state.isChecked,
+            onSelectionChanged = onSelectedChanged,
+            onSendErrorClick = { onSendErrorClicked(message) }
         )
     }
 
-    override val isSelectable: Boolean
-        get() = message.isSelectable
+    override val isSelectable = true
 
     override fun key() = super.key() + "_${showAvatar}"
 }

@@ -781,7 +781,7 @@
     <!-- Button to park an account -->
     <string name="park_account_button">Parkeren</string>
     <!-- Text shown in the last alert dialog to park an account -->
-    <string name="park_account_text_last_step">Dit is de laatste stap om uw account te parkeren, voer uw nieuwe wachtwoord in. Uw gegevens worden behouden voor tenminste 60 dagen, als u uw geparkeerde account wachtwoord herinnert, neem dan contact op met support&#64;mega.nz</string>
+    <string name="park_account_text_last_step">Dit is de laatste stap om uw account te parkeren. Voer uw nieuwe wachtwoord in. Uw gegevens worden minstens 60 &#160; dagen bewaard. Als u zich het wachtwoord van uw geparkeerde account herinnert, neem contact op met support&#64;mega.nz</string>
     <!-- Title of the screen to write the new password after opening the recovery link -->
     <string name="title_enter_new_password">Voer nieuw wachtwoord in</string>
     <!-- Message when the user tries to open a recovery pass link and it has expired -->
@@ -795,7 +795,7 @@
     <!-- Message to promote PRO accounts -->
     <string name="get_pro_account">Laat uw cloud groeien.[A]Krijg meer opslag- en overdrachttegoed met een Pro-account.</string>
     <!-- Error shown when the user tries to change his mail to one that is already used -->
-    <string name="mail_already_used">Dit e-mailadres is al in gebruik. Gelieve een ander e-mailadres te gebruiken.</string>
+    <string name="mail_already_used">E-mailadres is al in gebruik. Voer een ander e-mailadres in.</string>
     <!-- Error shown when the user tries to change his mail while the user has already requested a confirmation link for that email address -->
     <string name="mail_changed_confirm_requested">U heeft al een bevestigingslink voor dat e-mailadres gevraagd.</string>
     <!-- Error shown when the user tries to change his mail while the email is the same as the old -->
@@ -1853,7 +1853,7 @@
     <!-- Description of the screen shown when the user enabled correctly Two-Factor Authentication -->
     <string name="description_2fa_enabled">De volgende keer dat u inlogt in uw account wordt u gevraagd een 6-cijferige code in te voeren die gegeven is door uw authenticatie applicatie.</string>
     <!-- Recommendation displayed after enable Two-Factor Authentication -->
-    <string name="recommendation_2fa_enabled">Bewaar uw <b>herstelsleutel</b> op een veilige locatie om problemen te voorkomen als u toegang tot uw applicatie verliest of als u twee-staps authenticatie wilt uitschakelen.</string>
+    <string name="recommendation_2fa_enabled">Bewaar alstublieft uw  <b>herstelsleutel</b> op een veilige lokatie, om problemen te vermijden als u de toegang tot uw applicatie verliest of als u twee-staps authenticatie wilt uitschakelen.</string>
     <!-- Error shown when a user tries to enable Two-Factor Authentication and introduce an invalid code -->
     <string name="pin_error_2fa">Ongeldige code</string>
     <!-- Title of screen Lost authenticator decive -->
@@ -5226,7 +5226,7 @@
     <!-- Label of the button to call all absent participants from the not in call participants list -->
     <string name="meetings_bottom_panel_not_in_call_participants_call_all_button">Iedereen bellen</string>
     <!-- Banner description when a user navigates from other app with a different account than the one currently logged in -->
-    <string name="account_upgrade_vpn_wrong_account_upgrade_banner_description">Deze applicatie is aangemeld bij een ander MEGA-account. \nLog uit bij dit account en log in met uw MEGA VPN-account.</string>
+    <string name="account_upgrade_vpn_wrong_account_upgrade_banner_description">Deze applicatie is aangemeld bij een ander MEGA-account. \nLog uit bij dit account en log in met uw MEGA&#160;VPN-account.</string>
     <!-- Warning shown if user denies the camera permission when trying to capture photos or videos from camera -->
     <string name="chat_attach_pick_from_camera_deny_permission">MEGA heeft toegang tot uw camera nodig om foto\’s en video\’s vast te leggen</string>
     <!-- Warning shown if user denies the location permission when trying to pick a location -->
@@ -5271,17 +5271,74 @@
     <!-- Add new strings to this file (the string code must be unique). Add edits for strings to this file (the string code must match the existing string). -->
     <string name="chat_toolbar_bottom_sheet_allow_gallery_access_title">Geef toegang tot uw gallerij</string>
     <string name="chat_toolbar_bottom_sheet_grant_gallery_access_button">Toegang verlenen</string>
-    <!-- Add new strings to this file (the string code must be unique). Add edits for strings to this file (the string code must match the existing string). -->
-    <string name="meetings_chat_screen_app_update_dialog_title">Update required</string>
+    <!-- The title of the Dialog shown to Update the application from playstore -->
+    <string name="meetings_chat_screen_app_update_dialog_title">Update vereist</string>
+    <!-- The Body of the Dialog shown to Update the application from playstore -->
     <string name="meetings_chat_screen_app_update_dialog_message">U gebruikt niet de laatste versie van onze applicatie, dus u kunt geen oproepen starten of aansluiten. Update nu om door te gaan.</string>
+    <!-- Button text of the Dialog shown to Update the application from playstore -->
     <string name="meetings_chat_screen_app_update_dialog_update_button">Updaten</string>
-    <string name="meetings_chat_screen_app_update_dialog_cancel_button">Dismiss</string>
+    <!-- Negative Button text of the Dialog shown to Update the application from playstore -->
+    <string name="meetings_chat_screen_app_update_dialog_cancel_button">Afwijzen</string>
     <!-- Title of the bottom panel when the only host left the call on meeting screen -->
     <string name="meeting_call_screen_title_of_bottom_panel_when_only_host_leave_the_meeting">Gastheer toewijzen om oproep te verlaten</string>
     <!-- Description of the bottom panel when the only host leave the call, displayed on the group call and meeting screen -->
-    <string name="meeting_call_screen_description_of_bottom_panel_when_only_host_leave_the_meeting">You’re the only host on the call. Assign another host for the group before leaving so someone on the call will have host permissions. You’ll remain a host in the group.</string>
+    <string name="meeting_call_screen_description_of_bottom_panel_when_only_host_leave_the_meeting">U bent de enige host in het gesprek. Wijs een andere host aan de groep toe voordat u vertrekt, zodat iemand die deelneemt aan het gesprek de host rechten heeft. U blijft gastheer in de groep.</string>
     <!-- Option in bottom panel to assign another host and leave the call, displayed on the group call and meeting screen -->
     <string name="meeting_call_screen_bottom_panel_assign_and_leave_option">Toewijzen en verlaten</string>
     <!-- Option in bottom panel to leave the call, displayed on the group call and meeting screen -->
     <string name="meeting_call_screen_bottom_panel_leave_option">Toch verlaten</string>
+    <!-- Camera uploads updated info in Photos screen. -->
+    <string name="photos_camera_uploads_updated">Camerauploads zijn bijgewerkt</string>
+    <!-- Camera uploads no internet info in Photos screen. -->
+    <string name="photos_camera_uploads_no_internet">Upload onderbroken omdat er geen internetverbinding is</string>
+    <!-- Camera uploads low battery info in Photos screen. -->
+    <string name="photos_camera_uploads_low_battery">Het uploaden is gepauzeerd. Batterij onder %1$d%% en laad niet op.</string>
+    <!-- Camera uploads general issue info in Photos screen. -->
+    <string name="photos_camera_uploads_general_issue">Camera-uploads werken niet meer. Probeer camera-uploads opnieuw in te schakelen om het probleem op te lossen. Als het probleem zich blijft voordoen, neem contact op met de klantenservice.</string>
+    <!-- Camera uploads pending info in Photos screen. -->
+    <plurals name="photos_camera_uploads_pending">
+        <item quantity="one">Camera uploads zijn in behandeling,%1$d bestand in wachtrij</item>
+        <item quantity="other">Camera uploads zijn in behandeling, %1$d bestanden in wachtrij</item>
+    </plurals>
+    <!-- Camera uploads completed info in Photos screen. -->
+    <plurals name="photos_camera_uploads_completed">
+        <item quantity="one">Camera uploads voltooid, %1$d bestand geüpload</item>
+        <item quantity="other">Camera uploads voltooid, %1$d bestanden geüpload</item>
+    </plurals>
+    <!-- Free plan limitation text for scheduled meetings calls longer than 60 minutes. -->
+    <string name="meetings_schedule_meeting_free_plan_60_minute_limit_warning">[A]Uw gratis abonnement heeft een limiet van 60 &#160; minuten voor vergaderingen. Pro-gebruikers kunnen onbeperkt bellen en tot 1000 &#160; deelnemers.[/A] [B]Nu upgraden.[/B]</string>
+    <!-- Bottom sheet button to hide a node/file -->
+    <string name="general_hide_node">Verbergen</string>
+    <!-- Bottom sheet button to unhide a node/file -->
+    <string name="general_unhide_node">Zichtbaar maken</string>
+    <!-- Promo label for promo notification section -->
+    <string name="notifications_screen_notification_label_promo">Promo</string>
+    <!-- Promo notification section title for promo notification section -->
+    <string name="notifications_screen_notification_section_title">Tijdelijke aanbieding</string>
+    <!-- The title of the Dialog shown to Change the SFU Server Id  -->
+    <string name="meetings_change_sfu_dialog_title">SFU-server wijzigen</string>
+    <!-- The body of the Dialog shown to Change the SFU Server Id  -->
+    <string name="meetings_change_sfu_dialog_subtitle">Standaard is -1</string>
+    <!-- The placeholder text to prompt user to enter the SFU Server Id -->
+    <string name="meetings_change_sfu_dialog_hint">Voer SFU-ID in</string>
+    <!-- Button text to change SFU Server Id  -->
+    <string name="meetings_change_sfu_dialog_action_button">Wijzigen</string>
+    <!-- Free plan limitation text for scheduled meetings calls longer than 60 minutes in edit occurrence dialog. -->
+    <string name="meetings_edit_occurrence_free_plan_60_minute_limit_warning">Gratis abonnementen hebben een limiet van 60 &#160; minuten per vergadering. [A]Nu upgraden.[/A]</string>
+    <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user selects monthly subscription. The placeholders %1$s and %2$s will be replaced with localised price and currency sign (based on Google localisation), for example $4.99. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string. -->
+    <string name="account_upgrade_account_subscription_details_body_monthly_with_price">Er worden onmiddelijk kosten in rekening gebracht %1$s en uw abonnement wordt na 1 &#160; maand automatisch verlengd voor %2$s per maand. Uw Google &#160; Play-account wordt binnen 24 &#160; uur na het einde van elke factureringsperiode in rekening gebracht voor verlenging. Om uw abonnement op te zeggen, moet u de automatische verlenging van uw MEGA &#160; Pro-abonnement ten minste 24 &#160; uur voor het einde van uw factureringsperiode uitschakelen via Abonnementen in [A]Google &#160; Play[/A].\nDoor uw account te upgraden, gaat u akkoord met MEGA\’s [B]Algemene Voorwaarden[/B] en [C]Privacybeleid[/C].</string>
+    <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user selects yearly subscription. The placeholders %1$s and %2$s will be replaced with localised price and currency sign (based on Google localisation), for example $4.99. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string. -->
+    <string name="account_upgrade_account_subscription_details_body_yearly_with_price">Er worden onmiddelijk kosten in rekening gebracht %1$s en uw abonnement wordt na 12 &#160; maanden automatisch verlengd voor %2$s per jaar. Uw Google &#160; Play-account wordt binnen 24 &#160; uur na het einde van elke factureringsperiode in rekening gebracht voor verlenging. Om uw abonnement op te zeggen, moet u de automatische verlenging van uw MEGA &#160; Pro-abonnement ten minste 24 &#160; uur voor het einde van uw factureringsperiode uitschakelen via Abonnementen in [A]Google &#160; Play[/A].\nDoor uw account te upgraden, gaat u akkoord met MEGA\’s [B]Algemene Voorwaarden[/B] en [C]Privacybeleid[/C].</string>
+    <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user is in monthly tab and no subscription plan was selected. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string. -->
+    <string name="account_upgrade_account_subscription_details_body_monthly_without_price">Er worden onmiddellijk kosten in rekening gebracht en uw abonnement wordt na 1 &#160; maand automatisch verlengd. Uw Google &#160; Play-account wordt binnen 24 &#160; uur na het einde van elke factureringsperiode in rekening gebracht voor verlenging. Om uw abonnement op te zeggen, moet u de automatische verlenging van uw MEGA &#160; Pro-abonnement ten minste 24 &#160; uur voor het einde van uw factureringsperiode uitschakelen via Abonnementen in [A]Google &#160; Play[/A].\nDoor uw account te upgraden, gaat u akkoord met MEGA\’s [B]Algemene Voorwaarden[/B] en [C]Privacybeleid[/C].</string>
+    <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user is in yearly tab and no subscription plan was selected. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string -->
+    <string name="account_upgrade_account_subscription_details_body_yearly_without_price">Er worden onmiddellijk kosten in rekening gebracht en uw abonnement wordt na 12 &#160; maanden automatisch verlengd. Uw Google &#160; Play-account wordt binnen 24 &#160; uur na het einde van elke factureringsperiode in rekening gebracht voor verlenging. Om uw abonnement op te zeggen, moet u de automatische verlenging van uw MEGA &#160; Pro-abonnement ten minste 24 &#160; uur voor het einde van uw factureringsperiode uitschakelen via Abonnementen in [A]Google &#160; Play[/A].\nDoor uw account te upgraden, gaat u akkoord met MEGA\’s [B]Algemene Voorwaarden[/B] en [C]Privacybeleid[/C].</string>
+    <!-- The title of the Dialog shown to a suspended Business Account User, regardless if the User is a Sub-User or Administrator -->
+    <string name="account_business_account_deactivated_dialog_title">Zakelijke account gedeactiveerd</string>
+    <!-- The body of the Dialog shown to a suspended Business Account Sub-User -->
+    <string name="account_business_account_deactivated_dialog_sub_user_body">Uw Zakelijke account is gedeactiveerd vanwege een mislukte betaling. U kunt alleen uw gegevens bekijken.\nVraag de beheerder van uw Zakelijke account om het probleem op te lossen.</string>
+    <!-- The body of the Dialog shown to a suspended Business Account Administrator -->
+    <string name="account_business_account_deactivated_dialog_admin_body">Uw Zakelijke account is gedeactiveerd vanwege een mislukte betaling. U kunt alleen uw gegevens bekijken.\nOm een betaling uit te voeren en uw abonnement te her activeren, moet u via een browser bij MEGA inloggen.</string>
+    <!-- The button of the Dialog shown to a suspended Business Account User, regardless if the User is a Sub-User or Administrator -->
+    <string name="account_business_account_deactivated_dialog_button">Ok, ik snap het</string>
 </resources>

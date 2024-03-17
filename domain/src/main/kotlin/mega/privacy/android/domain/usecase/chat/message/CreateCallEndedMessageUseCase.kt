@@ -12,13 +12,16 @@ internal class CreateCallEndedMessageUseCase @Inject constructor() : CreateTyped
                 chatId = chatId,
                 msgId = messageId,
                 time = timestamp,
+                isDeletable = isDeletable,
+                isEditable = isEditable,
                 isMine = isMine,
                 userHandle = userHandle,
                 termCode = termCode,
                 duration = duration,
                 shouldShowAvatar = shouldShowAvatar,
-                shouldShowTime = shouldShowTime,
                 reactions = reactions,
+                status = status,
+                content = content,
             )
         }
 }

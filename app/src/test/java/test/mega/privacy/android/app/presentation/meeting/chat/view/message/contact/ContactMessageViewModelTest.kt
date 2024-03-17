@@ -11,6 +11,7 @@ import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.android.domain.entity.user.UserId
 import mega.privacy.android.domain.entity.user.UserVisibility
 import mega.privacy.android.domain.usecase.contact.GetContactFromEmailUseCase
+import mega.privacy.android.domain.usecase.contact.GetMyUserHandleUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserUseCase
 import mega.privacy.android.domain.usecase.contact.InviteContactUseCase
 import mega.privacy.android.domain.usecase.contact.IsContactRequestSentUseCase
@@ -42,8 +43,10 @@ internal class ContactMessageViewModelTest {
     private val getUserUseCase = mock<GetUserUseCase>()
     private val isContactRequestSentUseCase = mock<IsContactRequestSentUseCase>()
     private val inviteContactUseCase = mock<InviteContactUseCase>()
+    private val getMyUserHandleUseCase = mock<GetMyUserHandleUseCase>()
 
     private val email = "email"
+    private val myUserHandle = 1L
     private val userHandle = 1234567890L
     private val userId = UserId(userHandle)
 
@@ -58,7 +61,8 @@ internal class ContactMessageViewModelTest {
             getContactFromEmailUseCase,
             getUserUseCase,
             isContactRequestSentUseCase,
-            inviteContactUseCase
+            inviteContactUseCase,
+            getMyUserHandleUseCase,
         )
     }
 
@@ -118,24 +122,43 @@ internal class ContactMessageViewModelTest {
     }
 
     @Test
-    fun `test that check contact invokes correctly when user is my contact`() = runTest {
-        val onContactClicked = mock<(String) -> Unit>()
+    fun `test that check contact invokes correctly when user is me`() = runTest {
+        val onContactClicked = mock<() -> Unit>()
         val onNonContactClicked = mock<() -> Unit>()
         val onNonContactAlreadyInvitedClicked = mock<() -> Unit>()
-        val user = mock<User> {
-            on { visibility } doReturn UserVisibility.Visible
-            on { email } doReturn email
-        }
-        whenever(getUserUseCase.invoke(userId)).thenReturn(user)
+        whenever(getMyUserHandleUseCase()).thenReturn(userHandle)
         underTest.checkUser(
             userHandle,
             email,
+            isContact = false,
             onContactClicked,
             onNonContactClicked,
             onNonContactAlreadyInvitedClicked
         )
-        verify(getUserUseCase).invoke(userId)
-        verify(onContactClicked).invoke(email)
+        verify(getMyUserHandleUseCase).invoke()
+        verifyNoInteractions(getUserUseCase)
+        verifyNoInteractions(isContactRequestSentUseCase)
+        verifyNoInteractions(onContactClicked)
+        verifyNoInteractions(onNonContactClicked)
+        verifyNoInteractions(onNonContactAlreadyInvitedClicked)
+    }
+
+    @Test
+    fun `test that check contact invokes correctly when user is my contact`() = runTest {
+        val onContactClicked = mock<() -> Unit>()
+        val onNonContactClicked = mock<() -> Unit>()
+        val onNonContactAlreadyInvitedClicked = mock<() -> Unit>()
+        whenever(getMyUserHandleUseCase()).thenReturn(myUserHandle)
+        underTest.checkUser(
+            userHandle,
+            email,
+            isContact = true,
+            onContactClicked,
+            onNonContactClicked,
+            onNonContactAlreadyInvitedClicked
+        )
+        verify(getMyUserHandleUseCase).invoke()
+        verify(onContactClicked).invoke()
         verifyNoInteractions(isContactRequestSentUseCase)
         verifyNoInteractions(onNonContactClicked)
         verifyNoInteractions(onNonContactAlreadyInvitedClicked)
@@ -147,24 +170,24 @@ internal class ContactMessageViewModelTest {
         onceContact: Boolean,
         invitationSent: Boolean,
     ) = runTest {
-        val onContactClicked = mock<(String) -> Unit>()
+        val onContactClicked = mock<() -> Unit>()
         val onNonContactClicked = mock<() -> Unit>()
         val onNonContactAlreadyInvitedClicked = mock<() -> Unit>()
         val user = mock<User> {
             on { visibility } doReturn UserVisibility.Hidden
             on { email } doReturn email
         }
-        whenever(getUserUseCase.invoke(userId))
-            .thenReturn(if (onceContact) user else null)
+        whenever(getMyUserHandleUseCase()).thenReturn(myUserHandle)
         whenever(isContactRequestSentUseCase.invoke(email)).thenReturn(invitationSent)
         underTest.checkUser(
             userHandle,
             email,
+            isContact = false,
             onContactClicked,
             onNonContactClicked,
             onNonContactAlreadyInvitedClicked
         )
-        verify(getUserUseCase).invoke(userId)
+        verify(getMyUserHandleUseCase).invoke()
         verify(isContactRequestSentUseCase).invoke(email)
         verifyNoInteractions(onContactClicked)
         if (invitationSent) {
@@ -191,7 +214,8 @@ internal class ContactMessageViewModelTest {
             getContactFromEmailUseCase,
             getUserUseCase,
             isContactRequestSentUseCase,
-            inviteContactUseCase
+            inviteContactUseCase,
+            getMyUserHandleUseCase,
         )
     }
 

@@ -30,19 +30,17 @@ import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import java.util.stream.Stream
 
-@ExtendWith(CoroutineMainDispatcherExtension::class)
 @OptIn(ExperimentalCoroutinesApi::class)
+@ExtendWith(CoroutineMainDispatcherExtension::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AvailableOfflineBottomSheetMenuItemTest {
 
     private val removeOfflineNodeUseCase = mock<RemoveOfflineNodeUseCase>()
     private val isFolderEmptyUseCase = mock<IsFolderEmptyUseCase>()
-    private val scope = CoroutineScope(UnconfinedTestDispatcher())
     private val underTest = AvailableOfflineBottomSheetMenuItem(
         menuAction = AvailableOfflineMenuAction(),
         removeOfflineNodeUseCase = removeOfflineNodeUseCase,
         isFolderEmptyUseCase = isFolderEmptyUseCase,
-        scope = scope
     )
 
     @ParameterizedTest(name = "isNodeInRubbish {0} - accessPermission {1} - isInBackups {2} - node {3} - isConnected {4} - expected {5}")
@@ -139,7 +137,9 @@ class AvailableOfflineBottomSheetMenuItemTest {
         val onDismiss = mock<() -> Unit>()
         val actionHandler = mock<(MenuAction, TypedNode) -> Unit>()
         val navController = mock<NavHostController>()
-        val onClick = underTest.getOnClickFunction(node, onDismiss, actionHandler, navController)
+        val parentScope = CoroutineScope(UnconfinedTestDispatcher())
+        val onClick =
+            underTest.getOnClickFunction(node, onDismiss, actionHandler, navController, parentScope)
 
         onClick()
         verify(removeOfflineNodeUseCase).invoke(node.id)
@@ -155,7 +155,9 @@ class AvailableOfflineBottomSheetMenuItemTest {
         val onDismiss = mock<() -> Unit>()
         val actionHandler = mock<(MenuAction, TypedNode) -> Unit>()
         val navController = mock<NavHostController>()
-        val onClick = underTest.getOnClickFunction(node, onDismiss, actionHandler, navController)
+        val parentScope = mock<CoroutineScope>()
+        val onClick =
+            underTest.getOnClickFunction(node, onDismiss, actionHandler, navController, parentScope)
 
         onClick()
         verifyNoInteractions(removeOfflineNodeUseCase)

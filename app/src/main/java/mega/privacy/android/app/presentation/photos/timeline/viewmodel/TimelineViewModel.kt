@@ -6,11 +6,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -38,6 +38,8 @@ import mega.privacy.android.domain.entity.VideoQuality
 import mega.privacy.android.domain.entity.account.EnableCameraUploadsStatus.CAN_ENABLE_CAMERA_UPLOADS
 import mega.privacy.android.domain.entity.account.EnableCameraUploadsStatus.SHOW_REGULAR_BUSINESS_ACCOUNT_PROMPT
 import mega.privacy.android.domain.entity.account.EnableCameraUploadsStatus.SHOW_SUSPENDED_BUSINESS_ACCOUNT_PROMPT
+import mega.privacy.android.domain.entity.account.EnableCameraUploadsStatus.SHOW_SUSPENDED_MASTER_BUSINESS_ACCOUNT_PROMPT
+import mega.privacy.android.domain.entity.camerauploads.CameraUploadsFinishedReason
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRestartMode
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsStatusInfo
 import mega.privacy.android.domain.entity.photos.Photo
@@ -45,7 +47,7 @@ import mega.privacy.android.domain.entity.photos.TimelinePreferencesJSON
 import mega.privacy.android.domain.qualifier.DefaultDispatcher
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.qualifier.MainDispatcher
-import mega.privacy.android.domain.usecase.CheckEnableCameraUploadsStatus
+import mega.privacy.android.domain.usecase.CheckEnableCameraUploadsStatusUseCase
 import mega.privacy.android.domain.usecase.FilterCameraUploadPhotos
 import mega.privacy.android.domain.usecase.FilterCloudDrivePhotos
 import mega.privacy.android.domain.usecase.SetInitialCUPreferences
@@ -64,6 +66,7 @@ import nz.mega.sdk.MegaNode
 import org.jetbrains.anko.collections.forEachWithIndex
 import timber.log.Timber
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * View Model for Timeline
@@ -79,7 +82,7 @@ import javax.inject.Inject
  * @property ioDispatcher
  * @property mainDispatcher
  * @property defaultDispatcher
- * @property checkEnableCameraUploadsStatus
+ * @property checkEnableCameraUploadsStatusUseCase
  * @property stopCameraUploadsUseCase
  * @property broadcastBusinessAccountExpiredUseCase
  * @param monitorCameraUploadsStatusInfoUseCase
@@ -97,7 +100,7 @@ class TimelineViewModel @Inject constructor(
     @IoDispatcher val ioDispatcher: CoroutineDispatcher,
     @MainDispatcher val mainDispatcher: CoroutineDispatcher,
     @DefaultDispatcher val defaultDispatcher: CoroutineDispatcher,
-    private val checkEnableCameraUploadsStatus: CheckEnableCameraUploadsStatus,
+    private val checkEnableCameraUploadsStatusUseCase: CheckEnableCameraUploadsStatusUseCase,
     private val stopCameraUploadsUseCase: StopCameraUploadsUseCase,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val getTimelineFilterPreferencesUseCase: GetTimelineFilterPreferencesUseCase,
@@ -114,6 +117,8 @@ class TimelineViewModel @Inject constructor(
     internal val selectedPhotosIds = mutableSetOf<Long>()
 
     private var job: Job? = null
+    private var isCameraUploadsFirstSyncTriggered = false
+    private var isCameraUploadsUploading = false
 
     init {
         job = viewModelScope.launch {
@@ -124,23 +129,84 @@ class TimelineViewModel @Inject constructor(
         }
         viewModelScope.launch {
             monitorCameraUploadsStatusInfoUseCase()
-                .filter { it is CameraUploadsStatusInfo.UploadProgress || it is CameraUploadsStatusInfo.Finished }
                 .collect {
                     when (it) {
+                        is CameraUploadsStatusInfo.CheckFilesForUpload -> {
+                            handleCameraUploadsCheckStatus(it)
+                        }
+
                         is CameraUploadsStatusInfo.UploadProgress -> {
-                            updateCameraUploadProgressIfNeeded(
-                                progress = it.progress,
-                                pending = it.totalToUpload - it.totalUploaded,
-                            )
+                            handleCameraUploadsProgressStatus(it)
                         }
 
                         is CameraUploadsStatusInfo.Finished -> {
-                            updateCameraUploadProgressIfNeeded(progress = Progress(1f), pending = 0)
+                            handleCameraUploadsFinishedStatus(it)
                         }
 
                         else -> Unit
                     }
                 }
+        }
+    }
+
+    private fun handleCameraUploadsCheckStatus(info: CameraUploadsStatusInfo.CheckFilesForUpload) {
+        setCameraUploadsSyncFab(isVisible = true)
+
+        setCameraUploadsCompleteMenu(isVisible = false)
+        setCameraUploadsWarningMenu(isVisible = false)
+    }
+
+    private fun handleCameraUploadsProgressStatus(info: CameraUploadsStatusInfo.UploadProgress) {
+        updateCameraUploadProgressIfNeeded(
+            progress = info.progress,
+            pending = info.totalToUpload - info.totalUploaded,
+        )
+
+        setCameraUploadsUploadingFab(
+            isVisible = true,
+            progress = info.progress.floatValue,
+        )
+        setCameraUploadsTotalUploaded(info.totalToUpload)
+
+        isCameraUploadsUploading = true
+    }
+
+    private suspend fun handleCameraUploadsFinishedStatus(info: CameraUploadsStatusInfo.Finished) {
+        updateCameraUploadProgressIfNeeded(progress = Progress(1f), pending = 0)
+        if (info.reason == CameraUploadsFinishedReason.UNKNOWN) return
+
+        hideCameraUploadsFab()
+        setCameraUploadsFinishedReason(reason = info.reason)
+
+        if (info.reason == CameraUploadsFinishedReason.COMPLETED) {
+            if (isCameraUploadsUploading) {
+                setCameraUploadsCompleteFab(isVisible = true)
+                setCameraUploadsCompletedMessage(show = true)
+
+                isCameraUploadsUploading = false
+                delay(4.seconds)
+            }
+
+            setCameraUploadsCompleteMenu(isVisible = true)
+            setCameraUploadsCompleteFab(isVisible = false)
+        } else {
+            setCameraUploadsCompleteMenu(isVisible = false)
+            setCameraUploadsWarningFab(isVisible = true, progress = 0.5f)
+        }
+    }
+
+    fun syncCameraUploadsStatus() {
+        if (isCameraUploadsFirstSyncTriggered) return
+        isCameraUploadsFirstSyncTriggered = true
+
+        viewModelScope.launch {
+            startCameraUploadUseCase()
+        }
+    }
+
+    fun setCameraUploadsCompletedMessage(show: Boolean) {
+        _state.update {
+            it.copy(showCameraUploadsCompletedMessage = show)
         }
     }
 
@@ -218,10 +284,10 @@ class TimelineViewModel @Inject constructor(
 
     /**
      * Checks whether Camera Uploads can be enabled and handles the Status accordingly, as
-     * determined by the Use Case [checkEnableCameraUploadsStatus]
+     * determined by the Use Case [checkEnableCameraUploadsStatusUseCase]
      */
     fun handleEnableCameraUploads() = viewModelScope.launch {
-        runCatching { checkEnableCameraUploadsStatus() }.onSuccess { status ->
+        runCatching { checkEnableCameraUploadsStatusUseCase() }.onSuccess { status ->
             when (status) {
                 CAN_ENABLE_CAMERA_UPLOADS -> {
                     setTriggerCameraUploadsState(shouldTrigger = true)
@@ -231,7 +297,9 @@ class TimelineViewModel @Inject constructor(
                     setBusinessAccountPromptState(shouldShow = true)
                 }
 
-                SHOW_SUSPENDED_BUSINESS_ACCOUNT_PROMPT -> {
+                SHOW_SUSPENDED_BUSINESS_ACCOUNT_PROMPT,
+                SHOW_SUSPENDED_MASTER_BUSINESS_ACCOUNT_PROMPT,
+                -> {
                     broadcastBusinessAccountExpiredUseCase()
                 }
             }
@@ -427,6 +495,8 @@ class TimelineViewModel @Inject constructor(
                         progressBarShowing = false
                     )
                 }
+
+                hideCameraUploadsFab()
             }
         }
     }
@@ -616,7 +686,7 @@ class TimelineViewModel @Inject constructor(
                 cameraUploadsStatus = CameraUploadsStatus.Uploading.takeIf {
                     isVisible
                 } ?: CameraUploadsStatus.None,
-                progress = progress,
+                cameraUploadsProgress = progress,
             )
         }
     }
@@ -676,6 +746,18 @@ class TimelineViewModel @Inject constructor(
     fun setCameraUploadsMessage(message: String) {
         _state.update {
             it.copy(cameraUploadsMessage = message)
+        }
+    }
+
+    private fun setCameraUploadsTotalUploaded(totalUploaded: Int) {
+        _state.update { state ->
+            state.copy(cameraUploadsTotalUploaded = totalUploaded)
+        }
+    }
+
+    private fun setCameraUploadsFinishedReason(reason: CameraUploadsFinishedReason) {
+        _state.update {
+            it.copy(cameraUploadsFinishedReason = reason)
         }
     }
 }

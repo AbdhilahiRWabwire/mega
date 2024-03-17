@@ -6,6 +6,7 @@ import mega.privacy.android.data.model.ChatUpdate
 import mega.privacy.android.data.model.ScheduledMeetingUpdate
 import mega.privacy.android.data.model.meeting.ChatCallUpdate
 import mega.privacy.android.domain.entity.chat.ChatVideoUpdate
+import nz.mega.sdk.MegaChatApi
 import nz.mega.sdk.MegaChatCall
 import nz.mega.sdk.MegaChatListItem
 import nz.mega.sdk.MegaChatLoggerInterface
@@ -1532,6 +1533,18 @@ interface MegaChatApiGateway {
     fun getReactionUsers(chatId: Long, msgId: Long, reaction: String): MegaHandleList
 
     /**
+     * Change the SFU id
+     *
+     * This function allows to set the SFU server where all chat calls will be started
+     * It's only useful for testing or debugging purposes.
+     *
+     * Note: To restore default behavior (SFU assigned by API), sfuId param must be set to SFU_ID_DEFAULT(-1)
+     *
+     * @param sfuId New SFU id
+     */
+    suspend fun setSFUid(sfuId: Int)
+
+    /**
      * Sets the last-seen-by-us pointer to the specified message
      *
      * The last-seen-by-us pointer is persisted in the account, so every client will
@@ -1682,5 +1695,104 @@ interface MegaChatApiGateway {
         sourceChatId: Long,
         msgId: Long,
         targetChatId: Long,
+    ): MegaChatMessage?
+
+    /**
+     * Deletes an existing message
+     *
+     * Message's deletions are equivalent to message's edits, but with empty content.
+     * @see \c MegaChatapi::editMessage for more information.
+     *
+     * You take the ownership of the returned value.
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param msgId MegaChatHandle that identifies the message
+     *
+     * @return MegaChatMessage that will be deleted. NULL if the message cannot be deleted (too old)
+     */
+    suspend fun deleteMessage(chatId: Long, msgId: Long): MegaChatMessage?
+
+    /**
+     * Revoke the access to a node granted by an attachment message
+     *
+     * The attachment message will be deleted as any other message. Therefore,
+     *
+     * The revoke is actually a deletion of the former message. Hence, the behavior is the
+     * same than a regular deletion.
+     * @see MegaChatApi::editMessage or MegaChatApi::deleteMessage for more information.
+     *
+     * If the revoke is rejected because the attachment message is too old, or if the message is
+     * not an attachment message, this function returns NULL.
+     *
+     * You take the ownership of the returned value.
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param msgId MegaChatHandle that identifies the message
+     *
+     * @return MegaChatMessage that will be modified. NULL if the message cannot be edited (too old)
+     */
+    suspend fun revokeAttachmentMessage(chatId: Long, msgId: Long): MegaChatMessage?
+
+    /**
+     * Edits an existing message
+     *
+     * Message's edits are only allowed during a short timeframe, usually 1 hour.
+     * Message's deletions are equivalent to message's edits, but with empty content.
+     *
+     * There is only one pending edit for not-yet confirmed edits. Therefore, this function will
+     * discard previous edits that haven't been notified via MegaChatRoomListener::onMessageUpdate
+     * where the message has MegaChatMessage::hasChanged(MegaChatMessage::CHANGE_TYPE_CONTENT).
+     *
+     * If the edits is rejected... // TODO:
+     *
+     * You take the ownership of the returned value.
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param msgId MegaChatHandle that identifies the message
+     * @param msg New content of the message
+     *
+     * @return MegaChatMessage that will be modified. NULL if the message cannot be edited (too old)
+     */
+    suspend fun editMessage(chatId: Long, msgId: Long, msg: String): MegaChatMessage?
+
+    /**
+     * Edit a geolocation message
+     *
+     * Message's edits are only allowed during a short timeframe, usually 1 hour.
+     * Message's deletions are equivalent to message's edits, but with empty content.
+     *
+     * There is only one pending edit for not-yet confirmed edits. Therefore, this function will
+     * discard previous edits that haven't been notified via MegaChatRoomListener::onMessageUpdate
+     * where the message has MegaChatMessage::hasChanged(MegaChatMessage::CHANGE_TYPE_CONTENT).
+     *
+     * If the edit is rejected because the original message is too old, this function return NULL.
+     *
+     * When an already delivered message (MegaChatMessage::STATUS_DELIVERED) is edited, the status
+     * of the message will change from STATUS_SENDING directly to STATUS_DELIVERED again, without
+     * the transition through STATUS_SERVER_RECEIVED. In other words, the protocol doesn't allow
+     * to know when an edit has been delivered to the target user, but only when the edit has been
+     * received by the server, so for convenience the status of the original message is kept.
+     * if MegaChatApi::isMessageReceptionConfirmationActive returns false, messages may never
+     * reach the status delivered, since the target user will not send the required acknowledge to the
+     * server upon reception.
+     *
+     * After this function, MegaChatApi::sendStopTypingNotification has to be called. To notify other clients
+     * that it isn't typing
+     *
+     * You take the ownership of the returned value.
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param msgId MegaChatHandle that identifies the message
+     * @param longitude from shared geolocation
+     * @param latitude from shared geolocation
+     * @param img Preview as a byte array encoded in Base64URL. It can be NULL
+     * @return MegaChatMessage that will be sent. The message id is not definitive, but temporal.
+     */
+    suspend fun editGeolocation(
+        chatId: Long,
+        msgId: Long,
+        longitude: Float,
+        latitude: Float,
+        img: String,
     ): MegaChatMessage?
 }

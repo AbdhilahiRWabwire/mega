@@ -35,6 +35,7 @@ fun ReactionsView(
     modifier: Modifier,
     reactions: List<UIReaction> = emptyList(),
     isMine: Boolean = false,
+    interactionEnabled: Boolean = true,
     onMoreReactionsClick: () -> Unit = {},
     onReactionClick: (String) -> Unit = {},
     onReactionLongClick: (String) -> Unit = {},
@@ -44,7 +45,7 @@ fun ReactionsView(
     CompositionLocalProvider(LocalLayoutDirection provides flowDirection) {
         FlowRow(
             modifier = modifier
-                .padding(4.dp)
+                .padding(vertical = 4.dp)
                 .testTag(TEST_TAG_REACTIONS_VIEW),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -55,10 +56,12 @@ fun ReactionsView(
                     onClick = onReactionClick,
                     onLongClick = onReactionLongClick,
                     systemLayoutDirection = systemLayoutDirection,
+                    interactionEnabled = interactionEnabled,
                 )
             }
             AddReactionChip(
                 onAddClicked = onMoreReactionsClick,
+                interactionEnabled = interactionEnabled,
             )
         }
     }

@@ -16,12 +16,29 @@ enum class AppFeatures(override val description: String, private val defaultValu
     Feature {
 
     /**
+     * Enables the Hidden Nodes feature
+     */
+    HiddenNodes(
+        "Enables the Hidden Nodes feature",
+        false,
+    ),
+
+    /**
      * Enables the Settings Camera Uploads page in Jetpack Compose
      */
     SettingsCameraUploadsCompose(
         "Enables the Settings Camera Uploads in Jetpack Compose. This requires an app " +
                 "restart for the changes to take effect.",
         false,
+    ),
+
+
+    /**
+     * Enables new incoming shares compose page
+     */
+    IncomingSharesCompose(
+        "Enable new Incoming Shares Compose page (requires app restart)",
+        false
     ),
 
 
@@ -40,14 +57,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     LinksCompose(
         "Enable new Shared Links Compose page (requires app restart)",
         false
-    ),
-
-    /**
-     * Enables new audio section flag
-     */
-    NewAudioSection(
-        "Enable new audio section flag",
-        true
     ),
 
     /**
@@ -103,24 +112,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     DownloadWorker(
         "Enables DownloadWorker for download nodes, instead of DownloadService. This is a work in progress feature.",
-        false,
-    ),
-
-    /**
-     * Shows the Dashboard Side Menu entrypoint named "Device centre"
-     *
-     * The Device Center shows the list of Devices that have uploaded content through Camera Uploads
-     * or Backups.
-     *
-     * Enabling this Feature Flag will hide the "Backups" Dashboard Side Menu entrypoint, and Backups
-     * can only be accessed inside Device Center when clicking a Device Backup Folder
-     */
-    DeviceCenter(
-        "Shows the Dashboard Side Menu entrypoint named \"Device centre\". The Device Center shows " +
-                "the list of Devices that have uploaded content through Camera Uploads or Backups. " +
-                "Enabling this Feature Flag will hide the \"Backups\" Dashboard Side Menu entrypoint, and " +
-                "Backups can only be accessed inside Device Center when clicking a Device Backup Folder.",
-        false,
+        true,
     ),
 
     /**
@@ -220,11 +212,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
      * To switch into new chat activity
      */
     NewChatActivity("Enable new chat activity", false),
-
-    /**
-     * Mute participant
-     */
-    MuteParticipant("Enable Mute participant", false),
 
     /**
      * Call unlimited for pro users

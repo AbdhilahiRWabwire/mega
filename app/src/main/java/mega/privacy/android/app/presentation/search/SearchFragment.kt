@@ -15,13 +15,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.appcompat.view.ActionMode
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
@@ -68,7 +66,6 @@ import mega.privacy.android.app.presentation.search.model.SearchFilter
 import mega.privacy.android.app.presentation.search.model.SearchState
 import mega.privacy.android.app.presentation.search.view.LoadingStateView
 import mega.privacy.android.app.presentation.search.view.SearchFilterChipsView
-import mega.privacy.android.app.presentation.shares.incoming.IncomingSharesViewModel
 import mega.privacy.android.app.utils.CloudStorageOptionControlUtil
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.AUTHORITY_STRING_FILE_PROVIDER
@@ -147,7 +144,6 @@ class SearchFragment : RotatableFragment() {
     private val sortByHeaderViewModel: SortByHeaderViewModel by activityViewModels()
     private val managerViewModel: ManagerViewModel by activityViewModels()
     private val fileBrowserViewModel: FileBrowserViewModel by activityViewModels()
-    private val incomingSharesViewModel: IncomingSharesViewModel by activityViewModels()
     private val backupsViewModel: BackupsViewModel by activityViewModels()
     private val rubbishBinViewModel: RubbishBinViewModel by activityViewModels()
     private val searchViewModel: SearchViewModel by activityViewModels()
@@ -298,7 +294,7 @@ class SearchFragment : RotatableFragment() {
                         isVisible = true
                         recyclerView?.isVisible = false
                         LoadingStateView(
-                            modifier = if (state().showChips) Modifier.padding(top = 48.dp) else Modifier,
+                            modifier = Modifier,
                             isList = state().currentViewType == ViewType.LIST
                         )
                     } else if (adapter.itemCount == 0) {
@@ -713,7 +709,7 @@ class SearchFragment : RotatableFragment() {
             browserParentHandle = fileBrowserViewModel.state.value.fileBrowserHandle,
             rubbishBinParentHandle = rubbishBinViewModel.state.value.rubbishBinHandle,
             backupsParentHandle = backupsViewModel.state.value.currentBackupsFolderNodeId.longValue,
-            incomingParentHandle = incomingSharesViewModel.state.value.incomingHandle,
+            incomingParentHandle = managerActivity.getHandleFromIncomingSharesViewModel(),
             outgoingParentHandle = managerActivity.getHandleFromOutgoingSharesViewModel(),
             linksParentHandle = managerActivity.getHandleFromLinksViewModel(),
             isFirstNavigationLevel = managerViewModel.state.value.isFirstNavigationLevel,

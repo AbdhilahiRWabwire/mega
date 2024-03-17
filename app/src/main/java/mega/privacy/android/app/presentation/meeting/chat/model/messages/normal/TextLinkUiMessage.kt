@@ -1,6 +1,5 @@
 package mega.privacy.android.app.presentation.meeting.chat.model.messages.normal
 
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.AvatarMessage
@@ -19,16 +18,19 @@ data class TextLinkUiMessage(
     override val reactions: List<UIReaction>,
 ) : AvatarMessage() {
     @Composable
-    override fun RowScope.ContentComposable(onLongClick: (TypedMessage) -> Unit) {
+    override fun ContentComposable(
+        onLongClick: (TypedMessage) -> Unit,
+        interactionEnabled: Boolean,
+    ) {
         ChatLinksMessageView(
-            modifier = Modifier.weight(1f, fill = false),
+            modifier = Modifier,
             onLongClick = onLongClick,
             message = message,
+            interactionEnabled = interactionEnabled,
         )
     }
 
     override val showAvatar = message.shouldShowAvatar
-    override val showTime = message.shouldShowTime
     override val displayAsMine = message.isMine
     override val shouldDisplayForwardIcon = true
     override val timeSent = message.time

@@ -116,6 +116,7 @@ import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_CHAT;
 import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_CHAT_ID;
 import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_CONTACT_TYPE;
 import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_FILE_NAME;
+import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_IMPORT_TO;
 import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_INSIDE;
 import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_IS_PLAYLIST;
 import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_MSG_ID;
@@ -205,7 +206,6 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -304,7 +304,7 @@ import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import kotlin.Unit;
-import mega.privacy.android.app.BuildConfig;
+import mega.privacy.android.analytics.Analytics;
 import mega.privacy.android.app.MegaApplication;
 import mega.privacy.android.app.MimeTypeList;
 import mega.privacy.android.app.R;
@@ -370,7 +370,6 @@ import mega.privacy.android.app.namecollision.data.NameCollision;
 import mega.privacy.android.app.namecollision.usecase.CheckNameCollisionUseCase;
 import mega.privacy.android.app.objects.GifData;
 import mega.privacy.android.app.objects.PasscodeManagement;
-import mega.privacy.android.app.presentation.transfers.startdownload.StartDownloadViewModel;
 import mega.privacy.android.app.presentation.chat.ChatViewModel;
 import mega.privacy.android.app.presentation.chat.ContactInvitation;
 import mega.privacy.android.app.presentation.chat.dialog.AddParticipantsNoContactsDialogFragment;
@@ -387,13 +386,13 @@ import mega.privacy.android.app.presentation.meeting.UsersInWaitingRoomDialogFra
 import mega.privacy.android.app.presentation.meeting.WaitingRoomActivity;
 import mega.privacy.android.app.presentation.meeting.WaitingRoomManagementViewModel;
 import mega.privacy.android.app.presentation.pdfviewer.PdfViewerActivity;
+import mega.privacy.android.app.presentation.transfers.startdownload.StartDownloadViewModel;
 import mega.privacy.android.app.psa.PsaWebBrowser;
 import mega.privacy.android.app.usecase.GetAvatarUseCase;
 import mega.privacy.android.app.usecase.GetNodeUseCase;
 import mega.privacy.android.app.usecase.GetPublicNodeUseCase;
 import mega.privacy.android.app.usecase.LegacyCopyNodeUseCase;
 import mega.privacy.android.app.usecase.LegacyGetPublicLinkInformationUseCase;
-import mega.privacy.android.app.usecase.call.EndCallUseCase;
 import mega.privacy.android.app.usecase.call.GetCallStatusChangesUseCase;
 import mega.privacy.android.app.usecase.call.GetCallUseCase;
 import mega.privacy.android.app.usecase.call.GetParticipantsChangesUseCase;
@@ -413,7 +412,6 @@ import mega.privacy.android.app.utils.Util;
 import mega.privacy.android.app.utils.permission.PermissionUtils;
 import mega.privacy.android.data.model.chat.AndroidMegaChatMessage;
 import mega.privacy.android.data.model.chat.AndroidMegaRichLinkMessage;
-import mega.privacy.android.domain.entity.ChatRoomPermission;
 import mega.privacy.android.domain.entity.StorageState;
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting;
 import mega.privacy.android.domain.entity.chat.FileGalleryItem;
@@ -422,8 +420,29 @@ import mega.privacy.android.domain.entity.chat.PendingMessageState;
 import mega.privacy.android.domain.entity.contacts.ContactLink;
 import mega.privacy.android.domain.entity.meeting.ScheduledMeetingStatus;
 import mega.privacy.android.domain.usecase.GetPushToken;
-import mega.privacy.android.domain.usecase.GetThemeMode;
 import mega.privacy.android.domain.usecase.permisison.HasMediaPermissionUseCase;
+import mega.privacy.mobile.analytics.event.ChatConversationAddParticipantsMenuToolbarEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationAddToCloudDriveActionMenuEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationArchiveMenuToolbarEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationCallMenuToolbarEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationClearMenuToolbarEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationCopyActionMenuEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationDeleteActionMenuEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationDownloadActionMenuEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationEditActionMenuEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationEndCallForAllMenuToolbarEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationForwardActionMenuEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationInfoMenuToolbarEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationInviteActionMenuEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationLeaveMenuToolbarEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationMuteMenuToolbarEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationScreenEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationSelectMenuToolbarEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationSendMessageActionMenuEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationShareActionMenuEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationUnmuteMenuToolbarEvent;
+import mega.privacy.mobile.analytics.event.ChatConversationVideoMenuToolbarEvent;
+import mega.privacy.mobile.analytics.event.ChatMessageLongPressedEvent;
 import nz.mega.documentscanner.DocumentScannerActivity;
 import nz.mega.sdk.MegaApiAndroid;
 import nz.mega.sdk.MegaApiJava;
@@ -514,8 +533,6 @@ public class ChatActivity extends PasscodeActivity
 
     private final static int PADDING_BUBBLE = 25;
     private final static int CORNER_RADIUS_BUBBLE = 30;
-    private final static int MARGIN_BUTTON_DEACTIVATED = 20;
-    private final static int MARGIN_BUTTON_ACTIVATED = 24;
     private final static int DURATION_BUBBLE = 4000;
     private int MIN_FIRST_AMPLITUDE = 2;
     private int MIN_SECOND_AMPLITUDE;
@@ -532,9 +549,6 @@ public class ChatActivity extends PasscodeActivity
     private final static int SIXTH_RANGE = 6;
 
     @Inject
-    GetThemeMode getThemeMode;
-
-    @Inject
     FilePrepareUseCase filePrepareUseCase;
     @Inject
     PasscodeManagement passcodeManagement;
@@ -546,8 +560,6 @@ public class ChatActivity extends PasscodeActivity
     GetPublicNodeUseCase getPublicNodeUseCase;
     @Inject
     GetChatChangesUseCase getChatChangesUseCase;
-    @Inject
-    EndCallUseCase endCallUseCase;
     @Inject
     GetCallStatusChangesUseCase getCallStatusChangesUseCase;
     @Inject
@@ -1463,6 +1475,9 @@ public class ChatActivity extends PasscodeActivity
     public void onCreate(Bundle savedInstanceState) {
         supportRequestWindowFeature(Window.FEATURE_NO_TITLE);
         super.onCreate(savedInstanceState);
+
+        Analytics.INSTANCE.getTracker().trackEvent(ChatConversationScreenEvent.INSTANCE);
+
         viewModel = new ViewModelProvider(this).get(ChatViewModel.class);
         startDownloadViewModel = new ViewModelProvider(this).get(StartDownloadViewModel.class);
         waitingRoomManagementViewModel = new ViewModelProvider(this).get(WaitingRoomManagementViewModel.class);
@@ -2092,7 +2107,9 @@ public class ChatActivity extends PasscodeActivity
 
             ChatScheduledMeeting schedMeet = chatState.getScheduledMeeting();
             if (schedMeet != null) {
-                adapter.notifyItemChanged(0);
+                if (adapter != null) {
+                    adapter.notifyItemChanged(0);
+                }
                 updateCallBanner();
             }
 
@@ -2549,11 +2566,6 @@ public class ChatActivity extends PasscodeActivity
         emptyLayout.setVisibility(View.VISIBLE);
 
         chatRelativeLayout.setVisibility(View.GONE);
-    }
-
-    public void removeChatLink() {
-        Timber.d("removeChatLink");
-        megaChatApi.removeChatLink(idChat, this);
     }
 
     /**
@@ -3252,6 +3264,8 @@ public class ChatActivity extends PasscodeActivity
     public boolean onOptionsItemSelected(MenuItem item) {
         Timber.d("onOptionsItemSelected");
 
+        trackOptionsItemSelected(item.getItemId());
+
         if (viewModel.getStorageState() == StorageState.PayWall &&
                 (item.getItemId() == R.id.cab_menu_call_chat || item.getItemId() == R.id.cab_menu_video_chat)) {
             showOverDiskQuotaPaywallWarning();
@@ -3330,6 +3344,32 @@ public class ChatActivity extends PasscodeActivity
             MegaApplication.getPushNotificationSettingManagement().controlMuteNotificationsOfAChat(this, NOTIFICATIONS_ENABLED, chatRoom.getChatId());
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void trackOptionsItemSelected(int itemId) {
+        if (itemId == R.id.cab_menu_call_chat) {
+            Analytics.INSTANCE.getTracker().trackEvent(ChatConversationCallMenuToolbarEvent.INSTANCE);
+        } else if (itemId == R.id.cab_menu_video_chat) {
+            Analytics.INSTANCE.getTracker().trackEvent(ChatConversationVideoMenuToolbarEvent.INSTANCE);
+        } else if (itemId == R.id.cab_menu_select_messages) {
+            Analytics.INSTANCE.getTracker().trackEvent(ChatConversationSelectMenuToolbarEvent.INSTANCE);
+        } else if (itemId == R.id.cab_menu_invite_chat) {
+            Analytics.INSTANCE.getTracker().trackEvent(ChatConversationAddParticipantsMenuToolbarEvent.INSTANCE);
+        } else if (itemId == R.id.cab_menu_contact_info_chat) {
+            Analytics.INSTANCE.getTracker().trackEvent(ChatConversationInfoMenuToolbarEvent.INSTANCE);
+        } else if (itemId == R.id.cab_menu_clear_history_chat) {
+            Analytics.INSTANCE.getTracker().trackEvent(ChatConversationClearMenuToolbarEvent.INSTANCE);
+        } else if (itemId == R.id.cab_menu_leave_chat) {
+            Analytics.INSTANCE.getTracker().trackEvent(ChatConversationLeaveMenuToolbarEvent.INSTANCE);
+        } else if (itemId == R.id.cab_menu_end_call_for_all) {
+            Analytics.INSTANCE.getTracker().trackEvent(ChatConversationEndCallForAllMenuToolbarEvent.INSTANCE);
+        } else if (itemId == R.id.cab_menu_archive_chat) {
+            Analytics.INSTANCE.getTracker().trackEvent(ChatConversationArchiveMenuToolbarEvent.INSTANCE);
+        } else if (itemId == R.id.cab_menu_mute_chat) {
+            Analytics.INSTANCE.getTracker().trackEvent(ChatConversationMuteMenuToolbarEvent.INSTANCE);
+        } else if (itemId == R.id.cab_menu_unmute_chat) {
+            Analytics.INSTANCE.getTracker().trackEvent(ChatConversationUnmuteMenuToolbarEvent.INSTANCE);
+        }
     }
 
     /*
@@ -3832,22 +3872,6 @@ public class ChatActivity extends PasscodeActivity
                 && checkPermissions(REQUEST_WRITE_STORAGE_TAKE_PICTURE, Manifest.permission.WRITE_EXTERNAL_STORAGE);
     }
 
-    private boolean checkPermissionsReadStorage() {
-        Timber.d("checkPermissionsReadStorage");
-        String[] PERMISSIONS = new String[]{
-                PermissionUtils.getImagePermissionByVersion(),
-                PermissionUtils.getAudioPermissionByVersion(),
-                PermissionUtils.getVideoPermissionByVersion(),
-                PermissionUtils.getReadExternalStoragePermission()
-        };
-        return checkPermissions(REQUEST_READ_STORAGE, PERMISSIONS);
-    }
-
-    private boolean checkPermissionWriteStorage(int code) {
-        Timber.d("checkPermissionsWriteStorage :%s", code);
-        return checkPermissions(code, Manifest.permission.WRITE_EXTERNAL_STORAGE);
-    }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         Timber.d("onRequestPermissionsResult");
@@ -3917,30 +3941,6 @@ public class ChatActivity extends PasscodeActivity
                 in.putExtra("chatId", idChat);
                 in.putExtra("aBtitle", getString(R.string.add_participants_menu_item));
                 startActivityForResult(in, REQUEST_ADD_PARTICIPANTS);
-            }
-        } else {
-            Timber.w("Online but not megaApi");
-            showErrorAlertDialog(getString(R.string.error_server_connection_problem), false, this);
-        }
-    }
-
-    public void chooseContactsDialog() {
-        Timber.d("chooseContactsDialog");
-
-        if (megaApi != null && megaApi.getRootNode() != null) {
-            ArrayList<MegaUser> contacts = megaApi.getContacts();
-            if (contacts == null) {
-                showSnackbar(SNACKBAR_TYPE, getString(R.string.no_contacts_invite), -1);
-            } else {
-                if (contacts.isEmpty()) {
-                    showSnackbar(SNACKBAR_TYPE, getString(R.string.no_contacts_invite), -1);
-                } else {
-                    Intent in = new Intent(this, AddContactActivity.class);
-                    in.putExtra("contactType", CONTACT_TYPE_MEGA);
-                    in.putExtra("chat", true);
-                    in.putExtra("aBtitle", getString(R.string.send_contacts));
-                    startActivityForResult(in, REQUEST_SEND_CONTACTS);
-                }
             }
         } else {
             Timber.w("Online but not megaApi");
@@ -4043,7 +4043,7 @@ public class ChatActivity extends PasscodeActivity
                 return;
             }
 
-            final long toHandle = intent.getLongExtra("IMPORT_TO", 0);
+            final long toHandle = intent.getLongExtra(INTENT_EXTRA_KEY_IMPORT_TO, 0);
 
             final long[] importMessagesHandles = intent.getLongArrayExtra("HANDLES_IMPORT_CHAT");
 
@@ -4998,8 +4998,10 @@ public class ChatActivity extends PasscodeActivity
 
             int itemId = item.getItemId();
             if (itemId == R.id.chat_cab_menu_edit) {
+                Analytics.INSTANCE.getTracker().trackEvent(ChatConversationEditActionMenuEvent.INSTANCE);
                 editMessage(messagesSelected);
             } else if (itemId == R.id.chat_cab_menu_share) {
+                Analytics.INSTANCE.getTracker().trackEvent(ChatConversationShareActionMenuEvent.INSTANCE);
                 Timber.d("Share option");
                 if (!messagesSelected.isEmpty()) {
                     if (messagesSelected.size() == 1) {
@@ -5009,6 +5011,7 @@ public class ChatActivity extends PasscodeActivity
                     }
                 }
             } else if (itemId == R.id.chat_cab_menu_invite) {
+                Analytics.INSTANCE.getTracker().trackEvent(ChatConversationInviteActionMenuEvent.INSTANCE);
                 ContactController cC = new ContactController(chatActivity);
                 if (messagesSelected.size() == 1) {
                     cC.inviteContact(messagesSelected.get(0).getMessage().getUserEmail(0));
@@ -5020,6 +5023,7 @@ public class ChatActivity extends PasscodeActivity
                     cC.inviteMultipleContacts(contactEmails);
                 }
             } else if (itemId == R.id.chat_cab_menu_start_conversation) {
+                Analytics.INSTANCE.getTracker().trackEvent(ChatConversationSendMessageActionMenuEvent.INSTANCE);
                 if (messagesSelected.size() == 1) {
                     startConversation(messagesSelected.get(0).getMessage().getUserHandle(0));
                 } else {
@@ -5030,9 +5034,11 @@ public class ChatActivity extends PasscodeActivity
                     startGroupConversation(contactHandles);
                 }
             } else if (itemId == R.id.chat_cab_menu_forward) {
+                Analytics.INSTANCE.getTracker().trackEvent(ChatConversationForwardActionMenuEvent.INSTANCE);
                 Timber.d("Forward message");
                 forwardMessages(messagesSelected);
             } else if (itemId == R.id.chat_cab_menu_copy) {
+                Analytics.INSTANCE.getTracker().trackEvent(ChatConversationCopyActionMenuEvent.INSTANCE);
                 String text;
                 if (messagesSelected.size() == 1) {
                     MegaChatMessage msg = messagesSelected.get(0).getMessage();
@@ -5042,8 +5048,10 @@ public class ChatActivity extends PasscodeActivity
                 }
                 copyToClipboard(text);
             } else if (itemId == R.id.chat_cab_menu_delete) {//Delete
+                Analytics.INSTANCE.getTracker().trackEvent(ChatConversationDeleteActionMenuEvent.INSTANCE);
                 showConfirmationDeleteMessages(messagesSelected, chatRoom);
             } else if (itemId == R.id.chat_cab_menu_download) {
+                Analytics.INSTANCE.getTracker().trackEvent(ChatConversationDownloadActionMenuEvent.INSTANCE);
                 ArrayList<Long> messageIds = new ArrayList<>();
                 for (int i = 0; i < messagesSelected.size(); i++) {
                     Long megaNodeHandle = messagesSelected.get(i).getMessage().getMsgId();
@@ -5064,6 +5072,7 @@ public class ChatActivity extends PasscodeActivity
                             return Unit.INSTANCE;
                         });
             } else if (itemId == R.id.chat_cab_menu_import) {
+                Analytics.INSTANCE.getTracker().trackEvent(ChatConversationAddToCloudDriveActionMenuEvent.INSTANCE);
                 finishMultiselectionMode();
                 chatC.importNodesFromAndroidMessages(messagesSelected, IMPORT_ONLY_OPTION);
             } else if (itemId == R.id.chat_cab_menu_offline) {
@@ -5560,6 +5569,7 @@ public class ChatActivity extends PasscodeActivity
     }
 
     public void itemLongClick(int positionInAdapter) {
+        Analytics.INSTANCE.getTracker().trackEvent(ChatMessageLongPressedEvent.INSTANCE);
         int positionInMessages = positionInAdapter - 1;
         if (positionInMessages >= messages.size())
             return;
@@ -8584,11 +8594,6 @@ public class ChatActivity extends PasscodeActivity
         this.chatRoom = chatRoom;
     }
 
-    public void revoke() {
-        Timber.d("revoke");
-        megaChatApi.revokeAttachmentMessage(idChat, selectedMessageId);
-    }
-
     @Override
     public void onRequestStart(MegaApiJava api, MegaRequest request) {
 
@@ -9474,27 +9479,6 @@ public class ChatActivity extends PasscodeActivity
 
     }
 
-    public MegaApiAndroid getLocalMegaApiFolder() {
-
-        PackageManager m = getPackageManager();
-        String s = getPackageName();
-        PackageInfo p;
-        String path = null;
-        try {
-            p = m.getPackageInfo(s, 0);
-            path = p.applicationInfo.dataDir + "/";
-        } catch (PackageManager.NameNotFoundException e) {
-            e.printStackTrace();
-        }
-
-        MegaApiAndroid megaApiFolder = new MegaApiAndroid(MegaApplication.APP_KEY, BuildConfig.USER_AGENT, path);
-
-        megaApiFolder.setDownloadMethod(MegaApiJava.TRANSFER_METHOD_AUTO_ALTERNATIVE);
-        megaApiFolder.setUploadMethod(MegaApiJava.TRANSFER_METHOD_AUTO_ALTERNATIVE);
-
-        return megaApiFolder;
-    }
-
     public File createImageFile() {
         Timber.d("createImageFile");
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
@@ -10152,23 +10136,36 @@ public class ChatActivity extends PasscodeActivity
 
         dialogBuilder.setTitle(getString(R.string.meetings_chat_screen_app_update_dialog_title))
                 .setMessage(getString(R.string.meetings_chat_screen_app_update_dialog_message))
-                .setNegativeButton(getString(R.string.meetings_chat_screen_app_update_dialog_cancel_button),
+                .setNegativeButton(getString(R.string.general_skip),
                         (dialog, which) -> {
-                            dialog.dismiss();
-                            viewModel.onForceUpdateDialogConsumed();
-                            forceAppUpdateDialog = null;
+                            skipForceUpdateDialog();
                         })
                 .setPositiveButton(getString(R.string.meetings_chat_screen_app_update_dialog_update_button),
                         (dialog, which) -> {
-                            viewModel.onForceUpdateDialogConsumed();
-                            dialog.dismiss();
-                            openPlayStore();
-                            forceAppUpdateDialog = null;
+                            updateApp();
                         });
 
         forceAppUpdateDialog = dialogBuilder.create();
         forceAppUpdateDialog.show();
     }
+
+    private void skipForceUpdateDialog() {
+        if (forceAppUpdateDialog != null && forceAppUpdateDialog.isShowing()) {
+            forceAppUpdateDialog.dismiss();
+            viewModel.onForceUpdateDialogConsumed();
+            forceAppUpdateDialog = null;
+        }
+    }
+
+    private void updateApp() {
+        if (forceAppUpdateDialog != null && forceAppUpdateDialog.isShowing()) {
+            forceAppUpdateDialog.dismiss();
+            viewModel.onForceUpdateDialogConsumed();
+            openPlayStore();
+            forceAppUpdateDialog = null;
+        }
+    }
+
 
     private void openPlayStore() {
         try {

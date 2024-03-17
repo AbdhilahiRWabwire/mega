@@ -1,10 +1,10 @@
 package mega.privacy.android.app.presentation.meeting.chat.model.messages.management
 
-import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
+import mega.privacy.android.app.presentation.meeting.chat.model.messages.UIMessageState
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.UiChatMessage
 import mega.privacy.android.core.ui.controls.chat.ChatMessageContainer
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
@@ -18,9 +18,7 @@ abstract class ManagementUiChatMessage : UiChatMessage {
     /**
      * Message
      */
-    abstract val message: ManagementMessage
-
-    override val showTime: Boolean = true
+    abstract override val message: ManagementMessage
 
     override val displayAsMine = false
 
@@ -29,19 +27,18 @@ abstract class ManagementUiChatMessage : UiChatMessage {
     /**
      * Content composable
      */
-    abstract val contentComposable: @Composable (RowScope.() -> Unit)
+    abstract val contentComposable: @Composable () -> Unit
 
     @Composable
     override fun MessageListItem(
-        uiState: ChatUiState,
-        lastUpdatedCache: Long,
-        timeFormatter: (Long) -> String,
-        dateFormatter: (Long) -> String,
+        state: UIMessageState,
         onLongClick: (TypedMessage) -> Unit,
         onMoreReactionsClicked: (Long) -> Unit,
         onReactionClicked: (Long, String, List<UIReaction>) -> Unit,
         onReactionLongClick: (String, List<UIReaction>) -> Unit,
         onForwardClicked: (TypedMessage) -> Unit,
+        onSelectedChanged: (Boolean) -> Unit,
+        onSendErrorClicked: (TypedMessage) -> Unit,
     ) {
         ChatMessageContainer(
             modifier = Modifier.fillMaxWidth(),
@@ -52,8 +49,11 @@ abstract class ManagementUiChatMessage : UiChatMessage {
             onReactionClick = { onReactionClicked(id, it, reactions) },
             onForwardClicked = { onForwardClicked(message) },
             onReactionLongClick = { onReactionLongClick(it, reactions) },
-            time = getTimeOrNull(timeFormatter),
-            content = contentComposable,
+            content = { _ -> contentComposable() },
+            onSelectionChanged = onSelectedChanged,
+            avatarOrIcon = { modifier ->
+                Spacer(modifier = modifier)
+            }
         )
     }
 

@@ -1,6 +1,7 @@
 package mega.privacy.android.core.ui.controls.chat
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -42,17 +43,6 @@ class ChatMessageContainerTest {
             time = null,
         )
         composeRule.onNodeWithTag(TEST_TAG_FORWARD_ICON).assertDoesNotExist()
-    }
-
-    @Test
-    fun `test that time show correctly`() {
-        val time = "12:00"
-        initComposeRuleContent(
-            isMine = false,
-            showForwardIcon = false,
-            time = time,
-        )
-        composeRule.onNodeWithText(time).assertExists()
     }
 
     @Test
@@ -122,21 +112,28 @@ class ChatMessageContainerTest {
         time: String?,
         isSendError: Boolean = false,
         reactions: List<UIReaction> = emptyList(),
+        inSelectMode: Boolean = false,
+        onSelectionChange: (Boolean) -> Unit = {},
     ) {
         composeRule.setContent {
-            ChatMessageContainer(
-                isMine = isMine,
-                showForwardIcon = showForwardIcon,
-                reactions = reactions,
-                onMoreReactionsClick = {},
-                onReactionClick = {},
-                onForwardClicked = onForwardClicked,
-                time = time,
-                isSendError = isSendError,
-                avatarOrIcon = {},
-                content = {},
-                onReactionLongClick = {},
-            )
+            LazyColumn() {
+                item {
+                    ChatMessageContainer(
+                        isMine = isMine,
+                        showForwardIcon = showForwardIcon,
+                        reactions = reactions,
+                        onMoreReactionsClick = {},
+                        onReactionClick = {},
+                        onForwardClicked = onForwardClicked,
+                        isSendError = isSendError,
+                        avatarOrIcon = {},
+                        content = {},
+                        onReactionLongClick = {},
+                        isSelectMode = inSelectMode,
+                        onSelectionChanged = onSelectionChange,
+                    )
+                }
+            }
         }
     }
 }

@@ -42,7 +42,6 @@ import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
 import mega.privacy.android.app.meeting.listeners.GroupVideoListener
 import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.meeting.model.InMeetingUiState
-import mega.privacy.android.app.usecase.call.EndCallUseCase
 import mega.privacy.android.app.usecase.call.GetCallStatusChangesUseCase
 import mega.privacy.android.app.usecase.call.GetCallUseCase
 import mega.privacy.android.app.usecase.call.GetNetworkChangesUseCase
@@ -68,10 +67,15 @@ import mega.privacy.android.domain.entity.statistics.EndCallForAll
 import mega.privacy.android.domain.entity.statistics.StayOnCallEmptyCall
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
+import mega.privacy.android.domain.usecase.chat.EndCallUseCase
+import mega.privacy.android.domain.usecase.chat.link.JoinPublicChatUseCase
+import mega.privacy.android.domain.usecase.login.ChatLogoutUseCase
 import mega.privacy.android.domain.usecase.meeting.BroadcastCallEndedUseCase
 import mega.privacy.android.domain.usecase.meeting.EnableAudioLevelMonitorUseCase
 import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
+import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.IsAudioLevelMonitorEnabledUseCase
+import mega.privacy.android.domain.usecase.meeting.JoinMeetingAsGuestUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 
 import mega.privacy.android.domain.usecase.meeting.RequestHighResolutionVideoUseCase
@@ -90,7 +94,6 @@ import nz.mega.sdk.MegaChatRoom.PRIV_MODERATOR
 import nz.mega.sdk.MegaChatSession
 import nz.mega.sdk.MegaChatVideoListenerInterface
 import nz.mega.sdk.MegaHandleList
-import nz.mega.sdk.MegaRequestListenerInterface
 import org.jetbrains.anko.defaultSharedPreferences
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
@@ -121,6 +124,9 @@ import javax.inject.Inject
  * @property getChatCallUseCase                 [GetChatCallUseCase]
  * @property getChatRoomUseCase                 [GetChatRoomUseCase]
  * @property monitorChatRoomUpdates             [MonitorChatRoomUpdates]
+ * @property joinPublicChatUseCase              [JoinPublicChatUseCase]
+ * @property joinMeetingAsGuestUseCase          [JoinMeetingAsGuestUseCase]
+ * @property chatLogoutUseCase                  [ChatLogoutUseCase]
  * @property state                              Current view state as [InMeetingUiState]
  */
 @HiltViewModel
@@ -149,6 +155,10 @@ class InMeetingViewModel @Inject constructor(
     private val getChatCallUseCase: GetChatCallUseCase,
     private val getChatRoomUseCase: GetChatRoomUseCase,
     private val broadcastCallEndedUseCase: BroadcastCallEndedUseCase,
+    private val hangChatCallUseCase: HangChatCallUseCase,
+    private val joinMeetingAsGuestUseCase: JoinMeetingAsGuestUseCase,
+    private val joinPublicChatUseCase: JoinPublicChatUseCase,
+    private val chatLogoutUseCase: ChatLogoutUseCase
 ) : BaseRxViewModel(), EditChatRoomNameListener.OnEditedChatRoomNameCallback,
     GetUserEmailListener.OnUserEmailUpdateCallback {
 
@@ -899,6 +909,95 @@ class InMeetingViewModel @Inject constructor(
      */
     fun isCallOrSessionOnHoldOfOneToOneCall(): Boolean =
         if (isCallOnHold()) true else isSessionOnHoldOfOneToOneCall()
+
+    /**
+     * Control when join a meeting as a guest
+     *
+     * @param meetingLink   Meeting link
+     * @param firstName     Guest first name
+     * @param lastName      Guest last name
+     */
+    fun joinMeetingAsGuest(meetingLink: String, firstName: String, lastName: String) {
+        viewModelScope.launch {
+            runCatching {
+                joinMeetingAsGuestUseCase(meetingLink, firstName, lastName)
+            }.onSuccess {
+                chatManagement
+                    .setOpeningMeetingLink(
+                        state.value.currentChatId,
+                        true
+                    )
+                autoJoinPublicChat()
+
+            }.onFailure { exception ->
+                Timber.e(exception)
+                chatLogout()
+            }
+        }
+    }
+
+    /**
+     * Chat logout
+     */
+    private fun chatLogout() {
+        viewModelScope.launch {
+            runCatching {
+                chatLogoutUseCase()
+            }.onSuccess {
+                _state.update {
+                    it.copy(
+                        shouldFinish = true,
+                    )
+                }
+            }.onFailure { exception ->
+                Timber.e(exception)
+                _state.update {
+                    it.copy(
+                        shouldFinish = true,
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Auto join public chat
+     */
+    private fun autoJoinPublicChat() {
+        if (!chatManagement.isAlreadyJoining(state.value.currentChatId)) {
+            chatManagement.addJoiningChatId(state.value.currentChatId)
+            viewModelScope.launch {
+                runCatching {
+                    joinPublicChatUseCase(state.value.currentChatId)
+                }.onSuccess {
+                    chatManagement.removeJoiningChatId(state.value.currentChatId)
+                    chatManagement.broadcastJoinedSuccessfully()
+                    _state.update {
+                        it.copy(
+                            joinedAsGuest = true,
+                        )
+                    }
+                }.onFailure { exception ->
+                    Timber.e(exception)
+                    chatManagement.removeJoiningChatId(state.value.currentChatId)
+                    _state.update {
+                        it.copy(
+                            shouldFinish = true,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Sets joinedAsGuest in state as consumed.
+     */
+    fun onJoinedAsGuestConsumed() = _state.update {
+        it.copy(
+            joinedAsGuest = false,
+        )
+    }
 
     /**
      * Method to know if a session is on hold in one to one call
@@ -2389,25 +2488,6 @@ class InMeetingViewModel @Inject constructor(
     }
 
     /**
-     * Log out of the chat for join as guest action
-     */
-    fun chatLogout(listener: MegaChatRequestListenerInterface) =
-        inMeetingRepository.chatLogout(listener)
-
-    /**
-     * Method to create an ephemera plus plus account, required before joining the chat room
-     *
-     * @param firstName First name of the guest
-     * @param lastName Last name of the guest
-     * @param listener MegaRequestListenerInterface
-     */
-    fun createEphemeralAccountAndJoinChat(
-        firstName: String,
-        lastName: String,
-        listener: MegaRequestListenerInterface,
-    ) = inMeetingRepository.createEphemeralAccountPlusPlus(firstName, lastName, listener)
-
-    /**
      * Method to open chat preview when joining as a guest
      *
      * @param link The link to the chat room or the meeting
@@ -2759,19 +2839,15 @@ class InMeetingViewModel @Inject constructor(
      *
      * @param chatId Chat ID
      */
-    private fun endCallForAll(chatId: Long) {
+    private fun endCallForAll(chatId: Long) = viewModelScope.launch {
         Timber.d("End for all. Chat id $chatId")
-        endCallUseCase.endCallForAllWithChatId(chatId)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy(onComplete = {
-                viewModelScope.launch {
-                    broadcastCallEndedUseCase(chatId)
-                }
-            }, onError = { error ->
-                Timber.e(error.stackTraceToString())
-            })
-            .addTo(composite)
+        runCatching {
+            endCallUseCase(chatId)
+        }.onSuccess {
+            broadcastCallEndedUseCase(chatId)
+        }.onFailure {
+            Timber.e(it.stackTraceToString())
+        }
     }
 
     /**
@@ -2794,19 +2870,15 @@ class InMeetingViewModel @Inject constructor(
      *
      * @param callId Call ID
      */
-    private fun hangCall(callId: Long) {
+    private fun hangCall(callId: Long) = viewModelScope.launch {
         Timber.d("Hang up call. Call id $callId")
-        endCallUseCase.hangCall(callId)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy(onComplete = {
-                viewModelScope.launch {
-                    broadcastCallEndedUseCase(state.value.currentChatId)
-                }
-            }, onError = { error ->
-                Timber.e(error.stackTraceToString())
-            })
-            .addTo(composite)
+        runCatching {
+            hangChatCallUseCase(callId)
+        }.onSuccess {
+            broadcastCallEndedUseCase(state.value.currentChatId)
+        }.onFailure {
+            Timber.e(it.stackTraceToString())
+        }
     }
 
     /**

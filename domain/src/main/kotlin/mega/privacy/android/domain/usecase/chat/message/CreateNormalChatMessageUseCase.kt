@@ -25,27 +25,31 @@ class CreateNormalChatMessageUseCase @Inject constructor(
                         chatId = chatId,
                         msgId = messageId,
                         time = timestamp,
+                        isDeletable = isDeletable,
+                        isEditable = isEditable,
                         isMine = isMine,
                         userHandle = userHandle,
                         links = allLinks,
                         content = content.orEmpty(),
                         shouldShowAvatar = shouldShowAvatar,
-                        shouldShowTime = shouldShowTime,
                         reactions = reactions,
+                        status = status,
                     )
 
                 else -> TextMessage(
                     chatId = chatId,
                     msgId = messageId,
                     time = timestamp,
+                    isDeletable = isDeletable,
+                    isEditable = isEditable,
                     isMine = isMine,
                     userHandle = userHandle,
                     content = content.orEmpty(),
                     hasOtherLink = allLinks.any { it.type !in supportedTypes },
                     shouldShowAvatar = shouldShowAvatar,
-                    shouldShowTime = shouldShowTime,
                     reactions = reactions,
                     isEdited = isEdited,
+                    status = status,
                 )
             }
         }

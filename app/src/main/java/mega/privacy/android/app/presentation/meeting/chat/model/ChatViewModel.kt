@@ -9,8 +9,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.palm.composestateevents.consumed
 import de.palm.composestateevents.triggered
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -32,8 +31,13 @@ import mega.privacy.android.app.presentation.extensions.isPast
 import mega.privacy.android.app.presentation.meeting.chat.extension.isJoined
 import mega.privacy.android.app.presentation.meeting.chat.mapper.ForwardMessagesResultMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteParticipantResultMapper
+import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteUserAsContactResultOptionMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.ParticipantNameMapper
+import mega.privacy.android.app.presentation.meeting.chat.view.navigation.INVALID_LOCATION_MESSAGE_ID
+import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
+import mega.privacy.android.app.utils.CacheFolderManager
 import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.core.ui.controls.chat.VoiceClipRecordEvent
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReactionUser
 import mega.privacy.android.domain.entity.ChatRoomPermission
@@ -42,12 +46,14 @@ import mega.privacy.android.domain.entity.chat.ChatConnectionStatus
 import mega.privacy.android.domain.entity.chat.ChatPushNotificationMuteOption
 import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.ChatRoomChange
+import mega.privacy.android.domain.entity.chat.messages.ContactAttachmentMessage
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.contacts.User
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
+import mega.privacy.android.domain.entity.node.chat.ChatFile
 import mega.privacy.android.domain.entity.statistics.EndCallForAll
 import mega.privacy.android.domain.entity.transfer.MultiTransferEvent
 import mega.privacy.android.domain.entity.user.UserId
@@ -58,8 +64,8 @@ import mega.privacy.android.domain.usecase.AddNodeType
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
-import mega.privacy.android.domain.usecase.MonitorContactCacheUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
+import mega.privacy.android.domain.usecase.cache.GetCacheFileUseCase
 import mega.privacy.android.domain.usecase.chat.ArchiveChatUseCase
 import mega.privacy.android.domain.usecase.chat.ClearChatHistoryUseCase
 import mega.privacy.android.domain.usecase.chat.CloseChatPreviewUseCase
@@ -81,15 +87,20 @@ import mega.privacy.android.domain.usecase.chat.MonitorParticipatingInACallInOth
 import mega.privacy.android.domain.usecase.chat.MonitorUserChatStatusByHandleUseCase
 import mega.privacy.android.domain.usecase.chat.MuteChatNotificationForChatRoomsUseCase
 import mega.privacy.android.domain.usecase.chat.OpenChatLinkUseCase
+import mega.privacy.android.domain.usecase.chat.RecordAudioUseCase
 import mega.privacy.android.domain.usecase.chat.UnmuteChatNotificationUseCase
 import mega.privacy.android.domain.usecase.chat.link.JoinPublicChatUseCase
 import mega.privacy.android.domain.usecase.chat.link.MonitorJoiningChatUseCase
 import mega.privacy.android.domain.usecase.chat.message.AttachContactsUseCase
 import mega.privacy.android.domain.usecase.chat.message.AttachNodeUseCase
+import mega.privacy.android.domain.usecase.chat.message.GetChatFromContactMessagesUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendChatAttachmentsUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendGiphyMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendLocationMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendTextMessageUseCase
+import mega.privacy.android.domain.usecase.chat.message.delete.DeleteMessagesUseCase
+import mega.privacy.android.domain.usecase.chat.message.edit.EditLocationMessageUseCase
+import mega.privacy.android.domain.usecase.chat.message.edit.EditMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.forward.ForwardMessagesUseCase
 import mega.privacy.android.domain.usecase.chat.message.reactions.AddReactionUseCase
 import mega.privacy.android.domain.usecase.chat.message.reactions.DeleteReactionUseCase
@@ -98,11 +109,13 @@ import mega.privacy.android.domain.usecase.contact.GetParticipantFirstNameUseCas
 import mega.privacy.android.domain.usecase.contact.GetParticipantFullNameUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserOnlineStatusByHandleUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserUseCase
+import mega.privacy.android.domain.usecase.contact.InviteContactUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorAllContactParticipantsInChatUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorHasAnyContactUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorUserLastGreenUpdatesUseCase
 import mega.privacy.android.domain.usecase.contact.RequestUserLastGreenUseCase
 import mega.privacy.android.domain.usecase.file.CreateNewImageUriUseCase
+import mega.privacy.android.domain.usecase.file.DeleteFileUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
@@ -120,8 +133,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
 
 /**
  * Extra Action
@@ -145,7 +156,6 @@ const val EXTRA_LINK = "LINK"
  *
  * @param savedStateHandle
  */
-@OptIn(FlowPreview::class)
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val isChatNotificationMuteUseCase: IsChatNotificationMuteUseCase,
@@ -189,7 +199,6 @@ class ChatViewModel @Inject constructor(
     private val sendTextMessageUseCase: SendTextMessageUseCase,
     private val holdChatCallUseCase: HoldChatCallUseCase,
     private val hangChatCallUseCase: HangChatCallUseCase,
-    private val monitorContactCacheUpdates: MonitorContactCacheUpdates,
     private val joinPublicChatUseCase: JoinPublicChatUseCase,
     private val isAnonymousModeUseCase: IsAnonymousModeUseCase,
     private val savedStateHandle: SavedStateHandle,
@@ -215,6 +224,15 @@ class ChatViewModel @Inject constructor(
     private val attachNodeUseCase: AttachNodeUseCase,
     private val getNodeByIdUseCase: GetNodeByIdUseCase,
     private val addNodeType: AddNodeType,
+    private val deleteMessagesUseCase: DeleteMessagesUseCase,
+    private val editMessageUseCase: EditMessageUseCase,
+    private val editLocationMessageUseCase: EditLocationMessageUseCase,
+    private val inviteContactUseCase: InviteContactUseCase,
+    private val inviteUserAsContactResultOptionMapper: InviteUserAsContactResultOptionMapper,
+    private val getChatFromContactMessagesUseCase: GetChatFromContactMessagesUseCase,
+    private val getCacheFileUseCase: GetCacheFileUseCase,
+    private val recordAudioUseCase: RecordAudioUseCase,
+    private val deleteFileUseCase: DeleteFileUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ChatUiState())
     val state = _state.asStateFlow()
@@ -245,7 +263,6 @@ class ChatViewModel @Inject constructor(
         monitorHasAnyContact()
         loadChatOrPreview()
         checkAnonymousMode()
-        monitorContactCacheUpdate()
         monitorNotificationMute()
         monitorJoiningChat()
         monitorLeavingChat()
@@ -309,19 +326,6 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             val isAnonymousMode = isAnonymousModeUseCase()
             _state.update { state -> state.copy(isAnonymousMode = isAnonymousMode) }
-        }
-    }
-
-    private fun monitorContactCacheUpdate() {
-        viewModelScope.launch {
-            monitorContactCacheUpdates()
-                // I don't know why sdk emit 2 the same events, add debounce to optimize
-                .debounce(300L.toDuration(DurationUnit.MILLISECONDS))
-                .catch { Timber.e(it) }
-                .collect {
-                    Timber.d("Contact cache update: $it")
-                    _state.update { state -> state.copy(userUpdate = it) }
-                }
         }
     }
 
@@ -1018,7 +1022,13 @@ class ChatViewModel @Inject constructor(
      */
     fun sendTextMessage(message: String) {
         viewModelScope.launch {
-            sendTextMessageUseCase(chatId, message)
+            state.value.editingMessageId?.let {
+                val editedMessage = editMessageUseCase(chatId, it, message)
+                onCloseEditing()
+                if (editedMessage == null) {
+                    messageCannotBeEdited()
+                }
+            } ?: sendTextMessageUseCase(chatId, message)
         }
     }
 
@@ -1065,12 +1075,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /**
-     * On user update handled.
-     */
-    fun onUserUpdateHandled() {
-        _state.update { state -> state.copy(userUpdate = null) }
-    }
 
     /**
      * Sets pending link to join.
@@ -1082,9 +1086,12 @@ class ChatViewModel @Inject constructor(
     /**
      * Attaches files.
      */
-    fun onAttachFiles(files: List<Uri>) {
+    fun onAttachFiles(files: List<Uri>) =
+        onAttachFiles(files.map { it.toString() }, false)
+
+    private fun onAttachFiles(files: List<String>, isVoiceClip: Boolean) {
         viewModelScope.launch {
-            sendChatAttachmentsUseCase(chatId, files.map { it.toString() })
+            sendChatAttachmentsUseCase(chatId, files, isVoiceClip)
                 .catch { Timber.e(it) }
                 .collect {
                     if (it is MultiTransferEvent.TransferNotStarted<*>) {
@@ -1136,7 +1143,7 @@ class ChatViewModel @Inject constructor(
     suspend fun createNewImageUri(): Uri? {
         Timber.d("createNewImageUri")
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val imageFileName = "picture${timeStamp}_.jpg"
+        val imageFileName = "picture${timeStamp}.jpg"
         return createNewImageUriUseCase(imageFileName)?.let { Uri.parse(it) }
     }
 
@@ -1148,15 +1155,30 @@ class ChatViewModel @Inject constructor(
             val byteArray = data.getByteArrayExtra(MapsActivity.SNAPSHOT) ?: return
             val latitude = data.getDoubleExtra(MapsActivity.LATITUDE, 0.0).toFloat()
             val longitude = data.getDoubleExtra(MapsActivity.LONGITUDE, 0.0).toFloat()
+            val isEditing = data.getBooleanExtra(MapsActivity.EDITING_MESSAGE, false)
+            val msgId = data.getLongExtra(MapsActivity.MSG_ID, INVALID_LOCATION_MESSAGE_ID)
 
             viewModelScope.launch {
                 val encodedSnapshot = Base64.encodeToString(byteArray, Base64.DEFAULT)
-                sendLocationMessageUseCase(
-                    chatId = chatId,
-                    latitude = latitude,
-                    longitude = longitude,
-                    image = encodedSnapshot
-                )
+                if (isEditing) {
+                    val editedMessage = editLocationMessageUseCase(
+                        chatId = chatId,
+                        msgId = msgId,
+                        longitude = longitude,
+                        latitude = latitude,
+                        image = encodedSnapshot
+                    )
+                    if (editedMessage == null) {
+                        messageCannotBeEdited()
+                    }
+                } else {
+                    sendLocationMessageUseCase(
+                        chatId = chatId,
+                        latitude = latitude,
+                        longitude = longitude,
+                        image = encodedSnapshot
+                    )
+                }
             }
         }
     }
@@ -1166,7 +1188,13 @@ class ChatViewModel @Inject constructor(
      *
      */
     fun onCloseEditing() {
-        _state.update { state -> state.copy(editingMessageId = null) }
+        _state.update { state ->
+            state.copy(
+                editingMessageId = null,
+                editingMessageContent = null,
+                sendingText = "",
+            )
+        }
     }
 
     /**
@@ -1272,12 +1300,12 @@ class ChatViewModel @Inject constructor(
      * Forward messages.
      */
     fun onForwardMessages(
-        messages: List<TypedMessage>,
+        messages: Set<TypedMessage>,
         chatHandles: List<Long>?,
         contactHandles: List<Long>?,
     ) {
         viewModelScope.launch {
-            runCatching { forwardMessagesUseCase(messages, chatHandles, contactHandles) }
+            runCatching { forwardMessagesUseCase(messages.toList(), chatHandles, contactHandles) }
                 .onSuccess { results ->
                     val result = forwardMessagesResultMapper(results, messages.size)
                     val infoToShow = InfoToShow.ForwardMessagesResult(result)
@@ -1311,6 +1339,21 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * Delete messages.
+     *
+     * @param messages list of [TypedMessage].
+     */
+    fun onDeletedMessages(messages: Set<TypedMessage>) {
+        viewModelScope.launch {
+            runCatching {
+                deleteMessagesUseCase(messages.toList())
+            }.onFailure {
+                Timber.e(it)
+            }
+        }
+    }
+
+    /**
      * called when viewmodel is cleared
      */
     override fun onCleared() {
@@ -1326,7 +1369,191 @@ class ChatViewModel @Inject constructor(
         super.onCleared()
     }
 
+    /**
+     * Consume download event
+     *
+     */
+    fun consumeDownloadEvent() {
+        _state.update { state -> state.copy(downloadEvent = consumed()) }
+    }
+
+    /**
+     * On download chat node
+     *
+     * @param file [ChatFile]
+     */
+    fun onDownloadForPreviewChatNode(file: ChatFile) {
+        _state.update {
+            it.copy(downloadEvent = triggered(TransferTriggerEvent.StartDownloadForPreview(file)))
+        }
+    }
+
+    /**
+     * On download for offline chat node
+     *
+     * @param file [ChatFile]
+     */
+    fun onDownloadForOfflineChatNode(file: ChatFile) {
+        _state.update {
+            it.copy(downloadEvent = triggered(TransferTriggerEvent.StartDownloadForOffline(file)))
+        }
+    }
+
+    /**
+     * Edit message.
+     *
+     * @param message [TypedMessage].
+     */
+    fun onEditMessage(message: TypedMessage) {
+        val content = message.content
+        if (content.isNullOrEmpty()) {
+            onCloseEditing()
+            messageCannotBeEdited()
+        } else {
+            _state.update { state ->
+                state.copy(
+                    sendingText = content,
+                    editingMessageId = message.msgId,
+                    editingMessageContent = content,
+                )
+            }
+        }
+    }
+
+    /**
+     * Invite contacts
+     *
+     * @param contactMessageList set of [ContactAttachmentMessage]
+     */
+    fun inviteContacts(contactMessageList: Set<ContactAttachmentMessage>) = viewModelScope.launch {
+        if (contactMessageList.size == 1) {
+            inviteSingleContact(contactMessageList.first())
+        } else if (contactMessageList.size > 1) {
+            inviteMultipleContacts(contactMessageList)
+        }
+    }
+
+    private suspend fun inviteMultipleContacts(messageList: Set<ContactAttachmentMessage>) {
+        runCatching {
+            TODO("not implemented")
+        }.onSuccess {
+
+        }.onFailure { Timber.e(it) }
+    }
+
+    private suspend fun inviteSingleContact(
+        message: ContactAttachmentMessage,
+    ) {
+        runCatching {
+            inviteContactUseCase(
+                email = message.contactEmail,
+                handle = message.contactHandle,
+                message = null
+            )
+        }.onSuccess {
+            val email = message.contactEmail
+            val infoToShow = InfoToShow.InviteUserAsContactResult(
+                inviteUserAsContactResultOptionMapper(
+                    inviteContactRequest = it,
+                    email = email
+                )
+            )
+            _state.update { state -> state.copy(infoToShowEvent = triggered(infoToShow)) }
+        }.onFailure { Timber.e(it) }
+    }
+
+    /**
+     * Send message
+     */
+    fun onOpenChatWith(messages: List<ContactAttachmentMessage>) {
+        viewModelScope.launch {
+            runCatching {
+                getChatFromContactMessagesUseCase(messages)
+            }.onSuccess {
+                _state.update { state ->
+                    state.copy(actionToManageEvent = triggered(ActionToManage.OpenChat(it)))
+                }
+            }.onFailure {
+                Timber.e(it)
+            }
+        }
+    }
+
+    /**
+     * Open chat conversation event consumed
+     */
+    fun onActionToManageEventConsumed() {
+        _state.update { state -> state.copy(actionToManageEvent = consumed()) }
+    }
+
+    private fun messageCannotBeEdited() {
+        val infoToShow = InfoToShow.SimpleString(R.string.error_editing_message)
+        _state.update { state -> state.copy(infoToShowEvent = triggered(infoToShow)) }
+    }
+
+    /**
+     * Enable select mode.
+     */
+    fun onEnableSelectMode() {
+        _state.update { state ->
+            state.copy(actionToManageEvent = triggered(ActionToManage.EnableSelectMode))
+        }
+    }
+
+    /**
+     * Open contact info.
+     */
+    fun onOpenContactInfo(contactEmail: String) {
+        _state.update { state ->
+            state.copy(actionToManageEvent = triggered(ActionToManage.OpenContactInfo(contactEmail)))
+        }
+    }
+
+    /**
+     * Handle voice clip record event
+     */
+    fun onVoiceClipRecordEvent(voiceClipRecordEvent: VoiceClipRecordEvent) {
+        when (voiceClipRecordEvent) {
+            VoiceClipRecordEvent.Start -> startRecordingVoiceClip()
+            VoiceClipRecordEvent.Cancel -> recordAudioJob?.cancel(CancelVoiceClip)
+            VoiceClipRecordEvent.Finish -> recordAudioJob?.cancel(StopAndSendVoiceClip)
+            VoiceClipRecordEvent.None, VoiceClipRecordEvent.Lock -> {} //nothing here
+        }
+    }
+
+    private var recordAudioJob: Job? = null
+    private fun startRecordingVoiceClip() {
+        recordAudioJob?.cancel()
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        getCacheFileUseCase(CacheFolderManager.VOICE_CLIP_FOLDER, "note_voice${timeStamp}.m4a")
+            ?.let { voiceClipFile ->
+                recordAudioJob = viewModelScope.launch {
+                    recordAudioUseCase(voiceClipFile).collectLatest {
+                        //this should be used to play waveform animation in AND-18251
+                        Timber.d("recording audio with amplitude $it")
+                    }
+                }
+                recordAudioJob?.invokeOnCompletion {
+                    if (it == StopAndSendVoiceClip) {
+                        onAttachFiles(listOf(voiceClipFile.toString()), true)
+                    } else {
+                        viewModelScope.launch {
+                            deleteFileUseCase(voiceClipFile.toString())
+                        }
+                    }
+                    if (it !is CancellationException) {
+                        Timber.e("Error recording voice clip", it)
+                    }
+                }
+            } ?: run {
+            Timber.e("Cache file for voice clip recording can't be created")
+        }
+    }
+
     companion object {
         private const val INVALID_HANDLE = -1L
     }
 }
+
+internal object StopAndSendVoiceClip : CancellationException()
+internal object CancelVoiceClip : CancellationException()

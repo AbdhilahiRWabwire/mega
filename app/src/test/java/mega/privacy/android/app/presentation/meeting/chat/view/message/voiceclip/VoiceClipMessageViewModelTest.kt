@@ -49,12 +49,14 @@ class VoiceClipMessageViewModelTest {
         name = "name",
         isMine = true,
         time = 1,
+        isDeletable = false,
+        isEditable = false,
         status = ChatMessageStatus.SERVER_RECEIVED,
+        content = null,
         size = 1,
         duration = 3000.milliseconds,
         userHandle = 1L,
         shouldShowAvatar = true,
-        shouldShowTime = true,
         reactions = emptyList(),
     )
 

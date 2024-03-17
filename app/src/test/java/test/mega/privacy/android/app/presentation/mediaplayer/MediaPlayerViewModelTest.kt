@@ -68,7 +68,7 @@ internal class MediaPlayerViewModelTest {
             getNodeByHandle = getNodeByHandle,
             legacyCopyNodeUseCase = legacyCopyNodeUseCase,
             checkNameCollisionUseCase = checkNameCollisionUseCase,
-            legacyPublicAlbumPhotoNodeProvider = mock()
+            legacyPublicAlbumPhotoNodeProvider = mock(),
         )
     }
 

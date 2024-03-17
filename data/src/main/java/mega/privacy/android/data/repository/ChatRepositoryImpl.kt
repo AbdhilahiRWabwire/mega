@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -61,7 +62,7 @@ import mega.privacy.android.data.mapper.chat.paging.GiphyEntityMapper
 import mega.privacy.android.data.mapper.chat.paging.MessagePagingInfoMapper
 import mega.privacy.android.data.mapper.chat.paging.RichPreviewEntityMapper
 import mega.privacy.android.data.mapper.chat.paging.TypedMessageEntityMapper
-import mega.privacy.android.data.mapper.chat.paging.TypedMessagePagingSourceMapper
+import mega.privacy.android.data.mapper.chat.update.ChatRoomMessageUpdateMapper
 import mega.privacy.android.data.mapper.notification.ChatMessageNotificationBehaviourMapper
 import mega.privacy.android.data.model.ChatRoomUpdate
 import mega.privacy.android.data.model.ChatUpdate
@@ -78,6 +79,7 @@ import mega.privacy.android.domain.entity.chat.RichLinkConfig
 import mega.privacy.android.domain.entity.chat.messages.paging.MessagePagingInfo
 import mega.privacy.android.domain.entity.chat.messages.request.CreateTypedMessageRequest
 import mega.privacy.android.domain.entity.chat.notification.ChatMessageNotification
+import mega.privacy.android.domain.entity.chat.room.update.ChatRoomMessageUpdate
 import mega.privacy.android.domain.entity.contacts.InviteContactRequest
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.settings.ChatSettings
@@ -129,7 +131,6 @@ import kotlin.coroutines.suspendCoroutine
  * @property megaLocalRoomGateway
  * @property databaseHandler
  * @property chatStorageGateway
- * @property typedMessagePagingSourceMapper
  * @property typedMessageEntityMapper
  * @property messagePagingInfoMapper
  * @property richPreviewEntityMapper
@@ -161,7 +162,6 @@ internal class ChatRepositoryImpl @Inject constructor(
     private val megaLocalRoomGateway: MegaLocalRoomGateway,
     private val databaseHandler: DatabaseHandler,
     private val chatStorageGateway: ChatStorageGateway,
-    private val typedMessagePagingSourceMapper: TypedMessagePagingSourceMapper,
     private val typedMessageEntityMapper: TypedMessageEntityMapper,
     private val messagePagingInfoMapper: MessagePagingInfoMapper,
     private val richPreviewEntityMapper: RichPreviewEntityMapper,
@@ -169,6 +169,7 @@ internal class ChatRepositoryImpl @Inject constructor(
     private val chatGeolocationEntityMapper: ChatGeolocationEntityMapper,
     private val chatNodeEntityListMapper: ChatNodeEntityListMapper,
     private val reactionUpdateMapper: ReactionUpdateMapper,
+    private val chatRoomMessageUpdateMapper: ChatRoomMessageUpdateMapper,
     @ApplicationContext private val context: Context,
 ) : ChatRepository {
     private val richLinkConfig = MutableStateFlow(RichLinkConfig())
@@ -705,26 +706,22 @@ internal class ChatRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun monitorMessageUpdates(chatId: Long) = flow {
-        getChatRoomUpdates(chatId)?.let { updates ->
+    override fun monitorMessageUpdates(chatId: Long): Flow<ChatRoomMessageUpdate> = flow {
+        getChatRoomUpdates(chatId)?.let { updates: Flow<ChatRoomUpdate> ->
             emitAll(updates.mapNotNull {
-                when (it) {
-                    is ChatRoomUpdate.OnHistoryTruncatedByRetentionTime -> it.msg
-                    is ChatRoomUpdate.OnMessageReceived -> it.msg
-                    is ChatRoomUpdate.OnMessageUpdate -> it.msg
-                    else -> null
-                }
-            }.map {
-                chatMessageMapper(it)
+                chatRoomMessageUpdateMapper(it)
+            }.onEach {
+                Timber.d("Chat message update for chatId: $chatId: $it")
             }.flowOn(ioDispatcher))
         }
     }
 
     override fun monitorReactionUpdates(chatId: Long) = flow {
         getChatRoomUpdates(chatId)?.let { updates ->
-            emitAll(updates.filterIsInstance<ChatRoomUpdate.OnReactionUpdate>()
-                .map { reactionUpdateMapper(it) }
-                .flowOn(ioDispatcher))
+            emitAll(
+                updates.filterIsInstance<ChatRoomUpdate.OnReactionUpdate>()
+                    .map { reactionUpdateMapper(it) }
+                    .flowOn(ioDispatcher))
         }
     }
 
@@ -1249,9 +1246,6 @@ internal class ChatRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getPagedMessages(chatId: Long) =
-        typedMessagePagingSourceMapper(chatStorageGateway.getTypedMessageRequestPagingSource(chatId))
-
     override suspend fun storeMessages(messages: List<CreateTypedMessageRequest>) {
         withContext(ioDispatcher) {
             chatStorageGateway.storeMessages(
@@ -1362,4 +1356,8 @@ internal class ChatRepositoryImpl @Inject constructor(
         }.map { (chatId, message) ->
             message?.let { ChatMessageNotification(chatId, chatMessageMapper(it)) }
         }.flowOn(ioDispatcher)
+
+    override suspend fun setSFUid(sfuId: Int) = withContext(ioDispatcher) {
+        megaChatApiGateway.setSFUid(sfuId)
+    }
 }

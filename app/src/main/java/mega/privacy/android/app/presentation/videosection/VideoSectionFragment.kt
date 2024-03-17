@@ -37,17 +37,19 @@ import mega.privacy.android.app.mediaplayer.miniplayer.MiniAudioPlayerController
 import mega.privacy.android.app.presentation.bottomsheet.NodeOptionsBottomSheetDialogFragment
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.mapper.GetOptionsForToolbarMapper
+import mega.privacy.android.app.presentation.videosection.model.VideoSectionTab
 import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
 import mega.privacy.android.app.presentation.videosection.view.VideoSectionFeatureScreen
 import mega.privacy.android.app.presentation.videosection.view.playlist.videoPlaylistDetailRoute
 import mega.privacy.android.app.presentation.videosection.view.videoSectionRoute
-import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.AUTHORITY_STRING_FILE_PROVIDER
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_FILE_NAME
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_HANDLE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ORDER_GET_CHILDREN
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_POSITION
+import mega.privacy.android.app.utils.Constants.ORDER_CLOUD
+import mega.privacy.android.app.utils.Constants.ORDER_VIDEO_PLAYLIST
 import mega.privacy.android.app.utils.Constants.VIDEO_BROWSE_ADAPTER
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.callManager
@@ -87,6 +89,10 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
     private val playlistMenuMoreProvider = object : MenuProvider {
         override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
             menuInflater.inflate(R.menu.fragment_playlist_menu_more, menu)
+            menu.findItem(R.id.menu_playlist_more).setOnMenuItemClickListener {
+                videoSectionViewModel.setShouldShowMoreVideoPlaylistOptions(true)
+                true
+            }
         }
 
         override fun onMenuItemSelected(menuItem: MenuItem): Boolean = true
@@ -143,6 +149,12 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
                 (activity as? ManagerActivity)?.closeSearchView()
             }
         }
+
+        viewLifecycleOwner.collectFlow(
+            videoSectionViewModel.state.map { it.currentDestinationRoute }.distinctUntilChanged()
+        ) { route ->
+            route?.let { updateToolbarWhenDestinationChanged(it) }
+        }
     }
 
     private fun initVideoSectionComposeView() {
@@ -173,9 +185,6 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
                         },
                         onMenuClick = { item ->
                             showOptionsMenuForItem(item)
-                        },
-                        onDestinationChanged = { route ->
-                            route?.let { updateToolbarWhenDestinationChanged(it) }
                         }
                     )
                 }
@@ -185,7 +194,10 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
     }
 
     private fun showSortByPanel() {
-        (requireActivity() as ManagerActivity).showNewSortByPanel(Constants.ORDER_CLOUD)
+        val currentSelectTab = videoSectionViewModel.tabState.value.selectedTab
+        (requireActivity() as ManagerActivity).showNewSortByPanel(
+            if (currentSelectTab == VideoSectionTab.All) ORDER_CLOUD else ORDER_VIDEO_PLAYLIST
+        )
     }
 
     private fun openVideoFile(

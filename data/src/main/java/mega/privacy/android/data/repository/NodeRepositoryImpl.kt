@@ -843,18 +843,26 @@ internal class NodeRepositoryImpl @Inject constructor(
     override suspend fun exportNode(nodeToExport: NodeId, expireTime: Long?): String =
         withContext(ioDispatcher) {
             val node = getMegaNodeByHandle(nodeToExport, true)
-            requireNotNull(node) { "Node to export with handle ${nodeToExport.longValue} not found" }
-            require(!node.isTakenDown) { "Node to export with handle ${nodeToExport.longValue} not found" }
-
-            if (node.isExported && !node.isExpired && node.expirationTime == expireTime) {
-                return@withContext node.publicLink
-            }
-            suspendCancellableCoroutine { continuation ->
-                val listener = continuation.getRequestListener("exportNode") { it.link }
-                megaApiGateway.exportNode(node, expireTime, listener)
-                continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
-            }
+            exportNode(node, expireTime)
         }
+
+    override suspend fun exportNode(node: TypedNode) = withContext(ioDispatcher) {
+        exportNode(megaNodeMapper(node), null)
+    }
+
+    private suspend fun exportNode(node: MegaNode?, expireTime: Long?): String {
+        requireNotNull(node) { "Node to export not found" }
+        require(!node.isTakenDown) { "Node to export is taken down" }
+
+        if (node.isExported && !node.isExpired && node.expirationTime == expireTime) {
+            return node.publicLink.orEmpty()
+        }
+        return suspendCancellableCoroutine { continuation ->
+            val listener = continuation.getRequestListener("exportNode") { it.link.orEmpty() }
+            megaApiGateway.exportNode(node, expireTime, listener)
+            continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
+        }
+    }
 
     override suspend fun getBannerQuotaTime() =
         withContext(ioDispatcher) {
@@ -939,6 +947,14 @@ internal class NodeRepositoryImpl @Inject constructor(
             megaApiGateway.setNodeFavourite(
                 node = megaApiGateway.getMegaNodeByHandle(nodeId.longValue),
                 favourite = isFavorite
+            )
+        }
+
+    override suspend fun updateNodeSensitive(nodeId: NodeId, isSensitive: Boolean) =
+        withContext(ioDispatcher) {
+            megaApiGateway.setNodeSensitive(
+                node = megaApiGateway.getMegaNodeByHandle(nodeId.longValue),
+                sensitive = isSensitive,
             )
         }
 
@@ -1030,8 +1046,12 @@ internal class NodeRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getLocalLink(node: TypedNode): String? = withContext(ioDispatcher) {
-        megaNodeMapper(node)?.let { node ->
-            megaApiGateway.httpServerGetLocalLink(node)
-        }
+        runCatching {
+            megaNodeMapper(node)?.let { node ->
+                megaApiGateway.httpServerGetLocalLink(node)
+            }
+        }.onFailure {
+            Timber.e(it)
+        }.getOrNull()
     }
 }

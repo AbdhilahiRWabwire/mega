@@ -19,6 +19,8 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.domain.usecase.GetNodeByHandle
 import mega.privacy.android.app.presentation.videosection.mapper.VideoPlaylistUIEntityMapper
 import mega.privacy.android.app.presentation.videosection.mapper.VideoUIEntityMapper
+import mega.privacy.android.app.presentation.videosection.model.DurationFilterOption
+import mega.privacy.android.app.presentation.videosection.model.LocationFilterOption
 import mega.privacy.android.app.presentation.videosection.model.VideoPlaylistUIEntity
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionState
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionTab
@@ -42,8 +44,10 @@ import mega.privacy.android.domain.usecase.photos.GetNextDefaultAlbumNameUseCase
 import mega.privacy.android.domain.usecase.videosection.AddVideosToPlaylistUseCase
 import mega.privacy.android.domain.usecase.videosection.CreateVideoPlaylistUseCase
 import mega.privacy.android.domain.usecase.videosection.GetAllVideosUseCase
+import mega.privacy.android.domain.usecase.videosection.GetSyncUploadsFolderIdsUseCase
 import mega.privacy.android.domain.usecase.videosection.GetVideoPlaylistsUseCase
 import mega.privacy.android.domain.usecase.videosection.RemoveVideoPlaylistsUseCase
+import mega.privacy.android.domain.usecase.videosection.UpdateVideoPlaylistTitleUseCase
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
 import java.io.File
@@ -71,6 +75,8 @@ class VideoSectionViewModel @Inject constructor(
     private val addVideosToPlaylistUseCase: AddVideosToPlaylistUseCase,
     private val getNextDefaultAlbumNameUseCase: GetNextDefaultAlbumNameUseCase,
     private val removeVideoPlaylistsUseCase: RemoveVideoPlaylistsUseCase,
+    private val updateVideoPlaylistTitleUseCase: UpdateVideoPlaylistTitleUseCase,
+    private val getSyncUploadsFolderIdsUseCase: GetSyncUploadsFolderIdsUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(VideoSectionState())
 
@@ -143,7 +149,11 @@ class VideoSectionViewModel @Inject constructor(
     private fun setPendingRefreshNodes() = _state.update { it.copy(isPendingRefresh = true) }
 
     internal fun refreshNodes() = viewModelScope.launch {
-        val videoList = getVideoUIEntityList().updateOriginalData().filterVideosBySearchQuery()
+        val videoList = getVideoUIEntityList()
+            .updateOriginalData()
+            .filterVideosBySearchQuery()
+            .filterVideosByDuration()
+            .filterVideosByLocation()
         val sortOrder = getCloudSortOrder()
         _state.update {
             it.copy(
@@ -170,6 +180,35 @@ class VideoSectionViewModel @Inject constructor(
     private suspend fun getVideoUIEntityList() =
         getAllVideosUseCase().map { videoUIEntityMapper(it) }
 
+    private suspend fun List<VideoUIEntity>.filterVideosByLocation() =
+        _state.value.locationSelectedFilterOption?.let { locationOption ->
+            val syncUploadsFolderIds = getSyncUploadsFolderIdsUseCase()
+            filter {
+                when (locationOption) {
+                    LocationFilterOption.CloudDrive ->
+                        it.parentId.longValue !in syncUploadsFolderIds
+
+                    LocationFilterOption.CameraUploads ->
+                        it.parentId.longValue in syncUploadsFolderIds
+
+                    LocationFilterOption.SharedItems -> it.isSharedItems
+                }
+            }
+        } ?: this
+
+    private fun List<VideoUIEntity>.filterVideosByDuration() =
+        _state.value.durationSelectedFilterOption?.let { durationOption ->
+            filter {
+                when (durationOption) {
+                    DurationFilterOption.LessThan4 -> it.durationInMinutes < 4
+
+                    DurationFilterOption.Between4And20 -> it.durationInMinutes in 4..20
+
+                    DurationFilterOption.MoreThan20 -> it.durationInMinutes > 20
+                }
+            }
+        } ?: this
+
     internal fun markHandledPendingRefresh() = _state.update { it.copy(isPendingRefresh = false) }
 
     internal fun onTabSelected(selectTab: VideoSectionTab) {
@@ -190,10 +229,12 @@ class VideoSectionViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     sortOrder = sortOrder,
-                    progressBarShowing = true
+                    progressBarShowing = true,
+                    isPlaylistProgressBarShown = true
                 )
             }
             setPendingRefreshNodes()
+            loadVideoPlaylists()
         }
 
     internal fun shouldShowSearchMenu() =
@@ -399,7 +440,7 @@ class VideoSectionViewModel @Inject constructor(
             .takeIf { it.isNotEmpty() && checkVideoPlaylistTitleValidity(it) }
             ?.let { playlistTitle ->
                 createVideoPlaylistJob = viewModelScope.launch {
-                    setShowCreateVideoPlaylistDialog(false)
+                    setShouldCreateVideoPlaylist(false)
                     runCatching {
                         createVideoPlaylistUseCase(playlistTitle)
                     }.onSuccess { videoPlaylist ->
@@ -433,9 +474,23 @@ class VideoSectionViewModel @Inject constructor(
                         playlistIDs = deletedPlaylistIDs,
                         deletedPlaylist = deletedList
                     )
+                Timber.d("removeVideoPlaylists deletedPlaylistTitles: $deletedPlaylistTitles")
                 _state.update {
                     it.copy(
-                        deletedVideoPlaylistTitles = deletedPlaylistTitles
+                        deletedVideoPlaylistTitles = deletedPlaylistTitles,
+                        shouldDeleteVideoPlaylist = false,
+                        shouldDeleteSingleVideoPlaylist = false,
+                        areVideoPlaylistsRemovedSuccessfully = true
+                    )
+                }
+                loadVideoPlaylists()
+            }.onFailure { exception ->
+                Timber.e(exception)
+                _state.update {
+                    it.copy(
+                        shouldDeleteVideoPlaylist = false,
+                        shouldDeleteSingleVideoPlaylist = false,
+                        areVideoPlaylistsRemovedSuccessfully = false
                     )
                 }
             }
@@ -467,14 +522,55 @@ class VideoSectionViewModel @Inject constructor(
             }
         }
 
+    internal fun updateVideoPlaylistTitle(playlistID: NodeId, newTitle: String) =
+        newTitle.trim()
+            .takeIf { it.isNotEmpty() && checkVideoPlaylistTitleValidity(it) }
+            ?.let { title ->
+                viewModelScope.launch {
+                    runCatching {
+                        updateVideoPlaylistTitleUseCase(playlistID, title)
+                    }.onSuccess { title ->
+                        Timber.d("Updated video playlist title: $title")
+                        _state.update {
+                            it.copy(
+                                shouldRenameVideoPlaylist = false
+                            )
+                        }
+                        loadVideoPlaylists()
+                        updateCurrentVideoPlaylistAfterUpdatedTitle(title)
+                    }.onFailure { exception ->
+                        Timber.e(exception)
+                        _state.update {
+                            it.copy(
+                                shouldRenameVideoPlaylist = false
+                            )
+                        }
+                    }
+                }
+            }
+
+    private fun updateCurrentVideoPlaylistAfterUpdatedTitle(newTitle: String) =
+        _state.value.currentVideoPlaylist?.copy(title = newTitle)
+            ?.let { updatedCurrentVideoPlaylist ->
+                _state.update {
+                    it.copy(
+                        currentVideoPlaylist = updatedCurrentVideoPlaylist
+                    )
+                }
+            }
+
+    internal fun setShouldRenameVideoPlaylist(value: Boolean) = _state.update {
+        it.copy(shouldRenameVideoPlaylist = value)
+    }
+
     internal fun updateCurrentVideoPlaylist(playlist: VideoPlaylistUIEntity?) {
         _state.update {
             it.copy(currentVideoPlaylist = playlist)
         }
     }
 
-    internal fun setShowCreateVideoPlaylistDialog(showCreateDialog: Boolean) = _state.update {
-        it.copy(shouldCreateVideoPlaylistDialog = showCreateDialog)
+    internal fun setShouldCreateVideoPlaylist(value: Boolean) = _state.update {
+        it.copy(shouldCreateVideoPlaylist = value)
     }
 
     internal fun setPlaceholderTitle(placeholderTitle: String) {
@@ -525,6 +621,48 @@ class VideoSectionViewModel @Inject constructor(
     internal fun setIsVideoPlaylistCreatedSuccessfully(value: Boolean) = _state.update {
         it.copy(isVideoPlaylistCreatedSuccessfully = value)
     }
+
+    internal fun setShouldDeleteVideoPlaylist(value: Boolean) = _state.update {
+        it.copy(shouldDeleteVideoPlaylist = value)
+    }
+
+    internal fun setShouldDeleteSingleVideoPlaylist(value: Boolean) = _state.update {
+        it.copy(shouldDeleteSingleVideoPlaylist = value)
+    }
+
+    internal fun clearDeletedVideoPlaylistTitles() = _state.update {
+        it.copy(deletedVideoPlaylistTitles = emptyList())
+    }
+
+    internal fun setShouldShowMoreVideoPlaylistOptions(value: Boolean) = _state.update {
+        it.copy(shouldShowMoreVideoPlaylistOptions = value)
+    }
+
+    internal fun setAreVideoPlaylistsRemovedSuccessfully(value: Boolean) = _state.update {
+        it.copy(areVideoPlaylistsRemovedSuccessfully = value)
+    }
+
+    internal fun setCurrentDestinationRoute(route: String?) = _state.update {
+        it.copy(currentDestinationRoute = route)
+    }
+
+    internal fun setLocationSelectedFilterOption(locationFilterOption: LocationFilterOption?) =
+        _state.update {
+            it.copy(
+                locationSelectedFilterOption = locationFilterOption,
+                progressBarShowing = true,
+                isPendingRefresh = true
+            )
+        }
+
+    internal fun setDurationSelectedFilterOption(durationFilterOption: DurationFilterOption?) =
+        _state.update {
+            it.copy(
+                durationSelectedFilterOption = durationFilterOption,
+                progressBarShowing = true,
+                isPendingRefresh = true
+            )
+        }
 
     companion object {
         private const val ERROR_MESSAGE_REPEATED_TITLE = 0

@@ -9,6 +9,7 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.meeting.chat.view.message.management.ChatCallMessageView
 import mega.privacy.android.app.utils.TextUtil
 import mega.privacy.android.core.ui.controls.chat.messages.TEST_TAG_MANAGEMENT_MESSAGE_ICON
+import mega.privacy.android.domain.entity.chat.ChatMessageStatus
 import mega.privacy.android.domain.entity.chat.ChatMessageTermCode
 import mega.privacy.android.domain.entity.chat.messages.management.CallEndedMessage
 import mega.privacy.android.domain.entity.chat.messages.management.CallMessage
@@ -32,11 +33,14 @@ class ChatCallMessageViewTest {
                 chatId = 1,
                 msgId = msgId,
                 time = System.currentTimeMillis(),
+                isDeletable = false,
+                isEditable = false,
                 isMine = true,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
-                shouldShowTime = false,
                 reactions = emptyList(),
+                status = ChatMessageStatus.UNKNOWN,
+                content = null
             ),
             isOneToOneChat = true
         )
@@ -52,13 +56,16 @@ class ChatCallMessageViewTest {
                 chatId = 1,
                 msgId = msgId,
                 time = System.currentTimeMillis(),
+                isDeletable = false,
+                isEditable = false,
                 isMine = true,
                 termCode = ChatMessageTermCode.ENDED,
                 duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
-                shouldShowTime = false,
                 reactions = emptyList(),
+                status = ChatMessageStatus.UNKNOWN,
+                content = null
             ),
             isOneToOneChat = true
         )
@@ -74,13 +81,16 @@ class ChatCallMessageViewTest {
                 chatId = 1,
                 msgId = msgId,
                 time = System.currentTimeMillis(),
+                isDeletable = false,
+                isEditable = false,
                 isMine = true,
                 termCode = ChatMessageTermCode.ENDED,
                 duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
-                shouldShowTime = false,
                 reactions = emptyList(),
+                status = ChatMessageStatus.UNKNOWN,
+                content = null
             ),
             isOneToOneChat = false
         )
@@ -100,13 +110,16 @@ class ChatCallMessageViewTest {
                 chatId = 1,
                 msgId = msgId,
                 time = System.currentTimeMillis(),
+                isDeletable = false,
+                isEditable = false,
                 isMine = true,
                 termCode = ChatMessageTermCode.REJECTED,
                 duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
-                shouldShowTime = false,
                 reactions = emptyList(),
+                status = ChatMessageStatus.UNKNOWN,
+                content = null
             ),
             isOneToOneChat = true
         )
@@ -126,13 +139,16 @@ class ChatCallMessageViewTest {
                 chatId = 1,
                 msgId = msgId,
                 time = System.currentTimeMillis(),
+                isDeletable = false,
+                isEditable = false,
                 isMine = true,
                 termCode = ChatMessageTermCode.NO_ANSWER,
                 duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
-                shouldShowTime = false,
                 reactions = emptyList(),
+                status = ChatMessageStatus.UNKNOWN,
+                content = null
             ),
             isOneToOneChat = true
         )
@@ -152,13 +168,16 @@ class ChatCallMessageViewTest {
                 chatId = 1,
                 msgId = msgId,
                 time = System.currentTimeMillis(),
+                isDeletable = false,
+                isEditable = false,
                 isMine = false,
                 termCode = ChatMessageTermCode.NO_ANSWER,
                 duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
-                shouldShowTime = false,
                 reactions = emptyList(),
+                status = ChatMessageStatus.UNKNOWN,
+                content = null
             ),
             isOneToOneChat = true
         )
@@ -178,13 +197,16 @@ class ChatCallMessageViewTest {
                 chatId = 1,
                 msgId = msgId,
                 time = System.currentTimeMillis(),
+                isDeletable = false,
+                isEditable = false,
                 isMine = true,
                 termCode = ChatMessageTermCode.CANCELLED,
                 duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
-                shouldShowTime = false,
                 reactions = emptyList(),
+                status = ChatMessageStatus.UNKNOWN,
+                content = null
             ),
             isOneToOneChat = true
         )
@@ -204,13 +226,16 @@ class ChatCallMessageViewTest {
                 chatId = 1,
                 msgId = msgId,
                 time = System.currentTimeMillis(),
+                isDeletable = false,
+                isEditable = false,
                 isMine = false,
                 termCode = ChatMessageTermCode.CANCELLED,
                 duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
-                shouldShowTime = false,
                 reactions = emptyList(),
+                status = ChatMessageStatus.UNKNOWN,
+                content = null
             ),
             isOneToOneChat = true
         )
@@ -230,13 +255,16 @@ class ChatCallMessageViewTest {
                 chatId = 1,
                 msgId = msgId,
                 time = System.currentTimeMillis(),
+                isDeletable = false,
+                isEditable = false,
                 isMine = false,
                 termCode = ChatMessageTermCode.FAILED,
                 duration = 0.seconds,
                 userHandle = 1234567890L,
                 shouldShowAvatar = false,
-                shouldShowTime = false,
                 reactions = emptyList(),
+                status = ChatMessageStatus.UNKNOWN,
+                content = null
             ),
             isOneToOneChat = true
         )

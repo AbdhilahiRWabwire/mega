@@ -1,5 +1,6 @@
 package mega.privacy.android.domain.repository
 
+import mega.privacy.android.domain.entity.FileTypeInfo
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeId
@@ -339,11 +340,6 @@ interface FileSystemRepository {
     suspend fun getFileNameFromUri(uriString: String): String?
 
     /**
-     * @return the extension of the file represented by [uriString]
-     */
-    suspend fun getFileExtensionFromUri(uriString: String): String?
-
-    /**
      * Copies the file represented by a content [uriString] to the destination File. Usually, it is to make a content file returned by a share intent usable by the SDK.
      * @param uriString the string representing the file, it must be a "content" uri
      * @param file the destination file where the original file will be copied
@@ -354,4 +350,21 @@ interface FileSystemRepository {
      * @return the files in same folder
      */
     suspend fun getFileSiblingByUri(uriString: String): List<File>
+
+    /**
+     * Creates a new image from [file] to [destination] with [maxPixels] pixels if the image has more than [maxPixels] pixels
+     */
+    suspend fun downscaleImage(file: File, destination: File, maxPixels: Long)
+
+    /**
+     * Deletes a voice clip file.
+     *
+     * @return True if file has been removed, false otherwise
+     */
+    suspend fun deleteVoiceClip(name: String): Boolean
+
+    /**
+     * Get file type info for a given file
+     */
+    suspend fun getFileTypeInfo(file: File): FileTypeInfo
 }

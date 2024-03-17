@@ -26,6 +26,7 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.contacts.ContactsActivity
 import mega.privacy.android.app.databinding.NavigationViewLayoutBinding
+import mega.privacy.android.app.featuretoggle.ABTestFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.globalmanagement.MyAccountInfo
 import mega.privacy.android.app.main.DrawerItem
@@ -49,6 +50,7 @@ import mega.privacy.android.data.qualifier.MegaApi
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.mobile.analytics.event.AndroidSyncNavigationItemEvent
+import mega.privacy.mobile.analytics.event.DeviceCenterEntrypointButtonEvent
 import nz.mega.sdk.MegaApiAndroid
 import timber.log.Timber
 import javax.inject.Inject
@@ -156,12 +158,12 @@ internal class ManagerDrawerFragment : Fragment() {
             setContactStatus(uiState.userChatStatus)
             // For QA Builds, show Backups when the Device Center Feature Flag is also disabled
             binding.backupsSection.isVisible =
-                !uiState.enabledFlags.contains(AppFeatures.DeviceCenter) && uiState.hasBackupsChildren
+                !uiState.enabledFlags.contains(ABTestFeatures.dmca) && uiState.hasBackupsChildren
             setDrawerLayout(uiState.isRootNodeExist && uiState.isConnected)
             binding.navigationDrawerAddPhoneNumberContainer.isVisible = uiState.canVerifyPhoneNumber
             binding.syncSection.isVisible = uiState.enabledFlags.contains(AppFeatures.AndroidSync)
             binding.deviceCenterSection.isVisible =
-                uiState.enabledFlags.contains(AppFeatures.DeviceCenter)
+                uiState.enabledFlags.contains(ABTestFeatures.dmca)
         }
         viewLifecycleOwner.collectFlow(managerViewModel.numUnreadUserAlerts) { result ->
             if (result.first != UnreadUserAlertsCheckType.NAVIGATION_TOOLBAR_ICON) {
@@ -201,7 +203,10 @@ internal class ManagerDrawerFragment : Fragment() {
         }
         binding.backupsSection.setOnClickListener { drawerManager.drawerItemClicked(DrawerItem.BACKUPS) }
         binding.notificationsSection.setOnClickListener { drawerManager.drawerItemClicked(DrawerItem.NOTIFICATIONS) }
-        binding.deviceCenterSection.setOnClickListener { drawerManager.drawerItemClicked(DrawerItem.DEVICE_CENTER) }
+        binding.deviceCenterSection.setOnClickListener {
+            Analytics.tracker.trackEvent(DeviceCenterEntrypointButtonEvent)
+            drawerManager.drawerItemClicked(DrawerItem.DEVICE_CENTER)
+        }
         binding.transfersSection.setOnClickListener { drawerManager.drawerItemClicked(DrawerItem.TRANSFERS) }
         binding.syncSection.setOnClickListener {
             Analytics.tracker.trackEvent(AndroidSyncNavigationItemEvent)

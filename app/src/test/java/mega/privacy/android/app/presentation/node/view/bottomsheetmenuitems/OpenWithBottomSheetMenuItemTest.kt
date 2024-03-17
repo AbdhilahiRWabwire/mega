@@ -14,7 +14,7 @@ import mega.privacy.android.domain.entity.shares.AccessPermission
 import mega.privacy.android.domain.usecase.file.GetFileUriUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunningUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
-import mega.privacy.android.domain.usecase.node.GetNodePreviewFilePathUseCase
+import mega.privacy.android.domain.usecase.node.GetNodePreviewFileUseCase
 import mega.privacy.android.domain.usecase.streaming.GetStreamingUriStringForNode
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -32,13 +32,12 @@ import java.util.stream.Stream
 class OpenWithBottomSheetMenuItemTest {
     private val openWithMenuAction = OpenWithMenuAction()
     private val getFileUriUseCase = mock<GetFileUriUseCase>()
-    private val getLocalFilePathUseCase = mock<GetNodePreviewFilePathUseCase>()
+    private val getLocalFilePathUseCase = mock<GetNodePreviewFileUseCase>()
     private val httpServerStartUseCase = mock<MegaApiHttpServerStartUseCase>()
     private val getStreamingUriStringForNode = mock<GetStreamingUriStringForNode>()
     private val isHttpServerRunningUseCase = mock<MegaApiHttpServerIsRunningUseCase>()
     private val snackBarHandler = mock<SnackBarHandler>()
     private val context = mock<Context>()
-    private val scope = mock<CoroutineScope>()
     private val underTest = OpenWithBottomSheetMenuItem(
         openWithMenuAction,
         getFileUriUseCase,
@@ -48,7 +47,6 @@ class OpenWithBottomSheetMenuItemTest {
         getStreamingUriStringForNode,
         snackBarHandler,
         context,
-        scope,
     )
 
     @ParameterizedTest(name = "isNodeInRubbish {0} - accessPermission {1} - isInBackups {2} - node {3} - expected {4}")
@@ -121,8 +119,9 @@ class OpenWithBottomSheetMenuItemTest {
         val onDismiss = mock<() -> Unit>()
         val actionHandler = { _: MenuAction, _: TypedNode -> }
         val navController = mock<NavHostController>()
+        val parentScope = mock<CoroutineScope>()
         val onClickFunction =
-            underTest.getOnClickFunction(node, onDismiss, actionHandler, navController)
+            underTest.getOnClickFunction(node, onDismiss, actionHandler, navController, parentScope)
         onClickFunction.invoke()
         verify(onDismiss).invoke()
         verifyNoInteractions(getLocalFilePathUseCase)

@@ -24,8 +24,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -53,6 +58,11 @@ const val TEST_TAG_EXPAND_ICON = "chat_input_text_toolbar:expand_icon"
 const val TEST_TAG_SEND_ICON = "chat_input_text_toolbar:send_icon"
 
 /**
+ * Record voice clip tag
+ */
+const val TEST_TAG_RECORD_VOICE_CLIP_ICON = "chat_input_text_toolbar:record_voice_clip"
+
+/**
  * Chat input text toolbar
  *
  * @param modifier modifier
@@ -74,11 +84,15 @@ fun ChatInputTextToolbar(
     editingMessageId: Long? = null,
     editMessageContent: String? = null,
     onCloseEditing: () -> Unit = {},
+    onVoiceClipEvent: (VoiceClipRecordEvent) -> Unit = {},
+    focusRequester: FocusRequester = remember { FocusRequester() },
 ) {
     var isInputExpanded by rememberSaveable { mutableStateOf(false) }
     var showExpandButton by remember { mutableStateOf(false) }
     var isRoundedShape by remember { mutableStateOf(false) }
     val isEditing = editingMessageId != null
+    val voiceClipRecorderState =
+        remember { mutableStateOf(VoiceClipRecorderState()) }
     LaunchedEffect(textFieldValue.text) {
         if (textFieldValue.text.isEmpty()) {
             isInputExpanded = false
@@ -92,6 +106,7 @@ fun ChatInputTextToolbar(
     } else {
         RoundedCornerShape(12.dp)
     }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -112,6 +127,10 @@ fun ChatInputTextToolbar(
                 tint = MegaTheme.colors.icon.secondary,
             )
         }
+        VoiceClipRecorderView(
+            voiceClipRecorderState = voiceClipRecorderState,
+            onVoiceClipEvent = onVoiceClipEvent,
+        )
         Column {
             Row {
                 Icon(
@@ -140,12 +159,14 @@ fun ChatInputTextToolbar(
                 ) {
                     if (editingMessageId != null) {
                         ChatEditMessageView(
-                            modifier = Modifier.padding(
-                                start = 12.dp,
-                                end = 10.dp,
-                                top = 8.dp,
-                                bottom = 4.dp,
-                            ).fillMaxWidth(),
+                            modifier = Modifier
+                                .padding(
+                                    start = 12.dp,
+                                    end = 10.dp,
+                                    top = 8.dp,
+                                    bottom = 4.dp,
+                                )
+                                .fillMaxWidth(),
                             content = editMessageContent.orEmpty(),
                             onCloseEditing = onCloseEditing,
                         )
@@ -161,7 +182,8 @@ fun ChatInputTextToolbar(
                             showExpandButton = it.lineCount >= 4
                             isRoundedShape = it.lineCount == 1
                         },
-                        interactionSource = interactionSource
+                        interactionSource = interactionSource,
+                        focusRequester = focusRequester,
                     )
                 }
 
@@ -169,7 +191,8 @@ fun ChatInputTextToolbar(
                     modifier = Modifier
                         .align(Alignment.Bottom)
                         .padding(vertical = 6.dp),
-                    visible = textFieldValue.text.isNotEmpty()
+                    visible = textFieldValue.text.isNotEmpty() ||
+                            voiceClipRecorderState.value.event == VoiceClipRecordEvent.Lock,
                 ) {
                     Icon(
                         modifier = Modifier
@@ -177,12 +200,52 @@ fun ChatInputTextToolbar(
                             .padding(start = 8.dp)
                             .testTag(TEST_TAG_SEND_ICON)
                             .clickable(onClick = {
-                                onSendClick(textFieldValue.text)
+                                if (voiceClipRecorderState.value.show) {
+                                    voiceClipRecorderState.value =
+                                        VoiceClipRecorderState(show = false)
+                                    onVoiceClipEvent(VoiceClipRecordEvent.Finish)
+                                } else {
+                                    onSendClick(textFieldValue.text)
+                                }
                                 isInputExpanded = false
                             }),
                         painter = painterResource(id = R.drawable.ic_send),
                         contentDescription = "Send icon",
                         tint = MegaTheme.colors.icon.accent
+                    )
+                }
+                AnimatedVisibility(
+                    modifier = Modifier
+                        .align(Alignment.Bottom)
+                        .padding(vertical = 6.dp),
+                    visible = textFieldValue.text.isEmpty() &&
+                            voiceClipRecorderState.value.event != VoiceClipRecordEvent.Lock,
+                ) {
+                    Icon(
+                        imageVector = ImageVector.vectorResource(R.drawable.ic_icon_mic_medium_regular_outline),
+                        contentDescription = "mic icon",
+                        tint = MegaTheme.colors.icon.secondary,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 8.dp)
+                            .testTag(TEST_TAG_RECORD_VOICE_CLIP_ICON)
+                            .pointerInput(null) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        if (event.type == PointerEventType.Press) {
+                                            voiceClipRecorderState.value =
+                                                VoiceClipRecorderState(show = true)
+                                        }
+                                        voiceClipRecorderState.value =
+                                            voiceClipRecorderState.value.copy(
+                                                offsetX = event.changes.first().position.x,
+                                                offsetY = event.changes.first().position.y,
+                                                type = event.type
+                                            )
+                                    }
+                                }
+                            },
                     )
                 }
             }

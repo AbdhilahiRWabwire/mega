@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.ModalBottomSheetValue
@@ -46,8 +45,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -66,17 +65,19 @@ import mega.privacy.android.app.presentation.meeting.chat.extension.getInfo
 import mega.privacy.android.app.presentation.meeting.chat.extension.getOpenChatId
 import mega.privacy.android.app.presentation.meeting.chat.extension.isJoined
 import mega.privacy.android.app.presentation.meeting.chat.extension.isStarted
+import mega.privacy.android.app.presentation.meeting.chat.model.ActionToManage
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
 import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
+import mega.privacy.android.app.presentation.meeting.chat.model.InviteUserAsContactResultOption
 import mega.privacy.android.app.presentation.meeting.chat.saver.ChatSavers
 import mega.privacy.android.app.presentation.meeting.chat.view.actions.MessageAction
 import mega.privacy.android.app.presentation.meeting.chat.view.appbar.ChatAppBar
 import mega.privacy.android.app.presentation.meeting.chat.view.bottombar.ChatBottomBar
+import mega.privacy.android.app.presentation.meeting.chat.view.bottombar.ChatBottomBarParameter
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.AllContactsAddedDialog
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.ClearChatConfirmationDialog
-import mega.privacy.android.app.presentation.meeting.chat.view.dialog.EnableGeolocationDialog
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.EndCallForAllDialog
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.JoinAnswerCallDialog
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.MutePushNotificationDialog
@@ -87,7 +88,7 @@ import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openAt
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openChatFragment
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openChatPicker
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openContactInfoActivity
-import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openLocationPicker
+import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openSentRequests
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.showGroupOrContactInfoActivity
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.startLoginActivity
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.startMeetingActivity
@@ -97,12 +98,14 @@ import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ChatToolbar
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.MessageOptionsBottomSheet
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ReactionsInfoBottomSheet
 import mega.privacy.android.app.presentation.qrcode.findActivity
+import mega.privacy.android.app.presentation.transfers.startdownload.view.StartDownloadComponent
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.permission.PermissionUtils
 import mega.privacy.android.core.ui.controls.appbar.SelectModeAppBar
 import mega.privacy.android.core.ui.controls.chat.ChatObserverIndicator
 import mega.privacy.android.core.ui.controls.chat.ScrollToBottomFab
+import mega.privacy.android.core.ui.controls.chat.VoiceClipRecordEvent
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
 import mega.privacy.android.core.ui.controls.layouts.MegaScaffold
 import mega.privacy.android.core.ui.controls.sheets.BottomSheet
@@ -117,12 +120,15 @@ import mega.privacy.android.shared.theme.MegaAppTheme
 
 @Composable
 internal fun ChatView(
-    viewModel: ChatViewModel = hiltViewModel(),
     actionsFactories: Set<(ChatViewModel) -> MessageAction>,
     savers: ChatSavers,
+    viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.state.collectAsStateWithLifecycle()
     val onBackPressedDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    val actions by remember {
+        mutableStateOf(actionsFactories.map { it(viewModel) }.toSet())
+    }
 
     ChatView(
         uiState = uiState,
@@ -147,7 +153,6 @@ internal fun ChatView(
         onSendClick = viewModel::sendTextMessage,
         onHoldAndAnswerCall = viewModel::onHoldAndAnswerCall,
         onEndAndAnswerCall = viewModel::onEndAndAnswerCall,
-        onUserUpdateHandled = viewModel::onUserUpdateHandled,
         onJoinChat = viewModel::onJoinChat,
         onSetPendingJoinLink = viewModel::onSetPendingJoinLink,
         createNewImage = viewModel::createNewImageUri,
@@ -162,8 +167,11 @@ internal fun ChatView(
         getUserInfoIntoReactionList = viewModel::getUserInfoIntoReactionList,
         getUser = viewModel::getUser,
         onForwardMessages = viewModel::onForwardMessages,
-        actions = actionsFactories.map { it(viewModel) }.toSet(),
-        messageListSaver = savers.messageListSaver,
+        actions = actions,
+        messageSetSaver = savers.messageSetSaver,
+        consumeDownloadEvent = viewModel::consumeDownloadEvent,
+        onActionToManageEventConsumed = viewModel::onActionToManageEventConsumed,
+        onVoiceClipRecordEvent = viewModel::onVoiceClipRecordEvent,
     )
 }
 
@@ -189,7 +197,6 @@ internal fun ChatView(
  * @param onStartOrJoinMeeting
  * @param onAnswerCall
  * @param onEnableGeolocation
- * @param onUserUpdateHandled
  * @param messageListView
  * @param bottomBar
  * @param onSendClick
@@ -235,51 +242,6 @@ internal fun ChatView(
     onStartOrJoinMeeting: (isStarted: Boolean) -> Unit = {},
     onAnswerCall: () -> Unit = {},
     onEnableGeolocation: () -> Unit = {},
-    onUserUpdateHandled: () -> Unit = {},
-    messageListView: @Composable (
-        ChatUiState,
-        LazyListState,
-        Dp,
-        (TypedMessage) -> Unit,
-        (Long) -> Unit,
-        (Long, String, List<UIReaction>) -> Unit,
-        (String, List<UIReaction>) -> Unit,
-        (TypedMessage) -> Unit,
-        (Boolean) -> Unit,
-    ) -> Unit =
-        { state, listState, bottomPadding, onMessageLongClick, onMoreReactionsClick, onReactionClick, onReactionLongClick, onForwardClick, onCanSelectChanged ->
-            MessageListView(
-                uiState = state,
-                scrollState = listState,
-                bottomPadding = bottomPadding,
-                onUserUpdateHandled = onUserUpdateHandled,
-                onMessageLongClick = onMessageLongClick,
-                onMoreReactionsClicked = onMoreReactionsClick,
-                onReactionClicked = onReactionClick,
-                onReactionLongClick = onReactionLongClick,
-                onForwardClicked = onForwardClick,
-                onCanSelectChanged = onCanSelectChanged,
-            )
-        },
-    bottomBar: @Composable (
-        uiState: ChatUiState,
-        showEmojiPicker: Boolean,
-        onSendClick: (String) -> Unit,
-        onAttachmentClick: () -> Unit,
-        onEmojiClick: () -> Unit,
-        onCloseEditing: () -> Unit,
-        interactionSourceTextInput: MutableInteractionSource,
-    ) -> Unit = { state, showEmojiPicker, onSendClicked, onAttachmentClick, onEmojiClick, onCloseEditingClick, interactionSourceTextInput ->
-        ChatBottomBar(
-            uiState = state,
-            showEmojiPicker = showEmojiPicker,
-            onSendClick = onSendClicked,
-            onAttachmentClick = onAttachmentClick,
-            onEmojiClick = onEmojiClick,
-            interactionSourceTextInput = interactionSourceTextInput,
-            onCloseEditing = onCloseEditingClick
-        )
-    },
     onSendClick: (String) -> Unit = {},
     onHoldAndAnswerCall: () -> Unit = {},
     onEndAndAnswerCall: () -> Unit = {},
@@ -296,11 +258,14 @@ internal fun ChatView(
     onAttachContacts: (List<String>) -> Unit = { _ -> },
     getUserInfoIntoReactionList: suspend (List<UIReaction>) -> List<UIReaction> = { emptyList() },
     getUser: suspend (UserId) -> User? = { null },
-    onForwardMessages: (List<TypedMessage>, List<Long>?, List<Long>?) -> Unit = { _, _, _ -> },
+    onForwardMessages: (Set<TypedMessage>, List<Long>?, List<Long>?) -> Unit = { _, _, _ -> },
     actions: Set<MessageAction> = setOf(),
-    messageListSaver: Saver<List<TypedMessage>, String> = Saver(
+    messageSetSaver: Saver<Set<TypedMessage>, String> = Saver(
         save = { "" },
-        restore = { emptyList() }),
+        restore = { emptySet() }),
+    consumeDownloadEvent: () -> Unit = {},
+    onActionToManageEventConsumed: () -> Unit = {},
+    onVoiceClipRecordEvent: (VoiceClipRecordEvent) -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -313,17 +278,22 @@ internal fun ChatView(
     var showMutePushNotificationDialog by rememberSaveable { mutableStateOf(false) }
     var muteNotificationDialogOptions by rememberSaveable { mutableStateOf(emptyList<ChatPushNotificationMuteOption>()) }
     var isSelectMode by rememberSaveable { mutableStateOf(false) }
+    var selectedMessages by rememberSaveable(stateSaver = messageSetSaver) {
+        mutableStateOf(
+            emptySet()
+        )
+    }
+    val exitSelectMode = {
+        isSelectMode = false
+        selectedMessages = emptySet()
+    }
+
     var showJoinAnswerCallDialog by rememberSaveable { mutableStateOf(false) }
     var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
     var showReactionPicker by rememberSaveable { mutableStateOf(false) }
     var addingReactionTo by rememberSaveable { mutableStateOf<Long?>(null) }
     var selectedReaction by rememberSaveable { mutableStateOf("") }
     var reactionList by rememberSaveable { mutableStateOf(emptyList<UIReaction>()) }
-    var selectedMessages by rememberSaveable(stateSaver = messageListSaver) {
-        mutableStateOf(
-            emptyList()
-        )
-    }
     val audioPermissionState = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
     val keyboardController = LocalSoftwareKeyboardController.current
     val toolbarModalSheetState =
@@ -354,7 +324,9 @@ internal fun ChatView(
                 keyboardController?.hide()
                 showEmojiPicker = false
             } else {
-                selectedMessages = emptyList()
+                if (!isSelectMode) {
+                    selectedMessages = emptySet()
+                }
                 addingReactionTo = null
             }
             true
@@ -373,31 +345,7 @@ internal fun ChatView(
             true
         }
     )
-    var showEnableGeolocationDialog by rememberSaveable { mutableStateOf(false) }
-    var waitingForPickLocation by rememberSaveable { mutableStateOf(false) }
-    val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
-    val locationPickerLauncher =
-        rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.StartActivityForResult()
-        ) {
-            onSendLocationMessage(it.data)
-            coroutineScope.launch { toolbarModalSheetState.hide() }
-        }
-    val locationPermissionsLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            openLocationPicker(context, locationPickerLauncher)
-        } else {
-            coroutineScope.launch { toolbarModalSheetState.hide() }
-            showPermissionNotAllowedSnackbar(
-                context,
-                coroutineScope,
-                scaffoldState.snackbarHostState,
-                R.string.chat_attach_location_deny_permission
-            )
-        }
-    }
+    var showLocationView by rememberSaveable { mutableStateOf(false) }
     val scrollState = rememberLazyListState()
     val showScrollToBottomFab by remember {
         derivedStateOf {
@@ -459,8 +407,11 @@ internal fun ChatView(
                 }
             }
 
-            selectedMessages = emptyList()
+            selectedMessages = emptySet()
         }
+    var pendingAction: (@Composable () -> Unit)? by remember {
+        mutableStateOf(null)
+    }
 
     with(uiState) {
         val addContactLauncher =
@@ -546,11 +497,15 @@ internal fun ChatView(
                             onMoreReactionsClicked = { showReactionPicker = true },
                             actions = actions.filter { action ->
                                 action.appliesTo(selectedMessages)
-                            }.map {
-                                it.bottomSheetMenuItem(
+                            }.map { action ->
+                                action.bottomSheetMenuItem(
                                     messages = selectedMessages,
-                                    chatId = chatId,
-                                    context = context
+                                    hideBottomSheet = {
+                                        coroutineScope.launch {
+                                            messageOptionsModalSheetState.hide()
+                                        }
+                                    },
+                                    setAction = { pendingAction = it }
                                 )
                             },
                             sheetState = messageOptionsModalSheetState,
@@ -603,19 +558,8 @@ internal fun ChatView(
                                 }
                             },
                             onPickLocation = {
-                                checkLocationPicker(
-                                    isGeolocationEnabled = isGeolocationEnabled,
-                                    isPermissionGranted = locationPermissionState.status.isGranted,
-                                    onShowEnableGeolocationDialog = {
-                                        showEnableGeolocationDialog = true
-                                    },
-                                    onAskForLocationPermission = {
-                                        locationPermissionsLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                                    },
-                                    onPickLocation = {
-                                        openLocationPicker(context, locationPickerLauncher)
-                                    }
-                                )
+                                coroutineScope.launch { toolbarModalSheetState.hide() }
+                                showLocationView = true
                             },
                             onSendGiphyMessage = onSendGiphyMessage,
                             onTakePicture = {
@@ -652,10 +596,19 @@ internal fun ChatView(
                 topBar = {
                     if (isSelectMode) {
                         SelectModeAppBar(
-                            title = "",
-                            onNavigationPressed = {
-                                isSelectMode = false
-                            },
+                            title =
+                            if (selectedMessages.isEmpty()) stringResource(id = R.string.select_message_title)
+                            else selectedMessages.size.toString(),
+                            onNavigationPressed = exitSelectMode,
+                            actions = actions.filter {
+                                it.appliesTo(selectedMessages)
+                            }.mapNotNull { action ->
+                                action.toolbarMenuItemWithClick(
+                                    messages = selectedMessages,
+                                    exitSelectMode = exitSelectMode,
+                                    setAction = { pendingAction = it }
+                                )
+                            }
                         )
                     } else {
                         Column {
@@ -710,26 +663,35 @@ internal fun ChatView(
                 },
                 bottomBar = {
                     if (haveWritePermission) {
-                        bottomBar(
-                            uiState,
-                            showEmojiPicker,
-                            onSendClick,
-                            {
-                                coroutineScope.launch {
-                                    toolbarModalSheetState.show()
-                                }
-                            },
-                            {
-                                showEmojiPicker = !showEmojiPicker
+                        val onAttachmentClick: () -> Unit = {
+                            coroutineScope.launch {
+                                toolbarModalSheetState.show()
+                            }
+                        }
+                        val onEmojiClick: () -> Unit = {
+                            showEmojiPicker = !showEmojiPicker
 
-                                if (showEmojiPicker) {
-                                    keyboardController?.hide()
-                                } else {
-                                    keyboardController?.show()
-                                }
-                            },
-                            onCloseEditing,
-                            interactionSourceTextInput,
+                            if (showEmojiPicker) {
+                                keyboardController?.hide()
+                            } else {
+                                keyboardController?.show()
+                            }
+                        }
+                        val onVoiceClipEvent: (VoiceClipRecordEvent) -> Unit =
+                            { voiceClipRecordEvent ->
+                                onVoiceClipRecordEvent(voiceClipRecordEvent)
+                            }
+                        ChatBottomBar(
+                            ChatBottomBarParameter(
+                                uiState = uiState,
+                                showEmojiPicker = showEmojiPicker,
+                                onSendClick = onSendClick,
+                                onAttachmentClick = onAttachmentClick,
+                                onEmojiClick = onEmojiClick,
+                                interactionSourceTextInput = interactionSourceTextInput,
+                                onCloseEditing = onCloseEditing,
+                                onVoiceClipEvent = onVoiceClipEvent
+                            )
                         )
                     }
                     JoinChatButton(isPreviewMode = isPreviewMode, isJoining = isJoining) {
@@ -778,24 +740,21 @@ internal fun ChatView(
                             )
                         },
                         listView = { bottomPadding ->
-                            messageListView(
-                                uiState,
-                                scrollState,
-                                bottomPadding,
-                                { message ->
-                                    selectedMessages = listOf(message)
-                                    // Use message for showing correct available options
-                                    coroutineScope.launch {
-                                        messageOptionsModalSheetState.show()
-                                    }
-                                },
-                                { msgId ->
-                                    addingReactionTo = msgId
-                                    showReactionPicker = true
-                                    coroutineScope.launch {
-                                        messageOptionsModalSheetState.show()
-                                    }
-                                },
+                            val onMessageLongClick: (TypedMessage) -> Unit = { message ->
+                                selectedMessages = setOf(message)
+                                // Use message for showing correct available options
+                                coroutineScope.launch {
+                                    messageOptionsModalSheetState.show()
+                                }
+                            }
+                            val onMoreReactionsClicked: (Long) -> Unit = { msgId ->
+                                addingReactionTo = msgId
+                                showReactionPicker = true
+                                coroutineScope.launch {
+                                    messageOptionsModalSheetState.show()
+                                }
+                            }
+                            val onReactionClicked: (Long, String, List<UIReaction>) -> Unit =
                                 { msgId, clickedReaction, reactions ->
                                     reactions.find { reaction -> reaction.reaction == clickedReaction }
                                         ?.let {
@@ -805,7 +764,8 @@ internal fun ChatView(
                                                 onAddReaction(msgId, clickedReaction)
                                             }
                                         }
-                                },
+                                }
+                            val onReactionLongClick: (String, List<UIReaction>) -> Unit =
                                 { clickedReaction, reactions ->
                                     if (clickedReaction.isNotEmpty() && reactions.isNotEmpty()) {
                                         selectedReaction = clickedReaction
@@ -814,13 +774,39 @@ internal fun ChatView(
                                             reactionInfoBottomSheetState.show()
                                         }
                                     }
-                                },
-                                { message ->
-                                    selectedMessages = listOf(message)
-                                    openChatPicker(context, chatId, chatPickerLauncher)
-                                },
-                                { hasSelectableMessage -> canSelect = hasSelectableMessage },
+                                }
+                            val onForwardClicked: (TypedMessage) -> Unit = { message ->
+                                selectedMessages = setOf(message)
+                                openChatPicker(context, chatId, chatPickerLauncher)
+                            }
+                            val onCanSelectChanged: (Boolean) -> Unit = { hasSelectableMessage ->
+                                canSelect = hasSelectableMessage
+                            }
+                            val selectItem = { message: TypedMessage ->
+                                selectedMessages = selectedMessages + message
+                            }
+                            val deselectItem = { message: TypedMessage ->
+                                selectedMessages = selectedMessages - message
+                            }
+                            MessageListView(
+                                MessageListParameter(
+                                    uiState = uiState,
+                                    scrollState = scrollState,
+                                    bottomPadding = bottomPadding,
+                                    onMessageLongClick = onMessageLongClick,
+                                    onMoreReactionsClicked = onMoreReactionsClicked,
+                                    onReactionClicked = onReactionClicked,
+                                    onReactionLongClick = onReactionLongClick,
+                                    onForwardClicked = onForwardClicked,
+                                    onCanSelectChanged = onCanSelectChanged,
+                                    selectedItems = selectedMessages.map { it.msgId }.toSet(),
+                                    selectItem = selectItem,
+                                    deselectItem = deselectItem,
+                                    selectMode = isSelectMode,
+                                    onSendErrorClick = { TODO("Not implemented") }
+                                )
                             )
+
                         },
                     )
                 }
@@ -889,19 +875,13 @@ internal fun ChatView(
                     )
                 }
 
-                if (showEnableGeolocationDialog) {
-                    EnableGeolocationDialog(
-                        onConfirm = {
-                            waitingForPickLocation = true
-                            onEnableGeolocation()
-                        },
-                        onDismiss = { showEnableGeolocationDialog = false },
+                if (showLocationView) {
+                    ChatLocationView(
+                        isGeolocationEnabled = isGeolocationEnabled,
+                        onEnableGeolocation = onEnableGeolocation,
+                        onSendLocationMessage = onSendLocationMessage,
+                        onDismissView = { showLocationView = false },
                     )
-                }
-
-                if (waitingForPickLocation && isGeolocationEnabled) {
-                    waitingForPickLocation = false
-                    openLocationPicker(context, locationPickerLauncher)
                 }
 
                 if (showJoinAnswerCallDialog) {
@@ -919,6 +899,8 @@ internal fun ChatView(
                         onDismiss = { showJoinAnswerCallDialog = false },
                     )
                 }
+
+                pendingAction?.let { it() }
             }
 
             EventEffect(
@@ -927,18 +909,33 @@ internal fun ChatView(
             ) { info ->
                 info?.let {
                     info.getInfo(context).let { text ->
-                        if (info is InfoToShow.ForwardMessagesResult) {
-                            info.result.getOpenChatId(chatId)?.let { openChatId ->
-                                val result = scaffoldState.snackbarHostState.showSnackbar(
+                        when {
+                            info is InfoToShow.ForwardMessagesResult -> {
+                                info.result.getOpenChatId(chatId)?.let { openChatId ->
+                                    val result = scaffoldState.snackbarHostState.showSnackbar(
+                                        text,
+                                        context.getString(R.string.general_confirmation_open)
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        openChatFragment(context, openChatId)
+                                    }
+                                } ?: scaffoldState.snackbarHostState.showSnackbar(text)
+                            }
+
+                            info is InfoToShow.InviteUserAsContactResult &&
+                                    info.result is InviteUserAsContactResultOption.ContactInviteSent -> {
+
+                                scaffoldState.snackbarHostState.showSnackbar(
                                     text,
-                                    context.getString(R.string.general_confirmation_open)
-                                )
-                                if (result == SnackbarResult.ActionPerformed) {
-                                    openChatFragment(context, openChatId, null)
+                                    context.getString(R.string.action_see)
+                                ).also { result ->
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        openSentRequests(context)
+                                    }
                                 }
-                            } ?: scaffoldState.snackbarHostState.showSnackbar(text)
-                        } else {
-                            scaffoldState.snackbarHostState.showSnackbar(text)
+                            }
+
+                            else -> scaffoldState.snackbarHostState.showSnackbar(text)
                         }
                     }
                 } ?: context.findActivity()?.finish()
@@ -951,7 +948,27 @@ internal fun ChatView(
                 muteNotificationDialogOptions = options
                 showMutePushNotificationDialog = true
             }
+
+            EventEffect(
+                event = actionToManageEvent,
+                onConsumed = onActionToManageEventConsumed,
+            ) { action ->
+                when (action) {
+                    is ActionToManage.OpenChat -> openChatFragment(context, action.chatId)
+                    is ActionToManage.EnableSelectMode -> isSelectMode = true
+                    is ActionToManage.OpenContactInfo -> openContactInfoActivity(
+                        context,
+                        action.email
+                    )
+                }
+            }
         }
+
+        StartDownloadComponent(
+            event = uiState.downloadEvent,
+            onConsumeEvent = consumeDownloadEvent,
+            snackBarHostState = scaffoldState.snackbarHostState,
+        )
 
         if (isStartingCall && callInThisChat != null) {
             onCallStarted()
@@ -973,31 +990,9 @@ internal fun ChatView(
 }
 
 /**
- * Checks if location picker can be shown depending on permissions.
+ * Shows a permission not allowed warning.
  */
-private fun checkLocationPicker(
-    isGeolocationEnabled: Boolean,
-    isPermissionGranted: Boolean,
-    onShowEnableGeolocationDialog: () -> Unit,
-    onAskForLocationPermission: () -> Unit,
-    onPickLocation: () -> Unit,
-) {
-    when {
-        !isGeolocationEnabled -> {
-            onShowEnableGeolocationDialog()
-        }
-
-        !isPermissionGranted -> {
-            onAskForLocationPermission()
-        }
-
-        else -> {
-            onPickLocation()
-        }
-    }
-}
-
-private fun showPermissionNotAllowedSnackbar(
+fun showPermissionNotAllowedSnackbar(
     context: Context,
     coroutineScope: CoroutineScope,
     snackBarHostState: SnackbarHostState,

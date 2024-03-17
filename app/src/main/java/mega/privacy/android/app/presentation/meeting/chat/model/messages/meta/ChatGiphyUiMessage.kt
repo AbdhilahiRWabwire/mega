@@ -1,6 +1,5 @@
 package mega.privacy.android.app.presentation.meeting.chat.model.messages.meta
 
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.runtime.Composable
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.AvatarMessage
 import mega.privacy.android.app.presentation.meeting.chat.view.message.meta.GiphyMessageView
@@ -23,20 +22,23 @@ class ChatGiphyUiMessage(
 ) : AvatarMessage() {
 
     @Composable
-    override fun RowScope.ContentComposable(onLongClick: (TypedMessage) -> Unit) {
+    override fun ContentComposable(
+        onLongClick: (TypedMessage) -> Unit,
+        interactionEnabled: Boolean
+    ) {
         message.chatGifInfo?.let { giphy ->
             GiphyMessageView(
                 gifInfo = giphy,
                 title = giphy.title,
                 autoPlayGif = if (autoPlay) true else giphy.webpSize < MAX_SIZE_FOR_AUTO_PLAY,
                 onLoaded = { autoPlay = true },
-                onLongClick = { onLongClick(message) }
+                onLongClick = { onLongClick(message) },
+                interactionEnabled = interactionEnabled,
             )
         }
     }
 
     override val showAvatar = message.shouldShowAvatar
-    override val showTime = message.shouldShowTime
     override val displayAsMine = message.isMine
     override val shouldDisplayForwardIcon = true
     override val timeSent = message.time

@@ -17,6 +17,8 @@ internal class CreateVoiceClipMessageUseCase @Inject constructor() : CreateTyped
             chatId = chatId,
             msgId = messageId,
             time = timestamp,
+            isDeletable = isDeletable,
+            isEditable = isEditable,
             isMine = isMine,
             userHandle = userHandle,
             status = status,
@@ -24,8 +26,8 @@ internal class CreateVoiceClipMessageUseCase @Inject constructor() : CreateTyped
             size = fileNode?.size ?: 0L,
             duration = (fileNode?.type as? AudioFileTypeInfo)?.duration ?: 0.seconds,
             shouldShowAvatar = shouldShowAvatar,
-            shouldShowTime = shouldShowTime,
             reactions = reactions,
+            content = content,
         )
     }
 }

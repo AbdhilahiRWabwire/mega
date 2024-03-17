@@ -47,9 +47,9 @@
     <!-- Sync to resolve conflict Merge folders -->
     <string name="sync_stalled_issue_merge_folders">Ordner zusammenführen</string>
     <!-- Sync to resolve conflict Choose local file -->
-    <string name="sync_stalled_issue_choose_local_file">Choose the local file</string>
+    <string name="sync_stalled_issue_choose_local_file">Lokale Datei auswählen</string>
     <!-- Sync to resolve conflict Choose remote file -->
-    <string name="sync_stalled_issue_choose_remote_file">Choose the file stored in MEGA</string>
+    <string name="sync_stalled_issue_choose_remote_file">Datei auf MEGA auswählen</string>
     <!-- Sync to resolve conflict Choose the one with the latest modified time -->
     <string name="sync_stalled_issue_choose_latest_modified_time">Zuletzt geänderte Datei auswählen</string>
     <!-- Sync message when conflict resolved -->
@@ -167,7 +167,7 @@
     <!-- Sync stalled issue reason is upload issue detailed description-->
     <string name="sync_stalled_issue_upload_issue_detail">Der Zielordner ist nicht zugänglich</string>
     <!-- Sync stalled issue reason is download issue detailed description-->
-    <string name="sync_stalled_issue_download_issue_detail">Beim Herunterladen der Datei oder beim Verschieben der heruntergeladenen temporären Datei an den endgültigen Speicherort ist ein Fehler aufgetreten</string>
+    <string name="sync_stalled_issue_download_issue_detail">Beim Herunterladen der Datei oder beim Verschieben der heruntergeladenen temporären Datei an den endgültigen Speicherort ist ein Fehler aufgetreten.</string>
     <!-- Sync stalled issue reason is can not create folder detailed description-->
     <string name="sync_stalled_issue_cannot_create_folder_detail">Ein lokaler Fehler verhindert den Ordnerzugriff</string>
     <!-- Sync stalled issue reason is can not perform deletion detailed description-->
@@ -185,9 +185,9 @@
     <!-- Sync notification title description sync monitoring-->
     <string name="sync_stalled_issues_move_or_rename_message_mega">Ein Verschieben oder Umbenennen wurde auf MEGA erkannt, konnte jedoch lokal nicht repliziert werden.</string>
     <!-- Sync notification title description sync monitoring-->
-    <string name="sync_stalled_issues_move_or_rename_message_local">Ein Verschieben oder Umbenennen wurde lokal erkannt, konnte jedoch auf MEGA nicht repliziert werden.</string>
+    <string name="sync_stalled_issues_move_or_rename_message_local">Ein lokal erkannter Verschiebe- oder Umbenennungsvorgang konnte auf MEGA nicht repliziert werden.</string>
     <!-- Sync stalled issue delete or move scanning detail-->
-    <string name="sync_stalled_issue_delete_or_move_scanning_detail">Abschluss des Scanvorgangs wird abgewartet, um zu sehen, ob die Datei verschoben oder gelöscht wurde.</string>
+    <string name="sync_stalled_issue_delete_or_move_scanning_detail">Abschluss des Scanvorgangs wird abgewartet, um zu bestimmen, ob die Datei verschoben oder gelöscht wurde.</string>
     <!-- Sync subtitle for sync screen to choose folders-->
     <string name="sync_choose_folders">Ordner auswählen</string>
 </resources>

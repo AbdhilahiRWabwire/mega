@@ -5,6 +5,11 @@ package mega.privacy.android.domain.entity.meeting
  */
 enum class ChatCallChanges {
     /**
+     *  No changes
+     */
+    NoChanges,
+
+    /**
      *  Change type Status
      */
     Status,
@@ -99,6 +104,16 @@ enum class ChatCallChanges {
      * We have been pushed into a waiting room
      */
     WaitingRoomPushedFromCall,
+
+    /**
+     * Speak request added/removed for a call participant
+     */
+    SpeakRequested,
+
+    /**
+     *  * Notify that call will end due to duration restrictions associated to MEGA account plan
+     */
+    CallWillEnd,
 
     /**
      * Unknown

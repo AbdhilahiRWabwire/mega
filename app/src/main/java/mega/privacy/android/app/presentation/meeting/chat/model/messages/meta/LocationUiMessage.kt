@@ -2,7 +2,6 @@ package mega.privacy.android.app.presentation.meeting.chat.model.messages.meta
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -17,6 +16,7 @@ import mega.privacy.android.app.presentation.meeting.chat.view.message.meta.Chat
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openLocationActivity
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
 import mega.privacy.android.core.ui.controls.layouts.LocalSnackBarHostState
+import mega.privacy.android.core.ui.theme.extensions.conditional
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.chat.messages.meta.LocationMessage
 
@@ -29,8 +29,9 @@ class LocationUiMessage(
 ) : AvatarMessage() {
     @OptIn(ExperimentalFoundationApi::class)
     @Composable
-    override fun RowScope.ContentComposable(
+    override fun ContentComposable(
         onLongClick: (TypedMessage) -> Unit,
+        interactionEnabled: Boolean,
     ) {
         val context = LocalContext.current
         val snackbarHostState = LocalSnackBarHostState.current
@@ -38,9 +39,8 @@ class LocationUiMessage(
         ChatLocationMessageView(
             message = message,
             isEdited = message.isEdited,
-            modifier = Modifier
-                .weight(weight = 1f, fill = false)
-                .combinedClickable(
+            modifier = Modifier.conditional(interactionEnabled) {
+                this.combinedClickable(
                     onClick = {
                         message.chatGeolocationInfo?.let {
                             openLocationActivity(context, it) {
@@ -52,8 +52,9 @@ class LocationUiMessage(
                             }
                         }
                     },
-                    onLongClick = { onLongClick(message) }
+                    onLongClick = { onLongClick(message) },
                 )
+            }
         )
     }
 
@@ -69,7 +70,6 @@ class LocationUiMessage(
         }
 
     override val showAvatar = message.shouldShowAvatar
-    override val showTime = message.shouldShowTime
     override val displayAsMine = message.isMine
     override val shouldDisplayForwardIcon = true
     override val timeSent = message.time

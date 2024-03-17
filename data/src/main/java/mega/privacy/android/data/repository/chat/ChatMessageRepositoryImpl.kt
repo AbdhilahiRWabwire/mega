@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import mega.privacy.android.data.cache.Cache
 import mega.privacy.android.data.database.converter.TypedMessageEntityConverters
 import mega.privacy.android.data.extensions.getChatRequestListener
 import mega.privacy.android.data.gateway.api.MegaApiGateway
@@ -14,6 +15,7 @@ import mega.privacy.android.data.mapper.StringListMapper
 import mega.privacy.android.data.mapper.chat.ChatMessageMapper
 import mega.privacy.android.data.mapper.chat.messages.PendingMessageEntityMapper
 import mega.privacy.android.data.mapper.chat.messages.PendingMessageMapper
+import mega.privacy.android.data.mapper.chat.paging.TypedMessagePagingSourceMapper
 import mega.privacy.android.data.mapper.handles.HandleListMapper
 import mega.privacy.android.data.mapper.handles.MegaHandleListMapper
 import mega.privacy.android.domain.entity.chat.ChatMessage
@@ -21,6 +23,7 @@ import mega.privacy.android.domain.entity.chat.ChatMessageType
 import mega.privacy.android.domain.entity.chat.PendingMessage
 import mega.privacy.android.domain.entity.chat.messages.pending.SavePendingMessageRequest
 import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
+import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.repository.chat.ChatMessageRepository
 import javax.inject.Inject
@@ -37,6 +40,8 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
     private val pendingMessageEntityMapper: PendingMessageEntityMapper,
     private val pendingMessageMapper: PendingMessageMapper,
     private val typedMessageEntityConverters: TypedMessageEntityConverters,
+    private val originalPathCache: Cache<Map<NodeId, String>>,
+    private val typedMessagePagingSourceMapper: TypedMessagePagingSourceMapper,
 ) : ChatMessageRepository {
     override suspend fun setMessageSeen(chatId: Long, messageId: Long) = withContext(ioDispatcher) {
         megaChatApiGateway.setMessageSeen(chatId, messageId)
@@ -138,6 +143,13 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun updatePendingMessage(savePendingMessageRequest: SavePendingMessageRequest) {
+        return withContext(ioDispatcher) {
+            val pendingMessage = pendingMessageEntityMapper(savePendingMessageRequest)
+            chatStorageGateway.updatePendingMessage(pendingMessage)
+        }
+    }
+
     override fun monitorPendingMessages(chatId: Long) =
         chatStorageGateway.fetchPendingMessages(chatId)
             .map { list -> list.map { pendingMessageMapper(it) } }
@@ -206,9 +218,9 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
 
     override suspend fun getReactionsFromMessage(chatId: Long, msgId: Long): List<Reaction> =
         withContext(ioDispatcher) {
-            chatStorageGateway.getMessageReactions(chatId, msgId).let { reactions ->
+            chatStorageGateway.getMessageReactions(chatId, msgId)?.let { reactions ->
                 typedMessageEntityConverters.convertToMessageReactionList(reactions)
-            }
+            } ?: emptyList()
         }
 
     override suspend fun updateReactionsInMessage(
@@ -220,6 +232,56 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
             val reactionsString =
                 typedMessageEntityConverters.convertFromMessageReactionList(reactions)
             chatStorageGateway.updateMessageReactions(chatId, msgId, reactionsString)
+        }
+    }
+
+    override suspend fun deleteMessage(chatId: Long, msgId: Long) = withContext(ioDispatcher) {
+        megaChatApiGateway.deleteMessage(chatId, msgId)?.let { chatMessageMapper(it) }
+    }
+
+    override suspend fun revokeAttachmentMessage(chatId: Long, msgId: Long) =
+        withContext(ioDispatcher) {
+            megaChatApiGateway.revokeAttachmentMessage(chatId, msgId)?.let { chatMessageMapper(it) }
+        }
+
+    override suspend fun editMessage(chatId: Long, msgId: Long, msg: String) =
+        withContext(ioDispatcher) {
+            megaChatApiGateway.editMessage(chatId, msgId, msg)?.let { chatMessageMapper(it) }
+        }
+
+    override suspend fun editGeolocation(
+        chatId: Long,
+        msgId: Long,
+        longitude: Float,
+        latitude: Float,
+        img: String,
+    ) = withContext(ioDispatcher) {
+        megaChatApiGateway.editGeolocation(chatId, msgId, longitude, latitude, img)
+            ?.let { chatMessageMapper(it) }
+    }
+
+    override fun getCachedOriginalPathForNode(nodeId: NodeId) = originalPathCache.get()?.get(nodeId)
+
+    override fun cacheOriginalPathForNode(nodeId: NodeId, path: String) {
+        val updated = buildMap {
+            originalPathCache.get()?.let {
+                putAll(it)
+            }
+            put(nodeId, path)
+        }
+        originalPathCache.set(updated)
+    }
+
+    override fun getPagedMessages(chatId: Long) =
+        typedMessagePagingSourceMapper(chatStorageGateway.getTypedMessageRequestPagingSource(chatId))
+
+
+    override suspend fun truncateMessages(chatId: Long, truncateTimestamp: Long) {
+        withContext(ioDispatcher) {
+            chatStorageGateway.truncateMessages(
+                chatId = chatId,
+                truncateTimestamp = truncateTimestamp
+            )
         }
     }
 }

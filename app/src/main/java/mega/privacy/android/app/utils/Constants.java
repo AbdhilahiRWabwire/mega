@@ -222,7 +222,6 @@ public class Constants {
     public static final String BROADCAST_ACTION_INTENT_SSL_VERIFICATION_FAILED = "INTENT_SSL_VERIFICATION_FAILED";
     public static final String BROADCAST_ACTION_INTENT_SIGNAL_PRESENCE = "INTENT_SIGNAL_PRESENCE";
     public static final String BROADCAST_ACTION_INTENT_VOICE_CLIP_DOWNLOADED = "INTENT_VOICE_CLIP_DOWNLOADED";
-    public static final String BROADCAST_ACTION_INTENT_UPDATE_USER_DATA = "BROADCAST_ACTION_INTENT_UPDATE_USER_DATA";
 
     public static final String INTENT_EXTRA_KEY_PLACEHOLDER = "placeholder";
     public static final String INTENT_EXTRA_KEY_HANDLE = "HANDLE";
@@ -792,6 +791,7 @@ public class Constants {
     public static final int ORDER_CAMERA = 2;
     public static final int ORDER_OFFLINE = 3;
     public static final int ORDER_FAVOURITES = 4;
+    public static final int ORDER_VIDEO_PLAYLIST = 5;
 
     public final static float MAX_WIDTH_APPBAR_LAND = 400;
     public final static float MAX_WIDTH_APPBAR_PORT = 200;

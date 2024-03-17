@@ -11,6 +11,8 @@ import mega.privacy.android.app.domain.usecase.GetNodeByHandle
 import mega.privacy.android.app.presentation.videosection.VideoSectionViewModel
 import mega.privacy.android.app.presentation.videosection.mapper.VideoPlaylistUIEntityMapper
 import mega.privacy.android.app.presentation.videosection.mapper.VideoUIEntityMapper
+import mega.privacy.android.app.presentation.videosection.model.DurationFilterOption
+import mega.privacy.android.app.presentation.videosection.model.LocationFilterOption
 import mega.privacy.android.app.presentation.videosection.model.VideoPlaylistUIEntity
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionTab
 import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
@@ -33,8 +35,10 @@ import mega.privacy.android.domain.usecase.photos.GetNextDefaultAlbumNameUseCase
 import mega.privacy.android.domain.usecase.videosection.AddVideosToPlaylistUseCase
 import mega.privacy.android.domain.usecase.videosection.CreateVideoPlaylistUseCase
 import mega.privacy.android.domain.usecase.videosection.GetAllVideosUseCase
+import mega.privacy.android.domain.usecase.videosection.GetSyncUploadsFolderIdsUseCase
 import mega.privacy.android.domain.usecase.videosection.GetVideoPlaylistsUseCase
 import mega.privacy.android.domain.usecase.videosection.RemoveVideoPlaylistsUseCase
+import mega.privacy.android.domain.usecase.videosection.UpdateVideoPlaylistTitleUseCase
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -72,6 +76,8 @@ class VideoSectionViewModelTest {
     private val addVideosToPlaylistUseCase = mock<AddVideosToPlaylistUseCase>()
     private val getNextDefaultAlbumNameUseCase = mock<GetNextDefaultAlbumNameUseCase>()
     private val removeVideoPlaylistsUseCase = mock<RemoveVideoPlaylistsUseCase>()
+    private val updateVideoPlaylistTitleUseCase = mock<UpdateVideoPlaylistTitleUseCase>()
+    private val getSyncUploadsFolderIdsUseCase = mock<GetSyncUploadsFolderIdsUseCase>()
 
     private val expectedVideo = mock<VideoUIEntity> { on { name }.thenReturn("video name") }
 
@@ -103,7 +109,9 @@ class VideoSectionViewModelTest {
             createVideoPlaylistUseCase = createVideoPlaylistUseCase,
             addVideosToPlaylistUseCase = addVideosToPlaylistUseCase,
             getNextDefaultAlbumNameUseCase = getNextDefaultAlbumNameUseCase,
-            removeVideoPlaylistsUseCase = removeVideoPlaylistsUseCase
+            removeVideoPlaylistsUseCase = removeVideoPlaylistsUseCase,
+            updateVideoPlaylistTitleUseCase = updateVideoPlaylistTitleUseCase,
+            getSyncUploadsFolderIdsUseCase = getSyncUploadsFolderIdsUseCase
         )
     }
 
@@ -123,7 +131,9 @@ class VideoSectionViewModelTest {
             videoPlaylistUIEntityMapper,
             createVideoPlaylistUseCase,
             addVideosToPlaylistUseCase,
-            getNextDefaultAlbumNameUseCase
+            getNextDefaultAlbumNameUseCase,
+            updateVideoPlaylistTitleUseCase,
+            getSyncUploadsFolderIdsUseCase
         )
     }
 
@@ -457,15 +467,15 @@ class VideoSectionViewModelTest {
     }
 
     @Test
-    fun `test that the showCreateVideoPlaylistDialog is correctly updated`() = runTest {
+    fun `test that the showCreateVideoPlaylist is correctly updated`() = runTest {
         initUnderTest()
 
         underTest.state.test {
-            assertThat(awaitItem().shouldCreateVideoPlaylistDialog).isFalse()
-            underTest.setShowCreateVideoPlaylistDialog(true)
-            assertThat(awaitItem().shouldCreateVideoPlaylistDialog).isTrue()
-            underTest.setShowCreateVideoPlaylistDialog(false)
-            assertThat(awaitItem().shouldCreateVideoPlaylistDialog).isFalse()
+            assertThat(awaitItem().shouldCreateVideoPlaylist).isFalse()
+            underTest.setShouldCreateVideoPlaylist(true)
+            assertThat(awaitItem().shouldCreateVideoPlaylist).isTrue()
+            underTest.setShouldCreateVideoPlaylist(false)
+            assertThat(awaitItem().shouldCreateVideoPlaylist).isFalse()
         }
     }
 
@@ -515,6 +525,60 @@ class VideoSectionViewModelTest {
     }
 
     @Test
+    fun `test that the setShouldDeleteVideoPlaylist is correctly updated`() = runTest {
+        initUnderTest()
+
+        underTest.state.test {
+            assertThat(awaitItem().shouldDeleteVideoPlaylist).isFalse()
+            underTest.setShouldDeleteVideoPlaylist(true)
+            assertThat(awaitItem().shouldDeleteVideoPlaylist).isTrue()
+            underTest.setShouldDeleteVideoPlaylist(false)
+            assertThat(awaitItem().shouldDeleteVideoPlaylist).isFalse()
+        }
+    }
+
+    @Test
+    fun `test that the setShouldDeleteSingleVideoPlaylist is correctly updated`() = runTest {
+        initUnderTest()
+
+        underTest.state.test {
+            assertThat(awaitItem().shouldDeleteSingleVideoPlaylist).isFalse()
+            underTest.setShouldDeleteSingleVideoPlaylist(true)
+            assertThat(awaitItem().shouldDeleteSingleVideoPlaylist).isTrue()
+            underTest.setShouldDeleteSingleVideoPlaylist(false)
+            assertThat(awaitItem().shouldDeleteSingleVideoPlaylist).isFalse()
+        }
+    }
+
+    @Test
+    fun `test that the setAreVideoPlaylistsRemovedSuccessfully is correctly updated`() =
+        runTest {
+            initUnderTest()
+
+            underTest.state.test {
+                assertThat(awaitItem().areVideoPlaylistsRemovedSuccessfully).isFalse()
+                underTest.setAreVideoPlaylistsRemovedSuccessfully(true)
+                assertThat(awaitItem().areVideoPlaylistsRemovedSuccessfully).isTrue()
+                underTest.setAreVideoPlaylistsRemovedSuccessfully(false)
+                assertThat(awaitItem().areVideoPlaylistsRemovedSuccessfully).isFalse()
+            }
+        }
+
+    @Test
+    fun `test that the setShouldShowMoreVideoPlaylistOptions is correctly updated`() =
+        runTest {
+            initUnderTest()
+
+            underTest.state.test {
+                assertThat(awaitItem().shouldShowMoreVideoPlaylistOptions).isFalse()
+                underTest.setShouldShowMoreVideoPlaylistOptions(true)
+                assertThat(awaitItem().shouldShowMoreVideoPlaylistOptions).isTrue()
+                underTest.setShouldShowMoreVideoPlaylistOptions(false)
+                assertThat(awaitItem().shouldShowMoreVideoPlaylistOptions).isFalse()
+            }
+        }
+
+    @Test
     fun `test that the removeVideoPlaylists is correctly updated`() = runTest {
         val videoPlaylistTitles = listOf("new playlist", "new playlist1", "new playlist2")
         val playlistIDs = listOf(NodeId(1L), NodeId(2L), NodeId(3L))
@@ -538,8 +602,250 @@ class VideoSectionViewModelTest {
             val actual = awaitItem()
             assertThat(actual.deletedVideoPlaylistTitles.size).isEqualTo(2)
             assertThat(actual.deletedVideoPlaylistTitles[0]).isEqualTo(videoPlaylistTitles[0])
+            assertThat(actual.areVideoPlaylistsRemovedSuccessfully).isTrue()
+            assertThat(actual.shouldDeleteVideoPlaylist).isFalse()
+            cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun `test that shouldRenameVideoPlaylist is correctly updated after updated video playlist title`() =
+        runTest {
+            val newTitle = "newTitle"
+            val playlistID = NodeId(1L)
+
+            whenever(updateVideoPlaylistTitleUseCase(playlistID, newTitle)).thenReturn(
+                newTitle
+            )
+
+            underTest.state.test {
+                assertThat(awaitItem().shouldRenameVideoPlaylist).isFalse()
+                underTest.setShouldRenameVideoPlaylist(true)
+                assertThat(awaitItem().shouldRenameVideoPlaylist).isTrue()
+                underTest.updateVideoPlaylistTitle(playlistID, newTitle)
+                assertThat(awaitItem().shouldRenameVideoPlaylist).isFalse()
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `test that shouldRenameVideoPlaylist is correctly updated when throw exception`() =
+        runTest {
+            val newTitle = "newTitle"
+            val playlistID = NodeId(1L)
+            whenever(
+                updateVideoPlaylistTitleUseCase(
+                    playlistID,
+                    newTitle
+                )
+            ).thenAnswer { throw Exception() }
+
+            underTest.state.test {
+                assertThat(awaitItem().shouldRenameVideoPlaylist).isFalse()
+                underTest.setShouldRenameVideoPlaylist(true)
+                assertThat(awaitItem().shouldRenameVideoPlaylist).isTrue()
+                underTest.updateVideoPlaylistTitle(playlistID, newTitle)
+                assertThat(awaitItem().shouldRenameVideoPlaylist).isFalse()
+            }
+        }
+
+    @Test
+    fun `test that the setCurrentDestinationRoute is correctly updated`() = runTest {
+        val route = "route"
+        initUnderTest()
+
+        underTest.state.test {
+            assertThat(awaitItem().currentDestinationRoute).isNull()
+            underTest.setCurrentDestinationRoute(route)
+            assertThat(awaitItem().currentDestinationRoute).isEqualTo(route)
+            underTest.setCurrentDestinationRoute(null)
+            assertThat(awaitItem().currentDestinationRoute).isNull()
+        }
+    }
+
+    @Test
+    fun `test that the setLocationSelectedFilterOption is correctly updated`() = runTest {
+        val locationOption = LocationFilterOption.CameraUploads
+        initUnderTest()
+
+        underTest.state.test {
+            awaitItem().let {
+                assertThat(it.locationSelectedFilterOption).isNull()
+                assertThat(it.isPendingRefresh).isFalse()
+            }
+            underTest.setLocationSelectedFilterOption(locationOption)
+            awaitItem().let {
+                assertThat(it.locationSelectedFilterOption).isEqualTo(locationOption)
+                assertThat(it.isPendingRefresh).isTrue()
+                assertThat(it.progressBarShowing).isTrue()
+            }
+            underTest.setLocationSelectedFilterOption(null)
+            awaitItem().let {
+                assertThat(it.locationSelectedFilterOption).isNull()
+                assertThat(it.isPendingRefresh).isTrue()
+            }
+        }
+    }
+
+    @Test
+    fun `test that the setDurationSelectedFilterOption is correctly updated`() = runTest {
+        val durationOption = DurationFilterOption.MoreThan20
+        initUnderTest()
+
+        underTest.state.test {
+            awaitItem().let {
+                assertThat(it.durationSelectedFilterOption).isNull()
+                assertThat(it.isPendingRefresh).isFalse()
+            }
+            underTest.setDurationSelectedFilterOption(durationOption)
+            awaitItem().let {
+                assertThat(it.durationSelectedFilterOption).isEqualTo(durationOption)
+                assertThat(it.isPendingRefresh).isTrue()
+                assertThat(it.progressBarShowing).isTrue()
+            }
+            underTest.setDurationSelectedFilterOption(null)
+            awaitItem().let {
+                assertThat(it.durationSelectedFilterOption).isNull()
+                assertThat(it.isPendingRefresh).isTrue()
+            }
+        }
+    }
+
+    @Test
+    fun `test that the videos return correctly when the duration select option is not null`() =
+        runTest {
+            val durationOption = DurationFilterOption.MoreThan20
+
+            val typedVideoNode1 = getTypedVideoNode(1)
+            val typedVideoNode2 = getTypedVideoNode(2)
+            val typedVideoNode3 = getTypedVideoNode(3)
+
+            val videoOfDurationLessThan4 = getVideoUIEntityWithDuration(3)
+            val videoOfDurationBetween4And20 = getVideoUIEntityWithDuration(8)
+            val videoOfDurationMoreThan20 = getVideoUIEntityWithDuration(21)
+
+            whenever(getCloudSortOrder()).thenReturn(SortOrder.ORDER_MODIFICATION_DESC)
+            whenever(getAllVideosUseCase()).thenReturn(
+                listOf(typedVideoNode1, typedVideoNode2, typedVideoNode3)
+            )
+            whenever(videoUIEntityMapper(typedVideoNode1)).thenReturn(videoOfDurationLessThan4)
+            whenever(videoUIEntityMapper(typedVideoNode2)).thenReturn(videoOfDurationBetween4And20)
+            whenever(videoUIEntityMapper(typedVideoNode3)).thenReturn(videoOfDurationMoreThan20)
+
+            underTest.setDurationSelectedFilterOption(durationOption)
+            underTest.refreshNodes()
+
+            underTest.state.drop(1).test {
+                val actual = awaitItem()
+                assertThat(actual.durationSelectedFilterOption).isEqualTo(durationOption)
+                assertThat(actual.allVideos.size).isEqualTo(1)
+                assertThat(actual.allVideos[0].durationInMinutes)
+                    .isEqualTo(videoOfDurationMoreThan20.durationInMinutes)
+            }
+        }
+
+    private fun getTypedVideoNode(videoId: Long) = mock<TypedVideoNode> {
+        on { id }.thenReturn(NodeId(videoId))
+        on { name }.thenReturn("video name")
+    }
+
+    private fun getVideoUIEntityWithDuration(minutes: Long) = mock<VideoUIEntity> {
+        on { name }.thenReturn("video name")
+        on { durationInMinutes }.thenReturn(minutes)
+    }
+
+    @Test
+    fun `test that the videos return correctly when the location select option is CameraUploads`() =
+        runTest {
+            val video1 = getVideoUIEntityWithParentIdAndShared(5)
+            val video2 = getVideoUIEntityWithParentIdAndShared(7)
+            val video3 = getVideoUIEntityWithParentIdAndShared(4)
+
+            initFilterOptionTestData(
+                LocationFilterOption.CameraUploads,
+                listOf(video1, video2, video3)
+            )
+
+            underTest.state.drop(1).test {
+                val actual = awaitItem()
+                assertThat(actual.locationSelectedFilterOption).isEqualTo(
+                    LocationFilterOption.CameraUploads
+                )
+                assertThat(actual.allVideos.size).isEqualTo(1)
+                assertThat(actual.allVideos[0].parentId).isEqualTo(NodeId(7))
+            }
+        }
+
+    @Test
+    fun `test that the videos return correctly when the location select option is SharedItems`() =
+        runTest {
+            val video1 = getVideoUIEntityWithParentIdAndShared(5, true)
+            val video2 = getVideoUIEntityWithParentIdAndShared(7, false)
+            val video3 = getVideoUIEntityWithParentIdAndShared(4, false)
+
+            initFilterOptionTestData(
+                LocationFilterOption.SharedItems,
+                listOf(video1, video2, video3)
+            )
+
+            underTest.state.drop(1).test {
+                val actual = awaitItem()
+                assertThat(actual.locationSelectedFilterOption).isEqualTo(
+                    LocationFilterOption.SharedItems
+                )
+                assertThat(actual.allVideos.size).isEqualTo(1)
+                assertThat(actual.allVideos[0].parentId.longValue).isEqualTo(5)
+            }
+        }
+
+    @Test
+    fun `test that the videos return correctly when the location select option is CloudDrive`() =
+        runTest {
+            val video1 = getVideoUIEntityWithParentIdAndShared(5)
+            val video2 = getVideoUIEntityWithParentIdAndShared(7)
+            val video3 = getVideoUIEntityWithParentIdAndShared(4)
+
+            initFilterOptionTestData(
+                LocationFilterOption.CloudDrive,
+                listOf(video1, video2, video3)
+            )
+
+            underTest.state.drop(1).test {
+                val actual = awaitItem()
+                assertThat(actual.locationSelectedFilterOption).isEqualTo(
+                    LocationFilterOption.CloudDrive
+                )
+                assertThat(actual.allVideos.size).isEqualTo(2)
+            }
+        }
+
+    private suspend fun initFilterOptionTestData(
+        locationFilterOption: LocationFilterOption,
+        videos: List<VideoUIEntity>,
+    ) {
+        val typedVideoNode1 = getTypedVideoNode(1)
+        val typedVideoNode2 = getTypedVideoNode(2)
+        val typedVideoNode3 = getTypedVideoNode(3)
+
+        whenever(getCloudSortOrder()).thenReturn(SortOrder.ORDER_MODIFICATION_DESC)
+        whenever(getAllVideosUseCase()).thenReturn(
+            listOf(typedVideoNode1, typedVideoNode2, typedVideoNode3)
+        )
+        whenever(getSyncUploadsFolderIdsUseCase()).thenReturn(listOf(7))
+        whenever(videoUIEntityMapper(typedVideoNode1)).thenReturn(videos[0])
+        whenever(videoUIEntityMapper(typedVideoNode2)).thenReturn(videos[1])
+        whenever(videoUIEntityMapper(typedVideoNode3)).thenReturn(videos[2])
+
+        underTest.setLocationSelectedFilterOption(locationFilterOption)
+        underTest.refreshNodes()
+    }
+
+    private fun getVideoUIEntityWithParentIdAndShared(pId: Long, shared: Boolean = false) =
+        mock<VideoUIEntity> {
+            on { name }.thenReturn("video name")
+            on { parentId }.thenReturn(NodeId(pId))
+            on { isSharedItems }.thenReturn(shared)
+        }
 
     companion object {
         @JvmField

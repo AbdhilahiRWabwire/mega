@@ -5,6 +5,7 @@ import mega.privacy.android.domain.entity.CallsMeetingInvitations
 import mega.privacy.android.domain.entity.CallsMeetingReminders
 import mega.privacy.android.domain.entity.CallsSoundNotifications
 import mega.privacy.android.domain.entity.ChatImageQuality
+import mega.privacy.android.domain.entity.VideoQuality
 import mega.privacy.android.domain.entity.meeting.WaitingRoomReminders
 import mega.privacy.android.domain.entity.preference.StartScreen
 import java.io.File
@@ -92,20 +93,6 @@ interface SettingsRepository {
     suspend fun setSubfolderMediaDiscoveryEnabled(enabled: Boolean)
 
     /**
-     * Get always ask for storage value
-     *
-     * @return isStorageAskAlways as [Boolean]
-     */
-    suspend fun getStorageDownloadAskAlways(): Boolean
-
-    /**
-     * Set to always ask for storage
-     *
-     * @param isStorageAskAlways
-     */
-    suspend fun setStorageAskAlways(isStorageAskAlways: Boolean)
-
-    /**
      * Set the default storage download location
      */
     suspend fun setDefaultStorageDownloadLocation()
@@ -116,6 +103,16 @@ interface SettingsRepository {
      * @return storageDownloadLocation as File Path
      */
     suspend fun getStorageDownloadLocation(): String?
+
+    /**
+     * @return if should ask the user about download location
+     */
+    suspend fun isAskDownloadLocation(): Boolean
+
+    /**
+     * Set if should ask the user about download location
+     */
+    suspend fun setAskDownloadLocation(value: Boolean)
 
     /**
      * Set Storage download location
@@ -160,6 +157,13 @@ interface SettingsRepository {
      * @return Chat image quality.
      */
     fun getChatImageQuality(): Flow<ChatImageQuality>
+
+    /**
+     * Gets the current chat video quality.
+     *
+     * @return Chat video quality.
+     */
+    suspend fun getChatVideoQualityPreference(): VideoQuality
 
     /**
      * Sets chat image quality.

@@ -7,6 +7,7 @@ import mega.privacy.android.app.presentation.extensions.getZoneStartTime
 import mega.privacy.android.app.presentation.extensions.meeting.DialogOption
 import mega.privacy.android.app.presentation.meeting.CreateScheduledMeetingViewModel
 import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
 import mega.privacy.android.domain.entity.chat.ChatScheduledRules
 import mega.privacy.android.domain.entity.contacts.ContactItem
@@ -17,6 +18,7 @@ import mega.privacy.android.domain.entity.meeting.ScheduledMeetingType
 import mega.privacy.android.domain.entity.meeting.WeekOfMonth
 import mega.privacy.android.domain.entity.meeting.Weekday
 import java.time.DayOfWeek
+import java.time.Duration
 import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
@@ -63,12 +65,12 @@ import java.time.temporal.WeekFields
  * @property participantsRemoved                        List of participants removed.
  * @property weekList                                   List of [Weekday] in the week.
  */
-data class CreateScheduledMeetingState constructor(
+data class CreateScheduledMeetingState(
     val scheduledMeeting: ChatScheduledMeeting? = null,
     val openAddContact: Boolean? = null,
     val chatIdToOpenInfoScreen: Long? = null,
     val finish: Boolean = false,
-    val buttons: List<ScheduleMeetingAction> = ScheduleMeetingAction.values().asList(),
+    val buttons: List<ScheduleMeetingAction> = ScheduleMeetingAction.entries,
     val meetingTitle: String = "",
     val startDate: ZonedDateTime = ZonedDateTime.now(),
     val endDate: ZonedDateTime = startDate.plus(30, ChronoUnit.MINUTES),

@@ -12,6 +12,7 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.utils.TextUtil
 import mega.privacy.android.core.ui.controls.chat.messages.ChatManagementMessage
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.domain.entity.chat.ChatMessageStatus
 import mega.privacy.android.domain.entity.chat.ChatMessageTermCode
 import mega.privacy.android.domain.entity.chat.messages.management.CallEndedMessage
 import mega.privacy.android.domain.entity.chat.messages.management.CallMessage
@@ -169,11 +170,14 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
+                    isDeletable = false,
+                    isEditable = false,
                     isMine = true,
                     userHandle = 123L,
                     shouldShowAvatar = false,
-                    shouldShowTime = false,
                     reactions = emptyList(),
+                    status = ChatMessageStatus.UNKNOWN,
+                    content = null
                 ),
                 isOneToOneChat = true
             ),
@@ -182,13 +186,16 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
+                    isDeletable = false,
+                    isEditable = false,
                     isMine = true,
                     termCode = ChatMessageTermCode.ENDED,
                     duration = 0.seconds,
                     userHandle = 123L,
                     shouldShowAvatar = false,
-                    shouldShowTime = false,
                     reactions = emptyList(),
+                    status = ChatMessageStatus.UNKNOWN,
+                    content = null
                 ),
                 isOneToOneChat = true
             ),
@@ -197,13 +204,16 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
+                    isDeletable = false,
+                    isEditable = false,
                     isMine = true,
                     termCode = ChatMessageTermCode.ENDED,
                     duration = 0.seconds,
                     userHandle = 123L,
                     shouldShowAvatar = false,
-                    shouldShowTime = false,
                     reactions = emptyList(),
+                    status = ChatMessageStatus.UNKNOWN,
+                    content = null
                 ),
                 isOneToOneChat = false
             ),
@@ -212,13 +222,16 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
+                    isDeletable = false,
+                    isEditable = false,
                     isMine = true,
                     termCode = ChatMessageTermCode.ENDED,
                     duration = 100.seconds,
                     userHandle = 123L,
                     shouldShowAvatar = false,
-                    shouldShowTime = false,
                     reactions = emptyList(),
+                    status = ChatMessageStatus.UNKNOWN,
+                    content = null
                 ),
                 isOneToOneChat = true
             ),
@@ -227,13 +240,16 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
+                    isDeletable = false,
+                    isEditable = false,
                     isMine = true,
                     termCode = ChatMessageTermCode.ENDED,
                     duration = 100.seconds,
                     userHandle = 123L,
                     shouldShowAvatar = false,
-                    shouldShowTime = false,
                     reactions = emptyList(),
+                    status = ChatMessageStatus.UNKNOWN,
+                    content = null
                 ),
                 isOneToOneChat = false
             ),
@@ -242,13 +258,16 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
+                    isDeletable = false,
+                    isEditable = false,
                     isMine = true,
                     termCode = ChatMessageTermCode.FAILED,
                     duration = 0.seconds,
                     userHandle = 123L,
                     shouldShowAvatar = false,
-                    shouldShowTime = false,
                     reactions = emptyList(),
+                    status = ChatMessageStatus.UNKNOWN,
+                    content = null
                 ),
                 isOneToOneChat = true
             ),
@@ -257,13 +276,16 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
+                    isDeletable = false,
+                    isEditable = false,
                     isMine = true,
                     termCode = ChatMessageTermCode.CANCELLED,
                     duration = 0.seconds,
                     userHandle = 123L,
                     shouldShowAvatar = false,
-                    shouldShowTime = false,
                     reactions = emptyList(),
+                    status = ChatMessageStatus.UNKNOWN,
+                    content = null
                 ),
                 isOneToOneChat = false
             ),
@@ -272,13 +294,16 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
+                    isDeletable = false,
+                    isEditable = false,
                     isMine = true,
                     termCode = ChatMessageTermCode.REJECTED,
                     duration = 0.seconds,
                     userHandle = 123L,
                     shouldShowAvatar = false,
-                    shouldShowTime = false,
                     reactions = emptyList(),
+                    status = ChatMessageStatus.UNKNOWN,
+                    content = null
                 ),
                 isOneToOneChat = true
             ),
@@ -287,13 +312,16 @@ private class ChatCallMessageViewParameterProvider : PreviewParameterProvider<Pr
                     chatId = 1L,
                     msgId = 123L,
                     time = System.currentTimeMillis(),
+                    isDeletable = false,
+                    isEditable = false,
                     isMine = true,
                     termCode = ChatMessageTermCode.NO_ANSWER,
                     duration = 0.seconds,
                     userHandle = 123L,
                     shouldShowAvatar = false,
-                    shouldShowTime = false,
                     reactions = emptyList(),
+                    status = ChatMessageStatus.UNKNOWN,
+                    content = null
                 ),
                 isOneToOneChat = false
             ),

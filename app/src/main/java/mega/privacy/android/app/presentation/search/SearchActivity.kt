@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -22,6 +21,7 @@ import androidx.compose.material.SnackbarHost
 import androidx.compose.material.SnackbarHostState
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.core.view.WindowCompat
@@ -41,18 +41,28 @@ import mega.privacy.android.app.activities.contract.NameCollisionActivityContrac
 import mega.privacy.android.app.components.transferWidget.TransfersWidgetView
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.globalmanagement.TransfersManagement
+import mega.privacy.android.app.imageviewer.ImageViewerActivity
 import mega.privacy.android.app.main.ManagerActivity
+import mega.privacy.android.app.mediaplayer.AudioPlayerActivity
+import mega.privacy.android.app.mediaplayer.VideoPlayerActivity
 import mega.privacy.android.app.modalbottomsheet.SortByBottomSheetDialogFragment
 import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.presentation.clouddrive.FileBrowserViewModel
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.filelink.view.animationScale
 import mega.privacy.android.app.presentation.filelink.view.animationSpecs
+import mega.privacy.android.app.presentation.imagepreview.ImagePreviewActivity
+import mega.privacy.android.app.presentation.imagepreview.fetcher.CloudDriveImageNodeFetcher
+import mega.privacy.android.app.presentation.imagepreview.fetcher.RubbishBinImageNodeFetcher
+import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewFetcherSource
+import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewMenuSource
 import mega.privacy.android.app.presentation.manager.model.TransfersTab
-import mega.privacy.android.app.presentation.mapper.GetIntentToOpenFileMapper
 import mega.privacy.android.app.presentation.movenode.mapper.MoveRequestMessageMapper
+import mega.privacy.android.app.presentation.node.FileNodeContent
 import mega.privacy.android.app.presentation.node.NodeActionHandler
 import mega.privacy.android.app.presentation.node.NodeActionsViewModel
+import mega.privacy.android.app.presentation.pdfviewer.PdfViewerActivity
+import mega.privacy.android.app.presentation.search.mapper.NodeSourceTypeToViewTypeMapper
 import mega.privacy.android.app.presentation.search.model.SearchFilter
 import mega.privacy.android.app.presentation.search.navigation.contactArraySeparator
 import mega.privacy.android.app.presentation.search.navigation.searchForeignNodeDialog
@@ -62,16 +72,22 @@ import mega.privacy.android.app.presentation.snackbar.MegaSnackbarDuration
 import mega.privacy.android.app.presentation.snackbar.MegaSnackbarShower
 import mega.privacy.android.app.presentation.transfers.TransfersManagementViewModel
 import mega.privacy.android.app.presentation.transfers.startdownload.view.StartDownloadComponent
+import mega.privacy.android.app.textEditor.TextEditorActivity
+import mega.privacy.android.app.textEditor.TextEditorViewModel
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.app.utils.MegaApiUtils
+import mega.privacy.android.app.zippreview.ui.ZipBrowserActivity
 import mega.privacy.android.core.ui.controls.snackbars.MegaSnackbar
+import mega.privacy.android.domain.entity.AudioFileTypeInfo
 import mega.privacy.android.domain.entity.ThemeMode
+import mega.privacy.android.domain.entity.VideoFileTypeInfo
+import mega.privacy.android.domain.entity.ZipFileTypeInfo
 import mega.privacy.android.domain.entity.node.FileNode
-import mega.privacy.android.domain.entity.node.FolderNode
+import mega.privacy.android.domain.entity.node.NodeContentUri
 import mega.privacy.android.domain.entity.node.NodeNameCollisionResult
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.entity.node.NodeSourceType
-import mega.privacy.android.domain.entity.node.TypedNode
+import mega.privacy.android.domain.entity.node.TypedFileNode
+import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.search.SearchCategory
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.feature.sync.data.mapper.ListToStringWithDelimitersMapper
@@ -82,6 +98,7 @@ import mega.privacy.mobile.analytics.event.SearchImageFilterPressedEvent
 import mega.privacy.mobile.analytics.event.SearchResetFilterPressedEvent
 import mega.privacy.mobile.analytics.event.SearchVideosFilterPressedEvent
 import timber.log.Timber
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -105,6 +122,12 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
      */
     @Inject
     lateinit var transfersManagement: TransfersManagement
+
+    /**
+     * Mapper to convert node source type to Int
+     */
+    @Inject
+    lateinit var nodeSourceTypeToViewTypeMapper: NodeSourceTypeToViewTypeMapper
 
     /**
      * Mapper to convert list to json for sending data in navigation
@@ -166,12 +189,6 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
     }
 
     /**
-     * Mapper to open file
-     */
-    @Inject
-    lateinit var getIntentToOpenFileMapper: GetIntentToOpenFileMapper
-
-    /**
      * onCreate
      */
     @OptIn(ExperimentalMaterialNavigationApi::class)
@@ -187,7 +204,6 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
 
             val nodeActionState by nodeActionsViewModel.state.collectAsStateWithLifecycle()
             val transferState by transfersManagementViewModel.state.collectAsStateWithLifecycle()
-
             // Remember a SystemUiController
             val systemUiController = rememberSystemUiController()
             val useDarkIcons = themeMode.isDarkMode().not()
@@ -199,6 +215,7 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
             val scaffoldState = rememberScaffoldState(snackbarHostState = snackbarHostState)
             val bottomSheetNavigator = rememberBottomSheetNavigator()
             val navHostController = rememberNavController(bottomSheetNavigator)
+            val coroutineScope = rememberCoroutineScope()
 
             MegaAppTheme(isDark = themeMode.isDarkMode()) {
                 Scaffold(
@@ -234,7 +251,6 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
                             .statusBarsPadding(),
                         viewModel = viewModel,
                         nodeActionsViewModel = nodeActionsViewModel,
-                        handleClick = ::handleClick,
                         navigateToLink = ::navigateToLink,
                         showSortOrderBottomSheet = ::showSortOrderBottomSheet,
                         trackAnalytics = ::trackAnalytics,
@@ -242,6 +258,15 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
                         navHostController = navHostController,
                         bottomSheetNavigator = bottomSheetNavigator,
                         listToStringWithDelimitersMapper = listToStringWithDelimitersMapper,
+                        handleClick = {
+                            coroutineScope.launch {
+                                when (it) {
+                                    is TypedFileNode -> openFileClicked(it)
+                                    is TypedFolderNode -> openFolderClicked(it.id.longValue)
+                                    else -> Timber.e("Unsupported click")
+                                }
+                            }
+                        },
                         onBackPressed = {
                             if (viewModel.state.value.selectedNodes.isNotEmpty()) {
                                 viewModel.clearSelection()
@@ -308,14 +333,6 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
     }
 
 
-    private fun handleClick(node: TypedNode?) = node?.let {
-        when (it) {
-            is FileNode -> openFileClicked(it)
-            is FolderNode -> openFolderClicked(it.id.longValue)
-            else -> Timber.e("Unsupported click")
-        }
-    }
-
     /**
      * Clicked on link
      * @param link
@@ -348,42 +365,254 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
      *
      * @param currentFileNode [FileNode]
      */
-    private fun openFileClicked(currentFileNode: FileNode?) {
-        currentFileNode?.let {
-            openFile(fileNode = it)
-            viewModel.onItemPerformedClicked()
-        } ?: run {
-            // Update toolbar title here
+    private suspend fun openFileClicked(currentFileNode: TypedFileNode) {
+        runCatching {
+            nodeActionsViewModel.handleFileNodeClicked(currentFileNode)
+        }.onSuccess { content ->
+            val type = nodeSourceTypeToViewTypeMapper(viewModel.state.value.nodeSourceType)
+            when (content) {
+                is FileNodeContent.Pdf -> openPdfActivity(
+                    content = content.uri,
+                    currentFileNode = currentFileNode,
+                    viewType = type
+                )
+
+                is FileNodeContent.ImageForNode -> {
+                    openImageViewerActivity(
+                        isImagePreview = content.isImagePreview,
+                        currentFileNode = currentFileNode
+                    )
+                }
+
+                is FileNodeContent.TextContent -> openTextEditorActivity(
+                    currentFileNode = currentFileNode,
+                    viewType = type
+                )
+
+                is FileNodeContent.AudioOrVideo -> {
+                    openVideoOrAudioFile(
+                        content = content.uri,
+                        fileNode = currentFileNode,
+                        viewType = type
+                    )
+                }
+
+                is FileNodeContent.UrlContent -> {
+                    openUrlFile(
+                        content = content,
+                    )
+                }
+
+                is FileNodeContent.Other -> {
+                    content.localFile?.let {
+                        if (currentFileNode.type is ZipFileTypeInfo) {
+                            openZipFile(it, currentFileNode)
+                        } else {
+                            handleOtherFiles(it, currentFileNode)
+                        }
+                    } ?: run {
+                        nodeActionsViewModel.downloadNodeForPreview(currentFileNode)
+                    }
+                }
+
+                else -> {
+
+                }
+            }
+
+        }.onFailure {
+            Timber.e(it)
         }
     }
 
-    /**
-     * Open File
-     * @param fileNode [FileNode]
-     */
-    private fun openFile(fileNode: FileNode) {
-        lifecycleScope.launch {
+    private suspend fun handleOtherFiles(
+        localFile: File,
+        currentFileNode: TypedFileNode,
+    ) {
+        Intent(Intent.ACTION_VIEW).apply {
+            nodeActionsViewModel.applyNodeContentUri(
+                intent = this,
+                content = NodeContentUri.LocalContentUri(localFile),
+                mimeType = currentFileNode.type.mimeType,
+                isSupported = false
+            )
             runCatching {
-                val intent = getIntentToOpenFileMapper(
-                    activity = this@SearchActivity,
-                    fileNode = fileNode,
-                    viewType = Constants.FILE_BROWSER_ADAPTER
-                )
-                intent?.let {
-                    if (MegaApiUtils.isIntentAvailable(this@SearchActivity, it)) {
-                        startActivity(it)
-                    } else {
-                        Toast.makeText(
-                            this@SearchActivity,
-                            getString(R.string.intent_not_available),
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
-            }.onFailure {
-                Timber.e("itemClick:ERROR:httpServerGetLocalLink")
-                viewModel.showShowErrorMessage(errorMessageResId = R.string.general_text_error)
+                startActivity(this)
+            }.onFailure { error ->
+                Timber.e(error)
+                openShareIntent()
             }
+        }
+    }
+
+    private suspend fun Intent.openShareIntent() {
+        if (resolveActivity(packageManager) == null) {
+            action = Intent.ACTION_SEND
+        }
+        runCatching {
+            startActivity(this)
+        }.onFailure { error ->
+            Timber.e(error)
+            snackbarHostState.showSnackbar(getString(R.string.intent_not_available))
+        }
+    }
+
+    private suspend fun openZipFile(
+        localFile: File,
+        fileNode: TypedFileNode,
+    ) {
+        Timber.d("The file is zip, open in-app.")
+        if (ZipBrowserActivity.zipFileFormatCheck(this, localFile.absolutePath)) {
+            startActivity(
+                Intent(this, ZipBrowserActivity::class.java).apply {
+                    putExtra(
+                        ZipBrowserActivity.EXTRA_PATH_ZIP, localFile.absolutePath
+                    )
+                    putExtra(
+                        ZipBrowserActivity.EXTRA_HANDLE_ZIP, fileNode.id.longValue
+                    )
+                }
+            )
+        } else {
+            snackbarHostState.showSnackbar(getString(R.string.message_zip_format_error))
+        }
+    }
+
+    private fun openTextEditorActivity(currentFileNode: TypedFileNode, viewType: Int?) {
+        val textFileIntent = Intent(this, TextEditorActivity::class.java)
+        textFileIntent.putExtra(Constants.INTENT_EXTRA_KEY_HANDLE, currentFileNode.id.longValue)
+            .putExtra(TextEditorViewModel.MODE, TextEditorViewModel.VIEW_MODE)
+            .putExtra(Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE, viewType)
+        startActivity(textFileIntent)
+    }
+
+    private fun openPdfActivity(
+        content: NodeContentUri,
+        currentFileNode: TypedFileNode,
+        viewType: Int?,
+    ) {
+        val pdfIntent = Intent(this, PdfViewerActivity::class.java)
+        val mimeType = currentFileNode.type.mimeType
+        pdfIntent.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(Constants.INTENT_EXTRA_KEY_HANDLE, currentFileNode.id.longValue)
+            putExtra(Constants.INTENT_EXTRA_KEY_INSIDE, true)
+            putExtra(Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE, viewType)
+            putExtra(Constants.INTENT_EXTRA_KEY_APP, true)
+        }
+        nodeActionsViewModel.applyNodeContentUri(
+            intent = pdfIntent,
+            content = content,
+            mimeType = mimeType,
+        )
+        startActivity(pdfIntent)
+    }
+
+    private fun openImageViewerActivity(
+        isImagePreview: Boolean,
+        currentFileNode: TypedFileNode,
+    ) {
+        val nodeSourceType = viewModel.state.value.nodeSourceType
+        val intent = if (isImagePreview &&
+            (nodeSourceType == NodeSourceType.CLOUD_DRIVE || nodeSourceType == NodeSourceType.HOME)
+        ) {
+            ImagePreviewActivity.createIntent(
+                context = this,
+                imageSource = ImagePreviewFetcherSource.CLOUD_DRIVE,
+                menuOptionsSource = ImagePreviewMenuSource.CLOUD_DRIVE,
+                anchorImageNodeId = currentFileNode.id,
+                params = mapOf(CloudDriveImageNodeFetcher.PARENT_ID to currentFileNode.parentId.longValue),
+            )
+        } else if (isImagePreview && nodeSourceType == NodeSourceType.RUBBISH_BIN) {
+            ImagePreviewActivity.createIntent(
+                context = this,
+                imageSource = ImagePreviewFetcherSource.RUBBISH_BIN,
+                menuOptionsSource = ImagePreviewMenuSource.RUBBISH_BIN,
+                anchorImageNodeId = currentFileNode.id,
+                params = mapOf(RubbishBinImageNodeFetcher.PARENT_ID to currentFileNode.parentId.longValue),
+            )
+        } else {
+            ImageViewerActivity.getIntentForParentNode(
+                this,
+                currentFileNode.parentId.longValue,
+                viewModel.state.value.sortOrder,
+                currentFileNode.id.longValue
+            )
+        }
+        startActivity(intent)
+    }
+
+    private fun openVideoOrAudioFile(
+        fileNode: TypedFileNode,
+        content: NodeContentUri,
+        viewType: Int?,
+    ) {
+        val intent = when {
+            fileNode.type.isSupported && fileNode.type is VideoFileTypeInfo ->
+                Intent(this, VideoPlayerActivity::class.java).apply {
+                    putExtra(
+                        Constants.INTENT_EXTRA_KEY_ORDER_GET_CHILDREN,
+                        viewModel.state.value.sortOrder
+                    )
+                }
+
+            fileNode.type.isSupported && fileNode.type is AudioFileTypeInfo -> Intent(
+                this,
+                AudioPlayerActivity::class.java
+            ).apply {
+                putExtra(
+                    Constants.INTENT_EXTRA_KEY_ORDER_GET_CHILDREN,
+                    viewModel.state.value.sortOrder
+                )
+            }
+
+            else -> Intent(Intent.ACTION_VIEW)
+        }.apply {
+            putExtra(Constants.INTENT_EXTRA_KEY_PLACEHOLDER, 0)
+            putExtra(Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE, viewType)
+            putExtra(Constants.INTENT_EXTRA_KEY_FILE_NAME, fileNode.name)
+            putExtra(Constants.INTENT_EXTRA_KEY_HANDLE, fileNode.id.longValue)
+            putExtra(Constants.INTENT_EXTRA_KEY_PARENT_NODE_HANDLE, fileNode.parentId.longValue)
+            putExtra(Constants.INTENT_EXTRA_KEY_IS_FOLDER_LINK, false)
+            val mimeType =
+                if (fileNode.type.extension == "opus") "audio/*" else fileNode.type.mimeType
+            nodeActionsViewModel.applyNodeContentUri(
+                intent = this,
+                content = content,
+                mimeType = mimeType,
+            )
+        }
+        safeLaunchActivity(intent)
+    }
+
+    private fun openUrlFile(
+        content: FileNodeContent.UrlContent,
+    ) {
+        content.path?.let {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                data = Uri.parse(it)
+            }
+            startActivity(intent)
+        } ?: run {
+            showMegaSnackbar(
+                message = getString(R.string.general_text_error),
+                actionLabel = null,
+                duration = MegaSnackbarDuration.Short
+            )
+        }
+    }
+
+    private fun safeLaunchActivity(intent: Intent) {
+        runCatching {
+            startActivity(intent)
+        }.onFailure {
+            Timber.e(it)
+            showMegaSnackbar(
+                message = getString(R.string.intent_not_available),
+                actionLabel = null,
+                duration = MegaSnackbarDuration.Short
+            )
         }
     }
 

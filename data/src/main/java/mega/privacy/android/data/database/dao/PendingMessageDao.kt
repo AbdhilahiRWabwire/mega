@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import mega.privacy.android.data.database.entity.chat.PendingMessageEntity
 
@@ -21,6 +22,14 @@ interface PendingMessageDao {
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(pendingMessageEntity: PendingMessageEntity): Long
+
+    /**
+     * Update
+     *
+     * @param pendingMessageEntity
+     */
+    @Update
+    suspend fun update(pendingMessageEntity: PendingMessageEntity)
 
     /**
      * Delete

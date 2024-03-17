@@ -2,7 +2,9 @@ package mega.privacy.android.app.presentation.node.view.bottomsheetmenuitems
 
 import androidx.navigation.NavHostController
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import mega.privacy.android.app.presentation.mapper.RestoreNodeResultMapper
 import mega.privacy.android.app.presentation.node.model.menuaction.RestoreMenuAction
 import mega.privacy.android.app.presentation.snackbar.SnackBarHandler
@@ -11,7 +13,6 @@ import mega.privacy.android.core.ui.model.MenuActionWithIcon
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.shares.AccessPermission
-import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionUseCase
 import mega.privacy.android.domain.usecase.node.RestoreNodesUseCase
 import timber.log.Timber
@@ -24,7 +25,6 @@ import javax.inject.Inject
  */
 class RestoreBottomSheetMenuItem @Inject constructor(
     override val menuAction: RestoreMenuAction,
-    @ApplicationScope private val scope: CoroutineScope,
     private val checkNodesNameCollisionUseCase: CheckNodesNameCollisionUseCase,
     private val restoreNodesUseCase: RestoreNodesUseCase,
     private val restoreNodeResultMapper: RestoreNodeResultMapper,
@@ -45,11 +45,13 @@ class RestoreBottomSheetMenuItem @Inject constructor(
         onDismiss: () -> Unit,
         actionHandler: (menuAction: MenuAction, node: TypedNode) -> Unit,
         navController: NavHostController,
+        parentCoroutineScope: CoroutineScope,
     ): () -> Unit = {
-        node.restoreId?.let {
-            onDismiss()
-            val restoreMap = mapOf(Pair(node.id.longValue, it.longValue))
-            scope.launch {
+        val restoreHandle = node.restoreId?.longValue ?: -1L
+        onDismiss()
+        val restoreMap = mapOf(Pair(node.id.longValue, restoreHandle))
+        parentCoroutineScope.launch {
+            withContext(NonCancellable) {
                 runCatching {
                     checkNodesNameCollisionUseCase(restoreMap, NodeNameCollisionType.RESTORE)
                 }.onSuccess { result ->

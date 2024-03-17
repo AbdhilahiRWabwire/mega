@@ -15,11 +15,12 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.presentation.videosection.VideoSectionViewModel
-import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
 import mega.privacy.android.app.presentation.videosection.model.VideoPlaylistUIEntity
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionTab
+import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
 import mega.privacy.android.app.presentation.videosection.view.allvideos.AllVideosView
 import mega.privacy.android.app.presentation.videosection.view.playlist.VideoPlaylistsView
+import mega.privacy.android.domain.entity.SortOrder
 
 internal const val videoSectionRoute = "videoSection/video_section"
 
@@ -75,6 +76,10 @@ internal fun VideoSectionComposeView(
                     id = SortByHeaderViewModel.orderNameMap[uiState.sortOrder]
                         ?: R.string.sortby_name
                 ),
+                selectedDurationFilterOption = uiState.durationSelectedFilterOption,
+                selectedLocationFilterOption = uiState.locationSelectedFilterOption,
+                onLocationFilterItemClicked = videoSectionViewModel::setLocationSelectedFilterOption,
+                onDurationFilterItemClicked = videoSectionViewModel::setDurationSelectedFilterOption,
                 modifier = Modifier,
                 onSortOrderClick = onSortOrderClick,
                 onClick = onClick,
@@ -90,7 +95,19 @@ internal fun VideoSectionComposeView(
                 scrollToTop = uiState.scrollToTop,
                 lazyListState = playlistsLazyListState,
                 sortOrder = stringResource(
-                    id = SortByHeaderViewModel.orderNameMap[uiState.sortOrder]
+                    id = SortByHeaderViewModel.orderNameMap[
+                        when (uiState.sortOrder) {
+                            SortOrder.ORDER_SIZE_DESC,
+                            SortOrder.ORDER_SIZE_ASC,
+                            SortOrder.ORDER_FAV_ASC,
+                            SortOrder.ORDER_FAV_DESC,
+                            SortOrder.ORDER_LABEL_ASC,
+                            SortOrder.ORDER_LABEL_DESC,
+                            -> SortOrder.ORDER_DEFAULT_ASC
+
+                            else -> uiState.sortOrder
+                        }
+                    ]
                         ?: R.string.sortby_name
                 ),
                 errorMessage = uiState.createDialogErrorMessage,
@@ -98,14 +115,25 @@ internal fun VideoSectionComposeView(
                 onSortOrderClick = onSortOrderClick,
                 onClick = onPlaylistItemClick,
                 onLongClick = onPlaylistItemLongClick,
-                onMenuClick = onPlaylistItemMenuClick,
                 setDialogInputPlaceholder = videoSectionViewModel::setPlaceholderTitle,
                 isInputTitleValid = uiState.isInputTitleValid,
-                showCreateVideoPlaylistDialog = uiState.shouldCreateVideoPlaylistDialog,
                 inputPlaceHolderText = uiState.createVideoPlaylistPlaceholderTitle,
-                setShowCreateVideoPlaylistDialog = videoSectionViewModel::setShowCreateVideoPlaylistDialog,
                 setInputValidity = videoSectionViewModel::setNewPlaylistTitleValidity,
-                onDialogPositiveButtonClicked = videoSectionViewModel::createNewPlaylist
+                shouldCreateVideoPlaylistDialog = uiState.shouldCreateVideoPlaylist,
+                setShouldCreateVideoPlaylist = videoSectionViewModel::setShouldCreateVideoPlaylist,
+                onCreateDialogPositiveButtonClicked = videoSectionViewModel::createNewPlaylist,
+                shouldRenameVideoPlaylistDialog = uiState.shouldRenameVideoPlaylist,
+                setShouldRenameVideoPlaylist = videoSectionViewModel::setShouldRenameVideoPlaylist,
+                onRenameDialogPositiveButtonClicked = videoSectionViewModel::updateVideoPlaylistTitle,
+                shouldDeleteVideoPlaylistDialog = uiState.shouldDeleteVideoPlaylist,
+                setShouldDeleteVideoPlaylist = videoSectionViewModel::setShouldDeleteVideoPlaylist,
+                onDeleteDialogPositiveButtonClicked = { playlist ->
+                    videoSectionViewModel.removeVideoPlaylists(
+                        listOf(playlist)
+                    )
+                },
+                onDeletedMessageShown = videoSectionViewModel::clearDeletedVideoPlaylistTitles,
+                deletedVideoPlaylistTitles = uiState.deletedVideoPlaylistTitles
             )
         },
         selectedTab = tabState.selectedTab,

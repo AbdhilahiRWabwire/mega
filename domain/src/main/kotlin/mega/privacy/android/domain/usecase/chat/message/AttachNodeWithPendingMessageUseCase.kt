@@ -32,6 +32,7 @@ class AttachNodeWithPendingMessageUseCase @Inject constructor(
 
         chatMessageRepository.getPendingMessage(pendingMessageId)
             ?.let { pendingMessage ->
+                chatMessageRepository.cacheOriginalPathForNode(nodeId, pendingMessage.filePath)
                 pendingMessage.updateState(
                     PendingMessageState.ATTACHING,
                     nodeId.longValue
@@ -43,14 +44,18 @@ class AttachNodeWithPendingMessageUseCase @Inject constructor(
                     )
                 }
                 val chatId = pendingMessage.chatId
-                chatMessageRepository.attachNode(chatId, nodeId.longValue)
-                    ?.let {
-                        getChatMessageUseCase(chatId, it)?.let { message ->
-                            val request = createSaveSentMessageRequestUseCase(message, chatId)
-                            chatRepository.storeMessages(listOf(request))
-                            chatMessageRepository.deletePendingMessage(pendingMessage)
-                        }
-                    } ?: run {
+                val attachedNode = if (pendingMessage.isVoiceClip) {
+                    chatMessageRepository.attachVoiceMessage(chatId, nodeId.longValue)
+                } else {
+                    chatMessageRepository.attachNode(chatId, nodeId.longValue)
+                }
+                attachedNode?.let {
+                    getChatMessageUseCase(chatId, it)?.let { message ->
+                        val request = createSaveSentMessageRequestUseCase(message, chatId)
+                        chatRepository.storeMessages(listOf(request))
+                        chatMessageRepository.deletePendingMessage(pendingMessage)
+                    }
+                } ?: run {
                     pendingMessage.updateState(
                         PendingMessageState.ERROR_ATTACHING
                     )
@@ -62,7 +67,7 @@ class AttachNodeWithPendingMessageUseCase @Inject constructor(
         state: PendingMessageState,
         nodeHandle: Long = this.nodeHandle,
     ) {
-        chatMessageRepository.savePendingMessage(
+        chatMessageRepository.updatePendingMessage(
             SavePendingMessageRequest(
                 chatId = this.chatId,
                 type = this.type,

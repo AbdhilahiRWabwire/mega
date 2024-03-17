@@ -78,6 +78,7 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.ViewerNode
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
+import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.filelink.GetPublicNodeFromSerializedDataUseCase
 import mega.privacy.android.domain.usecase.folderlink.GetPublicChildNodeFromIdUseCase
@@ -139,6 +140,7 @@ class TextEditorViewModel @Inject constructor(
     private val getChatFileUseCase: GetChatFileUseCase,
     private val getPublicChildNodeFromIdUseCase: GetPublicChildNodeFromIdUseCase,
     private val getPublicNodeFromSerializedDataUseCase: GetPublicNodeFromSerializedDataUseCase,
+    private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase,
 ) : BaseRxViewModel() {
 
     companion object {
@@ -812,6 +814,12 @@ class TextEditorViewModel @Inject constructor(
         }
     }
 
+    fun hideOrUnhideNode(nodeId: NodeId, hide: Boolean) {
+        viewModelScope.launch {
+            updateNodeSensitiveUseCase(nodeId = nodeId, isSensitive = hide)
+        }
+    }
+
     /**
      * Checks if there is a name collision before proceeding with the action.
      *
@@ -892,6 +900,16 @@ class TextEditorViewModel @Inject constructor(
                             FILE_LINK_ADAPTER -> {
                                 val node = getNode()?.serialize()?.let {
                                     getPublicNodeFromSerializedDataUseCase(it)
+                                }
+                                val nodes = listOfNotNull(node)
+                                updateDownloadEvent(
+                                    TransferTriggerEvent.StartDownloadNode(nodes)
+                                )
+                            }
+
+                            else -> {
+                                val node = getNode()?.handle?.let {
+                                    getNodeByIdUseCase(NodeId(it))
                                 }
                                 val nodes = listOfNotNull(node)
                                 updateDownloadEvent(

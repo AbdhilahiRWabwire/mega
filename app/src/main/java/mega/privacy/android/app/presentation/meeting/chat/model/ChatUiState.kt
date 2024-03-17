@@ -3,6 +3,7 @@ package mega.privacy.android.app.presentation.meeting.chat.model
 import de.palm.composestateevents.StateEventWithContent
 import de.palm.composestateevents.consumed
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.UiChatMessage
+import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
 import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.chat.ChatCall
@@ -12,7 +13,6 @@ import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
-import mega.privacy.android.domain.entity.user.UserUpdate
 import mega.privacy.android.domain.usecase.meeting.LoadMessagesUseCase.Companion.NUMBER_MESSAGES_TO_LOAD
 
 /**
@@ -38,18 +38,17 @@ import mega.privacy.android.domain.usecase.meeting.LoadMessagesUseCase.Companion
  * @property infoToShowEvent Event to show some info. Set it to null in case the activity needs to be closed.
  * @property sendingText Text that is being sent.
  * @property isStartingCall True if it is starting a call, false otherwise.
- * @property messages List of [TypedMessage] containing the chat history.
- * @property pendingMessagesToLoad Number of messages already requested, but pending to load.
  * @property chatHistoryLoadStatus [ChatHistoryLoadStatus]. Until this is not [ChatHistoryLoadStatus.NONE], we can request for more messages.
  * @property mutePushNotificationDialogEvent Event to show the dialog to mute push notifications.
  * @property openWaitingRoomScreen True if should open waiting room screen, false otherwise.
  * @property isGeolocationEnabled True if geolocation internal permission (not device one) is granted, false otherwise.
- * @property userUpdate [UserUpdate] with the changes in the user.
  * @property isAnonymousMode True if the chat is in anonymous mode, false otherwise.
  * @property chatLink String with the chat link.
  * @property editingMessageId Id of the message being edited.
  * @property editingMessageContent Content of the message being edited.
  * @property myUserHandle User handle of current logged in user.
+ * @property downloadEvent Event to start a download.
+ * @property actionToManageEvent [ActionToManage].
  */
 data class ChatUiState(
     val chat: ChatRoom? = null,
@@ -72,18 +71,17 @@ data class ChatUiState(
     val infoToShowEvent: StateEventWithContent<InfoToShow?> = consumed(),
     val sendingText: String = "",
     val isStartingCall: Boolean = false,
-    val messages: List<UiChatMessage> = emptyList(),
-    val pendingMessagesToLoad: Int = NUMBER_MESSAGES_TO_LOAD,
     val chatHistoryLoadStatus: ChatHistoryLoadStatus? = null,
     val mutePushNotificationDialogEvent: StateEventWithContent<List<ChatPushNotificationMuteOption>> = consumed(),
     val openWaitingRoomScreen: Boolean = false,
     val isGeolocationEnabled: Boolean = false,
-    val userUpdate: UserUpdate? = null,
     val isAnonymousMode: Boolean = false,
     val chatLink: String? = null,
     val editingMessageId: Long? = null,
     val editingMessageContent: String? = null,
     val myUserHandle: Long? = null,
+    val downloadEvent: StateEventWithContent<TransferTriggerEvent> = consumed(),
+    val actionToManageEvent: StateEventWithContent<ActionToManage> = consumed(),
 ) {
 
     /**

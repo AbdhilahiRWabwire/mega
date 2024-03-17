@@ -28,7 +28,7 @@ buildscript {
         classpath(plugin.jfrog)
         classpath(plugin.junit5)
         classpath(plugin.kotlin.gradle)
-        classpath("androidx.benchmark:benchmark-baseline-profile-gradle-plugin:1.2.0-beta02")
+        classpath("androidx.benchmark:benchmark-baseline-profile-gradle-plugin:1.2.3")
         classpath(tools.mega.gradle)
     }
 }
@@ -72,7 +72,7 @@ tasks.register("clean", Delete::class) {
 
 // Define versions in a single place
 // App
-extra["appVersion"] = "11.7"
+extra["appVersion"] = "11.8"
 
 // Sdk and tools
 extra["compileSdkVersion"] = 34
@@ -81,7 +81,7 @@ extra["targetSdkVersion"] = 34
 extra["buildTools"] = "34.0.0"
 
 // Prebuilt MEGA SDK version
-extra["megaSdkVersion"] = "20240220.224525-rel"
+extra["megaSdkVersion"] = "20240306.115404-rel"
 
 //JDK and Java Version
 extra["jdk"] = "17"

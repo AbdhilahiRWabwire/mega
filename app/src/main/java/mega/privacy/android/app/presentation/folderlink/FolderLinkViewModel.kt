@@ -59,14 +59,14 @@ import mega.privacy.android.domain.entity.node.UnTypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
 import mega.privacy.android.domain.exception.FetchFolderNodesException
 import mega.privacy.android.domain.usecase.AddNodeType
-import mega.privacy.android.domain.usecase.GetLocalFileForNode
+import mega.privacy.android.domain.usecase.GetLocalFileForNodeUseCase
 import mega.privacy.android.domain.usecase.GetLocalFolderLinkFromMegaApiFolderUseCase
 import mega.privacy.android.domain.usecase.GetLocalFolderLinkFromMegaApiUseCase
 import mega.privacy.android.domain.usecase.GetPricing
+import mega.privacy.android.domain.usecase.HasCredentialsUseCase
 import mega.privacy.android.domain.usecase.RootNodeExistsUseCase
 import mega.privacy.android.domain.usecase.account.GetAccountTypeUseCase
 import mega.privacy.android.domain.usecase.achievements.AreAchievementsEnabledUseCase
-import mega.privacy.android.domain.usecase.HasCredentialsUseCase
 import mega.privacy.android.domain.usecase.contact.GetCurrentUserEmail
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.file.GetFileUriUseCase
@@ -113,7 +113,7 @@ class FolderLinkViewModel @Inject constructor(
     private val getCurrentUserEmail: GetCurrentUserEmail,
     private val getPricing: GetPricing,
     private val containsMediaItemUseCase: ContainsMediaItemUseCase,
-    private val getLocalFileForNode: GetLocalFileForNode,
+    private val getLocalFileForNodeUseCase: GetLocalFileForNodeUseCase,
     private val getLocalFolderLinkFromMegaApiFolderUseCase: GetLocalFolderLinkFromMegaApiFolderUseCase,
     private val megaApiFolderHttpServerStartUseCase: MegaApiFolderHttpServerStartUseCase,
     private val megaApiFolderHttpServerIsRunningUseCase: MegaApiFolderHttpServerIsRunningUseCase,
@@ -147,6 +147,9 @@ class FolderLinkViewModel @Inject constructor(
         checkViewType()
     }
 
+    /**
+     * Clear Rx subscriptions
+     */
     override fun onCleared() {
         rxSubscriptions.clear()
         super.onCleared()
@@ -694,7 +697,11 @@ class FolderLinkViewModel @Inject constructor(
                         ?: state.value.rootNode
                     listOfNotNull(node)
                 }.mapNotNull {
-                    mapNodeToPublicLinkUseCase(it as UnTypedNode, null) as? TypedNode
+                    runCatching {
+                        mapNodeToPublicLinkUseCase(it as UnTypedNode, null)
+                    }.onFailure {
+                        Timber.e(it)
+                    }.getOrNull()
                 }
                 _state.update {
                     it.copy(
@@ -750,7 +757,7 @@ class FolderLinkViewModel @Inject constructor(
                     )
                 }
 
-                getLocalFileForNode(fileNode)?.let {
+                getLocalFileForNodeUseCase(fileNode)?.let {
                     val path = it.path
                     if (path.contains(Environment.getExternalStorageDirectory().path)) {
                         val uri = getFileUriUseCase(it, Constants.AUTHORITY_STRING_FILE_PROVIDER)
@@ -797,7 +804,7 @@ class FolderLinkViewModel @Inject constructor(
                     putExtra(Constants.INTENT_EXTRA_KEY_APP, true)
                     putExtra(Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE, Constants.FOLDER_LINK_ADAPTER)
                 }
-                getLocalFileForNode(fileNode)?.let {
+                getLocalFileForNodeUseCase(fileNode)?.let {
                     val path = it.path
                     if (path.contains(Environment.getExternalStorageDirectory().path)) {
                         val uri = getFileUriUseCase(it, Constants.AUTHORITY_STRING_FILE_PROVIDER)
@@ -842,7 +849,11 @@ class FolderLinkViewModel @Inject constructor(
         viewModelScope.launch {
             if (getFeatureFlagValueUseCase(AppFeatures.DownloadWorker)) {
                 val linkNodes = nodes.mapNotNull {
-                    mapNodeToPublicLinkUseCase(it as UnTypedNode, null) as? TypedNode
+                    runCatching {
+                        mapNodeToPublicLinkUseCase(it as UnTypedNode, null)
+                    }.onFailure {
+                        Timber.e(it)
+                    }.getOrNull()
                 }
                 _state.update {
                     it.copy(

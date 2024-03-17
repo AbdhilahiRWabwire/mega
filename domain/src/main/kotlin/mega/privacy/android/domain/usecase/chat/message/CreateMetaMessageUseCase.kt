@@ -19,50 +19,61 @@ class CreateMetaMessageUseCase @Inject constructor() : CreateTypedMessageUseCase
                 chatId = chatId,
                 msgId = messageId,
                 time = timestamp,
+                isDeletable = isDeletable,
+                isEditable = isEditable,
                 isMine = isMine,
                 userHandle = userHandle,
                 chatRichPreviewInfo = chatRichPreviewInfo,
                 shouldShowAvatar = shouldShowAvatar,
-                shouldShowTime = shouldShowTime,
                 reactions = reactions,
                 content = content.orEmpty(),
                 isEdited = isEdited,
+                status = status,
             )
 
             ContainsMetaType.GEOLOCATION -> LocationMessage(
                 chatId = chatId,
                 msgId = messageId,
                 time = timestamp,
+                isDeletable = isDeletable,
+                isEditable = isEditable,
                 isMine = isMine,
                 userHandle = userHandle,
                 chatGeolocationInfo = chatGeolocationInfo,
                 shouldShowAvatar = shouldShowAvatar,
-                shouldShowTime = shouldShowTime,
                 reactions = reactions,
                 isEdited = isEdited,
+                status = status,
+                content = content,
             )
 
             ContainsMetaType.GIPHY -> GiphyMessage(
                 chatId = chatId,
                 msgId = messageId,
                 time = timestamp,
+                isDeletable = isDeletable,
+                isEditable = isEditable,
                 isMine = isMine,
                 userHandle = userHandle,
                 chatGifInfo = chatGifInfo,
                 shouldShowAvatar = shouldShowAvatar,
-                shouldShowTime = shouldShowTime,
                 reactions = reactions,
+                status = status,
+                content = content,
             )
 
             else -> InvalidMetaMessage(
                 chatId = chatId,
                 msgId = messageId,
                 time = timestamp,
+                isDeletable = isDeletable,
+                isEditable = isEditable,
                 isMine = isMine,
                 userHandle = userHandle,
                 shouldShowAvatar = shouldShowAvatar,
-                shouldShowTime = shouldShowTime,
                 reactions = reactions,
+                status = status,
+                content = content,
             )
         }
     }

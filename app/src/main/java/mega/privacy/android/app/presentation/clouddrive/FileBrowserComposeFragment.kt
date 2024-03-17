@@ -17,7 +17,6 @@ import androidx.appcompat.view.ActionMode
 import androidx.compose.material.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -45,6 +44,7 @@ import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.fragments.homepage.EventObserver
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.interfaces.ActionBackupListener
+import mega.privacy.android.app.interfaces.SnackbarShower
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.main.controllers.NodeController
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkDialogFragment
@@ -69,6 +69,7 @@ import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.MoveRequestResult
+import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.shared.theme.MegaAppTheme
@@ -268,11 +269,17 @@ class FileBrowserComposeFragment : Fragment() {
         mediaHandle: Long,
         @StringRes errorMessage: Int?,
     ) {
-        if (isMediaDiscoveryOpen) {
-            SideEffect {
+        LaunchedEffect(
+            isMediaDiscoveryOpen,
+            isMediaDiscoveryOpenedByIconClick,
+            mediaHandle,
+            errorMessage
+        ) {
+            if (isMediaDiscoveryOpen) {
                 fileBrowserActionListener?.showMediaDiscoveryFromCloudDrive(
                     mediaHandle = mediaHandle,
                     isAccessedByIconClick = isMediaDiscoveryOpenedByIconClick,
+                    replaceFragment = fileBrowserViewModel.state().hasNoOpenedFolders,
                     errorMessage = errorMessage,
                 )
                 fileBrowserViewModel.onItemPerformedClicked()
@@ -554,6 +561,22 @@ class FileBrowserComposeFragment : Fragment() {
                     disableSelectMode()
                 }
 
+                OptionItems.HIDE_CLICKED -> {
+                    fileBrowserViewModel.hideOrUnhideNodes(
+                        nodeIds = it.selectedMegaNode.map { node -> NodeId(node.handle) },
+                        hide = true
+                    )
+                    disableSelectMode()
+                }
+
+                OptionItems.UNHIDE_CLICKED -> {
+                    fileBrowserViewModel.hideOrUnhideNodes(
+                        nodeIds = it.selectedMegaNode.map { node -> NodeId(node.handle) },
+                        hide = false
+                    )
+                    disableSelectMode()
+                }
+
                 OptionItems.COPY_CLICKED -> {
                     val nC = NodeController(requireActivity())
                     nC.chooseLocationToCopyNodes(fileBrowserViewModel.state.value.selectedNodeHandles)
@@ -571,6 +594,16 @@ class FileBrowserComposeFragment : Fragment() {
                         Intent(requireContext(), WebViewActivity::class.java)
                             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                             .setData(Uri.parse(Constants.DISPUTE_URL))
+                    )
+                    disableSelectMode()
+                }
+
+                OptionItems.LEAVE_SHARE_CLICKED -> {
+                    val handleList =
+                        ArrayList<Long>().apply { addAll(it.selectedNode.map { node -> node.id.longValue }) }
+                    MegaNodeUtil.showConfirmationLeaveIncomingShares(
+                        requireActivity(),
+                        (requireActivity() as SnackbarShower), handleList
                     )
                     disableSelectMode()
                 }

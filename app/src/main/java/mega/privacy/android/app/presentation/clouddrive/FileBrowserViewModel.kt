@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.palm.composestateevents.consumed
 import de.palm.composestateevents.triggered
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -37,6 +38,7 @@ import mega.privacy.android.domain.usecase.GetParentNodeUseCase
 import mega.privacy.android.domain.usecase.GetRootNodeUseCase
 import mega.privacy.android.domain.usecase.IsNodeInRubbish
 import mega.privacy.android.domain.usecase.MonitorMediaDiscoveryView
+import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorRefreshSessionUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.filebrowser.GetFileBrowserNodeChildrenUseCase
@@ -92,6 +94,7 @@ class FileBrowserViewModel @Inject constructor(
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val durationInSecondsTextMapper: DurationInSecondsTextMapper,
+    private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(FileBrowserState())
@@ -222,14 +225,27 @@ class FileBrowserViewModel @Inject constructor(
      * Updates the current File Browser Handle [FileBrowserState.fileBrowserHandle]
      *
      * @param handle The new File Browser Handle to be set
+     * @param checkMediaDiscovery If true, checks if Media Discovery should be opened
      */
-    fun setFileBrowserHandle(handle: Long) =
+    fun setFileBrowserHandle(handle: Long, checkMediaDiscovery: Boolean = false) =
         viewModelScope.launch {
             handleStack.push(handle)
-            _state.update {
-                it.copy(
-                    fileBrowserHandle = handle,
+            if (checkMediaDiscovery && shouldEnterMediaDiscoveryMode(
+                    folderHandle = handle,
+                    mediaDiscoveryViewSettings = state.value.mediaDiscoveryViewSettings
                 )
+            ) {
+                _state.update {
+                    it.copy(
+                        fileBrowserHandle = handle,
+                        isMediaDiscoveryOpen = true,
+                        isMediaDiscoveryOpenedByIconClick = false,
+                    )
+                }
+            } else {
+                _state.update {
+                    it.copy(fileBrowserHandle = handle)
+                }
             }
             refreshNodesState()
         }
@@ -244,13 +260,13 @@ class FileBrowserViewModel @Inject constructor(
         handleStack.push(folderHandle)
         _state.update {
             it.copy(
+                isLoading = true,
                 fileBrowserHandle = folderHandle,
                 accessedFolderHandle = folderHandle,
                 openedFolderNodeHandles = emptySet(),
                 errorMessage = errorMessage,
             )
         }
-        refreshNodesState()
         if (shouldEnterMediaDiscoveryMode(
                 folderHandle = folderHandle,
                 mediaDiscoveryViewSettings = state.value.mediaDiscoveryViewSettings,
@@ -261,6 +277,7 @@ class FileBrowserViewModel @Inject constructor(
                 isMediaDiscoveryOpenedByIconClick = false,
             )
         }
+        refreshNodesState()
     }
 
     /**
@@ -416,18 +433,17 @@ class FileBrowserViewModel @Inject constructor(
      */
     suspend fun exitMediaDiscovery(performBackNavigation: Boolean) {
         if (performBackNavigation) {
-            handleStack.pop()
+            handleStack.takeIf { stack -> stack.isNotEmpty() }?.pop()
             handleAccessedFolderOnBackPress()
             removeCurrentNodeFromUiStateSet()
-
-            val parentHandle =
-                getParentNodeUseCase(NodeId(_state.value.fileBrowserHandle))?.id?.longValue
-                    ?: getRootNodeUseCase()?.id?.longValue ?: MegaApiJava.INVALID_HANDLE
-            _state.update { it.copy(fileBrowserHandle = parentHandle) }
             setMediaDiscoveryVisibility(
                 isMediaDiscoveryOpen = false,
                 isMediaDiscoveryOpenedByIconClick = false,
             )
+            val parentHandle =
+                getParentNodeUseCase(NodeId(_state.value.fileBrowserHandle))?.id?.longValue
+                    ?: getRootNodeUseCase()?.id?.longValue ?: MegaApiJava.INVALID_HANDLE
+            _state.update { it.copy(fileBrowserHandle = parentHandle) }
             refreshNodesState()
         } else {
             setMediaDiscoveryVisibility(
@@ -502,17 +518,7 @@ class FileBrowserViewModel @Inject constructor(
                         .apply { add(_state.value.fileBrowserHandle) },
                 )
             }
-            setFileBrowserHandle(folderHandle)
-            if (shouldEnterMediaDiscoveryMode(
-                    folderHandle = folderHandle,
-                    mediaDiscoveryViewSettings = state.value.mediaDiscoveryViewSettings,
-                )
-            ) {
-                setMediaDiscoveryVisibility(
-                    isMediaDiscoveryOpen = true,
-                    isMediaDiscoveryOpenedByIconClick = false,
-                )
-            }
+            setFileBrowserHandle(folderHandle, true)
         }
     }
 
@@ -791,4 +797,20 @@ class FileBrowserViewModel @Inject constructor(
      */
     fun resetIsAccessedFolderExited() =
         _state.update { it.copy(isAccessedFolderExited = false) }
+
+    /**
+     * Hide or unhide the node
+     */
+    fun hideOrUnhideNodes(nodeIds: List<NodeId>, hide: Boolean) = viewModelScope.launch {
+        for (nodeId in nodeIds) {
+            async {
+                runCatching {
+                    updateNodeSensitiveUseCase(nodeId = nodeId, isSensitive = hide)
+                }.onFailure {
+                    Timber.e(it)
+                }
+            }
+        }
+
+    }
 }

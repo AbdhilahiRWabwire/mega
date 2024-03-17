@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
@@ -38,6 +39,7 @@ import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.fragments.homepage.EventObserver
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.interfaces.ActionBackupListener
+import mega.privacy.android.app.interfaces.SnackbarShower
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.main.controllers.NodeController
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkDialogFragment
@@ -78,7 +80,7 @@ import javax.inject.Inject
 class LinksComposeFragment : Fragment() {
 
     private val viewModel: LinksViewModel by activityViewModels()
-    private val sortByHeaderViewModel: SortByHeaderViewModel by activityViewModels()
+    private val sortByHeaderViewModel: SortByHeaderViewModel by viewModels()
 
     /**
      * Mapper to open file
@@ -272,7 +274,7 @@ class LinksComposeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         sortByHeaderViewModel.orderChangeEvent.observe(viewLifecycleOwner, EventObserver {
-            viewModel.refreshLinkNodes()
+            viewModel.refreshLinkNodes(false)
         })
 
         viewLifecycleOwner.collectFlow(viewModel.state
@@ -500,6 +502,8 @@ class LinksComposeFragment : Fragment() {
                     disableSelectMode()
                 }
 
+                OptionItems.HIDE_CLICKED, OptionItems.UNHIDE_CLICKED -> {}
+
                 OptionItems.COPY_CLICKED -> {
                     val nC = NodeController(requireActivity())
                     nC.chooseLocationToCopyNodes(viewModel.state.value.selectedNodeHandles)
@@ -517,6 +521,16 @@ class LinksComposeFragment : Fragment() {
                         Intent(requireContext(), WebViewActivity::class.java)
                             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                             .setData(Uri.parse(Constants.DISPUTE_URL))
+                    )
+                    disableSelectMode()
+                }
+
+                OptionItems.LEAVE_SHARE_CLICKED -> {
+                    val handleList =
+                        ArrayList<Long>().apply { addAll(it.selectedNode.map { node -> node.id.longValue }) }
+                    MegaNodeUtil.showConfirmationLeaveIncomingShares(
+                        requireActivity(),
+                        (requireActivity() as SnackbarShower), handleList
                     )
                     disableSelectMode()
                 }
