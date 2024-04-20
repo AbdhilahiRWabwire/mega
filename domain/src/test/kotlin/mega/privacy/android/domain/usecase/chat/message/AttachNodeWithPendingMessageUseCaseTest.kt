@@ -4,7 +4,8 @@ import kotlinx.coroutines.test.runTest
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.PendingMessage
 import mega.privacy.android.domain.entity.chat.PendingMessageState
-import mega.privacy.android.domain.entity.chat.messages.pending.SavePendingMessageRequest
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateAndNodeHandleRequest
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateRequest
 import mega.privacy.android.domain.entity.chat.messages.request.CreateTypedMessageRequest
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.repository.ChatRepository
@@ -17,7 +18,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.eq
 import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
@@ -34,6 +34,7 @@ class AttachNodeWithPendingMessageUseCaseTest {
     private val getChatMessageUseCase = mock<GetChatMessageUseCase>()
     private val createSaveSentMessageRequestUseCase = mock<CreateSaveSentMessageRequestUseCase>()
     private val setNodeAttributesAfterUploadUseCase = mock<SetNodeAttributesAfterUploadUseCase>()
+    private val updatePendingMessageUseCase = mock<UpdatePendingMessageUseCase>()
 
     @BeforeAll
     fun setup() {
@@ -43,6 +44,7 @@ class AttachNodeWithPendingMessageUseCaseTest {
             getChatMessageUseCase,
             createSaveSentMessageRequestUseCase,
             setNodeAttributesAfterUploadUseCase,
+            updatePendingMessageUseCase,
         )
     }
 
@@ -54,18 +56,24 @@ class AttachNodeWithPendingMessageUseCaseTest {
             getChatMessageUseCase,
             createSaveSentMessageRequestUseCase,
             setNodeAttributesAfterUploadUseCase,
+            updatePendingMessageUseCase,
         )
     }
 
     @Test
     fun `test that pending message is updated to attaching when use case is invoked`() = runTest {
         val pendingMessage = createPendingMessageMock()
+        val nodeId = 34L
         whenever(chatMessageRepository.getPendingMessage(pendingMsgId)).thenReturn(pendingMessage)
 
-        underTest(pendingMsgId, NodeId(1L))
-        verify(chatMessageRepository)
-            .updatePendingMessage(
-                eq(pendingMessage.createRequest(PendingMessageState.ATTACHING))
+        underTest(pendingMsgId, NodeId(nodeId))
+        verify(updatePendingMessageUseCase)
+            .invoke(
+                UpdatePendingMessageStateAndNodeHandleRequest(
+                    pendingMsgId,
+                    nodeHandle = nodeId,
+                    state = PendingMessageState.ATTACHING
+                )
             )
     }
 
@@ -79,9 +87,12 @@ class AttachNodeWithPendingMessageUseCaseTest {
             whenever(chatMessageRepository.attachNode(chatId, nodeHandle)).thenReturn(null)
 
             underTest(pendingMsgId, NodeId(1L))
-            verify(chatMessageRepository)
-                .updatePendingMessage(
-                    eq(pendingMessage.createRequest(PendingMessageState.ERROR_ATTACHING))
+            verify(updatePendingMessageUseCase)
+                .invoke(
+                    UpdatePendingMessageStateRequest(
+                        pendingMsgId,
+                        state = PendingMessageState.ERROR_ATTACHING
+                    )
                 )
         }
 
@@ -167,21 +178,6 @@ class AttachNodeWithPendingMessageUseCaseTest {
         on { name } doReturn null
         on { transferTag } doReturn transferTag
     }
-
-    private fun PendingMessage.createRequest(state: PendingMessageState) =
-        SavePendingMessageRequest(
-            chatId = this.chatId,
-            type = this.type,
-            uploadTimestamp = this.uploadTimestamp,
-            state = state,
-            tempIdKarere = this.tempIdKarere,
-            videoDownSampled = this.videoDownSampled,
-            filePath = this.filePath,
-            nodeHandle = nodeHandle,
-            fingerprint = this.fingerprint,
-            name = this.name,
-            transferTag = this.transferTag,
-        )
 
     private val pendingMsgId = 43L
     private val chatId = 12L

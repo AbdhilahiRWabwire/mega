@@ -1,14 +1,18 @@
 package mega.privacy.android.domain.usecase.chat.message
 
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ChatMessageType
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.mock
+import kotlin.time.Duration.Companion.seconds
 
 
 class GetMessageListUseCaseTest {
@@ -113,4 +117,33 @@ class GetMessageListUseCaseTest {
         assertThat(underTest(flow)).hasSize(expectedCount)
     }
 
+    @Test
+    internal fun `test that an empty list is returned if the first message is null`() = runTest {
+        val flow = flow {
+            emit(null)
+            awaitCancellation()
+        }
+
+        initUseCase()
+
+        val actual = underTest(flow)
+
+        assertThat(actual).isNotNull()
+        assertThat(actual).isEmpty()
+    }
+
+    @Test
+    internal fun `test that timeout exception is thrown when flow takes too long`() = runTest {
+        val flow = flow {
+            delay(6.seconds) // delay is more than the timeout duration
+            emit(mock<ChatMessage>())
+            awaitCancellation()
+        }
+
+        initUseCase()
+
+        assertThrows<TimeoutCancellationException> {
+            underTest(flow)
+        }
+    }
 }

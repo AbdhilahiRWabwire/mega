@@ -1,6 +1,5 @@
 package mega.privacy.android.app.upgradeAccount
 
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -20,7 +19,6 @@ import mega.privacy.android.app.upgradeAccount.model.UpgradePayment
 import mega.privacy.android.app.upgradeAccount.model.UserSubscription
 import mega.privacy.android.app.upgradeAccount.model.mapper.LocalisedSubscriptionMapper
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.app.utils.livedata.SingleLiveEvent
 import mega.privacy.android.domain.entity.AccountSubscriptionCycle
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.Subscription
@@ -76,10 +74,6 @@ class UpgradeAccountViewModel @Inject constructor(
         )
     )
     val state: StateFlow<UpgradeAccountState> = _state
-
-    private val upgradeClick = SingleLiveEvent<Int>()
-
-    fun onUpgradeClick(): LiveData<Int> = upgradeClick
 
     init {
         viewModelScope.launch {
@@ -160,9 +154,7 @@ class UpgradeAccountViewModel @Inject constructor(
         }
         viewModelScope.launch {
             runCatching {
-                val showNoAds =
-                    getFeatureFlagValueUseCase(AppFeatures.InAppAdvertisement) &&
-                            getFeatureFlagValueUseCase(ABTestFeatures.ads)
+                val showNoAds = getFeatureFlagValueUseCase(ABTestFeatures.ads)
                 _state.update { state ->
                     state.copy(
                         showNoAdsFeature = showNoAds
@@ -170,6 +162,19 @@ class UpgradeAccountViewModel @Inject constructor(
                 }
             }.onFailure {
                 Timber.e("Failed to fetch feature flags or ab_ads test flag with error: ${it.message}")
+            }
+        }
+        viewModelScope.launch {
+            runCatching {
+                val showStringsForNewFeatures =
+                    getFeatureFlagValueUseCase(AppFeatures.ShowStringsForNewFeatures)
+                _state.update { state ->
+                    state.copy(
+                        showNewFeatures = showStringsForNewFeatures
+                    )
+                }
+            }.onFailure {
+                Timber.e("Failed to fetch feature flag ShowStringsForNewFeatures with error: ${it.message}")
             }
         }
     }

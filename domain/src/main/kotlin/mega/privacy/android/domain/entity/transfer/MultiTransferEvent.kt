@@ -1,6 +1,7 @@
 package mega.privacy.android.domain.entity.transfer
 
 import mega.privacy.android.domain.entity.Progress
+import mega.privacy.android.domain.entity.node.NodeId
 
 /**
  * Events for transfers (Upload or Download) that may involve more than one file or folder
@@ -18,62 +19,36 @@ sealed interface MultiTransferEvent {
 
     /**
      * Wraps a [TransferEvent] for a single node event
-     * @param transferEvent wrapped [TransferEvent]
-     * @param totalBytesTransferred the total amount of bytes already transferred in all involved transfers.
-     * @param totalBytesToTransfer the total amount of bytes to be transferred in all involved transfers. May be inaccurate since some nodes may not have been processed yet
+     * @property transferEvent wrapped [TransferEvent]
+     * @property totalBytesTransferred the total amount of bytes already transferred in all involved transfers.
+     * @property totalBytesToTransfer the total amount of bytes to be transferred in all involved transfers. May be inaccurate if [scanningFinished] is false since some nodes may not have been processed yet
+     * @property startedFiles the amount of files scanned for the transfer of the involved nodes
+     * @property alreadyTransferred the amount of already transferred files
+     * @property alreadyTransferredIds the ids of the nodes already transferred
+     * @property scanningFinished All transfers has been scanned by the sdk, starting from this event transfers can be retried by sdk if the app is closed
      */
     data class SingleTransferEvent(
         val transferEvent: TransferEvent,
         val totalBytesTransferred: Long,
         val totalBytesToTransfer: Long,
-    ) :
-        MultiTransferEvent {
-        /**
-         * return true if this event represents a finish processing event
-         */
-        val isFinishScanningEvent by lazy {
-            with(transferEvent) {
-                when {
-                    this is TransferEvent.TransferUpdateEvent &&
-                            transfer.isFolderTransfer && transfer.stage == TransferStage.STAGE_TRANSFERRING_FILES -> {
-                        true
-                    }
+        val startedFiles: Int = 0,
+        val alreadyTransferred: Int = 0,
+        val alreadyTransferredIds: Set<NodeId> = emptySet(),
+        val scanningFinished: Boolean = false,
+    ) : MultiTransferEvent {
 
-                    this is TransferEvent.TransferFinishEvent -> true
-                    this is TransferEvent.TransferUpdateEvent && !transfer.isFolderTransfer -> true
-                    else -> false
-                }
-            }
+        /**
+         * Returns true if the transfer finished with error.
+         */
+        val finishedWithError by lazy {
+            transferEvent is TransferEvent.TransferFinishEvent && transferEvent.error != null
         }
-
-        /**
-         * This event indicates that the transfer was not done due to being already transferred.
-         */
-        val isAlreadyTransferredEvent by lazy {
-            with(transferEvent.transfer) {
-                !isFolderTransfer && isAlreadyDownloaded
-            }
-        }
-
-        /**
-         * This event is related to a file transfer, not a folder.
-         */
-        val isFileTransferEvent by lazy { !transferEvent.transfer.isFolderTransfer }
-
 
         /**
          * Current overall progress of all the initiated transfers. May be inaccurate since some nodes may not have been processed yet, and therefore, totalBytesToTransfer could be inaccurate.
          */
         val overallProgress = Progress(totalBytesTransferred, totalBytesToTransfer)
     }
-
-    /**
-     * All transfers has been scanned by the sdk, starting from this event transfers can be retried by sdk if the app is closed
-     * @property scannedFiles the amount of files scanned for the transfer of the involved nodes
-     * @property alreadyDownloadedFiles the amount of already downloaded files
-     */
-    data class ScanningFoldersFinished(val scannedFiles: Int, val alreadyDownloadedFiles: Int) :
-        MultiTransferEvent
 
     /**
      * Event to notify that the download cannot be done due to insufficient storage space in the destination path

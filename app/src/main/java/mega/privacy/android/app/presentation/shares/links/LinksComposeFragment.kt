@@ -69,6 +69,7 @@ import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.MoveRequestResult
 import mega.privacy.android.domain.entity.node.publiclink.PublicLinkNode
 import mega.privacy.android.domain.usecase.GetThemeMode
+import mega.privacy.android.feature.sync.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.shared.theme.MegaAppTheme
 import timber.log.Timber
 import javax.inject.Inject
@@ -99,6 +100,12 @@ class LinksComposeFragment : Fragment() {
      */
     @Inject
     lateinit var getThemeMode: GetThemeMode
+
+    /**
+     * Mapper to get file type icon
+     */
+    @Inject
+    lateinit var fileTypeIconMapper: FileTypeIconMapper
 
     /**
      * Interface that notifies the attached Activity to execute specific functions
@@ -159,6 +166,7 @@ class LinksComposeFragment : Fragment() {
                         ),
                         onSortOrderClick = ::showSortByPanel,
                         onToggleAppBarElevation = ::toggleAppBarElevation,
+                        fileTypeIconMapper = fileTypeIconMapper,
                     )
                     LaunchedEffect(snackbarHostState.currentSnackbarData) {
                         snackbarHostState.currentSnackbarData?.message?.let {
@@ -267,7 +275,7 @@ class LinksComposeFragment : Fragment() {
     private fun showOptionsMenuForItem(nodeUIItem: NodeUIItem<PublicLinkNode>) {
         (requireActivity() as ManagerActivity).showNodeOptionsPanel(
             nodeId = nodeUIItem.id,
-            mode = NodeOptionsBottomSheetDialogFragment.CLOUD_DRIVE_MODE
+            mode = NodeOptionsBottomSheetDialogFragment.DEFAULT_MODE
         )
     }
 
@@ -347,7 +355,7 @@ class LinksComposeFragment : Fragment() {
                 val intent = getIntentToOpenFileMapper(
                     activity = requireActivity(),
                     fileNode = fileNode,
-                    viewType = Constants.FILE_BROWSER_ADAPTER
+                    viewType = Constants.LINKS_ADAPTER
                 )
                 intent?.let {
                     if (MegaApiUtils.isIntentAvailable(context, it)) {
@@ -572,6 +580,9 @@ class LinksComposeFragment : Fragment() {
                 )
 
                 // Slight customization for links page
+                control.move().isVisible = false
+                control.removeShare().isVisible = false
+                control.shareFolder().isVisible = false
                 if (selected.size > 1) {
                     control.removeLink().setVisible(true).showAsAction =
                         MenuItem.SHOW_AS_ACTION_ALWAYS
@@ -580,7 +591,9 @@ class LinksComposeFragment : Fragment() {
                         showAsAction = MenuItem.SHOW_AS_ACTION_NEVER
                     }
                 }
-
+                if (control.alwaysActionCount() < CloudStorageOptionControlUtil.MAX_ACTION_COUNT) {
+                    control.copy().showAsAction = MenuItem.SHOW_AS_ACTION_ALWAYS
+                }
                 CloudStorageOptionControlUtil.applyControl(menu, control)
             }
             return true

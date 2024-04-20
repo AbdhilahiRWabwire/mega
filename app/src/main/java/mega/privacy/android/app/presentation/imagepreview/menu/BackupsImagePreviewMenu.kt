@@ -57,6 +57,14 @@ internal class BackupsImagePreviewMenu @Inject constructor() : ImagePreviewMenu 
         return false
     }
 
+    override suspend fun isHideMenuVisible(imageNode: ImageNode): Boolean {
+        return false
+    }
+
+    override suspend fun isUnhideMenuVisible(imageNode: ImageNode): Boolean {
+        return false
+    }
+
     override suspend fun isMoveMenuVisible(imageNode: ImageNode): Boolean {
         return false
     }
@@ -82,7 +90,7 @@ internal class BackupsImagePreviewMenu @Inject constructor() : ImagePreviewMenu 
     }
 
     override suspend fun isMoreMenuVisible(imageNode: ImageNode): Boolean {
-        return false
+        return true
     }
 
     override suspend fun isMoveToRubbishBinMenuVisible(imageNode: ImageNode): Boolean {

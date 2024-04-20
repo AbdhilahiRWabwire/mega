@@ -2,7 +2,6 @@ package mega.privacy.android.data.repository
 
 import android.content.Context
 import android.net.Uri
-import android.provider.DocumentsContract
 import android.webkit.MimeTypeMap
 import androidx.core.net.toFile
 import androidx.core.net.toUri
@@ -22,9 +21,7 @@ import kotlinx.coroutines.withContext
 import mega.privacy.android.data.cache.Cache
 import mega.privacy.android.data.constant.CacheFolderConstant
 import mega.privacy.android.data.extensions.APP_DATA_BACKGROUND_TRANSFER
-import mega.privacy.android.data.extensions.dropRepeated
 import mega.privacy.android.data.extensions.failWithError
-import mega.privacy.android.data.extensions.getAllFolders
 import mega.privacy.android.data.extensions.getFileName
 import mega.privacy.android.data.extensions.getRequestListener
 import mega.privacy.android.data.gateway.CacheGateway
@@ -216,22 +213,10 @@ internal class FileSystemRepositoryImpl @Inject constructor(
     override suspend fun getOfflineBackupsPath() =
         withContext(ioDispatcher) { fileGateway.getOfflineFilesBackupsRootPath() }
 
-    override suspend fun createFolder(name: String) = withContext(ioDispatcher) {
-        val megaNode = megaApiGateway.getRootNode()
-        megaNode?.let { parentMegaNode ->
-            suspendCancellableCoroutine { continuation ->
-                val listener = continuation.getRequestListener("createFolder") { it.nodeHandle }
-                megaApiGateway.createFolder(name, parentMegaNode, listener)
-                continuation.invokeOnCancellation {
-                    megaApiGateway.removeRequestListener(listener)
-                }
-            }
-        }
-    }
-
     override suspend fun setMyChatFilesFolder(nodeHandle: Long) = withContext(ioDispatcher) {
         suspendCancellableCoroutine { continuation ->
             val listener = continuation.getRequestListener("setMyChatFilesFolder") {
+                myChatsFilesFolderIdFlow.value = NodeId(nodeHandle)
                 chatFilesFolderUserAttributeMapper(it.megaStringMap)?.let { value ->
                     megaApiGateway.base64ToHandle(value)
                         .takeIf { handle -> handle != megaApiGateway.getInvalidHandle() }
@@ -478,22 +463,22 @@ internal class FileSystemRepositoryImpl @Inject constructor(
         sdCardGateway.isSDCardCachePath(localPath)
     }
 
-    override suspend fun moveFileToSd(file: File, targetPath: String, sdCardUriString: String) =
+    override suspend fun moveFileToSd(
+        file: File,
+        destinationUri: String,
+        subFolders: List<String>,
+    ) =
         withContext(ioDispatcher) {
             val sourceDocument = DocumentFile.fromFile(file)
-            val sdCardUri = Uri.parse(sdCardUriString)
-            val targetSubFolders =
-                targetPath.removePrefix(sdCardGateway.getRootSDCardPath(targetPath)).getAllFolders()
-            val destinationRootSubFolders = sdCardUri.getSubFolders()
-            val extraSubFolders = targetSubFolders.dropRepeated(destinationRootSubFolders)
+            val sdCardUri = Uri.parse(destinationUri)
+
             val destDocument = getSdDocumentFile(
                 sdCardUri,
-                extraSubFolders,
+                subFolders,
                 file.name,
                 MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension)
                     ?: "application/octet-stream"
             )
-
 
             try {
                 if (destDocument != null) {
@@ -516,18 +501,15 @@ internal class FileSystemRepositoryImpl @Inject constructor(
             return@withContext false
         }
 
-    private fun Uri.getSubFolders() =
-        DocumentsContract.getTreeDocumentId(this).split(':').getOrNull(1)?.split(File.separator)
-            ?.filter { it.isNotBlank() } ?: emptyList()
-
     private fun getSdDocumentFile(
-        sdCardUri: Uri,
-        extraSubFolders: List<String>,
+        folderUri: Uri,
+        subFolders: List<String>,
         fileName: String,
         mimeType: String,
     ): DocumentFile? {
-        var folderDocument = DocumentFile.fromTreeUri(context, sdCardUri)
-        extraSubFolders.forEach { folder ->
+        var folderDocument = DocumentFile.fromTreeUri(context, folderUri)
+
+        subFolders.forEach { folder ->
             folderDocument =
                 folderDocument?.findFile(folder) ?: folderDocument?.createDirectory(folder)
         }
@@ -539,8 +521,16 @@ internal class FileSystemRepositoryImpl @Inject constructor(
         fileGateway.createNewImageUri(fileName)?.toString()
     }
 
+    override suspend fun createNewVideoUri(fileName: String): String? = withContext(ioDispatcher) {
+        fileGateway.createNewVideoUri(fileName)?.toString()
+    }
+
     override suspend fun isFileUri(uriString: String) = withContext(ioDispatcher) {
         fileGateway.isFileUri(uriString)
+    }
+
+    override suspend fun isFilePath(path: String) = withContext(ioDispatcher) {
+        fileGateway.isFilePath(path)
     }
 
     override suspend fun getFileFromFileUri(uriString: String) = withContext(ioDispatcher) {
@@ -550,6 +540,11 @@ internal class FileSystemRepositoryImpl @Inject constructor(
     override suspend fun isContentUri(uriString: String): Boolean = withContext(ioDispatcher) {
         fileGateway.isContentUri(uriString)
     }
+
+    override suspend fun isExternalStorageContentUri(uriString: String): Boolean =
+        withContext(ioDispatcher) {
+            fileGateway.isExternalStorageContentUri(uriString)
+        }
 
     override suspend fun getFileNameFromUri(uriString: String): String? =
         withContext(ioDispatcher) {

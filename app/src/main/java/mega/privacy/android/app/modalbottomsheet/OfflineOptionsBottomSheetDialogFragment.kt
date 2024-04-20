@@ -1,5 +1,6 @@
 package mega.privacy.android.app.modalbottomsheet
 
+import mega.privacy.android.icon.pack.R as IconPackR
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -11,13 +12,12 @@ import androidx.core.os.bundleOf
 import androidx.core.view.isGone
 import mega.privacy.android.app.MegaOffline
 import mega.privacy.android.app.MimeTypeList.Companion.typeForName
-import mega.privacy.android.core.R as CoreUiR
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.OfflineFileInfoActivity
 import mega.privacy.android.app.databinding.BottomSheetOfflineItemBinding
-import mega.privacy.android.app.presentation.offline.adapter.OfflineNodeListener
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.presentation.extensions.parcelable
+import mega.privacy.android.app.presentation.offline.adapter.OfflineNodeListener
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.FileUtil
 import mega.privacy.android.app.utils.OfflineUtils
@@ -46,15 +46,15 @@ internal class OfflineOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFr
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        binding.optionDownloadLayout.setOnClickListener(this)
-        binding.optionPropertiesLayout.setOnClickListener(this)
-        binding.optionShareLayout.setOnClickListener(this)
-        binding.optionDeleteOfflineLayout.setOnClickListener(this)
-        binding.optionOpenWithLayout.setOnClickListener(this)
+        binding.optionDownload.setOnClickListener(this)
+        binding.optionProperties.setOnClickListener(this)
+        binding.optionShare.setOnClickListener(this)
+        binding.optionDeleteOffline.setOnClickListener(this)
+        binding.optionOpenWith.setOnClickListener(this)
         binding.offlineNameText.maxWidth = Util.scaleWidthPx(200, resources.displayMetrics)
         binding.offlineInfoText.maxWidth = Util.scaleWidthPx(200, resources.displayMetrics)
-        binding.optionPropertiesText.setText(R.string.general_info)
-        binding.optionOpenWithLayout.isGone = nodeOffline.isFolder
+        binding.optionProperties.setText(R.string.general_info)
+        binding.optionOpenWith.isGone = nodeOffline.isFolder
         binding.separatorOpen.isGone = nodeOffline.isFolder
         binding.offlineNameText.text = nodeOffline.name
         Timber.d("Set node info")
@@ -78,7 +78,7 @@ internal class OfflineOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFr
                     binding.offlineThumbnail.layoutParams = params
                     binding.offlineThumbnail.setImageURI(Uri.fromFile(file))
                 } else {
-                    binding.offlineThumbnail.setActualImageResource(
+                    binding.offlineThumbnail.hierarchy.setPlaceholderImage(
                         typeForName(
                             nodeOffline.name
                         ).iconResourceId
@@ -92,10 +92,10 @@ internal class OfflineOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFr
                 )
             }
         } else {
-            binding.offlineThumbnail.setImageResource(CoreUiR.drawable.ic_folder_list)
+            binding.offlineThumbnail.setImageResource(IconPackR.drawable.ic_folder_medium_solid)
         }
         if (nodeOffline.isFolder && !Util.isOnline(requireContext())) {
-            binding.optionShareLayout.visibility = View.GONE
+            binding.optionShare.visibility = View.GONE
             binding.separatorShare.visibility = View.GONE
         }
         super.onViewCreated(view, savedInstanceState)
@@ -108,7 +108,7 @@ internal class OfflineOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFr
 
     override fun onClick(v: View) {
         when (v.id) {
-            R.id.option_delete_offline_layout -> {
+            R.id.option_delete_offline -> {
                 if (parentFragment is OfflineNodeListener) {
                     (parentFragment as OfflineNodeListener).showConfirmationRemoveOfflineNode(
                         nodeOffline
@@ -116,25 +116,25 @@ internal class OfflineOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFr
                 }
             }
 
-            R.id.option_open_with_layout -> {
+            R.id.option_open_with -> {
                 OfflineUtils.openWithOffline(
                     requireContext(),
                     nodeOffline.handle.toLong()
                 )
             }
 
-            R.id.option_share_layout -> {
+            R.id.option_share -> {
                 OfflineUtils.shareOfflineNode(
                     requireContext(),
                     nodeOffline.handle.toLong()
                 )
             }
 
-            R.id.option_download_layout -> {
+            R.id.option_download -> {
                 (requireActivity() as ManagerActivity).saveOfflineNodesToDevice(listOf(nodeOffline))
             }
 
-            R.id.option_properties_layout -> {
+            R.id.option_properties -> {
                 val offlineIntent = Intent(requireContext(), OfflineFileInfoActivity::class.java)
                 offlineIntent.putExtra(Constants.HANDLE, nodeOffline.handle)
                 startActivity(offlineIntent)

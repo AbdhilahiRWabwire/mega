@@ -10,6 +10,8 @@ import mega.privacy.android.data.database.entity.chat.PendingMessageEntity
 import mega.privacy.android.data.database.entity.chat.RichPreviewEntity
 import mega.privacy.android.data.database.entity.chat.TypedMessageEntity
 import mega.privacy.android.domain.entity.chat.ChatMessageType
+import mega.privacy.android.domain.entity.chat.PendingMessageState
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageRequest
 
 /**
  * Chat storage gateway
@@ -70,9 +72,9 @@ interface ChatStorageGateway {
     /**
      * Update pending message
      *
-     * @param pendingMessage
+     * @param updatePendingMessageRequest
      */
-    suspend fun updatePendingMessage(pendingMessage: PendingMessageEntity)
+    suspend fun updatePendingMessage(updatePendingMessageRequest: UpdatePendingMessageRequest)
 
     /**
      * Delete pending message by id
@@ -96,6 +98,11 @@ interface ChatStorageGateway {
      * @return a pending messages with [pendingMessageId] or null if not found
      */
     suspend fun getPendingMessage(pendingMessageId: Long): PendingMessageEntity?
+
+    /**
+     * Get all pending messages in a specific state
+     */
+    suspend fun getPendingMessagesByState(state: PendingMessageState): List<PendingMessageEntity>
 
     /**
      * Get message ids by type
@@ -131,4 +138,34 @@ interface ChatStorageGateway {
      * @param truncateTimestamp
      */
     suspend fun truncateMessages(chatId: Long, truncateTimestamp: Long)
+
+    /**
+     * Clear chat pending messages
+     *
+     * @param chatId
+     */
+    suspend fun clearChatPendingMessages(chatId: Long)
+
+    /**
+     * Update exists
+     *
+     * @param chatId Chat ID
+     * @param msgId Message ID
+     * @param exists True if the content in message exists
+     */
+    suspend fun updateExistsInMessage(chatId: Long, msgId: Long, exists: Boolean)
+
+    /**
+     * Get exists
+     *
+     * @param chatId Chat ID
+     * @param msgId Message ID
+     * @return True if the content in message exists
+     */
+    suspend fun getExistsInMessage(chatId: Long, msgId: Long): Boolean?
+
+    /**
+     * Clear all typed messages
+     */
+    suspend fun clearAllData()
 }

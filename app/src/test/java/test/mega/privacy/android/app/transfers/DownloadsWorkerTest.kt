@@ -13,7 +13,7 @@ import androidx.work.impl.utils.WorkForegroundUpdater
 import androidx.work.impl.utils.futures.SettableFuture
 import androidx.work.impl.utils.taskexecutor.WorkManagerTaskExecutor
 import androidx.work.workDataOf
-import com.google.common.truth.Truth.*
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -29,21 +29,22 @@ import mega.privacy.android.data.mapper.transfer.TransfersFinishedNotificationMa
 import mega.privacy.android.data.worker.AbstractTransfersWorker
 import mega.privacy.android.data.worker.AreNotificationsEnabledUseCase
 import mega.privacy.android.data.worker.DownloadsWorker
+import mega.privacy.android.data.worker.ForegroundSetter
 import mega.privacy.android.domain.entity.Progress
 import mega.privacy.android.domain.entity.transfer.ActiveTransferTotals
 import mega.privacy.android.domain.entity.transfer.MonitorOngoingActiveTransfersResult
 import mega.privacy.android.domain.entity.transfer.Transfer
 import mega.privacy.android.domain.entity.transfer.TransferEvent
 import mega.privacy.android.domain.entity.transfer.TransferType
+import mega.privacy.android.domain.monitoring.CrashReporter
 import mega.privacy.android.domain.usecase.qrcode.ScanMediaFileUseCase
 import mega.privacy.android.domain.usecase.transfers.MonitorTransferEventsUseCase
-import mega.privacy.android.domain.usecase.transfers.active.AddOrUpdateActiveTransferUseCase
 import mega.privacy.android.domain.usecase.transfers.active.ClearActiveTransfersIfFinishedUseCase
 import mega.privacy.android.domain.usecase.transfers.active.CorrectActiveTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.active.GetActiveTransferTotalsUseCase
+import mega.privacy.android.domain.usecase.transfers.active.HandleTransferEventUseCase
 import mega.privacy.android.domain.usecase.transfers.active.MonitorOngoingActiveTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
-import mega.privacy.android.domain.usecase.transfers.sd.HandleSDCardEventUseCase
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -54,6 +55,7 @@ import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
@@ -72,8 +74,7 @@ class DownloadsWorkerTest {
     private lateinit var workDatabase: WorkDatabase
 
     private val monitorTransferEventsUseCase = mock<MonitorTransferEventsUseCase>()
-    private val addOrUpdateActiveTransferUseCase = mock<AddOrUpdateActiveTransferUseCase>()
-    private val handleSDCardEventUseCase = mock<HandleSDCardEventUseCase>()
+    private val handleTransferEventUseCase = mock<HandleTransferEventUseCase>()
     private val monitorOngoingActiveTransfersUseCase =
         mock<MonitorOngoingActiveTransfersUseCase>()
     private val areTransfersPausedUseCase = mock<AreTransfersPausedUseCase>()
@@ -87,6 +88,8 @@ class DownloadsWorkerTest {
     private val transfersFinishedNotificationMapper = mock<TransfersFinishedNotificationMapper>()
     private val workProgressUpdater = mock<ProgressUpdater>()
     private val scanMediaFileUseCase = mock<ScanMediaFileUseCase>()
+    private val setForeground = mock<ForegroundSetter>()
+    private val crashReporter = mock<CrashReporter>()
 
     @Before
     fun setup() {
@@ -117,7 +120,7 @@ class DownloadsWorkerTest {
             ),
             ioDispatcher = ioDispatcher,
             monitorTransferEventsUseCase = monitorTransferEventsUseCase,
-            addOrUpdateActiveTransferUseCase = addOrUpdateActiveTransferUseCase,
+            handleTransferEventUseCase = handleTransferEventUseCase,
             areTransfersPausedUseCase = areTransfersPausedUseCase,
             monitorOngoingActiveTransfersUseCase = monitorOngoingActiveTransfersUseCase,
             getActiveTransferTotalsUseCase = getActiveTransferTotalsUseCase,
@@ -128,8 +131,9 @@ class DownloadsWorkerTest {
             correctActiveTransfersUseCase = correctActiveTransfersUseCase,
             clearActiveTransfersIfFinishedUseCase = clearActiveTransfersIfFinishedUseCase,
             transfersFinishedNotificationMapper = transfersFinishedNotificationMapper,
-            handleSDCardEventUseCase = handleSDCardEventUseCase,
             scanMediaFileUseCase = scanMediaFileUseCase,
+            crashReporter = crashReporter,
+            foregroundSetter = setForeground
         )
     }
 
@@ -145,6 +149,14 @@ class DownloadsWorkerTest {
             commonStub()
             underTest.doWork()
             verify(monitorTransferEventsUseCase).invoke()
+        }
+
+    @Test
+    fun `test that crashReporter is invoked when the worker starts doing work`() =
+        runTest {
+            commonStub()
+            underTest.doWork()
+            verify(crashReporter, times(2)).log(any())
         }
 
     @Test
@@ -249,6 +261,37 @@ class DownloadsWorkerTest {
             verifyNoInteractions(overQuotaNotificationBuilder)
         }
 
+    fun `test that setForeground is not invoked when worker starts with no transfers`() =
+        runTest {
+            val initial: ActiveTransferTotals = mockActiveTransferTotals(
+                hasCompleted = false,
+            )
+            whenever(initial.totalTransfers).thenReturn(0)
+            commonStub(initialTransferTotals = initial)
+            underTest.doWork()
+            verifyNoInteractions(setForeground)
+        }
+
+    @Test
+    fun `test that transfersFinishedNotificationMapper is invoked when worker starts with completed transfers`() =
+        runTest {
+            val initial: ActiveTransferTotals = mockActiveTransferTotals(true)
+            whenever(initial.totalTransfers).thenReturn(1)
+            commonStub(initialTransferTotals = initial)
+            underTest.doWork()
+            verify(transfersFinishedNotificationMapper).invoke(initial)
+        }
+
+    @Test
+    fun `test that setForeground is not invoked when worker starts with completed transfers`() =
+        runTest {
+            val initial: ActiveTransferTotals = mockActiveTransferTotals(true)
+            commonStub(initialTransferTotals = initial)
+            whenever(initial.totalTransfers).thenReturn(1)
+            underTest.doWork()
+            verifyNoInteractions(setForeground)
+        }
+
     @Test
     fun `test that transfersFinishedNotificationMapper is not invoked when transfer finishes with no transfers`() =
         runTest {
@@ -279,20 +322,6 @@ class DownloadsWorkerTest {
         val expectedData =
             workDataOf(AbstractTransfersWorker.PROGRESS to expectedProgress.floatValue)
         verify(workProgressUpdater).updateProgress(eq(context), any(), eq(expectedData))
-    }
-
-    @Test
-    fun `test that handleSDCardEventUseCase is invoked when start event is received`() = runTest {
-        val event = mock<TransferEvent.TransferStartEvent>()
-        underTest.onTransferEventReceived(event)
-        verify(handleSDCardEventUseCase).invoke(event)
-    }
-
-    @Test
-    fun `test that handleSDCardEventUseCase is invoked when finish event is received`() = runTest {
-        val event = mock<TransferEvent.TransferFinishEvent>()
-        underTest.onTransferEventReceived(event)
-        verify(handleSDCardEventUseCase).invoke(event)
     }
 
     @Test
@@ -332,6 +361,7 @@ class DownloadsWorkerTest {
         whenever(areNotificationsEnabledUseCase()).thenReturn(true)
         whenever(workProgressUpdater.updateProgress(any(), any(), any()))
             .thenReturn(SettableFuture.create<Void?>().also { it.set(null) })
+        whenever(downloadNotificationMapper(any(), any())).thenReturn(mock())
     }
 
     private fun mockActiveTransferTotals(

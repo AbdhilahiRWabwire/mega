@@ -9,26 +9,36 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
+import mega.privacy.android.app.presentation.meeting.chat.model.messages.actions.MessageActionGroup
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.CanNotOpenFileDialog
 import mega.privacy.android.app.presentation.meeting.chat.view.message.attachment.NodeAttachmentMessageViewModel
+import mega.privacy.android.core.ui.model.MenuActionWithClick
 import mega.privacy.android.domain.entity.chat.messages.NodeAttachmentMessage
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
+import mega.privacy.mobile.analytics.event.ChatConversationOpenWithActionMenuItemEvent
 import timber.log.Timber
 
 internal class OpenWithMessageAction(
     private val chatViewModel: ChatViewModel,
 ) : MessageAction(
     text = R.string.external_play,
-    icon = mega.privacy.android.icon.pack.R.drawable.ic_menu_open_with,
+    icon = mega.privacy.android.icon.pack.R.drawable.ic_external_link_medium_regular_outline,
     testTag = "open_with",
+    group = MessageActionGroup.Open,
 ) {
-    override fun appliesTo(messages: Set<TypedMessage>) =
-        messages.size == 1 && messages.first() is NodeAttachmentMessage
+    override fun shouldDisplayFor(messages: Set<TypedMessage>) =
+        messages.size == 1 && messages.first().let { it is NodeAttachmentMessage && it.exists }
+    override fun toolbarItem(
+        messages: Set<TypedMessage>,
+        onClick: () -> Unit,
+    ): MenuActionWithClick? = null
 
     @Composable
     override fun OnTrigger(messages: Set<TypedMessage>, onHandled: () -> Unit) {
+        Analytics.tracker.trackEvent(ChatConversationOpenWithActionMenuItemEvent)
         var showDownloadDialog by rememberSaveable {
             mutableStateOf(false)
         }

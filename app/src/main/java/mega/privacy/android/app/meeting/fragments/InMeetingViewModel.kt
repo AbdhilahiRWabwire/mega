@@ -1,5 +1,6 @@
 package mega.privacy.android.app.meeting.fragments
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.view.TextureView
@@ -13,6 +14,7 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.viewModelScope
 import com.jeremyliao.liveeventbus.LiveEventBus
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import de.palm.composestateevents.consumed
 import de.palm.composestateevents.triggered
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
@@ -20,8 +22,11 @@ import io.reactivex.rxjava3.disposables.Disposable
 import io.reactivex.rxjava3.kotlin.addTo
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
@@ -77,7 +82,6 @@ import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.IsAudioLevelMonitorEnabledUseCase
 import mega.privacy.android.domain.usecase.meeting.JoinMeetingAsGuestUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
-
 import mega.privacy.android.domain.usecase.meeting.RequestHighResolutionVideoUseCase
 import mega.privacy.android.domain.usecase.meeting.RequestLowResolutionVideoUseCase
 import mega.privacy.android.domain.usecase.meeting.SendStatisticsMeetingsUseCase
@@ -128,8 +132,10 @@ import javax.inject.Inject
  * @property joinMeetingAsGuestUseCase          [JoinMeetingAsGuestUseCase]
  * @property chatLogoutUseCase                  [ChatLogoutUseCase]
  * @property state                              Current view state as [InMeetingUiState]
+ * @property context                            Application context
  */
 @HiltViewModel
+@SuppressLint("StaticFieldLeak")
 class InMeetingViewModel @Inject constructor(
     private val inMeetingRepository: InMeetingRepository,
     private val getCallUseCase: GetCallUseCase,
@@ -158,7 +164,8 @@ class InMeetingViewModel @Inject constructor(
     private val hangChatCallUseCase: HangChatCallUseCase,
     private val joinMeetingAsGuestUseCase: JoinMeetingAsGuestUseCase,
     private val joinPublicChatUseCase: JoinPublicChatUseCase,
-    private val chatLogoutUseCase: ChatLogoutUseCase
+    private val chatLogoutUseCase: ChatLogoutUseCase,
+    @ApplicationContext private val context: Context,
 ) : BaseRxViewModel(), EditChatRoomNameListener.OnEditedChatRoomNameCallback,
     GetUserEmailListener.OnUserEmailUpdateCallback {
 
@@ -170,7 +177,7 @@ class InMeetingViewModel @Inject constructor(
     /**
      * public UI State
      */
-    val state: StateFlow<InMeetingUiState> = _state
+    val state = _state.asStateFlow()
 
     private var anotherCallInProgressDisposable: Disposable? = null
     private var networkQualityDisposable: Disposable? = null
@@ -178,6 +185,8 @@ class InMeetingViewModel @Inject constructor(
 
     private val _pinItemEvent = MutableLiveData<Event<Participant>>()
     val pinItemEvent: LiveData<Event<Participant>> = _pinItemEvent
+
+    private var meetingLeftTimerJob: Job? = null
 
     /**
      * Participant selected
@@ -380,24 +389,23 @@ class InMeetingViewModel @Inject constructor(
     /**
      * Get chat call
      */
-    private fun getChatCall(context: Context) {
+    private fun getChatCall() {
         viewModelScope.launch {
             runCatching {
                 getChatCallUseCase(_state.value.currentChatId)
             }.onSuccess { chatCall ->
                 chatCall?.let { call ->
+                    Timber.d("Call id ${call.callId} and chat id ${call.chatId} and call users limit ${call.callUsersLimit}")
+                    Timber.d("Call limit ${call.callDurationLimit} Call Duration ${call.duration} and initial timestamp ${call.initialTimestamp}")
                     _state.update { it.copy(call = call) }
                     call.status?.let { status ->
                         checkSubtitleToolbar()
-                        setCall(_state.value.currentChatId, context)
+                        setCall(_state.value.currentChatId)
                         if (status != ChatCallStatus.Initial && _state.value.previousState == ChatCallStatus.Initial) {
-                            _state.update {
-                                it.copy(
-                                    previousState = status,
-                                )
-                            }
+                            _state.update { it.copy(previousState = status) }
                         }
                     }
+                    handleFreeCallEndWarning()
                 }
             }.onFailure { exception ->
                 Timber.e(exception)
@@ -420,9 +428,7 @@ class InMeetingViewModel @Inject constructor(
                     }
                 }
                 if (chat.hasChanged(ChatRoomChange.OpenInvite)) {
-                    _state.update {
-                        it.copy(isOpenInvite = chat.isOpenInvite)
-                    }
+                    _state.update { it.copy(isOpenInvite = chat.isOpenInvite) }
                 }
             }
         }
@@ -438,7 +444,9 @@ class InMeetingViewModel @Inject constructor(
                     _state.update { it.copy(call = call) }
                     checkSubtitleToolbar()
                     call.changes?.apply {
+                        Timber.d("Changes in call $this")
                         if (contains(ChatCallChanges.Status)) {
+                            Timber.d("Call status changed ${call.status}")
                             call.status?.let { status ->
                                 checkSubtitleToolbar()
                                 _state.update { state ->
@@ -447,10 +455,72 @@ class InMeetingViewModel @Inject constructor(
                                     )
                                 }
                             }
+                        } else if (contains(ChatCallChanges.CallWillEnd)) {
+                            handleFreeCallEndWarning()
                         }
                     }
                 }
         }
+
+    /**
+     * Cancel the timer when call is upgraded or start the end timer if the call is free
+     */
+    private fun handleFreeCallEndWarning() {
+        val call = _state.value.call ?: return
+        if (call.callWillEndTs == null || call.callWillEndTs == 0L) return
+        if (call.callWillEndTs == -1L) {
+            Timber.d("Cancelling Meeting Timer Job")
+            // CALL_LIMIT_DISABLED
+            meetingLeftTimerJob?.cancel()
+            _state.update {
+                it.copy(
+                    minutesToEndMeeting = null,
+                    showMeetingEndWarningDialog = false
+                )
+            }
+
+        } else {
+            Timber.d("Call will end in ${call.callWillEndTs} seconds")
+            call.callWillEndTs?.let { timeStampInSecond ->
+                val currentTimeStampInSecond =
+                    TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis())
+                val seconds = timeStampInSecond - currentTimeStampInSecond
+                val minutes = TimeUnit.SECONDS.toMinutes(seconds)
+                Timber.d("Call will end in $minutes minutes")
+                startMeetingEndWarningTimer(if (minutes == 0L) 1 else minutes.toInt())
+            }
+            if (call.isOwnModerator) {
+                _state.update {
+                    it.copy(showMeetingEndWarningDialog = true)
+                }
+            }
+        }
+    }
+
+    private fun startMeetingEndWarningTimer(minutes: Int) {
+        meetingLeftTimerJob = viewModelScope.launch {
+            (minutes downTo 0).forEach { minute ->
+                Timber.d("Meeting will end in $minute minutes")
+                _state.update {
+                    it.copy(minutesToEndMeeting = minute)
+                }
+                delay(TimeUnit.MINUTES.toMillis(1))
+            }
+            _state.update {
+                it.copy(minutesToEndMeeting = null)
+            }
+            meetingLeftTimerJob = null
+        }
+    }
+
+    /**
+     * set showMeetingEndWarningDialog to false when dialog is shown
+     */
+    fun onMeetingEndWarningDialogDismissed() {
+        _state.update {
+            it.copy(showMeetingEndWarningDialog = false)
+        }
+    }
 
     /**
      * Show meeting info dialog
@@ -719,17 +789,17 @@ class InMeetingViewModel @Inject constructor(
      *
      * @param chatId chat ID
      */
-    fun setCall(chatId: Long, context: Context) {
+    fun setCall(chatId: Long) {
         if (isSameChatRoom(chatId)) {
             _callLiveData.value = inMeetingRepository.getMeeting(chatId)
             _callLiveData.value?.let {
                 if (_updateCallId.value != it.callId) {
                     _updateCallId.value = it.callId
                     checkAnotherCallBanner()
-                    checkParticipantsList(context)
+                    checkParticipantsList()
                     checkNetworkQualityChanges()
                     checkReconnectingChanges()
-                    updateMeetingInfoBottomPanel(context)
+                    updateMeetingInfoBottomPanel()
                 }
             }
         }
@@ -781,7 +851,7 @@ class InMeetingViewModel @Inject constructor(
      *
      * @param newChatId chat ID
      */
-    fun setChatId(newChatId: Long, context: Context) {
+    fun setChatId(newChatId: Long) {
         if (newChatId == MEGACHAT_INVALID_HANDLE || _state.value.currentChatId == newChatId)
             return
 
@@ -791,7 +861,7 @@ class InMeetingViewModel @Inject constructor(
             )
         }
         getChatRoom()
-        getChatCall(context)
+        getChatCall()
         enableAudioLevelMonitor(_state.value.currentChatId)
     }
 
@@ -1102,7 +1172,7 @@ class InMeetingViewModel @Inject constructor(
                     else -> participant
                 }
             }?.toMutableList()
-            updateMeetingInfoBottomPanel(context)
+            updateMeetingInfoBottomPanel()
         }
         return listWithChanges
     }
@@ -1120,7 +1190,7 @@ class InMeetingViewModel @Inject constructor(
                     )
                 )
             }?.toMutableList()
-            updateMeetingInfoBottomPanel(context)
+            updateMeetingInfoBottomPanel()
         }
     }
 
@@ -1142,7 +1212,7 @@ class InMeetingViewModel @Inject constructor(
                     else -> participant
                 }
             }?.toMutableList()
-            updateMeetingInfoBottomPanel(context)
+            updateMeetingInfoBottomPanel()
         }
 
         return listWithChanges
@@ -1458,7 +1528,7 @@ class InMeetingViewModel @Inject constructor(
 
                     participants.value?.removeAt(position)
                     Timber.d("Removing participant")
-                    updateParticipantsList(context)
+                    updateParticipantsList()
                     return position
                 }
             }
@@ -1482,7 +1552,7 @@ class InMeetingViewModel @Inject constructor(
             )?.let { screenSharedParticipant ->
                 participants.value?.indexOf(participant)?.let { index ->
                     participants.value?.add(index, screenSharedParticipant)
-                    updateParticipantsList(context)
+                    updateParticipantsList()
                     return participants.value?.indexOf(screenSharedParticipant)
                 }
             }
@@ -1595,11 +1665,11 @@ class InMeetingViewModel @Inject constructor(
     /**
      * Method to update the current participants list
      */
-    fun checkParticipantsList(context: Context) {
+    fun checkParticipantsList() {
         callLiveData.value?.let {
             val participants: Int = participants.value?.size ?: 0
             if (it.sessionsClientid.size() > 0 && (participants.toLong() != it.sessionsClientid.size())) {
-                createCurrentParticipants(it.sessionsClientid, context)
+                createCurrentParticipants(it.sessionsClientid)
             }
         }
     }
@@ -1609,7 +1679,7 @@ class InMeetingViewModel @Inject constructor(
      *
      * @param list list of participants
      */
-    private fun createCurrentParticipants(list: MegaHandleList?, context: Context) {
+    private fun createCurrentParticipants(list: MegaHandleList?) {
         list?.let { listParticipants ->
             participants.value?.clear()
             if (listParticipants.size() > 0) {
@@ -1619,7 +1689,7 @@ class InMeetingViewModel @Inject constructor(
                     }
                 }
 
-                updateParticipantsList(context)
+                updateParticipantsList()
             }
         }
     }
@@ -1627,12 +1697,12 @@ class InMeetingViewModel @Inject constructor(
     /**
      * Method to control when the number of participants changes
      */
-    private fun updateParticipantsList(context: Context) {
+    private fun updateParticipantsList() {
         when (_state.value.callUIStatus) {
             CallUIStatusType.SpeakerView -> sortParticipantsListForSpeakerView()
             else -> participants.value = participants.value
         }
-        updateMeetingInfoBottomPanel(context)
+        updateMeetingInfoBottomPanel()
     }
 
     /**
@@ -1644,7 +1714,7 @@ class InMeetingViewModel @Inject constructor(
     fun addParticipant(clientId: Long, context: Context): Int? {
         createParticipant(isScreenShared = false, clientId)?.let { participantCreated ->
             participants.value?.add(participantCreated)
-            updateParticipantsList(context)
+            updateParticipantsList()
 
             return participants.value?.indexOf(participantCreated)
         }
@@ -1697,7 +1767,7 @@ class InMeetingViewModel @Inject constructor(
 
                             participants.value?.removeAt(position)
                             Timber.d("Removing participant... $clientId")
-                            updateParticipantsList(context)
+                            updateParticipantsList()
 
                             if (isSpeaker) {
                                 Timber.d("The removed participant was speaker, clientID ${participant.clientId}")
@@ -2633,7 +2703,7 @@ class InMeetingViewModel @Inject constructor(
     /**
      * Method for updating meeting info panel information
      */
-    private fun updateMeetingInfoBottomPanel(context: Context) {
+    private fun updateMeetingInfoBottomPanel() {
         var nameList =
             if (isModerator()) inMeetingRepository.getMyName() else ""
         var numParticipantsModerator = if (isModerator()) 1 else 0

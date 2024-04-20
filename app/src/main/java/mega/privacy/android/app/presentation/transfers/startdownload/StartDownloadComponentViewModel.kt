@@ -13,8 +13,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.last
-import kotlinx.coroutines.flow.lastOrNull
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
@@ -31,18 +29,16 @@ import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.transfer.MultiTransferEvent
 import mega.privacy.android.domain.entity.transfer.TransferType
-import mega.privacy.android.domain.usecase.BroadcastOfflineFileAvailabilityUseCase
 import mega.privacy.android.domain.usecase.SetStorageDownloadAskAlwaysUseCase
 import mega.privacy.android.domain.usecase.SetStorageDownloadLocationUseCase
-import mega.privacy.android.domain.usecase.file.GetExternalPathByContentUriUseCase
 import mega.privacy.android.domain.usecase.file.TotalFileSizeOfNodesUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.node.GetFilePreviewDownloadPathUseCase
 import mega.privacy.android.domain.usecase.offline.GetOfflinePathForNodeUseCase
-import mega.privacy.android.domain.usecase.offline.SaveOfflineNodeInformationUseCase
 import mega.privacy.android.domain.usecase.setting.IsAskBeforeLargeDownloadsSettingUseCase
 import mega.privacy.android.domain.usecase.setting.SetAskBeforeLargeDownloadsSettingUseCase
 import mega.privacy.android.domain.usecase.transfers.active.ClearActiveTransfersIfFinishedUseCase
+import mega.privacy.android.domain.usecase.transfers.active.MonitorActiveTransferFinishedUseCase
 import mega.privacy.android.domain.usecase.transfers.active.MonitorOngoingActiveTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.downloads.GetCurrentDownloadSpeedUseCase
 import mega.privacy.android.domain.usecase.transfers.downloads.GetOrCreateStorageDownloadLocationUseCase
@@ -63,8 +59,6 @@ internal class StartDownloadComponentViewModel @Inject constructor(
     private val getOrCreateStorageDownloadLocationUseCase: GetOrCreateStorageDownloadLocationUseCase,
     private val getFilePreviewDownloadPathUseCase: GetFilePreviewDownloadPathUseCase,
     private val startDownloadsWithWorkerUseCase: StartDownloadsWithWorkerUseCase,
-    private val saveOfflineNodeInformationUseCase: SaveOfflineNodeInformationUseCase,
-    private val broadcastOfflineFileAvailabilityUseCase: BroadcastOfflineFileAvailabilityUseCase,
     private val clearActiveTransfersIfFinishedUseCase: ClearActiveTransfersIfFinishedUseCase,
     private val isConnectedToInternetUseCase: IsConnectedToInternetUseCase,
     private val totalFileSizeOfNodesUseCase: TotalFileSizeOfNodesUseCase,
@@ -78,7 +72,7 @@ internal class StartDownloadComponentViewModel @Inject constructor(
     private val saveDoNotPromptToSaveDestinationUseCase: SaveDoNotPromptToSaveDestinationUseCase,
     private val setStorageDownloadAskAlwaysUseCase: SetStorageDownloadAskAlwaysUseCase,
     private val setStorageDownloadLocationUseCase: SetStorageDownloadLocationUseCase,
-    private val getExternalPathByContentUriUseCase: GetExternalPathByContentUriUseCase,
+    private val monitorActiveTransferFinishedUseCase: MonitorActiveTransferFinishedUseCase,
 ) : ViewModel() {
 
     private var currentInProgressJob: Job? = null
@@ -174,13 +168,12 @@ internal class StartDownloadComponentViewModel @Inject constructor(
         startDownloadNode: TransferTriggerEvent.StartDownloadNode,
         destinationUri: Uri,
     ) {
+        Timber.d("Selected destination $destinationUri")
         viewModelScope.launch {
-            getExternalPathByContentUriUseCase(destinationUri.toString())?.let { destination ->
-                startDownloadNodes(startDownloadNode, destination)
-                if (shouldPromptToSaveDestinationUseCase()) {
-                    _uiState.update {
-                        it.copy(promptSaveDestination = triggered(destination))
-                    }
+            startDownloadNodes(startDownloadNode, destinationUri.toString())
+            if (shouldPromptToSaveDestinationUseCase()) {
+                _uiState.update {
+                    it.copy(promptSaveDestination = triggered(destinationUri.toString()))
                 }
             }
         }
@@ -195,7 +188,7 @@ internal class StartDownloadComponentViewModel @Inject constructor(
             startDownloadNodes(
                 nodes = listOf(node),
                 isHighPriority = true,
-                getPath = {
+                getUri = {
                     getFilePreviewDownloadPathUseCase()
                 },
             )
@@ -223,7 +216,7 @@ internal class StartDownloadComponentViewModel @Inject constructor(
                 startDownloadNodes(
                     nodes = siblingNodes,
                     isHighPriority = startDownloadNode.isHighPriority,
-                    getPath = {
+                    getUri = {
                         destination?.ensureSuffix(File.separator)
                     },
                 )
@@ -240,13 +233,9 @@ internal class StartDownloadComponentViewModel @Inject constructor(
             startDownloadNodes(
                 nodes = listOf(node),
                 isHighPriority,
-                getPath = {
+                getUri = {
                     getOfflinePathForNodeUseCase(node)
                 },
-                toDoAfterProcessing = {
-                    saveOfflineNodeInformationUseCase(node.id)
-                    broadcastOfflineFileAvailabilityUseCase(node.id.longValue)
-                }
             )
         }
     }
@@ -257,26 +246,27 @@ internal class StartDownloadComponentViewModel @Inject constructor(
     private suspend fun startDownloadNodes(
         nodes: List<TypedNode>,
         isHighPriority: Boolean,
-        toDoAfterProcessing: (suspend () -> Unit)? = null,
-        getPath: suspend () -> String?,
+        getUri: suspend () -> String?,
     ) {
+        monitorDownloadFinishJob?.cancel()
         clearActiveTransfersIfFinishedUseCase(TransferType.DOWNLOAD)
+        monitorDownloadFinish()
         _uiState.update {
             it.copy(jobInProgressState = StartDownloadTransferJobInProgress.ProcessingFiles)
         }
         var lastError: Throwable? = null
         val terminalEvent = runCatching {
-            getPath().also {
+            getUri().also {
                 if (it.isNullOrBlank()) {
                     throw NullPointerException("path not found!")
                 }
             }
         }.onFailure { lastError = it }
-            .getOrNull()?.let { path ->
+            .getOrNull()?.let { uri ->
                 startDownloadsWithWorkerUseCase(
-                    destinationPath = path,
+                    destinationPathOrUri = uri,
                     nodes = nodes,
-                    isHighPriority = isHighPriority
+                    isHighPriority = isHighPriority,
                 ).catch {
                     lastError = it
                     Timber.e(it)
@@ -286,20 +276,17 @@ internal class StartDownloadComponentViewModel @Inject constructor(
                     }
                 }.last()
             }
-        monitorFinish()
         checkRating()
-        if (terminalEvent is MultiTransferEvent.ScanningFoldersFinished) toDoAfterProcessing?.invoke()
         _uiState.updateEventAndClearProgress(
             when (terminalEvent) {
                 MultiTransferEvent.InsufficientSpace -> StartDownloadTransferEvent.Message.NotSufficientSpace
                 else -> {
-                    val finishedEvent =
-                        (terminalEvent as? MultiTransferEvent.ScanningFoldersFinished)
+                    val finishedEvent = (terminalEvent as? MultiTransferEvent.SingleTransferEvent)
                     StartDownloadTransferEvent.FinishProcessing(
                         exception = lastError?.takeIf { terminalEvent == null },
                         totalNodes = nodes.size,
-                        totalFiles = finishedEvent?.scannedFiles ?: 0,
-                        totalAlreadyDownloaded = finishedEvent?.alreadyDownloadedFiles ?: 0,
+                        totalFiles = finishedEvent?.startedFiles ?: 0,
+                        totalAlreadyDownloaded = finishedEvent?.alreadyTransferred ?: 0,
                     )
                 }
             }
@@ -318,6 +305,11 @@ internal class StartDownloadComponentViewModel @Inject constructor(
      */
     fun cancelCurrentJob() {
         currentInProgressJob?.cancel()
+        _uiState.update {
+            it.copy(
+                jobInProgressState = null,
+            )
+        }
     }
 
     /**
@@ -415,36 +407,30 @@ internal class StartDownloadComponentViewModel @Inject constructor(
         }
     }
 
-    private var monitorFinishJob: Job? = null
-    private fun monitorFinish() {
-        if (monitorFinishJob == null) {
-            monitorFinishJob = viewModelScope.launch {
-                val lastBeforeClear =
-                    monitorOngoingActiveTransfersUseCase(TransferType.DOWNLOAD)
-                        .conflate()
-                        .map { it.activeTransferTotals }
-                        .takeWhile {
-                            it.totalTransfers > 0
-                        }.lastOrNull() ?: return@launch
-                (lastBeforeClear.totalFilesDownloaded).takeIf { it > 0 }
-                    ?.let {
-                        when (_uiState.value.transferTriggerEvent) {
-                            is TransferTriggerEvent.StartDownloadForOffline -> {
-                                StartDownloadTransferEvent.Message.FinishOffline
-                            }
+    private var monitorDownloadFinishJob: Job? = null
 
-                            is TransferTriggerEvent.StartDownloadNode -> {
-                                StartDownloadTransferEvent.MessagePlural.FinishDownloading(
-                                    it
-                                )
-                            }
-
-                            else -> null
-                        }?.let { finishEvent ->
-                            _uiState.updateEventAndClearProgress(finishEvent)
-                        }
+    /**
+     * Monitor finish to send the corresponding event (will display a "Download Finished" snackbar or similar)
+     */
+    private fun monitorDownloadFinish() {
+        monitorDownloadFinishJob?.cancel()
+        monitorDownloadFinishJob = viewModelScope.launch {
+            monitorActiveTransferFinishedUseCase(TransferType.DOWNLOAD).collect { totalNodes ->
+                when (_uiState.value.transferTriggerEvent) {
+                    is TransferTriggerEvent.StartDownloadForOffline -> {
+                        StartDownloadTransferEvent.Message.FinishOffline
                     }
-                monitorFinishJob = null
+
+                    is TransferTriggerEvent.StartDownloadNode -> {
+                        StartDownloadTransferEvent.MessagePlural.FinishDownloading(
+                            totalNodes
+                        )
+                    }
+
+                    else -> null
+                }?.let { finishEvent ->
+                    _uiState.updateEventAndClearProgress(finishEvent)
+                }
             }
         }
     }

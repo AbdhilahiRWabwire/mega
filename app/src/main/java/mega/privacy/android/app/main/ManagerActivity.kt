@@ -2,7 +2,6 @@
 
 package mega.privacy.android.app.main
 
-import mega.privacy.android.core.R as CoreUiR
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -21,6 +20,7 @@ import android.graphics.PorterDuff
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
@@ -44,15 +44,30 @@ import androidx.activity.viewModels
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.ModalBottomSheetValue
+import androidx.compose.material.rememberModalBottomSheetState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.core.view.GravityCompat
 import androidx.core.view.MenuItemCompat
 import androidx.core.view.isVisible
+import androidx.documentfile.provider.DocumentFile
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentContainerView
@@ -68,6 +83,7 @@ import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
 import androidx.viewpager2.widget.ViewPager2
 import androidx.work.WorkManager
+import com.anggrayudi.storage.file.getAbsolutePath
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.bottomnavigation.BottomNavigationItemView
@@ -189,8 +205,10 @@ import mega.privacy.android.app.presentation.manager.model.TransfersTab
 import mega.privacy.android.app.presentation.mapper.RestoreNodeResultMapper
 import mega.privacy.android.app.presentation.meeting.CreateScheduledMeetingActivity
 import mega.privacy.android.app.presentation.meeting.WaitingRoomManagementViewModel
+import mega.privacy.android.app.presentation.meeting.chat.view.sheet.UpgradeProPlanBottomSheet
 import mega.privacy.android.app.presentation.meeting.view.CallRecordingConsentDialog
 import mega.privacy.android.app.presentation.meeting.view.DenyEntryToCallDialog
+import mega.privacy.android.app.presentation.meeting.view.FreePlanLimitParticipantsDialog
 import mega.privacy.android.app.presentation.meeting.view.UsersInWaitingRoomDialog
 import mega.privacy.android.app.presentation.movenode.mapper.MoveRequestMessageMapper
 import mega.privacy.android.app.presentation.node.NodeSourceTypeMapper
@@ -203,9 +221,7 @@ import mega.privacy.android.app.presentation.photos.PhotosFragment
 import mega.privacy.android.app.presentation.photos.albums.albumcontent.AlbumContentFragment
 import mega.privacy.android.app.presentation.photos.mediadiscovery.MediaDiscoveryFragment
 import mega.privacy.android.app.presentation.photos.timeline.photosfilter.PhotosFilterFragment
-import mega.privacy.android.app.presentation.qrcode.QRCodeActivity
 import mega.privacy.android.app.presentation.qrcode.QRCodeComposeActivity
-import mega.privacy.android.app.presentation.qrcode.scan.ScanCodeFragment
 import mega.privacy.android.app.presentation.recentactions.recentactionbucket.RecentActionBucketFragment
 import mega.privacy.android.app.presentation.rubbishbin.RubbishBinComposeFragment
 import mega.privacy.android.app.presentation.rubbishbin.RubbishBinViewModel
@@ -290,6 +306,7 @@ import mega.privacy.android.app.utils.permission.PermissionUtils
 import mega.privacy.android.app.utils.permission.PermissionUtils.hasPermissions
 import mega.privacy.android.app.utils.permission.PermissionUtils.requestPermission
 import mega.privacy.android.app.zippreview.ui.ZipBrowserActivity
+import mega.privacy.android.core.ui.controls.sheets.BottomSheet
 import mega.privacy.android.data.model.MegaAttributes
 import mega.privacy.android.data.model.MegaPreferences
 import mega.privacy.android.domain.entity.ChatRoomPermission
@@ -299,6 +316,7 @@ import mega.privacy.android.domain.entity.ShareData
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.chat.ChatLinkContent
+import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.MoveRequestResult
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeNameCollisionResult
@@ -502,7 +520,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
 
     private val badgeDrawable: BadgeDrawerArrowDrawable by lazy {
         BadgeDrawerArrowDrawable(
-            this, R.color.red_600_red_300,
+            this, R.color.color_button_brand,
             R.color.white_dark_grey, R.color.white_dark_grey
         )
     }
@@ -545,6 +563,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     private lateinit var fragmentLayout: LinearLayout
     private lateinit var waitingRoomComposeView: ComposeView
     private lateinit var callRecordingConsentDialogComposeView: ComposeView
+    private lateinit var freePlanLimitParticipantsDialogComposeView: ComposeView
     private lateinit var bottomNavigationView: BottomNavigationView
     private lateinit var navigationView: NavigationView
     private lateinit var adsComposeView: ComposeView
@@ -1055,11 +1074,8 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     private fun checkForInAppAdvertisement() {
         lifecycleScope.launch {
             runCatching {
-                val isInAppAdvertisementEnabled =
-                    getFeatureFlagValueUseCase(AppFeatures.InAppAdvertisement)
                 val isAdsEnabled = getFeatureFlagValueUseCase(ABTestFeatures.ads)
-
-                if (isInAppAdvertisementEnabled && isAdsEnabled) {
+                if (isAdsEnabled) {
                     if (this@ManagerActivity.isPortrait()) {
                         setupAdsView()
                     } else {
@@ -1106,6 +1122,8 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         waitingRoomComposeView = findViewById(R.id.waiting_room_dialog_compose_view)
         callRecordingConsentDialogComposeView =
             findViewById(R.id.call_recording_consent_dialog_compose_view)
+        freePlanLimitParticipantsDialogComposeView =
+            findViewById(R.id.free_plan_limit_dialog_compose_view)
         adsComposeView = findViewById(R.id.ads_web_compose_view)
         fragmentLayout = findViewById(R.id.fragment_layout)
         bottomNavigationView =
@@ -1138,6 +1156,8 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     }
 
 
+    @SuppressLint("UnrememberedMutableState")
+    @OptIn(ExperimentalMaterialApi::class, ExperimentalComposeUiApi::class)
     private fun setInitialViewProperties() {
         viewPagerShares.offscreenPageLimit = 3
         getProLayout.setBackgroundColor(
@@ -1212,6 +1232,76 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                                 startActivity(viewIntent)
                             }
                         )
+                    }
+                }
+            }
+        }
+
+        freePlanLimitParticipantsDialogComposeView.apply {
+            isVisible = true
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                val themeMode by getThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.System)
+                val isDark = themeMode.isDarkMode()
+                val state by viewModel.state.collectAsStateWithLifecycle()
+                val coroutineScope = rememberCoroutineScope()
+                val upgradeToProPlanBottomSheetState = rememberModalBottomSheetState(
+                    initialValue = ModalBottomSheetValue.Hidden,
+                    confirmValueChange = {
+                        true
+                    }
+                )
+                val isUpgradeToProPlanShown by derivedStateOf {
+                    Timber.d("Current Bottom Sheet state ${upgradeToProPlanBottomSheetState.currentValue}")
+                    upgradeToProPlanBottomSheetState.currentValue != ModalBottomSheetValue.Hidden
+                }
+
+                MegaAppTheme(isDark = isDark) {
+
+                    var showUpgradeDialog by rememberSaveable() {
+                        mutableStateOf(false)
+                    }
+                    LaunchedEffect(state.shouldUpgradeToProPlan) {
+                        Timber.d("shouldUpgradeToProPlan ${state.shouldUpgradeToProPlan}")
+                        if (state.shouldUpgradeToProPlan) {
+                            showUpgradeDialog = true
+                            upgradeToProPlanBottomSheetState.show()
+                            viewModel.onConsumeShouldUpgradeToProPlan()
+                        }
+                    }
+                    LaunchedEffect(upgradeToProPlanBottomSheetState.currentValue) {
+                        if (upgradeToProPlanBottomSheetState.currentValue == ModalBottomSheetValue.Hidden) {
+                            showUpgradeDialog = false
+                        }
+                    }
+
+                    if (state.callEndedDueToFreePlanLimits && state.isCallUnlimitedProPlanFeatureFlagEnabled &&
+                        state.usersCallLimitReminders == UsersCallLimitReminders.Enabled
+                    ) {
+                        FreePlanLimitParticipantsDialog(
+                            onConfirm = {
+                                viewModel.onConsumeShowFreePlanParticipantsLimitDialogEvent()
+                            },
+                        )
+                    }
+                    if (showUpgradeDialog) {
+                        BottomSheet(
+                            modifier = Modifier
+                                .semantics {
+                                    testTagsAsResourceId = true
+                                },
+                            modalSheetState = upgradeToProPlanBottomSheetState,
+                            sheetBody = {
+                                when {
+                                    isUpgradeToProPlanShown -> {
+                                        UpgradeProPlanBottomSheet {
+                                            coroutineScope.launch {
+                                                upgradeToProPlanBottomSheetState.hide()
+                                            }
+                                        }
+                                    }
+                                }
+                            })
                     }
                 }
             }
@@ -1298,13 +1388,13 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             object : TabLayout.OnTabSelectedListener {
                 override fun onTabSelected(tab: TabLayout.Tab) {
                     val tabIconColor =
-                        ContextCompat.getColor(applicationContext, R.color.red_600_red_300)
+                        ContextCompat.getColor(applicationContext, R.color.color_border_interactive)
                     tab.icon?.setColorFilter(tabIconColor, PorterDuff.Mode.SRC_IN)
                 }
 
                 override fun onTabUnselected(tab: TabLayout.Tab) {
                     val tabIconColor =
-                        ContextCompat.getColor(applicationContext, R.color.grey_300_grey_600)
+                        ContextCompat.getColor(applicationContext, R.color.color_icon_secondary)
                     tab.icon?.setColorFilter(tabIconColor, PorterDuff.Mode.SRC_IN)
                 }
 
@@ -1975,6 +2065,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             if (managerState.isPushNotificationSettingsUpdatedEvent) {
                 viewModel.onConsumePushNotificationSettingsUpdateEvent()
             }
+
             if (managerState.nodeUpdateReceived) {
                 // Invalidate the menu will collapse/expand the search view and set the query text to ""
                 // (call onQueryTextChanged) (BTW, SearchFragment uses textSubmitted to avoid the query
@@ -3091,11 +3182,14 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                     }
                 } else {
                     if (megaApi.rootNode != null) {
-                        fileBrowserViewModel.setFileBrowserHandle(
-                            megaApi.rootNode?.handle ?: INVALID_HANDLE
-                        )
-                        supportActionBar?.title = getString(R.string.title_mega_info_empty_screen)
-                        viewModel.setIsFirstNavigationLevel(true)
+                        if (fileBrowserViewModel.state().fileBrowserHandle == INVALID_HANDLE) {
+                            fileBrowserViewModel.setFileBrowserHandle(
+                                megaApi.rootNode?.handle ?: INVALID_HANDLE
+                            )
+                            supportActionBar?.title =
+                                getString(R.string.title_mega_info_empty_screen)
+                            viewModel.setIsFirstNavigationLevel(true)
+                        }
                     } else {
                         fileBrowserViewModel.setFileBrowserHandle(-1)
                         viewModel.setIsFirstNavigationLevel(true)
@@ -3499,17 +3593,17 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             when (position) {
                 SharesTab.INCOMING_TAB.position -> {
                     tab.setText(R.string.tab_incoming_shares)
-                    tab.setIcon(R.drawable.ic_incoming_shares)
+                    tab.setIcon(R.drawable.ic_folder_incoming_medium_regular_selector)
                 }
 
                 SharesTab.OUTGOING_TAB.position -> {
                     tab.setText(R.string.tab_outgoing_shares)
-                    tab.setIcon(R.drawable.ic_outgoing_shares)
+                    tab.setIcon(R.drawable.ic_folder_outgoing_medium_regular_selector)
                 }
 
                 SharesTab.LINKS_TAB.position -> {
                     tab.setText(R.string.tab_links_shares)
-                    tab.setIcon(CoreUiR.drawable.link_ic)
+                    tab.setIcon(R.drawable.ic_link01_medium_regular_selector)
                 }
             }
         }.attach()
@@ -3718,6 +3812,11 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                 }
 
                 R.id.documentsFragment -> {
+                    homepageScreen = HomepageScreen.DOCUMENTS
+                    hideAdsView()
+                }
+
+                R.id.documentSectionFragment -> {
                     homepageScreen = HomepageScreen.DOCUMENTS
                     hideAdsView()
                 }
@@ -5102,15 +5201,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     }
 
     fun openQR(openScanQr: Boolean) {
-        if (openScanQr) {
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, ScanCodeFragment()).commitNowAllowingStateLoss()
-        }
-
-        val qrIntent = if (viewModel.state.value.enabledFlags.contains(AppFeatures.QRCodeCompose))
-            Intent(this, QRCodeComposeActivity::class.java)
-        else
-            Intent(this, QRCodeActivity::class.java)
+        val qrIntent = Intent(this, QRCodeComposeActivity::class.java)
         qrIntent.putExtra(Constants.OPEN_SCAN_QR, openScanQr)
         startActivity(qrIntent)
     }
@@ -5394,13 +5485,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
      */
     fun exitBackupsPage() {
         handleSuperBackPressed()
-        val isDeviceCenterFeatureFlagEnabled =
-            viewModel.state.value.enabledFlags.contains(ABTestFeatures.dmca)
-        if (isDeviceCenterFeatureFlagEnabled) {
-            selectDrawerItem(DrawerItem.DEVICE_CENTER)
-        } else {
-            goBackToBottomNavigationItem(bottomNavigationCurrentItem)
-        }
+        selectDrawerItem(DrawerItem.DEVICE_CENTER)
     }
 
     /**
@@ -5730,6 +5815,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     private fun showOpenLinkDialog(isJoinMeeting: Boolean = false) {
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
             val isChatScreen = drawerItem == DrawerItem.CHAT
+
             OpenLinkDialogFragment.newInstance(
                 isChatScreen = isChatScreen,
                 isJoinMeeting = isJoinMeeting
@@ -8309,8 +8395,16 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             }
 
             DrawerItem.BACKUPS -> {
-                backupsFragment?.updateBackupsHandle(handle)
+                backupsFragment?.let {
+                    it.updateBackupsHandle(handle)
+                    it.refreshBackupsNodes()
+                }
                 refreshFragment(FragmentTag.BACKUPS.tag)
+            }
+
+            DrawerItem.RUBBISH_BIN -> {
+                rubbishBinViewModel.setRubbishBinHandle(handle)
+                refreshFragment(FragmentTag.RUBBISH_BIN_COMPOSE.tag)
             }
 
             else -> {}
@@ -8427,8 +8521,8 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                     }
 
                     false -> {
-                        val file = transfer.path?.let { File(it) }
-                        if (!FileUtil.isFileAvailable(file)) {
+                        val file = getFileFromUri(transfer.path)
+                        if (file?.exists() != true) {
                             showSnackbar(
                                 Constants.SNACKBAR_TYPE,
                                 getString(R.string.location_not_exist),
@@ -8438,7 +8532,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                         }
                         val intent = Intent(this, FileStorageActivity::class.java)
                         intent.action = FileStorageActivity.Mode.BROWSE_FILES.action
-                        intent.putExtra(FileStorageActivity.EXTRA_PATH, transfer.path)
+                        intent.putExtra(FileStorageActivity.EXTRA_PATH, file.path)
                         startActivity(intent)
                     }
 
@@ -8460,6 +8554,27 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         }
     }
 
+    private fun getFileFromUri(stringUri: String): File? {
+        val uri = stringUri.toUri()
+        return if (uri.scheme == "content") {
+            val documentFile = DocumentFile.fromTreeUri(this, uri)
+            if (documentFile == null) {
+                Timber.e("DocumentFile is null")
+                null
+            } else {
+                var file = File(documentFile.getAbsolutePath(this))
+                if (!file.exists()) {
+                    //best effort, probably a subfolder of downloads, but we can't access it as a file
+                    file =
+                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                }
+                file
+            }
+        } else {
+            File(stringUri)
+        }
+    }
+
     /**
      * Opens the location of a node.
      *
@@ -8474,7 +8589,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             selectDrawerItem(DrawerItem.CLOUD_DRIVE)
         } else if (parentNode.handle == megaApi.rubbishNode?.handle) {
             rubbishBinViewModel.setRubbishBinHandle(node.parentHandle)
-            refreshFragment(FragmentTag.RUBBISH_BIN.tag)
+            refreshFragment(FragmentTag.RUBBISH_BIN_COMPOSE.tag)
             selectDrawerItem(DrawerItem.RUBBISH_BIN)
         } else if (parentNode.isInShare) {
             if (enabledIncomingSharesCompose) {

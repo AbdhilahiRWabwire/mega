@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.components.ChatManagement
-import mega.privacy.android.app.domain.usecase.GetBackupsNode
 import mega.privacy.android.app.featuretoggle.ABTestFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
@@ -40,8 +39,10 @@ import mega.privacy.android.domain.entity.chat.ChatCall
 import mega.privacy.android.domain.entity.contacts.ContactRequest
 import mega.privacy.android.domain.entity.contacts.ContactRequestStatus
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
+import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
 import mega.privacy.android.domain.entity.meeting.ChatSessionChanges
 import mega.privacy.android.domain.entity.meeting.ScheduledMeetingStatus
+import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
@@ -52,7 +53,6 @@ import mega.privacy.android.domain.usecase.GetExtendedAccountDetail
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.GetNumUnreadUserAlertsUseCase
 import mega.privacy.android.domain.usecase.GetRootNodeUseCase
-import mega.privacy.android.domain.usecase.HasBackupsChildren
 import mega.privacy.android.domain.usecase.MonitorBackupFolder
 import mega.privacy.android.domain.usecase.MonitorContactRequestUpdates
 import mega.privacy.android.domain.usecase.MonitorContactUpdates
@@ -68,10 +68,7 @@ import mega.privacy.android.domain.usecase.account.RenameRecoveryKeyFileUseCase
 import mega.privacy.android.domain.usecase.account.RequireTwoFactorAuthenticationUseCase
 import mega.privacy.android.domain.usecase.account.SetCopyLatestTargetPathUseCase
 import mega.privacy.android.domain.usecase.account.SetMoveLatestTargetPathUseCase
-import mega.privacy.android.domain.usecase.billing.GetActiveSubscriptionUseCase
 import mega.privacy.android.domain.usecase.camerauploads.EstablishCameraUploadsSyncHandlesUseCase
-import mega.privacy.android.domain.usecase.camerauploads.GetPrimarySyncHandleUseCase
-import mega.privacy.android.domain.usecase.camerauploads.GetSecondarySyncHandleUseCase
 import mega.privacy.android.domain.usecase.camerauploads.MonitorCameraUploadsFolderDestinationUseCase
 import mega.privacy.android.domain.usecase.chat.GetNumUnreadChatsUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatArchivedUseCase
@@ -82,10 +79,13 @@ import mega.privacy.android.domain.usecase.login.MonitorFinishActivityUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
+import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorCallEndedUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorCallRecordingConsentEventUseCase
+import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
+import mega.privacy.android.domain.usecase.meeting.SetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.StartMeetingInWaitingRoomChatUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
@@ -98,6 +98,7 @@ import mega.privacy.android.domain.usecase.node.MoveNodesToRubbishUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodesUseCase
 import mega.privacy.android.domain.usecase.node.RemoveShareUseCase
 import mega.privacy.android.domain.usecase.node.RestoreNodesUseCase
+import mega.privacy.android.domain.usecase.notifications.GetNumUnreadPromoNotificationsUseCase
 import mega.privacy.android.domain.usecase.photos.mediadiscovery.SendStatisticsMediaDiscoveryUseCase
 import mega.privacy.android.domain.usecase.psa.DismissPsaUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorUpdatePushNotificationSettingsUseCase
@@ -115,50 +116,64 @@ import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * Manager view model
+ * ManagerViewModel
  *
- * @property monitorUserAlertUpdates
- * @property getBackupsNode
- * @property getNumUnreadUserAlertsUseCase
- * @property hasBackupsChildren
- * @property sendStatisticsMediaDiscoveryUseCase
- * @property savedStateHandle
- * @property monitorStorageStateEventUseCase
- * @param monitorCameraUploadsFolderDestinationUseCase
- * @property getPrimarySyncHandleUseCase
- * @property getSecondarySyncHandleUseCase
- * @property getCloudSortOrder
- * @property monitorConnectivityUseCase
- * @property getExtendedAccountDetail
- * @property getFullAccountInfoUseCase
- * @property getActiveSubscriptionUseCase
- * @property getFeatureFlagValueUseCase
- * @property getUnverifiedIncomingShares
- * @property getUnverifiedOutgoingShares
- * @property monitorUserUpdates
- * @property startCameraUploadUseCase
- * @property stopCameraUploadsUseCase
- * @property deleteOldestCompletedTransfersUseCase
- * @property getIncomingContactRequestsUseCase
- * @param monitorNodeUpdatesUseCase
- * @param monitorContactUpdates monitor contact update when credentials verification occurs to update shares count
- * @param monitorContactRequestUpdates
- * @param monitorFinishActivityUseCase
- * @param monitorOfflineNodeAvailabilityUseCase monitor the offline availability of the file to update the UI
- * @param getNumUnreadChatsUseCase  monitor number of unread chats
- * @property monitorBackupFolder
- * @property getScheduledMeetingByChat  [GetScheduledMeetingByChat]
- * @property getChatCallUseCase [GetChatCallUseCase]
- * @property startMeetingInWaitingRoomChatUseCase [StartMeetingInWaitingRoomChatUseCase]
- * @property answerChatCallUseCase [AnswerChatCallUseCase]
- * @property setChatVideoInDeviceUseCase [SetChatVideoInDeviceUseCase]
- * @property rtcAudioManagerGateway [RTCAudioManagerGateway]
- * @property chatManagement [ChatManagement]
- * @property passcodeManagement [PasscodeManagement]
- * @property monitorChatSessionUpdatesUseCase [MonitorChatSessionUpdatesUseCase]
- * @property hangChatCallUseCase [HangChatCallUseCase]
- * @property monitorCallRecordingConsentEventUseCase [MonitorCallRecordingConsentEventUseCase]
- * @property monitorCallEndedUseCase [MonitorCallEndedUseCase]
+ * @property monitorUserAlertUpdates Use case for monitoring user alert updates.
+ * @property getNumUnreadUserAlertsUseCase Use case for getting the number of unread user alerts.
+ * @property getNumUnreadPromoNotificationsUseCase Use case for getting the number of unread promo notifications.
+ * @property sendStatisticsMediaDiscoveryUseCase Use case for sending media discovery statistics.
+ * @property savedStateHandle Saved state handle for saving and restoring state related to the ViewModel.
+ * @property monitorStorageStateEventUseCase Use case for monitoring storage state events.
+ * @property getCloudSortOrder Use case for getting the cloud sort order.
+ * @property isConnectedToInternetUseCase Use case for checking if the device is connected to the internet.
+ * @property getExtendedAccountDetail Use case for getting extended account details.
+ * @property getFullAccountInfoUseCase Use case for getting full account info.
+ * @property getFeatureFlagValueUseCase Use case for getting the value of a feature flag.
+ * @property getUnverifiedIncomingShares Use case for getting unverified incoming shares.
+ * @property getUnverifiedOutgoingShares Use case for getting unverified outgoing shares.
+ * @property requireTwoFactorAuthenticationUseCase Use case for requiring two factor authentication.
+ * @property setCopyLatestTargetPathUseCase Use case for setting the latest target path for copy operations.
+ * @property setMoveLatestTargetPathUseCase Use case for setting the latest target path for move operations.
+ * @property monitorSecurityUpgradeInApp Use case for monitoring security upgrade in app.
+ * @property monitorUserUpdates Use case for monitoring user updates.
+ * @property establishCameraUploadsSyncHandlesUseCase Use case for establishing camera uploads sync handles.
+ * @property startCameraUploadUseCase Use case for starting camera uploads.
+ * @property stopCameraUploadsUseCase Use case for stopping camera uploads.
+ * @property saveContactByEmailUseCase Use case for saving a contact by email.
+ * @property createShareKeyUseCase Use case for creating a share key.
+ * @property getNodeByIdUseCase Use case for getting a node by its ID.
+ * @property deleteOldestCompletedTransfersUseCase Use case for deleting the oldest completed transfers.
+ * @property getIncomingContactRequestsUseCase Use case for getting incoming contact requests.
+ * @property monitorChatArchivedUseCase Use case for monitoring chat archived events.
+ * @property restoreNodesUseCase Use case for restoring nodes.
+ * @property checkNodesNameCollisionUseCase Use case for checking nodes name collision.
+ * @property monitorBackupFolder Use case for monitoring backup folder.
+ * @property moveNodesToRubbishUseCase Use case for moving nodes to rubbish.
+ * @property deleteNodesUseCase Use case for deleting nodes.
+ * @property moveNodesUseCase Use case for moving nodes.
+ * @property copyNodesUseCase Use case for copying nodes.
+ * @property renameRecoveryKeyFileUseCase Use case for renaming recovery key file.
+ * @property removeShareUseCase Use case for removing shares.
+ * @property removeShareResultMapper Mapper for mapping the result of remove share operation.
+ * @property disableExportNodesUseCase Use case for disabling export nodes.
+ * @property removePublicLinkResultMapper Mapper for mapping the result of remove public link operation.
+ * @property dismissPsaUseCase Use case for dismissing PSA.
+ * @property getRootNodeUseCase Use case for getting the root node.
+ * @property getChatLinkContentUseCase Use case for getting the content of a chat link.
+ * @property getScheduledMeetingByChat Use case for getting a scheduled meeting by chat.
+ * @property getChatCallUseCase Use case for getting a chat call.
+ * @property startMeetingInWaitingRoomChatUseCase Use case for starting a meeting in waiting room chat.
+ * @property answerChatCallUseCase Use case for answering a chat call.
+ * @property setChatVideoInDeviceUseCase Use case for setting chat video in device.
+ * @property rtcAudioManagerGateway Gateway for RTC audio manager.
+ * @property chatManagement Management for chat.
+ * @property passcodeManagement Management for passcode.
+ * @property monitorSyncStalledIssuesUseCase Use case for monitoring sync stalled issues.
+ * @property monitorSyncsUseCase Use case for monitoring syncs.
+ * @property monitorChatSessionUpdatesUseCase Use case for monitoring chat session updates.
+ * @property hangChatCallUseCase Use case for hanging a chat call.
+ * @property setUsersCallLimitRemindersUseCase      [SetUsersCallLimitRemindersUseCase]
+ * @property getUsersCallLimitRemindersUseCase      [GetUsersCallLimitRemindersUseCase]
  */
 @HiltViewModel
 class ManagerViewModel @Inject constructor(
@@ -166,21 +181,17 @@ class ManagerViewModel @Inject constructor(
     monitorContactUpdates: MonitorContactUpdates,
     private val monitorUserAlertUpdates: MonitorUserAlertUpdates,
     monitorContactRequestUpdates: MonitorContactRequestUpdates,
-    private val getBackupsNode: GetBackupsNode,
     private val getNumUnreadUserAlertsUseCase: GetNumUnreadUserAlertsUseCase,
-    private val hasBackupsChildren: HasBackupsChildren,
+    private val getNumUnreadPromoNotificationsUseCase: GetNumUnreadPromoNotificationsUseCase,
     private val sendStatisticsMediaDiscoveryUseCase: SendStatisticsMediaDiscoveryUseCase,
     private val savedStateHandle: SavedStateHandle,
     private val monitorStorageStateEventUseCase: MonitorStorageStateEventUseCase,
     monitorCameraUploadsFolderDestinationUseCase: MonitorCameraUploadsFolderDestinationUseCase,
-    private val getPrimarySyncHandleUseCase: GetPrimarySyncHandleUseCase,
-    private val getSecondarySyncHandleUseCase: GetSecondarySyncHandleUseCase,
     private val getCloudSortOrder: GetCloudSortOrder,
-    private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
+    monitorConnectivityUseCase: MonitorConnectivityUseCase,
     private val isConnectedToInternetUseCase: IsConnectedToInternetUseCase,
     private val getExtendedAccountDetail: GetExtendedAccountDetail,
     private val getFullAccountInfoUseCase: GetFullAccountInfoUseCase,
-    private val getActiveSubscriptionUseCase: GetActiveSubscriptionUseCase,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val getUnverifiedIncomingShares: GetUnverifiedIncomingShares,
     private val getUnverifiedOutgoingShares: GetUnverifiedOutgoingShares,
@@ -232,6 +243,9 @@ class ManagerViewModel @Inject constructor(
     private val hangChatCallUseCase: HangChatCallUseCase,
     private val monitorCallRecordingConsentEventUseCase: MonitorCallRecordingConsentEventUseCase,
     private val monitorCallEndedUseCase: MonitorCallEndedUseCase,
+    private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase,
+    private val setUsersCallLimitRemindersUseCase: SetUsersCallLimitRemindersUseCase,
+    private val getUsersCallLimitRemindersUseCase: GetUsersCallLimitRemindersUseCase,
 ) : ViewModel() {
 
     /**
@@ -288,6 +302,20 @@ class ManagerViewModel @Inject constructor(
      */
     val stalledIssuesCount = _stalledIssuesCount.asStateFlow()
 
+    private val _numUnreadUserAlerts = MutableStateFlow(
+        Pair(
+            UnreadUserAlertsCheckType.NOTIFICATIONS_TITLE,
+            0
+        )
+    )
+
+    private val legacyNumUnreadUserAlerts = SingleLiveEvent<Pair<UnreadUserAlertsCheckType, Int>>()
+
+    /**
+     * The number of unread user alerts
+     */
+    val numUnreadUserAlerts = _numUnreadUserAlerts.asStateFlow()
+
     /**
      * Is network connected
      */
@@ -302,6 +330,8 @@ class ManagerViewModel @Inject constructor(
     private var monitorChatSessionUpdatesJob: Job? = null
 
     init {
+        checkUsersCallLimitReminders()
+
         viewModelScope.launch {
             val order = getCloudSortOrder()
             combine(
@@ -372,6 +402,33 @@ class ManagerViewModel @Inject constructor(
                 _state.update { it.copy(titleChatArchivedEvent = chatTitle) }
             }
         }
+
+        viewModelScope.launch {
+            monitorChatCallUpdatesUseCase()
+                .collect {
+                    it.apply {
+                        when (status) {
+                            ChatCallStatus.TerminatingUserParticipation, ChatCallStatus.GenericNotification ->
+                                if (termCode == ChatCallTermCodeType.CallUsersLimit
+                                    && _state.value.isCallUnlimitedProPlanFeatureFlagEnabled
+                                ) {
+                                    _state.update { state -> state.copy(callEndedDueToFreePlanLimits = true) }
+                                } else if (termCode == ChatCallTermCodeType.CallDurationLimit && _state.value.isCallUnlimitedProPlanFeatureFlagEnabled) {
+                                    if (it.isOwnClientCaller) {
+                                        _state.update { state ->
+                                            state.copy(
+                                                shouldUpgradeToProPlan = true
+                                            )
+                                        }
+                                    }
+                                }
+
+                            else -> {}
+                        }
+                    }
+                }
+        }
+
         viewModelScope.launch {
             monitorBackupFolder()
                 .catch { Timber.w("Exception monitoring backups folder: $it") }
@@ -412,6 +469,14 @@ class ManagerViewModel @Inject constructor(
         viewModelScope.launch {
             val androidSyncEnabled =
                 getFeatureFlagValueUseCase(AppFeatures.AndroidSync)
+
+            _state.update {
+                it.copy(
+                    isCallUnlimitedProPlanFeatureFlagEnabled = getFeatureFlagValueUseCase(
+                        AppFeatures.CallUnlimitedProPlan
+                    )
+                )
+            }
 
             if (androidSyncEnabled) {
                 monitorSyncsUseCase().catch { Timber.e(it) }.collect { syncFolders ->
@@ -465,7 +530,6 @@ class ManagerViewModel @Inject constructor(
 
     private suspend fun getEnabledFeatures(): Set<Feature> {
         return setOfNotNull(
-            AppFeatures.QRCodeCompose.takeIf { getFeatureFlagValueUseCase(it) },
             ABTestFeatures.dmca.takeIf { getFeatureFlagValueUseCase(it) },
         )
     }
@@ -526,20 +590,6 @@ class ManagerViewModel @Inject constructor(
         _state.update { it.copy(nodeUpdateReceived = update) }
     }
 
-    private val _numUnreadUserAlerts = MutableStateFlow(
-        Pair(
-            UnreadUserAlertsCheckType.NOTIFICATIONS_TITLE,
-            0
-        )
-    )
-
-    private val legacyNumUnreadUserAlerts = SingleLiveEvent<Pair<UnreadUserAlertsCheckType, Int>>()
-
-    /**
-     * The number of unread user alerts
-     */
-    val numUnreadUserAlerts = _numUnreadUserAlerts.asStateFlow()
-
     /**
      * Notifies about the number of unread user alerts once.
      *
@@ -553,8 +603,19 @@ class ManagerViewModel @Inject constructor(
      */
     fun checkNumUnreadUserAlerts(type: UnreadUserAlertsCheckType) {
         viewModelScope.launch {
-            _numUnreadUserAlerts.update { Pair(type, getNumUnreadUserAlertsUseCase()) }
-            legacyNumUnreadUserAlerts.value = Pair(type, getNumUnreadUserAlertsUseCase())
+            runCatching {
+                val promoNotificationCount =
+                    if (getFeatureFlagValueUseCase(AppFeatures.PromoNotifications))
+                        getNumUnreadPromoNotificationsUseCase()
+                    else
+                        0
+                val totalCount =
+                    getNumUnreadUserAlertsUseCase() + promoNotificationCount
+                _numUnreadUserAlerts.update { Pair(type, totalCount) }
+                legacyNumUnreadUserAlerts.value = Pair(type, totalCount)
+            }.onFailure {
+                Timber.e("Failed to get the number of unread user alerts or promo notifications with error: $it")
+            }
         }
     }
 
@@ -677,6 +738,23 @@ class ManagerViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isPushNotificationSettingsUpdatedEvent = false) }
         }
+    }
+
+    /**
+     * Consume show free plan participants limit dialog event
+     *
+     */
+    fun onConsumeShowFreePlanParticipantsLimitDialogEvent() {
+        setUsersCallLimitReminderDisabled()
+        _state.update { state -> state.copy(callEndedDueToFreePlanLimits = false) }
+    }
+
+    /**
+     * Consume ShouldUpgradeToProPlan
+     *
+     */
+    fun onConsumeShouldUpgradeToProPlan() {
+        _state.update { state -> state.copy(shouldUpgradeToProPlan = false) }
     }
 
     /**
@@ -1008,7 +1086,8 @@ class ManagerViewModel @Inject constructor(
         NodeSourceType.LINKS -> linksParentHandle
         NodeSourceType.RUBBISH_BIN -> rubbishBinParentHandle
         NodeSourceType.BACKUPS -> backupsParentHandle
-        NodeSourceType.HOME, NodeSourceType.OTHER -> getRootNodeUseCase()?.id?.longValue ?: MegaApiJava.INVALID_HANDLE
+        NodeSourceType.HOME, NodeSourceType.OTHER -> getRootNodeUseCase()?.id?.longValue
+            ?: MegaApiJava.INVALID_HANDLE
     }
 
     /**
@@ -1229,6 +1308,26 @@ class ManagerViewModel @Inject constructor(
      */
     fun setDeviceCenterPreviousBottomNavigationItem(previousItem: Int?) {
         _state.update { it.copy(deviceCenterPreviousBottomNavigationItem = previousItem) }
+    }
+
+    /**
+     * Check users call limit reminders
+     */
+    private fun checkUsersCallLimitReminders() {
+        viewModelScope.launch {
+            getUsersCallLimitRemindersUseCase().collectLatest { result ->
+                _state.update { it.copy(usersCallLimitReminders = result) }
+            }
+        }
+    }
+
+    /**
+     * Disable users call limit reminder
+     */
+    private fun setUsersCallLimitReminderDisabled() = viewModelScope.launch {
+        runCatching {
+            setUsersCallLimitRemindersUseCase(UsersCallLimitReminders.Disabled)
+        }
     }
 
     internal companion object {

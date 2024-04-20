@@ -14,15 +14,18 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
+import mega.privacy.android.app.presentation.meeting.chat.model.messages.actions.MessageActionGroup
 import mega.privacy.android.app.presentation.meeting.chat.view.message.attachment.NodeAttachmentMessageViewModel
 import mega.privacy.android.core.ui.controls.layouts.LocalSnackBarHostState
+import mega.privacy.android.core.ui.controls.lists.MenuActionListTile
 import mega.privacy.android.core.ui.model.MenuActionWithClick
 import mega.privacy.android.domain.entity.chat.messages.NodeAttachmentMessage
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.legacy.core.ui.controls.controlssliders.MegaSwitch
-import mega.privacy.android.legacy.core.ui.controls.lists.MenuActionListTile
+import mega.privacy.mobile.analytics.event.ChatConversationAvailableOfflineActionMenuItemEvent
 import timber.log.Timber
 
 internal const val OFFLINE_SWITCH_TEST_TAG = "available_offline_message_option:offline_switch"
@@ -31,11 +34,12 @@ internal class AvailableOfflineMessageAction(
     private val chatViewModel: ChatViewModel,
 ) : MessageAction(
     text = R.string.file_properties_available_offline,
-    icon = mega.privacy.android.icon.pack.R.drawable.ic_menu_available_offline,
+    icon = mega.privacy.android.icon.pack.R.drawable.ic_arrow_down_circle_medium_regular_outline,
     testTag = "available_offline",
+    group = MessageActionGroup.Transfer,
 ) {
-    override fun appliesTo(messages: Set<TypedMessage>) =
-        messages.size == 1 && messages.first() is NodeAttachmentMessage
+    override fun shouldDisplayFor(messages: Set<TypedMessage>) =
+        messages.size == 1 && messages.first().let { it is NodeAttachmentMessage && it.exists }
 
     override fun bottomSheetItem(
         message: TypedMessage,
@@ -53,6 +57,7 @@ internal class AvailableOfflineMessageAction(
             modifier = Modifier
                 .testTag(bottomSheetItemTestTag)
                 .clickable(onClick = onClick),
+            dividerType = null,
             trailingItem = {
                 MegaSwitch(
                     modifier = Modifier
@@ -72,6 +77,7 @@ internal class AvailableOfflineMessageAction(
 
     @Composable
     override fun OnTrigger(messages: Set<TypedMessage>, onHandled: () -> Unit) {
+        Analytics.tracker.trackEvent(ChatConversationAvailableOfflineActionMenuItemEvent)
         val snackbarHostState = LocalSnackBarHostState.current
         val removeMessage = stringResource(id = R.string.file_removed_offline)
         val viewModel = hiltViewModel<NodeAttachmentMessageViewModel>()

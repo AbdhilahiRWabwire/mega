@@ -5,8 +5,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.palm.composestateevents.consumed
+import de.palm.composestateevents.triggered
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -14,21 +15,32 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.app.extensions.updateItemAt
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.data.NodeUIItem
+import mega.privacy.android.app.presentation.search.mapper.DateFilterOptionStringMapper
 import mega.privacy.android.app.presentation.search.mapper.EmptySearchViewMapper
 import mega.privacy.android.app.presentation.search.mapper.SearchFilterMapper
+import mega.privacy.android.app.presentation.search.mapper.TypeFilterOptionStringMapper
+import mega.privacy.android.app.presentation.search.mapper.TypeFilterToSearchMapper
+import mega.privacy.android.app.presentation.search.model.FilterOptionEntity
 import mega.privacy.android.app.presentation.search.model.SearchActivityState
 import mega.privacy.android.app.presentation.search.model.SearchFilter
-import mega.privacy.android.domain.entity.node.TypedNode
-import mega.privacy.android.domain.entity.preference.ViewType
-import mega.privacy.android.domain.entity.search.SearchCategory
+import mega.privacy.android.app.presentation.search.navigation.DATE_ADDED
+import mega.privacy.android.app.presentation.search.navigation.DATE_MODIFIED
+import mega.privacy.android.app.presentation.search.navigation.TYPE
 import mega.privacy.android.domain.entity.node.NodeSourceType
 import mega.privacy.android.domain.entity.node.NodeSourceType.OTHER
+import mega.privacy.android.domain.entity.node.TypedNode
+import mega.privacy.android.domain.entity.preference.ViewType
+import mega.privacy.android.domain.entity.search.DateFilterOption
+import mega.privacy.android.domain.entity.search.SearchCategory
+import mega.privacy.android.domain.entity.search.TypeFilterOption
 import mega.privacy.android.domain.usecase.GetCloudSortOrder
 import mega.privacy.android.domain.usecase.canceltoken.CancelCancelTokenUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
+import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.search.GetSearchCategoriesUseCase
 import mega.privacy.android.domain.usecase.search.SearchNodesUseCase
 import mega.privacy.android.domain.usecase.viewtype.MonitorViewType
@@ -36,13 +48,16 @@ import mega.privacy.android.domain.usecase.viewtype.SetViewType
 import nz.mega.sdk.MegaApiJava
 import timber.log.Timber
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * SearchActivity View Model
+ * @property getFeatureFlagValueUseCase [GetFeatureFlagValueUseCase]
  * @property monitorNodeUpdatesUseCase [MonitorNodeUpdatesUseCase]
  * @property searchNodesUseCase [SearchNodesUseCase]
  * @property getSearchCategoriesUseCase [GetSearchCategoriesUseCase]
  * @property searchFilterMapper [SearchFilterMapper]
+ * @property typeFilterToSearchMapper [TypeFilterToSearchMapper]
  * @property emptySearchViewMapper [EmptySearchViewMapper]
  * @property cancelCancelTokenUseCase [CancelCancelTokenUseCase]
  * @property setViewType [SetViewType]
@@ -52,10 +67,14 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class SearchActivityViewModel @Inject constructor(
+    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase,
     private val searchNodesUseCase: SearchNodesUseCase,
     private val getSearchCategoriesUseCase: GetSearchCategoriesUseCase,
     private val searchFilterMapper: SearchFilterMapper,
+    private val typeFilterToSearchMapper: TypeFilterToSearchMapper,
+    private val typeFilterOptionStringMapper: TypeFilterOptionStringMapper,
+    private val dateFilterOptionStringMapper: DateFilterOptionStringMapper,
     private val emptySearchViewMapper: EmptySearchViewMapper,
     private val cancelCancelTokenUseCase: CancelCancelTokenUseCase,
     private val setViewType: SetViewType,
@@ -73,10 +92,6 @@ class SearchActivityViewModel @Inject constructor(
      * public UI State
      */
     val state: StateFlow<SearchActivityState> = _state
-
-    /**
-     * Search job
-     */
     private var searchJob: Job? = null
 
     private val isFirstLevel = stateHandle.get<Boolean>(SearchActivity.IS_FIRST_LEVEL) ?: false
@@ -86,24 +101,47 @@ class SearchActivityViewModel @Inject constructor(
         stateHandle.get<Long>(SearchActivity.PARENT_HANDLE) ?: MegaApiJava.INVALID_HANDLE
 
     init {
+        checkDropdownChipsFlag()
         monitorNodeUpdatesForSearch()
         initializeSearch()
         checkViewType()
     }
 
-    private fun initializeSearch() {
-        _state.update { it.copy(nodeSourceType = nodeSourceType) }
-        runCatching {
-            getSearchCategoriesUseCase().map { searchFilterMapper(it) }
-                .filterNot { it.filter == SearchCategory.ALL }
-        }.onSuccess { filters ->
-            _state.update {
-                it.copy(filters = filters, selectedFilter = null)
+    private fun checkDropdownChipsFlag() {
+        viewModelScope.launch {
+            runCatching {
+                getFeatureFlagValueUseCase(AppFeatures.DropdownChips)
+            }.onSuccess { flag ->
+                _state.update {
+                    it.copy(dropdownChipsEnabled = flag)
+                }
+            }.onFailure {
+                Timber.e("Get feature flag failed $it")
             }
-        }.onFailure {
-            Timber.e("Get search categories failed $it")
         }
-        performSearch()
+    }
+
+    private fun initializeSearch() {
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    nodeSourceType = nodeSourceType,
+                    typeSelectedFilterOption = null,
+                    dateModifiedSelectedFilterOption = null,
+                    dateAddedSelectedFilterOption = null,
+                )
+            }
+            runCatching {
+                getSearchCategoriesUseCase().map { searchFilterMapper(it) }
+                    .filterNot { it.filter == SearchCategory.ALL }
+            }.onSuccess { filters ->
+                _state.update {
+                    it.copy(filters = filters, selectedFilter = null)
+                }
+            }.onFailure {
+                Timber.e("Get search categories failed $it")
+            }
+        }
     }
 
 
@@ -120,18 +158,30 @@ class SearchActivityViewModel @Inject constructor(
      * Perform search by entering query or change in search type
      */
     private fun performSearch() {
-        _state.update { it.copy(isSearching = true) }
         searchJob?.cancel()
+        _state.update { it.copy(isSearching = true) }
         searchJob = viewModelScope.launch {
             runCatching {
                 cancelCancelTokenUseCase()
-                searchNodesUseCase(
-                    query = state.value.searchQuery,
-                    parentHandle = parentHandle,
-                    nodeSourceType = nodeSourceType,
-                    isFirstLevel = isFirstLevel,
-                    searchCategory = state.value.selectedFilter?.filter ?: SearchCategory.ALL
-                )
+                if (state.value.dropdownChipsEnabled == true) {
+                    searchNodesUseCase(
+                        query = getCurrentSearchQuery(),
+                        parentHandle = getCurrentParentHandle(),
+                        nodeSourceType = nodeSourceType,
+                        isFirstLevel = isFirstLevel,
+                        searchCategory = typeFilterToSearchMapper(state.value.typeSelectedFilterOption),
+                        modificationDate = state.value.dateModifiedSelectedFilterOption,
+                        creationDate = state.value.dateAddedSelectedFilterOption,
+                    )
+                } else {
+                    searchNodesUseCase(
+                        query = getCurrentSearchQuery(),
+                        parentHandle = getCurrentParentHandle(),
+                        nodeSourceType = nodeSourceType,
+                        isFirstLevel = isFirstLevel,
+                        searchCategory = state.value.selectedFilter?.filter ?: SearchCategory.ALL
+                    )
+                }
             }.onSuccess {
                 onSearchSuccess(it)
             }.onFailure { ex ->
@@ -140,7 +190,17 @@ class SearchActivityViewModel @Inject constructor(
         }
     }
 
+    //If folder is opened from search screen we are setting query as empty
+    private fun getCurrentSearchQuery() =
+        state.value.searchQuery.takeIf { state.value.navigationLevel.isEmpty() }.orEmpty()
+
+    private fun getCurrentParentHandle() =
+        state.value.navigationLevel.lastOrNull()?.first ?: parentHandle
+
     private fun onSearchFailure(ex: Throwable) {
+        if (ex is CancellationException) {
+            return
+        }
         Timber.e(ex)
         val emptyState = getEmptySearchState()
         _state.update {
@@ -152,37 +212,45 @@ class SearchActivityViewModel @Inject constructor(
         }
     }
 
-    private suspend fun onSearchSuccess(searchResults: List<TypedNode>?) =
-        coroutineScope {
-            if (searchResults.isNullOrEmpty()) {
-                val emptyState = getEmptySearchState()
-                _state.update {
-                    it.copy(
-                        searchItemList = emptyList(),
-                        isSearching = false,
-                        emptyState = emptyState
-                    )
-                }
-            } else {
-                val nodeUIItems = searchResults.map { typedNode ->
-                    NodeUIItem(node = typedNode, isSelected = false)
-                }
-                _state.update { state ->
-                    val cloudSortOrder = getCloudSortOrder()
-                    state.copy(
-                        searchItemList = nodeUIItems,
-                        isSearching = false,
-                        sortOrder = cloudSortOrder
-                    )
-                }
+    private suspend fun onSearchSuccess(searchResults: List<TypedNode>?) {
+        if (searchResults.isNullOrEmpty()) {
+            val emptyState = getEmptySearchState()
+            _state.update {
+                it.copy(
+                    searchItemList = emptyList(),
+                    isSearching = false,
+                    emptyState = emptyState
+                )
+            }
+        } else {
+            val nodeUIItems = searchResults.distinctBy { it.id.longValue }.map { typedNode ->
+                NodeUIItem(node = typedNode, isSelected = false)
+            }
+            _state.update { state ->
+                val cloudSortOrder = getCloudSortOrder()
+                state.copy(
+                    searchItemList = nodeUIItems,
+                    isSearching = false,
+                    sortOrder = cloudSortOrder
+                )
             }
         }
+    }
 
-    private fun getEmptySearchState() = emptySearchViewMapper(
-        isSearchChipEnabled = true,
-        category = state.value.selectedFilter?.filter,
-        searchQuery = state.value.searchQuery
-    )
+    private fun getEmptySearchState() =
+        if (state.value.dropdownChipsEnabled == true) {
+            emptySearchViewMapper(
+                isSearchChipEnabled = true,
+                category = typeFilterToSearchMapper(state.value.typeSelectedFilterOption),
+                searchQuery = state.value.searchQuery
+            )
+        } else {
+            emptySearchViewMapper(
+                isSearchChipEnabled = true,
+                category = state.value.selectedFilter?.filter,
+                searchQuery = state.value.searchQuery
+            )
+        }
 
     /**
      * Update search filter on selection
@@ -190,7 +258,11 @@ class SearchActivityViewModel @Inject constructor(
      * @param selectedChip
      */
     fun updateFilter(selectedChip: SearchFilter?) {
-        _state.update { it.copy(selectedFilter = selectedChip.takeIf { selectedChip?.filter != state.value.selectedFilter?.filter }) }
+        _state.update {
+            it.copy(
+                selectedFilter = selectedChip.takeIf { selectedChip?.filter != state.value.selectedFilter?.filter },
+            )
+        }
         viewModelScope.launch { performSearch() }
     }
 
@@ -289,6 +361,42 @@ class SearchActivityViewModel @Inject constructor(
     }
 
     /**
+     * Updates the type filter with the selected option
+     */
+    fun setTypeSelectedFilterOption(typeFilterOption: TypeFilterOption?) {
+        _state.update {
+            it.copy(
+                typeSelectedFilterOption = typeFilterOption,
+            )
+        }
+        viewModelScope.launch { performSearch() }
+    }
+
+    /**
+     * Updates the date modified filter with the selected option
+     */
+    fun setDateModifiedSelectedFilterOption(dateFilterOption: DateFilterOption?) {
+        _state.update {
+            it.copy(
+                dateModifiedSelectedFilterOption = dateFilterOption,
+            )
+        }
+        viewModelScope.launch { performSearch() }
+    }
+
+    /**
+     * Updates the date added filter with the selected option
+     */
+    fun setDateAddedSelectedFilterOption(dateFilterOption: DateFilterOption?) {
+        _state.update {
+            it.copy(
+                dateAddedSelectedFilterOption = dateFilterOption,
+            )
+        }
+        viewModelScope.launch { performSearch() }
+    }
+
+    /**
      * This method will toggle view type
      */
     fun onChangeViewTypeClicked() {
@@ -328,5 +436,96 @@ class SearchActivityViewModel @Inject constructor(
      */
     fun errorMessageShown() {
         _state.update { it.copy(errorMessageId = null) }
+    }
+
+    /**
+     * Get filter options based on filter
+     *
+     * @param filter filter
+     */
+    fun getFilterOptions(filter: String): List<FilterOptionEntity> = when (filter) {
+        TYPE ->
+            TypeFilterOption.entries.map { option ->
+                FilterOptionEntity(
+                    option.ordinal,
+                    typeFilterOptionStringMapper(option),
+                    option == state.value.typeSelectedFilterOption
+                )
+            }
+
+        DATE_MODIFIED ->
+            DateFilterOption.entries.map { option ->
+                FilterOptionEntity(
+                    option.ordinal,
+                    dateFilterOptionStringMapper(option),
+                    option == state.value.dateModifiedSelectedFilterOption
+                )
+            }
+
+        DATE_ADDED -> DateFilterOption.entries.map { option ->
+            FilterOptionEntity(
+                option.ordinal,
+                dateFilterOptionStringMapper(option),
+                option == state.value.dateAddedSelectedFilterOption
+            )
+        }
+
+        else -> emptyList()
+    }
+
+    /**
+     * Update filter entity
+     */
+    fun updateFilterEntity(filter: String, filterOption: FilterOptionEntity) {
+        when (filter) {
+            TYPE -> {
+                val typeOption = TypeFilterOption.entries.getOrNull(filterOption.id)
+                    ?.takeIf { it.ordinal != state.value.typeSelectedFilterOption?.ordinal }
+                setTypeSelectedFilterOption(typeOption)
+            }
+
+            DATE_MODIFIED -> {
+                val dateModifiedOption = DateFilterOption.entries.getOrNull(filterOption.id)
+                    ?.takeIf { it.ordinal != state.value.dateModifiedSelectedFilterOption?.ordinal }
+
+                setDateModifiedSelectedFilterOption(dateModifiedOption)
+            }
+
+            DATE_ADDED -> {
+                val dateAddedOption = DateFilterOption.entries.getOrNull(filterOption.id)
+                    ?.takeIf { it.ordinal != state.value.dateAddedSelectedFilterOption?.ordinal }
+
+                setDateAddedSelectedFilterOption(dateAddedOption)
+            }
+        }
+    }
+
+    /**
+     * Open folder from search screen
+     *
+     * @param folderHandle folder handle
+     * @param name folder name
+     */
+    fun openFolder(folderHandle: Long, name: String) {
+        val list = _state.value.navigationLevel.toMutableList()
+        list.add(Pair(folderHandle, name))
+        _state.update { state ->
+            state.copy(navigationLevel = list)
+        }
+        performSearch()
+    }
+
+    /**
+     * Handle back press
+     *
+     * navigates back to previous folder
+     */
+    fun navigateBack() {
+        val list = _state.value.navigationLevel.toMutableList()
+        list.remove(list.last())
+        _state.update { state ->
+            state.copy(navigationLevel = list)
+        }
+        performSearch()
     }
 }

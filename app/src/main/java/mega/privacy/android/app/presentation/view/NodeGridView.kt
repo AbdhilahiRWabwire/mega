@@ -8,11 +8,15 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
+import mega.privacy.android.feature.sync.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.legacy.core.ui.controls.lists.HeaderViewItem
 
 /**
@@ -33,6 +37,7 @@ This method will show [NodeUIItem] in Grid manner based on span and getting thum
  * @param spanCount the span count of the grid
  * @param showChangeViewType whether to show change view type button
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun <T : TypedNode> NodeGridView(
     nodeUIItems: List<NodeUIItem<T>>,
@@ -51,11 +56,12 @@ fun <T : TypedNode> NodeGridView(
     showChangeViewType: Boolean = true,
     isPublicNode: Boolean = false,
     listContentPadding: PaddingValues = PaddingValues(0.dp),
+    fileTypeIconMapper: FileTypeIconMapper,
 ) {
     LazyVerticalGrid(
         state = gridState,
         columns = GridCells.Fixed(spanCount),
-        modifier = modifier.padding(horizontal = 2.dp),
+        modifier = modifier.padding(horizontal = 2.dp).semantics { testTagsAsResourceId = true },
         verticalArrangement = Arrangement.spacedBy(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         contentPadding = listContentPadding
@@ -95,6 +101,7 @@ fun <T : TypedNode> NodeGridView(
                 onItemClicked = onItemClicked,
                 onLongClick = onLongClick,
                 thumbnailData = ThumbnailRequest(nodeUIItems[it].node.id, isPublicNode),
+                fileTypeIconMapper = fileTypeIconMapper,
             )
         }
     }

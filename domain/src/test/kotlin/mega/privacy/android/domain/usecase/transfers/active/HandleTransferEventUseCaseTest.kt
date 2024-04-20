@@ -1,0 +1,172 @@
+package mega.privacy.android.domain.usecase.transfers.active
+
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
+import mega.privacy.android.domain.entity.transfer.DestinationUriAndSubFolders
+import mega.privacy.android.domain.entity.transfer.Transfer
+import mega.privacy.android.domain.entity.transfer.TransferEvent
+import mega.privacy.android.domain.entity.transfer.TransferType
+import mega.privacy.android.domain.exception.BusinessAccountExpiredMegaException
+import mega.privacy.android.domain.exception.QuotaExceededMegaException
+import mega.privacy.android.domain.repository.TransferRepository
+import mega.privacy.android.domain.usecase.business.BroadcastBusinessAccountExpiredUseCase
+import mega.privacy.android.domain.usecase.transfers.downloads.HandleAvailableOfflineEventUseCase
+import mega.privacy.android.domain.usecase.transfers.overquota.BroadcastTransferOverQuotaUseCase
+import mega.privacy.android.domain.usecase.transfers.sd.GetTransferDestinationUriUseCase
+import mega.privacy.android.domain.usecase.transfers.sd.HandleSDCardEventUseCase
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.MethodSource
+import org.mockito.kotlin.KStubbing
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.reset
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
+
+@ExperimentalCoroutinesApi
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class HandleTransferEventUseCaseTest {
+
+    private lateinit var underTest: HandleTransferEventUseCase
+
+    private val transferRepository = mock<TransferRepository>()
+    private val broadcastBusinessAccountExpiredUseCase =
+        mock<BroadcastBusinessAccountExpiredUseCase>()
+    private val broadcastTransferOverQuotaUseCase = mock<BroadcastTransferOverQuotaUseCase>()
+    private val handleAvailableOfflineEventUseCase = mock<HandleAvailableOfflineEventUseCase>()
+    private val handleSDCardEventUseCase = mock<HandleSDCardEventUseCase>()
+    private val getTransferDestinationUriUseCase = mock<GetTransferDestinationUriUseCase>()
+
+    @BeforeAll
+    fun setUp() {
+        underTest = HandleTransferEventUseCase(
+            transferRepository = transferRepository,
+            broadcastBusinessAccountExpiredUseCase = broadcastBusinessAccountExpiredUseCase,
+            broadcastTransferOverQuotaUseCase = broadcastTransferOverQuotaUseCase,
+            handleAvailableOfflineEventUseCase = handleAvailableOfflineEventUseCase,
+            handleSDCardEventUseCase = handleSDCardEventUseCase,
+            getTransferDestinationUriUseCase = getTransferDestinationUriUseCase,
+        )
+    }
+
+    @BeforeEach
+    fun resetMocks() {
+        reset(
+            transferRepository,
+            broadcastBusinessAccountExpiredUseCase,
+            broadcastTransferOverQuotaUseCase,
+            handleAvailableOfflineEventUseCase,
+            handleSDCardEventUseCase,
+            getTransferDestinationUriUseCase,
+        )
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideStartPauseFinishEvents")
+    fun `test that invoke call insertOrUpdateActiveTransfer with the related transfer when the event is a start, pause, or finish event`(
+        transferEvent: TransferEvent,
+    ) = runTest {
+        underTest.invoke(transferEvent)
+        verify(transferRepository).insertOrUpdateActiveTransfer(transferEvent.transfer)
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideUpdateFinishEvents")
+    fun `test that invoke call updateTransferredBytes with the related transfer when the event is a update or finish event`(
+        transferEvent: TransferEvent,
+    ) = runTest {
+        underTest.invoke(transferEvent)
+        verify(transferRepository).updateTransferredBytes(transferEvent.transfer)
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideFinishEventsWithError")
+    fun `test that invoke call broadcastBusinessAccountExpiredUseCase when the event is a finish event with BusinessAccountExpiredMegaException`(
+        transferEvent: TransferEvent,
+    ) = runTest {
+        underTest.invoke(transferEvent)
+        verify(broadcastBusinessAccountExpiredUseCase).invoke()
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideQuotaExceededMegaExceptionTemporaryErrorEvents")
+    fun `test that broadcastTransferOverQuotaUseCase is invoked when a QuotaExceededMegaException is received as a temporal error`(
+        transferEvent: TransferEvent,
+    ) = runTest {
+        underTest.invoke(transferEvent)
+        verify(broadcastTransferOverQuotaUseCase).invoke(true)
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideFinishEvents")
+    fun `test that invoke call addCompletedTransfer when the event is a finish event`(
+        transferEvent: TransferEvent.TransferFinishEvent,
+    ) = runTest {
+        underTest.invoke(transferEvent)
+        verify(transferRepository).addCompletedTransfer(transferEvent.transfer, transferEvent.error)
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideStartFinishEvents")
+    fun `test that handleSDCardEventUseCase with correct destination is invoked when start and update event is received`(
+        transferEvent: TransferEvent,
+    ) = runTest {
+        val destinationUriAndSubFolders = mock<DestinationUriAndSubFolders>()
+        whenever(getTransferDestinationUriUseCase(transferEvent.transfer)) doReturn destinationUriAndSubFolders
+        underTest.invoke(transferEvent)
+        verify(
+            handleSDCardEventUseCase,
+        ).invoke(transferEvent, destinationUriAndSubFolders)
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideFinishEvents")
+    fun `test that handleAvailableOfflineEventUseCase is invoked when finish event is received`(
+        transferEvent: TransferEvent.TransferFinishEvent,
+    ) = runTest {
+        underTest(transferEvent)
+        verify(handleAvailableOfflineEventUseCase).invoke(transferEvent)
+    }
+
+    private fun provideStartPauseFinishEvents() =
+        provideTransferEvents<TransferEvent.TransferStartEvent>() +
+                provideTransferEvents<TransferEvent.TransferPaused>() +
+                provideTransferEvents<TransferEvent.TransferFinishEvent>()
+
+    private fun provideUpdateFinishEvents() =
+        provideTransferEvents<TransferEvent.TransferUpdateEvent>() +
+                provideTransferEvents<TransferEvent.TransferFinishEvent>()
+
+    private fun provideFinishEvents(): List<TransferEvent.TransferFinishEvent> =
+        provideFinishEventsWithError() +
+                provideTransferEvents()
+
+    private fun provideFinishEventsWithError() =
+        provideTransferEvents<TransferEvent.TransferFinishEvent> {
+            on { this.error }.thenReturn(BusinessAccountExpiredMegaException(1))
+        }
+
+    private fun provideQuotaExceededMegaExceptionTemporaryErrorEvents() =
+        provideTransferEvents<TransferEvent.TransferTemporaryErrorEvent> {
+            on { this.error }.thenReturn(QuotaExceededMegaException(1, value = 1))
+        }
+
+    private fun provideStartFinishEvents() =
+        provideTransferEvents<TransferEvent.TransferStartEvent>() +
+                provideTransferEvents<TransferEvent.TransferFinishEvent>()
+
+
+    private inline fun <reified T : TransferEvent> provideTransferEvents(stubbing: KStubbing<T>.(T) -> Unit = {}) =
+        TransferType.entries.map { transferType ->
+            val transfer = mock<Transfer> {
+                on { this.transferType }.thenReturn(transferType)
+            }
+            mock<T> {
+                on { this.transfer }.thenReturn(transfer)
+                stubbing(it)
+            }
+        }
+}

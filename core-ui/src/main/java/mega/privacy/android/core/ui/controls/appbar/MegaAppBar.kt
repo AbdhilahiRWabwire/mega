@@ -288,6 +288,7 @@ internal fun BaseMegaAppBar(
                     iconId = when (appBarType) {
                         AppBarType.BACK_NAVIGATION -> R.drawable.ic_back
                         AppBarType.MENU -> R.drawable.ic_menu
+                        AppBarType.CLOSE -> R.drawable.ic_universal_close
                         else -> return@Box
                     },
                     modifier = Modifier.testTag(APP_BAR_BACK_BUTTON_TAG),
@@ -359,6 +360,7 @@ internal fun BaseMegaAppBar(
                     iconId = when (appBarType) {
                         AppBarType.BACK_NAVIGATION -> R.drawable.ic_back
                         AppBarType.MENU -> R.drawable.ic_menu
+                        AppBarType.CLOSE -> R.drawable.ic_universal_close
                         else -> return@Box
                     },
                     modifier = Modifier.testTag(APP_BAR_BACK_BUTTON_TAG),
@@ -405,6 +407,11 @@ internal fun BaseMegaAppBar(
     )
 }
 
+/**
+ * Mega App Bar Title Test Tag
+ */
+const val MEGA_APP_BAR_TITLE_TEST_TAG = "mega_app_bar_title:text"
+
 @Composable
 internal fun MegaAppBarTitle(title: String, modifier: Modifier = Modifier, maxLines: Int = 1) =
     Text(
@@ -413,7 +420,7 @@ internal fun MegaAppBarTitle(title: String, modifier: Modifier = Modifier, maxLi
         overflow = TextOverflow.Ellipsis,
         color = LocalMegaAppBarColors.current.titleColor,
         style = MaterialTheme.typography.subtitle1,
-        modifier = modifier
+        modifier = modifier.testTag(MEGA_APP_BAR_TITLE_TEST_TAG)
     )
 
 @Composable
@@ -423,7 +430,7 @@ internal fun MegaAppBarSubTitle(
     maxLines: Int = 1,
 ) = Text(
     text = subtitle,
-    modifier = modifier,
+    modifier = modifier.testTag(TEST_TAG_MEGA_APP_BAR_SUBTITLE),
     color = LocalMegaAppBarColors.current.subtitleColor.takeOrElse { MegaTheme.colors.text.secondary },
     maxLines = maxLines,
     style = MaterialTheme.typography.body4
@@ -435,7 +442,7 @@ internal fun MegaAppBarMarqueeSubTitle(
     modifier: Modifier = Modifier,
 ) = MarqueeText(
     text = subtitle,
-    modifier = modifier,
+    modifier = modifier.testTag(TEST_TAG_MEGA_APP_BAR_SUBTITLE),
     color = LocalMegaAppBarColors.current.subtitleColor.takeOrElse { MegaTheme.colors.text.secondary },
     style = MaterialTheme.typography.body4
 )
@@ -452,7 +459,9 @@ internal fun MegaAppBarTitleAndSubtitle(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            title()
+            Box(modifier = Modifier.weight(1f)) {
+                title()
+            }
             CompositionLocalProvider(
                 LocalContentColor provides MegaTheme.colors.icon.secondary,
                 LocalContentAlpha provides 1f,
@@ -531,6 +540,7 @@ private fun MegaAppBarPreviewWithMarqueeSubtitle() {
 
 internal const val APP_BAR_BACK_BUTTON_TAG = "appbar:button_back"
 internal const val APP_BAR_BADGE = "appbar:text_badge"
+internal const val TEST_TAG_MEGA_APP_BAR_SUBTITLE = "mega_app_bar_subtitle:text"
 
 /**
  * Test Tag App Bar
@@ -550,6 +560,11 @@ enum class AppBarType {
      * Menu
      */
     MENU,
+
+    /**
+     * Close
+     */
+    CLOSE,
 
     /**
      * None

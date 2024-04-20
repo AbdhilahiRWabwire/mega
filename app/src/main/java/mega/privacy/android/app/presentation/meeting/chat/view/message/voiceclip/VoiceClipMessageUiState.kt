@@ -11,13 +11,11 @@ import mega.privacy.android.domain.entity.chat.messages.VoiceClipMessage
  * @property loadProgress The progress of loading.
  * @property timestamp The timestamp text of the voice clip.
  * @property voiceClipMessage The voice clip message.
- * @property isError Whether the voice clip is in error status.
  */
 data class VoiceClipMessageUiState(
     val isPlaying: Boolean = false,
     val playProgress: Progress? = null,
     val loadProgress: Progress? = Progress(0f),
-    val timestamp: String = "--:--",
+    val timestamp: String? = null,
     val voiceClipMessage: VoiceClipMessage? = null,
-    val isError: Boolean = false,
 )

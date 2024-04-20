@@ -59,6 +59,7 @@ import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
@@ -578,8 +579,9 @@ class DefaultTransfersRepositoryTest {
             val transfer = mock<Transfer>()
             val error = mock<MegaException>()
             val expected = mock<CompletedTransfer>()
-            whenever(completedTransferMapper(transfer, error)).thenReturn(expected)
-            underTest.addCompletedTransfer(transfer, error)
+            val path = "path"
+            whenever(completedTransferMapper(transfer, error, path)).thenReturn(expected)
+            underTest.addCompletedTransfer(transfer, error, path)
             verify(megaLocalRoomGateway).addCompletedTransfer(expected)
             verify(appEventGateway).broadcastCompletedTransfer(expected)
         }
@@ -862,6 +864,17 @@ class DefaultTransfersRepositoryTest {
     fun `test that getAllSdTransfers invokes when getAllSdTransfers is called`() = runTest {
         underTest.getAllSdTransfers()
         verify(megaLocalRoomGateway).getAllSdTransfers()
+    }
+
+    @Test
+    fun `test that getSdTransferByTag returns transfer from gateway`() = runTest {
+        val tag = 1
+        val expected = mock<SdTransfer>()
+        whenever(megaLocalRoomGateway.getSdTransferByTag(tag)) doReturn expected
+
+        val actual = underTest.getSdTransferByTag(tag)
+
+        assertThat(actual).isEqualTo(expected)
     }
 
     @Test

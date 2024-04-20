@@ -1,5 +1,6 @@
 package mega.privacy.android.app.imageviewer.dialog
 
+import mega.privacy.android.icon.pack.R as iconPackR
 import android.annotation.SuppressLint
 import android.app.Dialog
 import android.content.Intent
@@ -217,7 +218,7 @@ class ImageBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                 val favoriteText =
                     if (node.isFavourite) R.string.file_properties_unfavourite else R.string.file_properties_favourite
                 val favoriteDrawable =
-                    if (node.isFavourite) R.drawable.ic_remove_favourite else R.drawable.ic_add_favourite
+                    if (node.isFavourite) iconPackR.drawable.ic_heart_broken_medium_regular_outline else iconPackR.drawable.ic_heart_medium_regular_outline
                 optionFavorite.text = getString(favoriteText)
                 optionFavorite.setCompoundDrawablesWithIntrinsicBounds(favoriteDrawable, 0, 0, 0)
                 optionFavorite.setOnClickListener {
@@ -401,7 +402,7 @@ class ImageBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
             val copyAction =
                 if (nodeItem?.isExternalNode == true) R.string.general_import else if (imageItem is ImageItem.ChatNode) R.string.add_to_cloud_node_chat else R.string.context_copy
             val copyDrawable =
-                if (nodeItem?.isExternalNode == true || imageItem is ImageItem.ChatNode) R.drawable.ic_import_to_cloud_white else R.drawable.ic_menu_copy
+                if (nodeItem?.isExternalNode == true || imageItem is ImageItem.ChatNode) R.drawable.ic_cloud_upload_medium_regular_outline else R.drawable.ic_icon_copy_medium_regular_outline
             optionCopy.setCompoundDrawablesWithIntrinsicBounds(copyDrawable, 0, 0, 0)
             optionCopy.text = getString(copyAction)
 
@@ -417,10 +418,10 @@ class ImageBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                 isVisible = imageItem.shouldShowRubbishBinOption()
                 if (nodeItem?.isFromRubbishBin == true) {
                     setText(R.string.general_remove)
-                    setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_remove, 0, 0, 0)
+                    setCompoundDrawablesWithIntrinsicBounds(iconPackR.drawable.ic_x_medium_regular_outline, 0, 0, 0)
                 } else {
                     setText(R.string.context_move_to_trash)
-                    setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_rubbish_bin, 0, 0, 0)
+                    setCompoundDrawablesWithIntrinsicBounds(iconPackR.drawable.ic_trash_medium_regular_outline, 0, 0, 0)
                 }
                 setOnClickListener { showAlertDialog(AlertDialogType.TYPE_RUBBISH_BIN) }
             }

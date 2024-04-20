@@ -55,6 +55,7 @@ import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.dragger.DragToExitSupport
 import mega.privacy.android.app.databinding.ActivityVideoPlayerBinding
 import mega.privacy.android.app.di.mediaplayer.VideoPlayer
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.interfaces.ActionNodeCallback
 import mega.privacy.android.app.listeners.OptionalMegaRequestListenerInterface
 import mega.privacy.android.app.main.FileExplorerActivity
@@ -95,9 +96,11 @@ import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_HANDLE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_MOVE_FROM
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_REBUILD_PLAYLIST
 import mega.privacy.android.app.utils.Constants.INVALID_VALUE
+import mega.privacy.android.app.utils.Constants.LINKS_ADAPTER
 import mega.privacy.android.app.utils.Constants.MEDIA_PLAYER_TOOLBAR_SHOW_HIDE_DURATION_MS
 import mega.privacy.android.app.utils.Constants.NAME
 import mega.privacy.android.app.utils.Constants.OFFLINE_ADAPTER
+import mega.privacy.android.app.utils.Constants.OUTGOING_SHARES_ADAPTER
 import mega.privacy.android.app.utils.Constants.RECENTS_ADAPTER
 import mega.privacy.android.app.utils.Constants.RUBBISH_BIN_ADAPTER
 import mega.privacy.android.app.utils.Constants.SEARCH_ADAPTER
@@ -108,6 +111,7 @@ import mega.privacy.android.app.utils.FileUtil
 import mega.privacy.android.app.utils.LinksUtil
 import mega.privacy.android.app.utils.MegaNodeDialogUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
+import mega.privacy.android.app.utils.MegaNodeUtil.getRootParentNode
 import mega.privacy.android.app.utils.MenuUtils.toggleAllMenuItemsVisibility
 import mega.privacy.android.app.utils.RunOnUIThreadUtils
 import mega.privacy.android.app.utils.Util.isDarkMode
@@ -118,6 +122,7 @@ import mega.privacy.android.domain.entity.mediaplayer.RepeatToggleMode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.exception.BlockedMegaException
 import mega.privacy.android.domain.exception.QuotaExceededMegaException
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.mobile.analytics.event.VideoPlayerGetLinkMenuToolbarEvent
 import mega.privacy.mobile.analytics.event.VideoPlayerInfoMenuItemEvent
 import mega.privacy.mobile.analytics.event.VideoPlayerIsActivatedEvent
@@ -145,6 +150,14 @@ class VideoPlayerActivity : MediaPlayerActivity() {
     @VideoPlayer
     @Inject
     lateinit var mediaPlayerGateway: MediaPlayerGateway
+
+    /**
+     * Inject [GetFeatureFlagValueUseCase] to the Fragment
+     */
+    @Inject
+    lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
+
+    private var isHiddenNodesEnabled: Boolean = false
 
     private lateinit var binding: ActivityVideoPlayerBinding
 
@@ -222,6 +235,13 @@ class VideoPlayerActivity : MediaPlayerActivity() {
         if (adapterType == INVALID_VALUE && rebuildPlaylist) {
             finish()
             return
+        }
+
+        lifecycleScope.launch {
+            runCatching {
+                isHiddenNodesEnabled = getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)
+                invalidateOptionsMenu()
+            }.onFailure { Timber.e(it) }
         }
 
         if (savedInstanceState != null) {
@@ -647,6 +667,42 @@ class VideoPlayerActivity : MediaPlayerActivity() {
                     viewModel.renameUpdate(node = megaApi.getNodeByHandle(playingHandle))
                 }
 
+                R.id.hide -> {
+                    megaApi.getNodeByHandle(playingHandle)?.let { node ->
+                        megaApi.setNodeSensitive(
+                            node,
+                            true,
+                            OptionalMegaRequestListenerInterface(onRequestFinish = { _, error ->
+                                if (error.errorCode == MegaError.API_OK) {
+                                    // Some times checking node.isMarkedSensitive immediately will still
+                                    // get true, so let's add some delay here.
+                                    RunOnUIThreadUtils.runDelay(500L) {
+                                        refreshMenuOptionsVisibility()
+                                    }
+                                }
+                            })
+                        )
+                    }
+                }
+
+                R.id.unhide -> {
+                    megaApi.getNodeByHandle(playingHandle)?.let { node ->
+                        megaApi.setNodeSensitive(
+                            node,
+                            false,
+                            OptionalMegaRequestListenerInterface(onRequestFinish = { _, error ->
+                                if (error.errorCode == MegaError.API_OK) {
+                                    // Some times checking node.isMarkedSensitive immediately will still
+                                    // get true, so let's add some delay here.
+                                    RunOnUIThreadUtils.runDelay(500L) {
+                                        refreshMenuOptionsVisibility()
+                                    }
+                                }
+                            })
+                        )
+                    }
+                }
+
                 R.id.move -> {
                     selectFolderToMoveLauncher.launch(
                         Intent(this, FileExplorerActivity::class.java).apply {
@@ -1010,6 +1066,8 @@ class VideoPlayerActivity : MediaPlayerActivity() {
             R.id.send_to_chat,
             R.id.get_link,
             R.id.remove_link,
+            R.id.hide,
+            R.id.unhide,
             R.id.chat_save_for_offline,
             R.id.rename,
             R.id.move,
@@ -1049,6 +1107,11 @@ class VideoPlayerActivity : MediaPlayerActivity() {
         }
 
         intent.getIntExtra(INTENT_EXTRA_KEY_ADAPTER_TYPE, INVALID_VALUE).let { adapterType ->
+            val isInSharedItems = adapterType in listOf(
+                INCOMING_SHARES_ADAPTER,
+                OUTGOING_SHARES_ADAPTER,
+                LINKS_ADAPTER
+            )
             when (currentFragmentId) {
                 R.id.video_playlist -> {
                     menu.toggleAllMenuItemsVisibility(false)
@@ -1147,6 +1210,22 @@ class VideoPlayerActivity : MediaPlayerActivity() {
                             menu.findItem(R.id.properties).isVisible =
                                 currentFragmentId == R.id.video_main_player
 
+                            val shouldShowHideNode =
+                                isHiddenNodesEnabled
+                                        && !isInSharedItems
+                                        && !megaApi.getRootParentNode(node).isInShare
+                                        && !node.isMarkedSensitive
+
+                            val shouldShowUnhideNode =
+                                isHiddenNodesEnabled
+                                        && !isInSharedItems
+                                        && !megaApi.getRootParentNode(node).isInShare
+                                        && node.isMarkedSensitive
+
+                            menu.findItem(R.id.hide).isVisible = shouldShowHideNode
+
+                            menu.findItem(R.id.unhide).isVisible = shouldShowUnhideNode
+
                             menu.findItem(R.id.share).isVisible =
                                 currentFragmentId == R.id.video_main_player
                                         && MegaNodeUtil.showShareOption(
@@ -1174,6 +1253,8 @@ class VideoPlayerActivity : MediaPlayerActivity() {
                                 -> {
                                     menu.findItem(R.id.rename).isVisible = false
                                     menu.findItem(R.id.move).isVisible = false
+                                    menu.findItem(R.id.hide).isVisible = false
+                                    menu.findItem(R.id.unhide).isVisible = false
                                 }
 
                                 MegaShare.ACCESS_FULL,

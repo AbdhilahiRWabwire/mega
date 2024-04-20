@@ -406,7 +406,6 @@
             android:launchMode="singleTop"
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustNothing" />
-        <activity android:name=".presentation.qrcode.QRCodeActivity" />
         <activity
             android:name=".presentation.qrcode.QRCodeComposeActivity"
             android:configChanges="orientation|screenSize" />
@@ -422,7 +421,7 @@
             android:label="@string/section_photo_sync"
             android:launchMode="singleTop" />
         <activity
-            android:name=".settings.camerauploads.SettingsCameraUploadsComposeActivity"
+            android:name=".presentation.settings.camerauploads.SettingsCameraUploadsComposeActivity"
             android:label="@string/section_photo_sync"
             android:launchMode="singleTop" />
         <activity
@@ -653,11 +652,10 @@
             android:label="@string/choose_account_fragment"
             android:launchMode="singleTop" />
         <activity
-            android:name=".upgradeAccount.payment.PaymentActivity"
-            android:label="@string/payment"
+            android:name=".mediaplayer.SelectSubtitleFileActivity"
             android:launchMode="singleTop" />
         <activity
-            android:name=".mediaplayer.SelectSubtitleFileActivity"
+            android:name=".presentation.videosection.VideoSelectedActivity"
             android:launchMode="singleTop" />
         <activity
             android:name=".activities.settingsActivities.StartScreenPreferencesActivity"
@@ -713,6 +711,13 @@
         <activity
             android:name=".presentation.imagepreview.slideshow.SlideshowActivity"
             android:windowSoftInputMode="stateHidden|adjustResize" />
+        <activity
+            android:name=".presentation.hidenode.HiddenNodesOnboardingActivity"
+            android:label=""
+            android:launchMode="singleTop" />
+        <activity
+            android:name="mega.privacy.android.app.camera.CameraActivity"
+            android:launchMode="singleTop" />
     </application>
 
 </manifest>

@@ -1,7 +1,11 @@
 package mega.privacy.android.app.presentation.meeting.chat.model.messages.header
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.pluralStringResource
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import mega.privacy.android.app.presentation.meeting.chat.model.MessageListViewModel
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.UIMessageState
 import mega.privacy.android.core.R
 import mega.privacy.android.core.ui.controls.chat.ChatUnreadMessageView
@@ -22,13 +26,16 @@ class ChatUnreadHeaderMessage(private val unreadCount: Int) : HeaderMessage() {
         onReactionLongClick: (String, List<UIReaction>) -> Unit,
         onForwardClicked: (TypedMessage) -> Unit,
         onSelectedChanged: (Boolean) -> Unit,
-        onSendErrorClicked: (TypedMessage) -> Unit,
+        onNotSentClick: (TypedMessage) -> Unit,
     ) {
+        val viewModel = hiltViewModel<MessageListViewModel>()
+        val listState by viewModel.state.collectAsStateWithLifecycle()
+        val finalUnreadCount = unreadCount + listState.extraUnreadCount
         ChatUnreadMessageView(
             content = pluralStringResource(
                 id = R.plurals.number_unread_messages,
-                count = unreadCount,
-                "$unreadCount"
+                count = finalUnreadCount,
+                "$finalUnreadCount"
             )
         )
     }

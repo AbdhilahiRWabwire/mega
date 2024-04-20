@@ -10,7 +10,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.count
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -34,10 +33,8 @@ import mega.privacy.android.domain.repository.TransferRepository
 import mega.privacy.android.domain.usecase.canceltoken.CancelCancelTokenUseCase
 import mega.privacy.android.domain.usecase.canceltoken.InvalidateCancelTokenUseCase
 import mega.privacy.android.domain.usecase.transfers.MonitorTransferEventsUseCase
-import mega.privacy.android.domain.usecase.transfers.active.AddOrUpdateActiveTransferUseCase
-import mega.privacy.android.domain.usecase.transfers.sd.HandleSDCardEventUseCase
+import mega.privacy.android.domain.usecase.transfers.active.HandleTransferEventUseCase
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -68,8 +65,7 @@ class DownloadNodesUseCaseTest {
     private val invalidateCancelTokenUseCase: InvalidateCancelTokenUseCase = mock()
     private val fileSystemRepository: FileSystemRepository = mock()
     private val transfer: Transfer = mock()
-    private val addOrUpdateActiveTransferUseCase: AddOrUpdateActiveTransferUseCase = mock()
-    private val handleSDCardEventUseCase: HandleSDCardEventUseCase = mock()
+    private val handleTransferEventUseCase: HandleTransferEventUseCase = mock()
     private val monitorTransferEventsUseCase = mock<MonitorTransferEventsUseCase>()
 
     private lateinit var underTest: DownloadNodesUseCase
@@ -80,8 +76,7 @@ class DownloadNodesUseCaseTest {
             DownloadNodesUseCase(
                 cancelCancelTokenUseCase = cancelCancelTokenUseCase,
                 invalidateCancelTokenUseCase = invalidateCancelTokenUseCase,
-                addOrUpdateActiveTransferUseCase = addOrUpdateActiveTransferUseCase,
-                handleSDCardEventUseCase = handleSDCardEventUseCase,
+                handleTransferEventUseCase = handleTransferEventUseCase,
                 monitorTransferEventsUseCase = monitorTransferEventsUseCase,
                 transferRepository = transferRepository,
                 fileSystemRepository = fileSystemRepository,
@@ -92,8 +87,8 @@ class DownloadNodesUseCaseTest {
     fun resetMocks() {
         reset(
             transferRepository, cancelTokenRepository, fileSystemRepository,
-            addOrUpdateActiveTransferUseCase, fileNode, folderNode, invalidateCancelTokenUseCase,
-            cancelCancelTokenUseCase, transfer, handleSDCardEventUseCase,
+            handleTransferEventUseCase, fileNode, folderNode, invalidateCancelTokenUseCase,
+            cancelCancelTokenUseCase, transfer,
             monitorTransferEventsUseCase,
         )
         commonStub()
@@ -295,37 +290,7 @@ class DownloadNodesUseCaseTest {
                 cancelAndConsumeRemainingEvents()
             }
             verify(
-                addOrUpdateActiveTransferUseCase,
-                Times(nodeIds.size * flow.count())
-            ).invoke(any())
-        }
-
-    @Test
-    fun `test that handleSDCardEventUseCase is invoked when each transfer is updated`() =
-        runTest {
-            whenever(transfer.isFolderTransfer).thenReturn(false)
-            val flow = flowOf(
-                mock<TransferEvent.TransferStartEvent> { on { it.transfer }.thenReturn(transfer) },
-                mock<TransferEvent.TransferUpdateEvent> { on { it.transfer }.thenReturn(transfer) },
-                mock<TransferEvent.TransferFinishEvent> { on { it.transfer }.thenReturn(transfer) },
-            )
-            fileNodes.forEach {
-                whenever(
-                    transferRepository.startDownload(
-                        it, DESTINATION_PATH_FOLDER, null, false,
-                    )
-                ).thenReturn(flow)
-            }
-            underTest(
-                fileNodes,
-                DESTINATION_PATH_FOLDER,
-                null,
-                false
-            ).filterIsInstance<MultiTransferEvent.SingleTransferEvent>().test {
-                cancelAndConsumeRemainingEvents()
-            }
-            verify(
-                handleSDCardEventUseCase,
+                handleTransferEventUseCase,
                 Times(nodeIds.size * flow.count())
             ).invoke(any())
         }
@@ -361,7 +326,6 @@ class DownloadNodesUseCaseTest {
                 false
             )
                 .filterIsInstance<MultiTransferEvent.SingleTransferEvent>()
-                .filter { it.isFinishScanningEvent }
                 .test {
                     nodeIds.forEach {
                         assertThat(awaitItem().transferEvent.transfer.nodeHandle).isEqualTo(it.longValue)
@@ -380,7 +344,7 @@ class DownloadNodesUseCaseTest {
 
             underTest(fileAndFolderNodes, DESTINATION_PATH_FOLDER, null, false).test {
                 assertThat(cancelAndConsumeRemainingEvents().mapNotNull { event ->
-                    (event as? Event.Item)?.value?.takeIf { it is MultiTransferEvent.ScanningFoldersFinished }
+                    (event as? Event.Item)?.value?.takeIf { (it as? MultiTransferEvent.SingleTransferEvent)?.scanningFinished == true }
                 }).hasSize(1)
             }
         }
@@ -422,7 +386,7 @@ class DownloadNodesUseCaseTest {
 
             underTest(fileAndFolderNodes, DESTINATION_PATH_FOLDER, null, false).test {
                 assertThat(cancelAndConsumeRemainingEvents().mapNotNull { event ->
-                    (event as? Event.Item)?.value?.takeIf { it is MultiTransferEvent.ScanningFoldersFinished }
+                    (event as? Event.Item)?.value?.takeIf { (it as? MultiTransferEvent.SingleTransferEvent)?.scanningFinished == true }
                 }).hasSize(1)
             }
         }
@@ -475,11 +439,9 @@ class DownloadNodesUseCaseTest {
 
                 //verify it's received if corresponds
                 if (childTransferEvent) {
-                    verify(handleSDCardEventUseCase)(globalEvent)
-                    verify(addOrUpdateActiveTransferUseCase)(globalEvent)
+                    verify(handleTransferEventUseCase)(globalEvent)
                 } else {
-                    verify(handleSDCardEventUseCase, times(0))(globalEvent)
-                    verify(addOrUpdateActiveTransferUseCase, times(0))(globalEvent)
+                    verify(handleTransferEventUseCase, times(0))(globalEvent)
                 }
                 cancelAndIgnoreRemainingEvents()
             }
@@ -508,7 +470,7 @@ class DownloadNodesUseCaseTest {
 
             underTest(fileNodes, DESTINATION_PATH_FOLDER, null, false).test {
                 assertThat(cancelAndConsumeRemainingEvents().mapNotNull { event ->
-                    (event as? Event.Item)?.value?.takeIf { it is MultiTransferEvent.ScanningFoldersFinished }
+                    (event as? Event.Item)?.value?.takeIf { (it as? MultiTransferEvent.SingleTransferEvent)?.scanningFinished == true }
                 }).isEmpty()
             }
         }

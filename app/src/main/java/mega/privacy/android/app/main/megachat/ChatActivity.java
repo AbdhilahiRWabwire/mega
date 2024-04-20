@@ -421,6 +421,7 @@ import mega.privacy.android.domain.entity.contacts.ContactLink;
 import mega.privacy.android.domain.entity.meeting.ScheduledMeetingStatus;
 import mega.privacy.android.domain.usecase.GetPushToken;
 import mega.privacy.android.domain.usecase.permisison.HasMediaPermissionUseCase;
+import mega.privacy.mobile.analytics.event.ChatConversationAddAttachmentButtonPressedEvent;
 import mega.privacy.mobile.analytics.event.ChatConversationAddParticipantsMenuToolbarEvent;
 import mega.privacy.mobile.analytics.event.ChatConversationAddToCloudDriveActionMenuEvent;
 import mega.privacy.mobile.analytics.event.ChatConversationArchiveMenuToolbarEvent;
@@ -2362,7 +2363,7 @@ public class ChatActivity extends PasscodeActivity
         sendIcon.setVisibility(View.GONE);
         sendIcon.setEnabled(false);
         emojiKeyboard.changeKeyboardIcon();
-        sendIcon.setImageDrawable(ColorUtils.tintIcon(chatActivity, R.drawable.ic_send_white, R.color.grey_054_white_054));
+        sendIcon.setImageDrawable(ColorUtils.tintIcon(chatActivity, mega.privacy.android.icon.pack.R.drawable.ic_send_horizontal_medium_regular_outline, R.color.grey_054_white_054));
 
         if (chatRoom != null) {
             megaChatApi.sendStopTypingNotification(chatRoom.getChatId());
@@ -3572,7 +3573,7 @@ public class ChatActivity extends PasscodeActivity
         if (editingMessage) {
             sendIcon.setImageResource(mega.privacy.android.core.R.drawable.ic_select_folder);
         } else {
-            sendIcon.setImageDrawable(ColorUtils.tintIcon(chatActivity, R.drawable.ic_send_white,
+            sendIcon.setImageDrawable(ColorUtils.tintIcon(chatActivity, mega.privacy.android.icon.pack.R.drawable.ic_send_horizontal_medium_regular_outline,
                     ColorUtils.getThemeColor(this, android.R.attr.colorAccent)));
         }
 
@@ -3605,7 +3606,7 @@ public class ChatActivity extends PasscodeActivity
 
             recordButton.activateOnTouchListener(false);
             recordButton.activateOnClickListener(true);
-            recordButton.setImageDrawable(ColorUtils.tintIcon(chatActivity, R.drawable.ic_send_white,
+            recordButton.setImageDrawable(ColorUtils.tintIcon(chatActivity, mega.privacy.android.icon.pack.R.drawable.ic_send_horizontal_medium_regular_outline,
                     ColorUtils.getThemeColor(this, android.R.attr.colorAccent)));
         }
     }
@@ -3802,9 +3803,9 @@ public class ChatActivity extends PasscodeActivity
         enable = enable && viewModel.shouldEnableCallOption();
         int idColor = enable ? R.color.grey_087_white_087 : R.color.grey_054_white_054;
         callMenuItem.setEnabled(enable);
-        callMenuItem.setIcon(mutateIcon(this, R.drawable.ic_phone_white, idColor));
+        callMenuItem.setIcon(mutateIcon(this, mega.privacy.android.icon.pack.R.drawable.ic_phone_01_medium_regular_outline, idColor));
         videoMenuItem.setEnabled(enable);
-        videoMenuItem.setIcon(mutateIcon(this, R.drawable.ic_videocam_white, idColor));
+        videoMenuItem.setIcon(mutateIcon(this, R.drawable.ic_video_medium_regular_outline, idColor));
     }
 
     /**
@@ -4552,6 +4553,7 @@ public class ChatActivity extends PasscodeActivity
             textChat.setText("", TextView.BufferType.EDITABLE);
             controlExpandableInputText(1);
         } else if (id == R.id.more_options_rl) {
+            Analytics.INSTANCE.getTracker().trackEvent(ChatConversationAddAttachmentButtonPressedEvent.INSTANCE);
             showChatRoomToolbarByPanel();
         } else if (id == R.id.cancel_edit) {
             editingMessage = false;

@@ -380,13 +380,6 @@ interface AccountRepository {
     suspend fun upgradeSecurity()
 
     /**
-     * Sets the secure share flag to true or false
-     *
-     * @param enable : Boolean
-     */
-    suspend fun setSecureFlag(enable: Boolean)
-
-    /**
      * Monitor update upgrade security events set in app
      *
      * @return
@@ -610,4 +603,37 @@ interface AccountRepository {
      * Monitors update user's data broadcast.
      */
     fun monitorUpdateUserData(): Flow<Unit>
+
+    /**
+     * Get last registered email
+     * @return [Boolean]
+     */
+    suspend fun getLastRegisteredEmail(): String?
+
+    /**
+     * Save last registered email
+     * @param email [String]
+     */
+    suspend fun saveLastRegisteredEmail(email: String)
+
+    /**
+     * Clear last registered email
+     */
+    suspend fun clearLastRegisteredEmail()
+
+    /**
+     * Retrieves information on the Account Cancellation Link
+     *
+     * @param accountCancellationLink The Account Cancellation Link to be queried
+     * @return the Account Cancellation Link if there are no issues found during the querying process
+     */
+    suspend fun queryCancelLink(accountCancellationLink: String): String
+
+    /**
+     * Retrieves information on the Change Email Link
+     *
+     * @param changeEmailLink The Change Email Link to be queried
+     * @return The Change Email Link if there are no issues found during the querying process
+     */
+    suspend fun queryChangeEmailLink(changeEmailLink: String): String
 }

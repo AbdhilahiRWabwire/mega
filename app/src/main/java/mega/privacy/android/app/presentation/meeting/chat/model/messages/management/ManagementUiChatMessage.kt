@@ -38,23 +38,22 @@ abstract class ManagementUiChatMessage : UiChatMessage {
         onReactionLongClick: (String, List<UIReaction>) -> Unit,
         onForwardClicked: (TypedMessage) -> Unit,
         onSelectedChanged: (Boolean) -> Unit,
-        onSendErrorClicked: (TypedMessage) -> Unit,
+        onNotSentClick: (TypedMessage) -> Unit,
     ) {
         ChatMessageContainer(
-            modifier = Modifier.fillMaxWidth(),
             isMine = displayAsMine,
             showForwardIcon = shouldDisplayForwardIcon,
             reactions = reactions,
             onMoreReactionsClick = { onMoreReactionsClicked(id) },
             onReactionClick = { onReactionClicked(id, it, reactions) },
-            onForwardClicked = { onForwardClicked(message) },
             onReactionLongClick = { onReactionLongClick(it, reactions) },
-            content = { _ -> contentComposable() },
+            onForwardClicked = { onForwardClicked(message) },
+            modifier = Modifier.fillMaxWidth(),
             onSelectionChanged = onSelectedChanged,
             avatarOrIcon = { modifier ->
                 Spacer(modifier = modifier)
             }
-        )
+        ) { _ -> contentComposable() }
     }
 
     override val shouldDisplayForwardIcon = false

@@ -1,6 +1,6 @@
 package mega.privacy.android.legacy.core.ui.controls.lists
 
-import mega.privacy.android.icon.pack.R as iconPackR
+import mega.privacy.android.icon.pack.R as IconPackR
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -44,6 +44,7 @@ import androidx.constraintlayout.compose.Visibility
 import mega.privacy.android.core.R
 import mega.privacy.android.core.ui.controls.images.ThumbnailView
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.core.ui.theme.extensions.color_button_brand
 import mega.privacy.android.core.ui.theme.extensions.red_800_red_400
 import mega.privacy.android.core.ui.theme.extensions.textColorPrimary
 import mega.privacy.android.core.ui.theme.extensions.textColorSecondary
@@ -261,6 +262,7 @@ fun NodeListViewItem(
                                 if (showMenuButton) Visibility.Visible else Visibility.Gone
                         }
                         .clickable { onMenuClick() }
+                        .testTag(MORE_ICON_TEST_TAG)
                 )
 
                 Row(
@@ -280,7 +282,8 @@ fun NodeListViewItem(
 
                     MiddleEllipsisText(
                         text = name,
-                        modifier = Modifier.widthIn(max = if (isScreenOrientationLandscape()) 275.dp else 190.dp),
+                        modifier = Modifier.widthIn(max = if (isScreenOrientationLandscape()) 275.dp else 190.dp)
+                            .testTag(NODE_TITLE_TEXT_TEST_TAG),
                         style = MaterialTheme.typography.subtitle1,
                         color = if (isTakenDown || isUnverifiedShare) MaterialTheme.colors.red_800_red_400 else MaterialTheme.colors.textColorPrimary,
                     )
@@ -290,7 +293,7 @@ fun NodeListViewItem(
                                 .size(10.dp)
                                 .background(
                                     shape = CircleShape, color = it
-                                )
+                                ).testTag(LABEL_TEST_TAG)
                         ) {}
                     }
                     if (isFavourite) {
@@ -309,7 +312,7 @@ fun NodeListViewItem(
                             modifier = iconModifier
                                 .size(16.dp)
                                 .testTag(EXPORTED_TEST_TAG),
-                            painter = painterResource(id = R.drawable.link_ic),
+                            painter = painterResource(id = IconPackR.drawable.ic_link01_medium_regular_outline),
                             contentDescription = "Link",
                             colorFilter = ColorFilter.tint(
                                 MaterialTheme.colors.textColorSecondary
@@ -321,8 +324,9 @@ fun NodeListViewItem(
                             alignment = Alignment.Center,
                             modifier = iconModifier
                                 .testTag(TAKEN_TEST_TAG),
-                            painter = painterResource(id = R.drawable.ic_taken_down),
+                            painter = painterResource(id = IconPackR.drawable.ic_alert_triangle_medium_regular_outline),
                             contentDescription = "Taken Down",
+                            colorFilter = ColorFilter.tint(color = MaterialTheme.colors.color_button_brand)
                         )
                     }
                 }
@@ -379,7 +383,8 @@ fun NodeListViewItem(
                                 visibility = Visibility.Visible
                             }
                             .padding(end = 4.dp)
-                            .size(21.dp),
+                            .size(21.dp)
+                            .testTag(SHARES_ICON_TEST_TAG),
                         colorFilter = ColorFilter.tint(
                             MaterialTheme.colors.textColorSecondary
                         ),
@@ -394,7 +399,7 @@ fun NodeListViewItem(
                             end.linkTo(threeDots.start)
                             visibility =
                                 if (nodeAvailableOffline) Visibility.Visible else Visibility.Gone
-                        },
+                        }.testTag(AVAILABLE_OFFLINE_ICON_TEST_TAG),
                     colorFilter = ColorFilter.tint(
                         MaterialTheme.colors.textColorSecondary
                     ),
@@ -410,6 +415,21 @@ fun NodeListViewItem(
  * Test tag for info text
  */
 const val INFO_TEXT_TEST_TAG = "node_list_view_item:text_info"
+
+/**
+ * Test tag for shares text
+ */
+const val SHARES_ICON_TEST_TAG = "node_list_view_item:shares_icon"
+
+/**
+ * Test tag for available offline
+ */
+const val AVAILABLE_OFFLINE_ICON_TEST_TAG = "node_list_view_item:available_offline"
+
+/**
+ * Test tag for node title
+ */
+const val NODE_TITLE_TEXT_TEST_TAG = "node_list_view_item:node_title"
 
 /**
  * Text tag for selected item
@@ -451,6 +471,16 @@ const val VERIFIED_TEST_TAG = "node_list_view_item:icon_verified"
  */
 const val INFO_ICON_TEST_TAG = "node_list_view_item:icon_info_icon"
 
+/**
+ * Test tag for more icon
+ */
+const val MORE_ICON_TEST_TAG = "node_list_view_item:more_icon"
+
+/**
+ * Test tag for the label
+ */
+const val LABEL_TEST_TAG = "node_list_view_item:label"
+
 
 @CombinedThemePreviews
 @Composable
@@ -463,7 +493,7 @@ private fun FilePreview() {
             modifier = Modifier,
             isSelected = false,
             folderInfo = null,
-            icon = iconPackR.drawable.ic_pdf_list,
+            icon = IconPackR.drawable.ic_pdf_medium_solid,
             fileSize = "1.2 MB",
             modifiedDate = "Dec 29, 2022",
             name = "documentation.pdf",
@@ -489,7 +519,7 @@ private fun FolderPreview() {
             modifier = Modifier,
             isSelected = false,
             folderInfo = "Empty Folder",
-            icon = R.drawable.ic_folder_list,
+            icon = IconPackR.drawable.ic_folder_medium_solid,
             sharesIcon = R.drawable.ic_alert_triangle,
             fileSize = "1.2 MB",
             modifiedDate = "Dec 29, 2022",

@@ -5,6 +5,7 @@
 
 package mega.privacy.android.app.presentation.imagepreview.view
 
+import mega.privacy.android.icon.pack.R as iconPackR
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -86,6 +87,7 @@ import mega.privacy.android.core.ui.theme.teal_300
 import mega.privacy.android.core.ui.theme.tokens.TextColor
 import mega.privacy.android.core.ui.theme.white
 import mega.privacy.android.domain.entity.VideoFileTypeInfo
+import mega.privacy.android.domain.entity.account.AccountDetail
 import mega.privacy.android.domain.entity.imageviewer.ImageResult
 import mega.privacy.android.domain.entity.node.ImageNode
 
@@ -106,6 +108,9 @@ internal fun ImagePreviewScreen(
     onClickSendTo: (ImageNode) -> Unit = {},
     onClickShare: (ImageNode) -> Unit = {},
     onClickRename: (ImageNode) -> Unit = {},
+    onClickHide: (ImageNode, AccountDetail?, Boolean?) -> Unit = { _, _, _ -> },
+    onClickHideHelp: () -> Unit = {},
+    onClickUnhide: (ImageNode) -> Unit = {},
     onClickMove: (ImageNode) -> Unit = {},
     onClickCopy: (ImageNode) -> Unit = {},
     onClickRestore: (ImageNode) -> Unit = {},
@@ -122,6 +127,8 @@ internal fun ImagePreviewScreen(
     }
 
     val currentImageNodeIndex = viewState.currentImageNodeIndex
+    val accountDetail = viewState.accountDetail
+    val isHiddenNodesOnboarded = viewState.isHiddenNodesOnboarded
     viewState.currentImageNode?.let { currentImageNode ->
         val isCurrentImageNodeAvailableOffline = viewState.isCurrentImageNodeAvailableOffline
         var showRemoveLinkDialog by rememberSaveable { mutableStateOf(false) }
@@ -285,12 +292,14 @@ internal fun ImagePreviewScreen(
                             ImagePreviewTopBar(
                                 imageNode = imageNode,
                                 showSlideshowMenu = viewModel::isSlideshowMenuVisible,
+                                showForwardMenu = viewModel::isForwardMenuVisible,
                                 showSaveToDeviceMenu = viewModel::isSaveToDeviceMenuVisible,
                                 showManageLinkMenu = viewModel::isGetLinkMenuVisible,
                                 showSendToMenu = viewModel::isSendToChatMenuVisible,
                                 showMoreMenu = viewModel::isMoreMenuVisible,
                                 onClickBack = onClickBack,
                                 onClickSlideshow = onClickSlideshow,
+                                onClickForward = { onClickSendTo(imageNode) },
                                 onClickSaveToDevice = { onClickSaveToDevice(imageNode) },
                                 onClickGetLink = { onClickGetLink(imageNode) },
                                 onClickSendTo = { onClickSendTo(imageNode) },
@@ -326,6 +335,8 @@ internal fun ImagePreviewScreen(
                     modalSheetState = modalSheetState,
                     imageNode = currentImageNode,
                     isAvailableOffline = isCurrentImageNodeAvailableOffline,
+                    accountDetail = accountDetail,
+                    isHiddenNodesOnboarded = isHiddenNodesOnboarded,
                     showInfoMenu = viewModel::isInfoMenuVisible,
                     showFavouriteMenu = viewModel::isFavouriteMenuVisible,
                     showLabelMenu = viewModel::isLabelMenuVisible,
@@ -338,6 +349,8 @@ internal fun ImagePreviewScreen(
                     showSendToChatMenu = viewModel::isSendToChatMenuVisible,
                     showShareMenu = viewModel::isShareMenuVisible,
                     showRenameMenu = viewModel::isRenameMenuVisible,
+                    showHideMenu = viewModel::isHideMenuVisible,
+                    showUnhideMenu = viewModel::isUnhideMenuVisible,
                     showMoveMenu = viewModel::isMoveMenuVisible,
                     showCopyMenu = viewModel::isCopyMenuVisible,
                     showRestoreMenu = viewModel::isRestoreMenuVisible,
@@ -364,7 +377,10 @@ internal fun ImagePreviewScreen(
                         onClickOpenWith(currentImageNode)
                         hideBottomSheet(coroutineScope, modalSheetState)
                     },
-                    onClickForward = {},
+                    onClickForward = {
+                        onClickSendTo(currentImageNode)
+                        hideBottomSheet(coroutineScope, modalSheetState)
+                    },
                     onClickSaveToDevice = {
                         onClickSaveToDevice(currentImageNode)
                         hideBottomSheet(coroutineScope, modalSheetState)
@@ -397,6 +413,18 @@ internal fun ImagePreviewScreen(
                     },
                     onClickRename = {
                         onClickRename(currentImageNode)
+                        hideBottomSheet(coroutineScope, modalSheetState)
+                    },
+                    onClickHide = {
+                        onClickHide(currentImageNode, accountDetail, isHiddenNodesOnboarded)
+                        hideBottomSheet(coroutineScope, modalSheetState)
+                    },
+                    onClickHideHelp = {
+                        onClickHideHelp()
+                        hideBottomSheet(coroutineScope, modalSheetState)
+                    },
+                    onClickUnhide = {
+                        onClickUnhide(currentImageNode)
                         hideBottomSheet(coroutineScope, modalSheetState)
                     },
                     onClickMove = {
@@ -589,12 +617,14 @@ private fun ImagePreviewTopBar(
     modifier: Modifier = Modifier,
     imageNode: ImageNode,
     showSlideshowMenu: suspend (ImageNode) -> Boolean,
+    showForwardMenu: suspend (ImageNode) -> Boolean,
     showSaveToDeviceMenu: suspend (ImageNode) -> Boolean,
     showManageLinkMenu: suspend (ImageNode) -> Boolean,
     showSendToMenu: suspend (ImageNode) -> Boolean,
     showMoreMenu: suspend (ImageNode) -> Boolean,
     onClickBack: () -> Unit,
     onClickSlideshow: () -> Unit,
+    onClickForward: () -> Unit,
     onClickSaveToDevice: () -> Unit,
     onClickGetLink: () -> Unit,
     onClickSendTo: () -> Unit,
@@ -617,6 +647,10 @@ private fun ImagePreviewTopBar(
         actions = {
             val isSlideshowMenuVisible by produceState(false, imageNode) {
                 value = showSlideshowMenu(imageNode)
+            }
+
+            val isForwardMenuVisible by produceState(false, imageNode) {
+                value = showForwardMenu(imageNode)
             }
 
             val isSaveToDeviceMenuVisible by produceState(false, imageNode) {
@@ -646,10 +680,21 @@ private fun ImagePreviewTopBar(
                 }
             }
 
+            if (isForwardMenuVisible) {
+                IconButton(onClick = onClickForward) {
+                    Icon(
+                        painter = painterResource(id = iconPackR.drawable.ic_corner_up_right_medium_regular_outline),
+                        contentDescription = null,
+                        tint = MaterialTheme.colors.black_white,
+                        modifier = Modifier.testTag(IMAGE_PREVIEW_APP_BAR_FORWARD),
+                    )
+                }
+            }
+
             if (isSaveToDeviceMenuVisible) {
                 IconButton(onClick = onClickSaveToDevice) {
                     Icon(
-                        painter = painterResource(id = R.drawable.ic_download_white),
+                        painter = painterResource(id = iconPackR.drawable.ic_download_medium_regular_outline),
                         contentDescription = null,
                         tint = MaterialTheme.colors.black_white,
                         modifier = Modifier.testTag(IMAGE_PREVIEW_APP_BAR_SAVE_TO_DEVICE),
@@ -671,7 +716,7 @@ private fun ImagePreviewTopBar(
             if (isSendToMenuVisible) {
                 IconButton(onClick = onClickSendTo) {
                     Icon(
-                        painter = painterResource(id = R.drawable.ic_send_to_contact),
+                        painter = painterResource(id = iconPackR.drawable.ic_message_arrow_up_medium_regular_outline),
                         contentDescription = null,
                         tint = MaterialTheme.colors.black_white,
                         modifier = Modifier.testTag(IMAGE_PREVIEW_APP_BAR_SEND_TO),

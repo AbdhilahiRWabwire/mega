@@ -30,10 +30,9 @@ data class CallUiMessage(
         onReactionLongClick: (String, List<UIReaction>) -> Unit,
         onForwardClicked: (TypedMessage) -> Unit,
         onSelectedChanged: (Boolean) -> Unit,
-        onSendErrorClicked: (TypedMessage) -> Unit,
+        onNotSentClick: (TypedMessage) -> Unit,
     ) {
         ChatMessageContainer(
-            modifier = Modifier.fillMaxWidth(),
             isMine = displayAsMine,
             showForwardIcon = shouldDisplayForwardIcon,
             reactions = reactions,
@@ -41,14 +40,14 @@ data class CallUiMessage(
             onReactionClick = { onReactionClicked(id, it, reactions) },
             onReactionLongClick = { onReactionLongClick(it, reactions) },
             onForwardClicked = { onForwardClicked(message) },
-            content = {
-                ChatCallMessageView(
-                    message = message,
-                    isOneToOneChat = state.isOneToOne
-                )
-            },
+            modifier = Modifier.fillMaxWidth(),
             onSelectionChanged = onSelectedChanged,
-        )
+        ) {
+            ChatCallMessageView(
+                message = message,
+                isOneToOneChat = state.isOneToOne
+            )
+        }
     }
 
     override val shouldDisplayForwardIcon = false

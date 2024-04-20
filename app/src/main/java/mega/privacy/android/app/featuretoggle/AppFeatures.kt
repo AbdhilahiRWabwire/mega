@@ -16,6 +16,22 @@ enum class AppFeatures(override val description: String, private val defaultValu
     Feature {
 
     /**
+     * Enables the report issue button on the login screen
+     */
+    LoginReportIssueButton(
+        "Enables the report issue button on the login screen feature",
+        false,
+    ),
+
+    /**
+     * Enables new document section flag
+     */
+    NewDocumentSection(
+        "Enable new document section flag",
+        true,
+    ),
+
+    /**
      * Enables the Hidden Nodes feature
      */
     HiddenNodes(
@@ -38,7 +54,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     IncomingSharesCompose(
         "Enable new Incoming Shares Compose page (requires app restart)",
-        false
+        true
     ),
 
 
@@ -47,7 +63,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     OutgoingSharesCompose(
         "Enable new Outgoing Shares Compose page (requires app restart)",
-        false
+        true
     ),
 
 
@@ -56,7 +72,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     LinksCompose(
         "Enable new Shared Links Compose page (requires app restart)",
-        false
+        true
     ),
 
     /**
@@ -72,14 +88,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     ImagePreview(
         "Enables new Image Preview flag",
-        false,
-    ),
-
-    /**
-     * Enables revamp CU interface
-     */
-    NewCU(
-        "Enables revamp CU interface",
         false,
     ),
 
@@ -164,11 +172,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     ),
 
     /**
-     * Sets the MegaApi::setSecureFlag
-     */
-    SetSecureFlag("Sets the secure flag value for MegaApi", false),
-
-    /**
      * Permanent logging toggle
      */
     PermanentLogging("Permanently enable logging, removing functionality to turn it on/off", true),
@@ -177,11 +180,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
      * App Test toggle
      */
     AppTest("This is a test toggle. It does nothing", false),
-
-    /**
-     * To switch into new Plans page UI
-     */
-    PlansPageUpdate("Enable new design for Upgrade account view", false),
 
     /**
      * To switch into new Offline Screen Compose UI
@@ -196,22 +194,23 @@ enum class AppFeatures(override val description: String, private val defaultValu
     /**
      * Clean refactored search implementation
      */
-    SearchWithChips("Advanced search implementation in clean architecture", false),
+    SearchWithChips("Advanced search implementation in clean architecture", true),
 
     /**
-     * In-App Ads toggle
+     * Search implementation with dropdown chips
      */
-    InAppAdvertisement("Enable In-App Ads", true),
+    DropdownChips("Search implementation with dropdown chips and bottom sheet", false),
 
     /**
-     * To switch into new QRCode compose screen with Google code scanner
+     * To enable showing promo notifications in Notifications screen
      */
-    QRCodeCompose("Enable compose for QRCode with google code scanner", true),
+    PromoNotifications("Enable promotional notifications", true),
 
     /**
      * To switch into new chat activity
+     * Enabled version 11.10
      */
-    NewChatActivity("Enable new chat activity", false),
+    NewChatActivity("Enable new chat activity", true),
 
     /**
      * Call unlimited for pro users
@@ -227,10 +226,10 @@ enum class AppFeatures(override val description: String, private val defaultValu
     ),
 
     /**
-     * To show promotional dynamic messages in Notifications
+     * To show strings for new features (meetings and VPN), strings should be hidden until the features are released
      */
-    NotificationCenter(
-        "To show promotional dynamic messages in Notifications",
+    ShowStringsForNewFeatures(
+        "Show strings for new features (meetings and VPN)",
         false
     );
 

@@ -78,21 +78,21 @@ class GeneralChatMessageBottomSheet : BaseBottomSheetDialogFragment(), View.OnCl
     private var chatRoom: MegaChatRoom? = null
     private lateinit var reactionsLayout: LinearLayout
     private lateinit var reactionsFragment: ChatReactionsView
-    private lateinit var optionOpenWith: RelativeLayout
+    private lateinit var optionOpenWith: TextView
     private lateinit var reactionSeparator: View
-    private lateinit var optionForward: RelativeLayout
-    private lateinit var optionEdit: RelativeLayout
-    private lateinit var optionCopy: RelativeLayout
-    private lateinit var optionShare: RelativeLayout
-    private lateinit var optionSelect: RelativeLayout
-    private lateinit var optionViewContacts: RelativeLayout
-    private lateinit var optionInfoContacts: RelativeLayout
-    private lateinit var optionStartConversation: RelativeLayout
-    private lateinit var optionInviteContact: RelativeLayout
-    private lateinit var optionImport: RelativeLayout
-    private lateinit var optionDownload: RelativeLayout
+    private lateinit var optionForward: TextView
+    private lateinit var optionEdit: TextView
+    private lateinit var optionCopy: TextView
+    private lateinit var optionShare: TextView
+    private lateinit var optionSelect: TextView
+    private lateinit var optionViewContacts: TextView
+    private lateinit var optionInfoContacts: TextView
+    private lateinit var optionStartConversation: TextView
+    private lateinit var optionInviteContact: TextView
+    private lateinit var optionImport: TextView
+    private lateinit var optionDownload: TextView
     private lateinit var offlineSwitch: SwitchMaterial
-    private lateinit var optionDelete: RelativeLayout
+    private lateinit var optionDelete: TextView
     private lateinit var forwardSeparator: LinearLayout
     private lateinit var editSeparator: LinearLayout
     private lateinit var copySeparator: LinearLayout
@@ -152,31 +152,30 @@ class GeneralChatMessageBottomSheet : BaseBottomSheetDialogFragment(), View.OnCl
      */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         reactionSeparator = contentView.findViewById(R.id.separator)
-        optionOpenWith = contentView.findViewById(R.id.open_with_layout)
+        optionOpenWith = contentView.findViewById(R.id.open_with)
         forwardSeparator = contentView.findViewById(R.id.forward_separator)
-        optionForward = contentView.findViewById(R.id.forward_layout)
+        optionForward = contentView.findViewById(R.id.forward)
         editSeparator = contentView.findViewById(R.id.edit_separator)
-        optionEdit = contentView.findViewById(R.id.edit_layout)
+        optionEdit = contentView.findViewById(R.id.edit)
         copySeparator = contentView.findViewById(R.id.copy_separator)
-        optionCopy = contentView.findViewById(R.id.copy_layout)
+        optionCopy = contentView.findViewById(R.id.copy)
         shareSeparator = contentView.findViewById(R.id.share_separator)
-        optionShare = contentView.findViewById(R.id.share_layout)
+        optionShare = contentView.findViewById(R.id.share)
         selectSeparator = contentView.findViewById(R.id.select_separator)
-        optionSelect = contentView.findViewById(R.id.select_layout)
+        optionSelect = contentView.findViewById(R.id.select)
         infoSeparator = contentView.findViewById(R.id.info_separator)
-        optionViewContacts = contentView.findViewById(R.id.option_view_layout)
-        optionInfoContacts = contentView.findViewById(R.id.option_info_layout)
+        optionViewContacts = contentView.findViewById(R.id.option_view)
+        optionInfoContacts = contentView.findViewById(R.id.option_info)
         inviteSeparator = contentView.findViewById(R.id.invite_separator)
-        optionStartConversation = contentView.findViewById(R.id.option_start_conversation_layout)
-        optionInviteContact = contentView.findViewById(R.id.option_invite_layout)
+        optionStartConversation = contentView.findViewById(R.id.option_start_conversation)
+        optionInviteContact = contentView.findViewById(R.id.option_invite)
         infoFileSeparator = contentView.findViewById(R.id.info_file_separator)
-        optionImport = contentView.findViewById(R.id.option_import_layout)
-        optionDownload = contentView.findViewById(R.id.option_download_layout)
+        optionImport = contentView.findViewById(R.id.option_import)
+        optionDownload = contentView.findViewById(R.id.option_download)
         optionSaveOffline = contentView.findViewById(R.id.option_save_offline_layout)
         offlineSwitch = contentView.findViewById(R.id.file_properties_switch)
         deleteSeparator = contentView.findViewById(R.id.delete_separator)
-        optionDelete = contentView.findViewById(R.id.delete_layout)
-        val textDelete = contentView.findViewById<TextView>(R.id.delete_text)
+        optionDelete = contentView.findViewById(R.id.delete)
         optionOpenWith.setOnClickListener(this)
         optionForward.setOnClickListener(this)
         optionEdit.setOnClickListener(this)
@@ -238,9 +237,9 @@ class GeneralChatMessageBottomSheet : BaseBottomSheetDialogFragment(), View.OnCl
                 optionDelete.visibility = View.GONE
             } else {
                 if (megaChatMessage.type == MegaChatMessage.TYPE_NORMAL || megaChatMessage.type == MegaChatMessage.TYPE_CONTAINS_META && megaChatMessage.containsMeta != null && megaChatMessage.containsMeta.type == MegaChatContainsMeta.CONTAINS_META_GEOLOCATION) {
-                    textDelete.text = getString(R.string.delete_button)
+                    optionDelete.text = getString(R.string.delete_button)
                 } else {
-                    textDelete.text = getString(R.string.context_remove)
+                    optionDelete.text = getString(R.string.context_remove)
                 }
                 optionDelete.visibility = View.VISIBLE
             }
@@ -375,7 +374,7 @@ class GeneralChatMessageBottomSheet : BaseBottomSheetDialogFragment(), View.OnCl
         val messagesSelected = ArrayList<AndroidMegaChatMessage>()
         messagesSelected.add(message)
         val id = view.id
-        if (id == R.id.open_with_layout) {
+        if (id == R.id.open_with) {
             Analytics.tracker.trackEvent(ChatConversationOpenWithActionMenuItemEvent)
             if (node == null) {
                 Timber.w("The selected node is NULL")
@@ -394,34 +393,34 @@ class GeneralChatMessageBottomSheet : BaseBottomSheetDialogFragment(), View.OnCl
                 }
             }
             return
-        } else if (id == R.id.forward_layout) {
+        } else if (id == R.id.forward) {
             Analytics.tracker.trackEvent(ChatConversationForwardActionMenuItemEvent)
             (requireActivity() as ChatActivity).forwardMessages(messagesSelected)
         } else if (id == R.id.edit_layout) {
             Analytics.tracker.trackEvent(ChatConversationEditActionMenuItemEvent)
             (requireActivity() as ChatActivity).editMessage(messagesSelected)
-        } else if (id == R.id.copy_layout) {
+        } else if (id == R.id.copy) {
             Analytics.tracker.trackEvent(ChatConversationCopyActionMenuItemEvent)
             val msg = message.message
             val text =
                 if (ChatUtil.isGeolocation(msg)) msg?.containsMeta?.textMessage
                 else (requireActivity() as ChatActivity).copyMessage(message)
             (requireActivity() as ChatActivity).copyToClipboard(text)
-        } else if (id == R.id.share_layout) {
+        } else if (id == R.id.share) {
             Analytics.tracker.trackEvent(ChatConversationShareActionMenuItemEvent)
             if (node == null) {
                 Timber.w("The selected node is NULL")
                 return
             }
             ChatUtil.shareMsgFromChat(requireActivity(), message, chatId)
-        } else if (id == R.id.select_layout) {
+        } else if (id == R.id.select) {
             Analytics.tracker.trackEvent(ChatConversationSelectActionMenuItemEvent)
             (requireActivity() as ChatActivity).activateActionModeWithItem(positionMessage)
-        } else if (id == R.id.option_view_layout) {
+        } else if (id == R.id.option_view) {
             Analytics.tracker.trackEvent(ChatConversationViewContactsActionMenuItemEvent)
             Timber.d("View option")
             ContactUtil.openContactAttachmentActivity(requireActivity(), chatId, messageId)
-        } else if (id == R.id.option_info_layout) {
+        } else if (id == R.id.option_info) {
             Analytics.tracker.trackEvent(ChatConversationInfoActionMenuItemEvent)
             if (!Util.isOnline(requireContext())) {
                 (requireActivity() as ChatActivity).showSnackbar(
@@ -439,7 +438,7 @@ class GeneralChatMessageBottomSheet : BaseBottomSheetDialogFragment(), View.OnCl
                 message.message?.getUserEmail(0),
                 isChatRoomOpen
             )
-        } else if (id == R.id.option_invite_layout) {
+        } else if (id == R.id.option_invite) {
             Analytics.tracker.trackEvent(ChatConversationInviteActionMenuItemEvent)
             if (!Util.isOnline(requireContext())) {
                 (requireActivity() as ChatActivity).showSnackbar(
@@ -464,7 +463,7 @@ class GeneralChatMessageBottomSheet : BaseBottomSheetDialogFragment(), View.OnCl
                 }
                 cC.inviteMultipleContacts(contactEmails)
             }
-        } else if (id == R.id.option_start_conversation_layout) {
+        } else if (id == R.id.option_start_conversation) {
             Analytics.tracker.trackEvent(ChatConversationSendMessageActionMenuItemEvent)
             val numUsers = message.message?.usersCount ?: 0
             if (numUsers == 1L) {
@@ -481,7 +480,7 @@ class GeneralChatMessageBottomSheet : BaseBottomSheetDialogFragment(), View.OnCl
                 }
                 (requireActivity() as ChatActivity).startGroupConversation(contactHandles)
             }
-        } else if (id == R.id.option_download_layout) {
+        } else if (id == R.id.option_download) {
             Analytics.tracker.trackEvent(ChatConversationSaveToDeviceActionMenuItemEvent)
             if (node == null) {
                 Timber.w("The selected node is NULL")
@@ -497,7 +496,7 @@ class GeneralChatMessageBottomSheet : BaseBottomSheetDialogFragment(), View.OnCl
                     }
                 }
             }
-        } else if (id == R.id.option_import_layout) {
+        } else if (id == R.id.option_import) {
             Analytics.tracker.trackEvent(ChatConversationAddToCloudDriveActionMenuItemEvent)
             if (node == null) {
                 Timber.w("The selected node is NULL")
@@ -531,7 +530,7 @@ class GeneralChatMessageBottomSheet : BaseBottomSheetDialogFragment(), View.OnCl
                     }
                 }
             }
-        } else if (id == R.id.delete_layout) {
+        } else if (id == R.id.delete) {
             Analytics.tracker.trackEvent(ChatConversationRemoveActionMenuItemEvent)
             (requireActivity() as ChatActivity).showConfirmationDeleteMessages(
                 messagesSelected,

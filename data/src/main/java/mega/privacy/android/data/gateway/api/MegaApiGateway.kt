@@ -17,6 +17,7 @@ import nz.mega.sdk.MegaNodeList
 import nz.mega.sdk.MegaPushNotificationSettings
 import nz.mega.sdk.MegaRecentActionBucket
 import nz.mega.sdk.MegaRequestListenerInterface
+import nz.mega.sdk.MegaSearchFilter
 import nz.mega.sdk.MegaSet
 import nz.mega.sdk.MegaSetElementList
 import nz.mega.sdk.MegaSetList
@@ -499,7 +500,7 @@ interface MegaApiGateway {
     fun setNodeSensitive(
         node: MegaNode?,
         sensitive: Boolean,
-        listener: MegaRequestListenerInterface? = null
+        listener: MegaRequestListenerInterface? = null,
     )
 
     /**
@@ -2385,6 +2386,19 @@ interface MegaApiGateway {
     ): List<MegaNode>
 
     /**
+     * Search query with search filter
+     *
+     * @param filter filter to apply [MegaSearchFilter]
+     * @param order [SortOrder]
+     * @param megaCancelToken [MegaCancelToken]
+     */
+    suspend fun searchWithFilter(
+        filter: MegaSearchFilter,
+        order: Int,
+        megaCancelToken: MegaCancelToken,
+    ): List<MegaNode>
+
+    /**
      * Creates a new share key for the node if there is no share key already created.
      *
      * @param megaNode : [MegaNode] object which needs to be shared
@@ -2401,14 +2415,6 @@ interface MegaApiGateway {
      * @param listener : Listener to track this request
      */
     fun upgradeSecurity(listener: MegaRequestListenerInterface)
-
-    /**
-     * Sets the secure flag to true or false while sharing a node
-     *
-     * @param enable : Boolean value
-     */
-    @Deprecated("This API is for testing purpose, will be deleted later")
-    fun setSecureFlag(enable: Boolean)
 
     /**
      * Get sms allowed state
@@ -3434,4 +3440,39 @@ interface MegaApiGateway {
      * @param listener MegaRequestListener to track this request
      */
     fun confirmChangeEmail(link: String, pwd: String, listener: MegaRequestListenerInterface)
+
+    /**
+     * Get information about a cancel link created by MegaApi::cancelAccount.
+     *
+     * The associated request type with this request is MegaRequest::TYPE_QUERY_RECOVERY_LINK
+     * Valid data in the MegaRequest object received on all callbacks:
+     * - MegaRequest::getLink - Returns the cancel link
+     *
+     * Valid data in the MegaRequest object received in onRequestFinish when the error code
+     * is MegaError::API_OK:
+     * - MegaRequest::getEmail - Return the email associated with the link
+     *
+     * @param link Cancel link (cancel)
+     * @param listener MegaRequestListener to track this request
+     */
+    fun queryCancelLink(link: String, listener: MegaRequestListenerInterface)
+
+    /**
+     * Get information about a change-email link created by MegaApi::changeEmail.
+     *
+     * The associated request type with this request is MegaRequest::TYPE_QUERY_RECOVERY_LINK
+     * Valid data in the MegaRequest object received on all callbacks:
+     * - MegaRequest::getLink - Returns the change-email link
+     *
+     * Valid data in the MegaRequest object received in onRequestFinish when the error code
+     * is MegaError::API_OK:
+     * - MegaRequest::getEmail - Return the email associated with the link
+     *
+     * If the account is logged-in into a different account than the account for which the link
+     * was generated, onRequestFinish will be called with the error code MegaError::API_EACCESS.
+     *
+     * @param link Change-email link (verify)
+     * @param listener MegaRequestListener to track this request
+     */
+    fun queryChangeEmailLink(link: String, listener: MegaRequestListenerInterface)
 }

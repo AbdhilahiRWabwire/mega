@@ -7,6 +7,7 @@ enum class ImagePreviewMenuSource {
     ALBUM_SHARING,
     MEDIA_DISCOVERY,
     CLOUD_DRIVE,
+    CHAT,
     OFFLINE,
     FAVOURITE,
     FILE,

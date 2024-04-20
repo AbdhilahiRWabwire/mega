@@ -69,6 +69,7 @@ tasks.withType<Test> {
 dependencies {
     lintChecks(project(":lint"))
 
+    implementation(project(":icon-pack"))
     testImplementation(project(":core-ui-test"))
 
     implementation(platform(androidx.compose.bom))
@@ -79,6 +80,7 @@ dependencies {
     implementation(google.material)
     implementation(google.accompanist.systemui)
     implementation(google.accompanist.permissions)
+    implementation(google.accompanist.navigationmaterial)
     implementation(androidx.compose.activity)
     implementation(androidx.lifecycle.runtime)
     implementation(androidx.lifecycle.runtime.compose)

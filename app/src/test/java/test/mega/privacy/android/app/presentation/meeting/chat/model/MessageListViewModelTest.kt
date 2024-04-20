@@ -13,8 +13,11 @@ import mega.privacy.android.app.presentation.meeting.chat.mapper.ChatMessageDate
 import mega.privacy.android.app.presentation.meeting.chat.mapper.ChatMessageTimeSeparatorMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.UiChatMessageMapper
 import mega.privacy.android.app.presentation.meeting.chat.model.MessageListViewModel
+    import mega.privacy.android.app.presentation.meeting.chat.model.messages.normal.TextUiMessage
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
+import mega.privacy.android.domain.entity.chat.ChatMessageStatus
+import mega.privacy.android.domain.entity.chat.messages.normal.TextMessage
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.entity.user.UserId
 import mega.privacy.android.domain.entity.user.UserUpdate
@@ -83,7 +86,7 @@ internal class MessageListViewModelTest {
             monitorReactionUpdatesUseCase = mock(),
             monitorContactCacheUpdates = monitorContactCacheUpdates,
             monitorPendingMessagesUseCase = mock(),
-            chatMessageTimeSeparatorMapper = chatMessageTimeSeparatorMapper
+            chatMessageTimeSeparatorMapper = chatMessageTimeSeparatorMapper,
         )
     }
 
@@ -134,6 +137,62 @@ internal class MessageListViewModelTest {
         underTest.state.test {
             val actual = awaitItem()
             assertThat(actual.userUpdate).isEqualTo(userUpdate)
+        }
+    }
+
+    @Test
+    fun `test that updateLatestMessage update state correctly`() = runTest {
+        val messageId = 123L
+        val typedMessage = mock<TextMessage> {
+            on { msgId } doReturn messageId
+            on { isMine } doReturn true
+            on { status } doReturn ChatMessageStatus.NOT_SEEN
+        }
+        val uiMessage = mock<TextUiMessage> {
+            on { message } doReturn typedMessage
+            on { id } doReturn messageId
+        }
+        assertThat(underTest.latestMessageId.longValue).isEqualTo(-1L)
+        underTest.updateLatestMessage(listOf(uiMessage))
+        assertThat(underTest.latestMessageId.longValue).isEqualTo(messageId)
+        underTest.updateLatestMessage(listOf(uiMessage))
+        // verify call only once
+        verify(setMessageSeenUseCase).invoke(chatId, messageId)
+        underTest.state.test {
+            val actual = awaitItem()
+            assertThat(actual.lastSeenMessageId).isEqualTo(-1L)
+            assertThat(actual.extraUnreadCount).isEqualTo(0)
+        }
+    }
+
+    @Test
+    fun `test that onUserUpdateHandled set userUpdate to null`() = runTest {
+        underTest.onUserUpdateHandled()
+        underTest.state.test {
+            val actual = awaitItem()
+            assertThat(actual.userUpdate).isNull()
+        }
+    }
+
+    @Test
+    fun `test that all received message clear when jump to latest message`() = runTest {
+        underTest.onScrollToLatestMessage()
+        underTest.state.test {
+            val actual = awaitItem()
+            assertThat(actual.receivedMessages).isEmpty()
+        }
+    }
+
+    @Test
+    fun `test that scrolled to the last seen message update state correctly`() = runTest {
+        underTest.state.test {
+            val actual = awaitItem()
+            assertThat(actual.isJumpingToLastSeenMessage).isFalse()
+        }
+        underTest.onScrolledToLastSeenMessage()
+        underTest.state.test {
+            val actual = awaitItem()
+            assertThat(actual.isJumpingToLastSeenMessage).isTrue()
         }
     }
 }

@@ -20,25 +20,15 @@ internal class ChatRoomMessageUpdateMapper @Inject constructor(
             )
 
             is ChatRoomUpdate.OnMessageLoaded -> update.msg?.let {
-                MessageLoaded(
-                    chatMessageMapper(
-                        it
-                    )
-                )
+                MessageLoaded(chatMessageMapper(it))
             }
 
             is ChatRoomUpdate.OnMessageReceived -> update.msg?.let {
-                MessageReceived(
-                    chatMessageMapper(it)
-                )
+                MessageReceived(chatMessageMapper(it))
             }
 
             is ChatRoomUpdate.OnMessageUpdate -> update.msg?.let {
-                MessageUpdate(
-                    chatMessageMapper(
-                        it
-                    )
-                )
+                MessageUpdate(chatMessageMapper(it))
             }
 
             else -> null

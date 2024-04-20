@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.folderlink.view
 
+import mega.privacy.android.icon.pack.R as iconPackR
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
@@ -75,6 +76,7 @@ import mega.privacy.android.core.ui.theme.extensions.teal_300_teal_200
 import mega.privacy.android.core.ui.theme.white
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
+import mega.privacy.android.feature.sync.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.shared.theme.MegaAppTheme
 import nz.mega.sdk.MegaNode
 
@@ -151,6 +153,7 @@ internal fun FolderLinkView(
     adsUiState: AdsUIState,
     onAdClicked: (uri: Uri?) -> Unit,
     onAdDismissed: () -> Unit,
+    fileTypeIconMapper: FileTypeIconMapper,
 ) {
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
@@ -272,7 +275,8 @@ internal fun FolderLinkView(
                     onDisputeTakeDownClicked = onDisputeTakeDownClicked,
                     showMediaDiscoveryButton = state.hasMediaItem,
                     onEnterMediaDiscoveryClick = onEnterMediaDiscoveryClick,
-                    isPublicNode = true
+                    isPublicNode = true,
+                    fileTypeIconMapper = fileTypeIconMapper
                 )
                 ImportDownloadView(
                     Modifier
@@ -343,7 +347,7 @@ internal fun FolderLinkTopAppBar(
         actions = {
             IconButton(onClick = onShareClicked) {
                 Image(
-                    painter = painterResource(id = R.drawable.ic_social_share_white),
+                    painter = painterResource(id = iconPackR.drawable.ic_share_network_medium_regular_outline),
                     contentDescription = stringResource(id = R.string.general_share),
                     colorFilter = ColorFilter.tint(if (MaterialTheme.colors.isLight) Color.Black else Color.White)
                 )

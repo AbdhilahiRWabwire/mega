@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.recentactions
 
+import mega.privacy.android.icon.pack.R as IconPackR
 import android.content.Context
 import android.text.Html
 import android.text.Spanned
@@ -18,13 +19,13 @@ import mega.privacy.android.app.presentation.extensions.getFormattedStringOrDefa
 import mega.privacy.android.app.presentation.extensions.getQuantityStringOrDefault
 import mega.privacy.android.app.presentation.recentactions.RecentActionsAdapter.RecentActionViewHolder
 import mega.privacy.android.app.presentation.recentactions.model.RecentActionItemType
-import mega.privacy.android.app.presentation.recentactions.model.RecentActionsSharesType
 import mega.privacy.android.app.utils.ColorUtils.getColorForElevation
 import mega.privacy.android.app.utils.ColorUtils.getColorHexString
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.MegaNodeUtil.getNodeLabelDrawable
 import mega.privacy.android.app.utils.TimeUtils
 import mega.privacy.android.app.utils.Util
+import mega.privacy.android.domain.entity.RecentActionsSharesType
 import mega.privacy.android.domain.entity.node.Node
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
@@ -141,14 +142,14 @@ class RecentActionsAdapter @Inject constructor() : RecyclerView.Adapter<RecentAc
 
                     RecentActionsSharesType.INCOMING_SHARES -> {
                         binding.sharedImage.visibility = View.VISIBLE
-                        binding.sharedImage.setImageResource(R.drawable.ic_folder_incoming_list)
+                        binding.sharedImage.setImageResource(IconPackR.drawable.ic_folder_incoming_medium_solid)
                     }
 
                     RecentActionsSharesType.OUTGOING_SHARES,
                     RecentActionsSharesType.PENDING_OUTGOING_SHARES,
                     -> {
                         binding.sharedImage.visibility = View.VISIBLE
-                        binding.sharedImage.setImageResource(R.drawable.ic_folder_outgoing_list)
+                        binding.sharedImage.setImageResource(IconPackR.drawable.ic_folder_outgoing_medium_solid)
                     }
                 }
 
@@ -204,7 +205,7 @@ class RecentActionsAdapter @Inject constructor() : RecyclerView.Adapter<RecentAc
 
                     if (bucket.isMedia) {
                         binding.firstLineText.text = getMediaTitle(context, nodeList)
-                        binding.thumbnailView.setImageResource(R.drawable.media)
+                        binding.thumbnailView.setImageResource(IconPackR.drawable.ic_image_stack_medium_solid)
                     } else {
                         if (!item.isKeyVerified) {
                             binding.firstLineText.text =
@@ -338,6 +339,7 @@ class RecentActionsAdapter @Inject constructor() : RecyclerView.Adapter<RecentAc
                     numImages
                 )
             }
+
             numImages == 0 && numVideos > 0 -> {
                 context.getQuantityStringOrDefault(
                     R.plurals.title_media_bucket_only_videos,
@@ -345,6 +347,7 @@ class RecentActionsAdapter @Inject constructor() : RecyclerView.Adapter<RecentAc
                     numVideos
                 )
             }
+
             else -> {
                 context.getQuantityStringOrDefault(
                     R.plurals.title_media_bucket_images_and_videos,

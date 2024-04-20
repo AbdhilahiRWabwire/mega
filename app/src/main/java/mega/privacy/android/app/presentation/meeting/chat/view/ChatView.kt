@@ -36,16 +36,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,6 +59,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 import de.palm.composestateevents.EventEffect
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
 import mega.privacy.android.app.extensions.navigateToAppSettings
@@ -70,7 +75,7 @@ import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuActi
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
 import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
-import mega.privacy.android.app.presentation.meeting.chat.model.InviteUserAsContactResultOption
+import mega.privacy.android.app.presentation.meeting.chat.model.messages.actions.MessageBottomSheetAction
 import mega.privacy.android.app.presentation.meeting.chat.saver.ChatSavers
 import mega.privacy.android.app.presentation.meeting.chat.view.actions.MessageAction
 import mega.privacy.android.app.presentation.meeting.chat.view.appbar.ChatAppBar
@@ -88,15 +93,17 @@ import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openAt
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openChatFragment
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openChatPicker
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openContactInfoActivity
-import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openSentRequests
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.showGroupOrContactInfoActivity
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.startLoginActivity
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.startMeetingActivity
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.startWaitingRoom
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ChatAttachFileBottomSheet
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ChatToolbarBottomSheet
+import mega.privacy.android.app.presentation.meeting.chat.view.sheet.MessageNotSentBottomSheet
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.MessageOptionsBottomSheet
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ReactionsInfoBottomSheet
+import mega.privacy.android.app.presentation.meeting.chat.view.sheet.UpgradeProPlanBottomSheet
+import mega.privacy.android.app.presentation.meeting.view.FreePlanLimitParticipantsDialog
 import mega.privacy.android.app.presentation.qrcode.findActivity
 import mega.privacy.android.app.presentation.transfers.startdownload.view.StartDownloadComponent
 import mega.privacy.android.app.utils.CallUtil
@@ -113,10 +120,13 @@ import mega.privacy.android.domain.entity.chat.ChatPushNotificationMuteOption
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.contacts.User
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
+import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.user.UserId
 import mega.privacy.android.domain.entity.user.UserVisibility
 import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.mobile.analytics.event.ChatConversationAddAttachmentButtonPressedEvent
+import mega.privacy.mobile.analytics.event.ChatMessageLongPressedEvent
 
 @Composable
 internal fun ChatView(
@@ -172,6 +182,8 @@ internal fun ChatView(
         consumeDownloadEvent = viewModel::consumeDownloadEvent,
         onActionToManageEventConsumed = viewModel::onActionToManageEventConsumed,
         onVoiceClipRecordEvent = viewModel::onVoiceClipRecordEvent,
+        onConfirmFreePlanParticipantsLimitDialogEvent = viewModel::consumeShowFreePlanParticipantsLimitDialogEvent,
+        onConsumeShouldUpgradeToProPlan = viewModel::onConsumeShouldUpgradeToProPlan,
     )
 }
 
@@ -197,8 +209,6 @@ internal fun ChatView(
  * @param onStartOrJoinMeeting
  * @param onAnswerCall
  * @param onEnableGeolocation
- * @param messageListView
- * @param bottomBar
  * @param onSendClick
  * @param onHoldAndAnswerCall
  * @param onEndAndAnswerCall
@@ -219,7 +229,8 @@ internal fun ChatView(
 @OptIn(
     ExperimentalMaterialApi::class,
     ExperimentalPermissionsApi::class,
-    ExperimentalLayoutApi::class
+    ExperimentalLayoutApi::class,
+    ExperimentalComposeUiApi::class
 )
 @Composable
 internal fun ChatView(
@@ -266,6 +277,8 @@ internal fun ChatView(
     consumeDownloadEvent: () -> Unit = {},
     onActionToManageEventConsumed: () -> Unit = {},
     onVoiceClipRecordEvent: (VoiceClipRecordEvent) -> Unit = {},
+    onConfirmFreePlanParticipantsLimitDialogEvent: () -> Unit = {},
+    onConsumeShouldUpgradeToProPlan: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -289,6 +302,8 @@ internal fun ChatView(
     }
 
     var showJoinAnswerCallDialog by rememberSaveable { mutableStateOf(false) }
+    var showFreePlanLimitParticipantsDialog by rememberSaveable { mutableStateOf(false) }
+
     var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
     var showReactionPicker by rememberSaveable { mutableStateOf(false) }
     var addingReactionTo by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -332,6 +347,16 @@ internal fun ChatView(
             true
         }
     )
+    val messageNotSentBottomSheetState = rememberModalBottomSheetState(
+        initialValue = ModalBottomSheetValue.Hidden,
+        confirmValueChange = {
+            if (it != ModalBottomSheetValue.Hidden) {
+                keyboardController?.hide()
+                showEmojiPicker = false
+            }
+            true
+        }
+    )
     val reactionInfoBottomSheetState = rememberModalBottomSheetState(
         initialValue = ModalBottomSheetValue.Hidden,
         confirmValueChange = {
@@ -342,6 +367,13 @@ internal fun ChatView(
                 selectedReaction = ""
                 reactionList = emptyList()
             }
+            true
+        }
+    )
+
+    val upgradeToProPlanBottomSheetState = rememberModalBottomSheetState(
+        initialValue = ModalBottomSheetValue.Hidden,
+        confirmValueChange = {
             true
         }
     )
@@ -373,6 +405,10 @@ internal fun ChatView(
     }
     BackHandler(enabled = showEmojiPicker) {
         showEmojiPicker = false
+    }
+    BackHandler(enabled = isSelectMode) {
+        isSelectMode = false
+        selectedMessages = emptySet()
     }
     LaunchedEffect(isTextInputPressed) {
         if (isTextInputPressed) {
@@ -413,6 +449,8 @@ internal fun ChatView(
         mutableStateOf(null)
     }
 
+    var unreadMessageCount by remember { mutableIntStateOf(0) }
+
     with(uiState) {
         val addContactLauncher =
             rememberLauncherForActivityResult(
@@ -439,6 +477,7 @@ internal fun ChatView(
                     }
             }
         var takePictureUri by remember { mutableStateOf(Uri.EMPTY) }
+
         val takePictureLauncher =
             rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.TakePicture()
@@ -455,24 +494,43 @@ internal fun ChatView(
         val isMessageOptionsModalShown by derivedStateOf {
             messageOptionsModalSheetState.currentValue != ModalBottomSheetValue.Hidden
         }
+        val isMessageNotSentModalShown by derivedStateOf {
+            messageNotSentBottomSheetState.currentValue != ModalBottomSheetValue.Hidden
+        }
         val isReactionInfoModalShown by derivedStateOf {
             reactionInfoBottomSheetState.currentValue != ModalBottomSheetValue.Hidden
         }
         val isToolbarModalShown by derivedStateOf {
             toolbarModalSheetState.currentValue != ModalBottomSheetValue.Hidden
         }
+
+        val isUpgradeToProPlanShown by derivedStateOf {
+            upgradeToProPlanBottomSheetState.currentValue != ModalBottomSheetValue.Hidden
+        }
+
         val noBottomSheetState = rememberModalBottomSheetState(ModalBottomSheetValue.Hidden)
 
         if (!isMessageOptionsModalShown && addingReactionTo == null) {
             showReactionPicker = false
         }
 
+        if (callEndedDueToFreePlanLimits && isCallUnlimitedProPlanFeatureFlagEnabled
+            && usersCallLimitReminders == UsersCallLimitReminders.Enabled
+        ) {
+            showFreePlanLimitParticipantsDialog = true
+        }
+
         BottomSheet(
+            modifier = Modifier.semantics {
+                testTagsAsResourceId = true
+            },
             modalSheetState = when {
                 isFileModalShown -> fileModalSheetState
                 isMessageOptionsModalShown -> messageOptionsModalSheetState
                 isReactionInfoModalShown -> reactionInfoBottomSheetState
                 isToolbarModalShown -> toolbarModalSheetState
+                isMessageNotSentModalShown -> messageNotSentBottomSheetState
+                isUpgradeToProPlanShown -> upgradeToProPlanBottomSheetState
                 else -> noBottomSheetState
             },
             sheetBody = {
@@ -495,6 +553,30 @@ internal fun ChatView(
                                 coroutineScope.launch { messageOptionsModalSheetState.hide() }
                             },
                             onMoreReactionsClicked = { showReactionPicker = true },
+                            actions =
+                            if (selectedMessages.isEmpty()) emptyList()
+                            else actions.filter { action ->
+                                action.appliesTo(selectedMessages)
+                            }.map { action ->
+                                MessageBottomSheetAction(
+                                    action.bottomSheetMenuItem(
+                                        messages = selectedMessages,
+                                        hideBottomSheet = {
+                                            coroutineScope.launch {
+                                                messageOptionsModalSheetState.hide()
+                                            }
+                                        },
+                                        setAction = { pendingAction = it }
+                                    ),
+                                    action.group
+                                )
+                            },
+                            sheetState = messageOptionsModalSheetState,
+                        )
+                    }
+
+                    isMessageNotSentModalShown -> {
+                        MessageNotSentBottomSheet(
                             actions = actions.filter { action ->
                                 action.appliesTo(selectedMessages)
                             }.map { action ->
@@ -502,13 +584,13 @@ internal fun ChatView(
                                     messages = selectedMessages,
                                     hideBottomSheet = {
                                         coroutineScope.launch {
-                                            messageOptionsModalSheetState.hide()
+                                            messageNotSentBottomSheetState.hide()
                                         }
                                     },
                                     setAction = { pendingAction = it }
                                 )
                             },
-                            sheetState = messageOptionsModalSheetState,
+                            sheetState = messageNotSentBottomSheetState,
                         )
                     }
 
@@ -582,6 +664,14 @@ internal fun ChatView(
                             },
                             onAttachFiles = onAttachFiles
                         )
+                    }
+
+                    isUpgradeToProPlanShown -> {
+                        UpgradeProPlanBottomSheet {
+                            coroutineScope.launch {
+                                upgradeToProPlanBottomSheetState.hide()
+                            }
+                        }
                     }
                 }
             },
@@ -665,6 +755,9 @@ internal fun ChatView(
                     if (haveWritePermission) {
                         val onAttachmentClick: () -> Unit = {
                             coroutineScope.launch {
+                                Analytics.tracker.trackEvent(
+                                    ChatConversationAddAttachmentButtonPressedEvent
+                                )
                                 toolbarModalSheetState.show()
                             }
                         }
@@ -709,7 +802,7 @@ internal fun ChatView(
                         enter = fadeIn() + scaleIn(),
                         exit = fadeOut(),
                     ) {
-                        ScrollToBottomFab {
+                        ScrollToBottomFab(unreadCount = unreadMessageCount) {
                             coroutineScope.launch {
                                 scrollState.animateScrollToItem(0)
                             }
@@ -744,6 +837,7 @@ internal fun ChatView(
                                 selectedMessages = setOf(message)
                                 // Use message for showing correct available options
                                 coroutineScope.launch {
+                                    Analytics.tracker.trackEvent(ChatMessageLongPressedEvent)
                                     messageOptionsModalSheetState.show()
                                 }
                             }
@@ -788,6 +882,15 @@ internal fun ChatView(
                             val deselectItem = { message: TypedMessage ->
                                 selectedMessages = selectedMessages - message
                             }
+
+                            val onNotSentClick: (TypedMessage) -> Unit =
+                                { message: TypedMessage ->
+                                    selectedMessages = setOf(message)
+                                    coroutineScope.launch {
+                                        messageNotSentBottomSheetState.show()
+                                    }
+                                }
+
                             MessageListView(
                                 MessageListParameter(
                                     uiState = uiState,
@@ -803,10 +906,12 @@ internal fun ChatView(
                                     selectItem = selectItem,
                                     deselectItem = deselectItem,
                                     selectMode = isSelectMode,
-                                    onSendErrorClick = { TODO("Not implemented") }
-                                )
+                                    onNotSentClick = onNotSentClick,
+                                    showUnreadIndicator = {
+                                        unreadMessageCount = it
+                                    }
+                                ),
                             )
-
                         },
                     )
                 }
@@ -900,6 +1005,13 @@ internal fun ChatView(
                     )
                 }
 
+                if (showFreePlanLimitParticipantsDialog) {
+                    FreePlanLimitParticipantsDialog(onConfirm = {
+                        onConfirmFreePlanParticipantsLimitDialogEvent()
+                        showFreePlanLimitParticipantsDialog = false
+                    })
+                }
+
                 pendingAction?.let { it() }
             }
 
@@ -922,19 +1034,6 @@ internal fun ChatView(
                                 } ?: scaffoldState.snackbarHostState.showSnackbar(text)
                             }
 
-                            info is InfoToShow.InviteUserAsContactResult &&
-                                    info.result is InviteUserAsContactResultOption.ContactInviteSent -> {
-
-                                scaffoldState.snackbarHostState.showSnackbar(
-                                    text,
-                                    context.getString(R.string.action_see)
-                                ).also { result ->
-                                    if (result == SnackbarResult.ActionPerformed) {
-                                        openSentRequests(context)
-                                    }
-                                }
-                            }
-
                             else -> scaffoldState.snackbarHostState.showSnackbar(text)
                         }
                     }
@@ -949,6 +1048,13 @@ internal fun ChatView(
                 showMutePushNotificationDialog = true
             }
 
+            LaunchedEffect(shouldUpgradeToProPlan) {
+                if (shouldUpgradeToProPlan) {
+                    upgradeToProPlanBottomSheetState.show()
+                    onConsumeShouldUpgradeToProPlan()
+                }
+            }
+
             EventEffect(
                 event = actionToManageEvent,
                 onConsumed = onActionToManageEventConsumed,
@@ -960,6 +1066,8 @@ internal fun ChatView(
                         context,
                         action.email
                     )
+
+                    is ActionToManage.CloseChat -> onBackPressed()
                 }
             }
         }

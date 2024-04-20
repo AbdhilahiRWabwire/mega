@@ -10,13 +10,10 @@ import android.net.Uri
 import android.util.Patterns
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
-import io.reactivex.rxjava3.kotlin.addTo
-import io.reactivex.rxjava3.kotlin.subscribeBy
-import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,8 +29,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mega.privacy.android.app.R
-import mega.privacy.android.app.arch.BaseRxViewModel
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.generalusecase.FilePrepareUseCase
 import mega.privacy.android.app.globalmanagement.MegaChatRequestHandler
 import mega.privacy.android.app.globalmanagement.MyAccountInfo
@@ -44,15 +39,15 @@ import mega.privacy.android.app.main.dialog.storagestatus.TYPE_ANDROID_PLATFORM
 import mega.privacy.android.app.main.dialog.storagestatus.TYPE_ANDROID_PLATFORM_NO_NAVIGATION
 import mega.privacy.android.app.main.dialog.storagestatus.TYPE_ITUNES
 import mega.privacy.android.app.middlelayer.iab.BillingConstant
-import mega.privacy.android.app.myAccount.usecase.CancelSubscriptionsUseCase
-import mega.privacy.android.app.myAccount.usecase.QueryRecoveryLinkUseCase
 import mega.privacy.android.app.presentation.login.LoginActivity
 import mega.privacy.android.app.presentation.snackbar.MegaSnackbarDuration
 import mega.privacy.android.app.presentation.snackbar.SnackBarHandler
 import mega.privacy.android.app.presentation.testpassword.TestPasswordActivity
 import mega.privacy.android.app.presentation.verifytwofactor.VerifyTwoFactorActivity
 import mega.privacy.android.app.utils.CacheFolderManager
+import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.ACTION_REFRESH
+import mega.privacy.android.app.utils.Constants.CANCEL_ACCOUNT_LINK_REGEXS
 import mega.privacy.android.app.utils.Constants.CHANGE_MAIL_2FA
 import mega.privacy.android.app.utils.Constants.EMAIL_ADDRESS
 import mega.privacy.android.app.utils.Constants.FREE
@@ -71,12 +66,13 @@ import mega.privacy.android.app.utils.permission.PermissionUtils.hasPermissions
 import mega.privacy.android.app.utils.permission.PermissionUtils.requestPermission
 import mega.privacy.android.data.qualifier.MegaApi
 import mega.privacy.android.domain.entity.AccountType
-import mega.privacy.android.domain.entity.Feature
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.entity.verification.VerifiedPhoneNumber
 import mega.privacy.android.domain.exception.account.ConfirmCancelAccountException
 import mega.privacy.android.domain.exception.account.ConfirmChangeEmailException
+import mega.privacy.android.domain.exception.account.QueryCancelLinkException
+import mega.privacy.android.domain.exception.account.QueryChangeEmailLinkException
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.usecase.GetAccountDetailsUseCase
 import mega.privacy.android.domain.usecase.GetCurrentUserFullName
@@ -85,9 +81,11 @@ import mega.privacy.android.domain.usecase.GetExtendedAccountDetail
 import mega.privacy.android.domain.usecase.GetFolderTreeInfo
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.GetNumberOfSubscription
+import mega.privacy.android.domain.usecase.IsUrlMatchesRegexUseCase
 import mega.privacy.android.domain.usecase.MonitorBackupFolder
 import mega.privacy.android.domain.usecase.MonitorUserUpdates
 import mega.privacy.android.domain.usecase.account.BroadcastRefreshSessionUseCase
+import mega.privacy.android.domain.usecase.account.CancelSubscriptionsUseCase
 import mega.privacy.android.domain.usecase.account.ChangeEmail
 import mega.privacy.android.domain.usecase.account.CheckVersionsUseCase
 import mega.privacy.android.domain.usecase.account.ConfirmCancelAccountUseCase
@@ -95,12 +93,13 @@ import mega.privacy.android.domain.usecase.account.ConfirmChangeEmailUseCase
 import mega.privacy.android.domain.usecase.account.GetUserDataUseCase
 import mega.privacy.android.domain.usecase.account.IsMultiFactorAuthEnabledUseCase
 import mega.privacy.android.domain.usecase.account.KillOtherSessionsUseCase
+import mega.privacy.android.domain.usecase.account.QueryCancelLinkUseCase
+import mega.privacy.android.domain.usecase.account.QueryChangeEmailLinkUseCase
 import mega.privacy.android.domain.usecase.account.UpdateCurrentUserName
 import mega.privacy.android.domain.usecase.avatar.GetMyAvatarFileUseCase
 import mega.privacy.android.domain.usecase.avatar.SetAvatarUseCase
 import mega.privacy.android.domain.usecase.billing.GetPaymentMethodUseCase
 import mega.privacy.android.domain.usecase.contact.GetCurrentUserEmail
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.file.GetFileVersionsOption
 import mega.privacy.android.domain.usecase.login.CheckPasswordReminderUseCase
 import mega.privacy.android.domain.usecase.login.LogoutUseCase
@@ -132,7 +131,9 @@ import javax.inject.Inject
  * @property resetSMSVerifiedPhoneNumber
  * @property getUserDataUseCase
  * @property getFileVersionsOption
- * @property queryRecoveryLinkUseCase
+ * @property queryCancelLinkUseCase Queries information on an Account Cancellation Link
+ * @property queryChangeEmailLinkUseCase Queries information on a Change Email Link
+ * @property isUrlMatchesRegexUseCase Checks if the URL Matches any of the Regex Patterns provided
  * @property [confirmCancelAccountUseCase] [ConfirmCancelAccountUseCase]
  * @property confirmChangeEmailUseCase
  * @property filePrepareUseCase
@@ -146,7 +147,6 @@ import javax.inject.Inject
  * @property updateCurrentUserName
  * @property getCurrentUserEmail
  * @property monitorVerificationStatus
- * @property getFeatureFlagValueUseCase
  * @property snackBarHandler Handler used to display a Snackbar
  */
 @HiltViewModel
@@ -165,7 +165,9 @@ class MyAccountViewModel @Inject constructor(
     private val resetSMSVerifiedPhoneNumber: ResetSMSVerifiedPhoneNumber,
     private val getUserDataUseCase: GetUserDataUseCase,
     private val getFileVersionsOption: GetFileVersionsOption,
-    private val queryRecoveryLinkUseCase: QueryRecoveryLinkUseCase,
+    private val queryCancelLinkUseCase: QueryCancelLinkUseCase,
+    private val queryChangeEmailLinkUseCase: QueryChangeEmailLinkUseCase,
+    private val isUrlMatchesRegexUseCase: IsUrlMatchesRegexUseCase,
     private val confirmCancelAccountUseCase: ConfirmCancelAccountUseCase,
     private val confirmChangeEmailUseCase: ConfirmChangeEmailUseCase,
     private val filePrepareUseCase: FilePrepareUseCase,
@@ -179,7 +181,6 @@ class MyAccountViewModel @Inject constructor(
     private val updateCurrentUserName: UpdateCurrentUserName,
     private val getCurrentUserEmail: GetCurrentUserEmail,
     private val monitorVerificationStatus: MonitorVerificationStatus,
-    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val getExportMasterKeyUseCase: GetExportMasterKeyUseCase,
     private val broadcastRefreshSessionUseCase: BroadcastRefreshSessionUseCase,
     private val logoutUseCase: LogoutUseCase,
@@ -188,7 +189,7 @@ class MyAccountViewModel @Inject constructor(
     private val getNodeByIdUseCase: GetNodeByIdUseCase,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     private val snackBarHandler: SnackBarHandler,
-) : BaseRxViewModel() {
+) : ViewModel() {
 
     companion object {
         const val CHECKING_2FA = "CHECKING_2FA"
@@ -226,7 +227,6 @@ class MyAccountViewModel @Inject constructor(
         refreshNumberOfSubscription(false)
         refreshUserName(false)
         refreshCurrentUserEmail()
-        getEnabledFeatures()
 
         viewModelScope.launch {
             flow {
@@ -274,20 +274,6 @@ class MyAccountViewModel @Inject constructor(
         }
     }
 
-    private fun getEnabledFeatures() {
-        viewModelScope.launch {
-            val enabledFeatures = setOfNotNull(
-                AppFeatures.QRCodeCompose.takeIf { getFeatureFlagValueUseCase(it) }
-            )
-            _state.update { it.copy(enabledFeatureFlags = enabledFeatures) }
-        }
-    }
-
-    /**
-     * Check if given feature flag is enabled or not
-     */
-    fun isFeatureEnabled(feature: Feature) = state.value.enabledFeatureFlags.contains(feature)
-
     override fun onCleared() {
         super.onCleared()
         resetJob?.cancel()
@@ -320,7 +306,7 @@ class MyAccountViewModel @Inject constructor(
      *
      * @param clearCache
      */
-    fun refreshNumberOfSubscription(clearCache: Boolean) {
+    private fun refreshNumberOfSubscription(clearCache: Boolean) {
         viewModelScope.launch {
             _numberOfSubscription.value =
                 runCatching { getNumberOfSubscription(clearCache) }
@@ -329,11 +315,10 @@ class MyAccountViewModel @Inject constructor(
     }
 
     /**
-     * Check subscription
-     *
+     * Checks the User's Subscription type
      */
-    fun checkSubscription() {
-        PlatformInfo.values().firstOrNull {
+    private fun checkSubscription() {
+        PlatformInfo.entries.firstOrNull {
             it.subscriptionMethodId == myAccountInfo.subscriptionMethodId
         }?.run {
             when {
@@ -734,22 +719,27 @@ class MyAccountViewModel @Inject constructor(
     /**
      * Cancel subscriptions
      *
-     * @param feedback
-     * @param action
-     * @receiver
+     * @param feedback Feedback message to cancel subscriptions.
      */
-    fun cancelSubscriptions(feedback: String?, action: (Boolean) -> Unit) {
-        cancelSubscriptionsUseCase.cancel(feedback)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy(
-                onSuccess = { action.invoke(true) },
-                onError = { error ->
-                    Timber.w("Error when killing sessions: ${error.message}")
-                    action.invoke(false)
+    fun cancelSubscriptions(feedback: String?) {
+        viewModelScope.launch {
+            runCatching {
+                cancelSubscriptionsUseCase(feedback).let { isSuccessful ->
+                    snackBarHandler.postSnackbarMessage(
+                        if (isSuccessful) R.string.cancel_subscription_ok
+                        else R.string.cancel_subscription_error,
+                        snackbarDuration = MegaSnackbarDuration.Long,
+                    )
                 }
-            )
-            .addTo(composite)
+            }.onFailure {
+                Timber.e(it, "Error cancelling subscriptions")
+                snackBarHandler.postSnackbarMessage(
+                    R.string.cancel_subscription_error,
+                    snackbarDuration = MegaSnackbarDuration.Long,
+                )
+            }
+            refreshNumberOfSubscription(true)
+        }
     }
 
     /**
@@ -1022,21 +1012,62 @@ class MyAccountViewModel @Inject constructor(
     }
 
     /**
-     * Confirm cancel account
+     * Begins the process of cancelling the User's Account
      *
-     * @param link
-     * @param action
-     * @receiver
+     * @param accountCancellationLink the Account Cancellation Link
      */
-    fun confirmCancelAccount(link: String, action: (String) -> Unit) {
-        queryRecoveryLinkUseCase.queryCancelAccount(link)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy { result ->
-                confirmationLink = result
-                action.invoke(result)
+    fun cancelAccount(accountCancellationLink: String) {
+        viewModelScope.launch {
+            runCatching {
+                queryCancelLinkUseCase(accountCancellationLink)
+            }.onSuccess { newAccountCancellationLink ->
+                Timber.d("Successfully queried the Account Cancellation Link")
+                confirmationLink = newAccountCancellationLink
+                checkAccountCancellationLinkValidity()
+            }.onFailure { exception ->
+                Timber.e("An issue occurred when querying the Account Cancellation Link", exception)
+                _state.update {
+                    it.copy(
+                        errorMessageRes = when (exception) {
+                            is QueryCancelLinkException.UnrelatedAccountCancellationLink -> R.string.error_not_logged_with_correct_account
+                            is QueryCancelLinkException.ExpiredAccountCancellationLink -> R.string.cancel_link_expired
+                            else -> R.string.invalid_link
+                        }
+                    )
+                }
             }
-            .addTo(composite)
+        }
+    }
+
+    /**
+     * Once the Account Cancellation Link has been successfully queried and no issues were found,
+     * check if the Account Cancellation Link matches the specified Regex
+     */
+    private fun checkAccountCancellationLinkValidity() {
+        viewModelScope.launch {
+            runCatching {
+                isUrlMatchesRegexUseCase(
+                    url = confirmationLink,
+                    patterns = CANCEL_ACCOUNT_LINK_REGEXS,
+                )
+            }.onSuccess { isMatching ->
+                Timber.d(
+                    "Successfully checked if the URL matches the Cancel Account Link Regex\n" +
+                            "Is Account Cancellation Link Valid: $isMatching"
+                )
+                if (isMatching) {
+                    checkSubscription()
+                } else {
+                    _state.update { it.copy(errorMessageRes = R.string.general_error_word) }
+                }
+            }.onFailure { exception ->
+                Timber.e(
+                    "An issue occurred when checking if the URL matches the Cancel Account Link Regex",
+                    exception
+                )
+                _state.update { it.copy(errorMessageRes = R.string.general_error_word) }
+            }
+        }
     }
 
     /**
@@ -1085,21 +1116,70 @@ class MyAccountViewModel @Inject constructor(
     }
 
     /**
-     * Confirm change email
+     * Begins the process of changing the User's Email Address
      *
-     * @param link
-     * @param action
-     * @receiver
+     * @param changeEmailLink the Change Email Link
      */
-    fun confirmChangeEmail(link: String, action: (String) -> Unit) {
-        queryRecoveryLinkUseCase.queryChangeEmail(link)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy { result ->
-                confirmationLink = link
-                action.invoke(result)
+    fun beginChangeEmailProcess(changeEmailLink: String) {
+        viewModelScope.launch {
+            runCatching {
+                queryChangeEmailLinkUseCase(changeEmailLink)
+            }.onSuccess { newChangeEmailLink ->
+                Timber.d("Successfully queried the Change Email Link")
+                confirmationLink = newChangeEmailLink
+                checkChangeEmailLinkValidity()
+            }.onFailure { exception ->
+                Timber.e("An issue occurred when querying the Change Email Link", exception)
+                if (exception is QueryChangeEmailLinkException.LinkNotGenerated) {
+                    _state.update { it.copy(showInvalidChangeEmailLinkPrompt = true) }
+                } else {
+                    _state.update { it.copy(errorMessageRes = R.string.general_error_word) }
+                }
             }
-            .addTo(composite)
+        }
+    }
+
+    /**
+     * Once the Change Email Link has been successfully queried and no issues were found,
+     * check if the Change Email Link matches the specified Regex
+     */
+    private fun checkChangeEmailLinkValidity() {
+        runCatching {
+            isUrlMatchesRegexUseCase(
+                url = confirmationLink,
+                patterns = Constants.VERIFY_CHANGE_MAIL_LINK_REGEXS,
+            )
+        }.onSuccess { isMatching ->
+            Timber.d(
+                "Successfully checked if the URL matches the Change Email Link Regex\n" +
+                        "Is Change Email Link Valid: $isMatching"
+            )
+            if (isMatching) {
+                _state.update { it.copy(showChangeEmailConfirmation = true) }
+            } else {
+                _state.update { it.copy(errorMessageRes = R.string.general_error_word) }
+            }
+        }.onFailure { exception ->
+            Timber.e(
+                "An issue occurred when checking if the URL matches the Change Email Link Regex",
+                exception
+            )
+            _state.update { it.copy(errorMessageRes = R.string.general_error_word) }
+        }
+    }
+
+    /**
+     * Change the specific State Parameter to hide the Change Email Confirmation
+     */
+    fun resetChangeEmailConfirmation() {
+        _state.update { it.copy(showChangeEmailConfirmation = false) }
+    }
+
+    /**
+     * Change the specific State Parameter to hide the Invalid Change Email Link Prompt
+     */
+    fun resetInvalidChangeEmailLinkPrompt() {
+        _state.update { it.copy(showInvalidChangeEmailLinkPrompt = false) }
     }
 
     /**

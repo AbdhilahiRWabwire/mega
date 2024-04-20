@@ -10,33 +10,41 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.constraintlayout.compose.ConstraintLayout
+import androidx.constraintlayout.compose.Dimension
 import androidx.core.content.FileProvider
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
-import mega.privacy.android.app.MimeTypeList
 import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
-import mega.privacy.android.app.databinding.FragmentVideoSectionBinding
 import mega.privacy.android.app.fragments.homepage.EventObserver
 import mega.privacy.android.app.fragments.homepage.HomepageSearchable
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.main.ManagerActivity
-import mega.privacy.android.app.mediaplayer.miniplayer.MiniAudioPlayerController
 import mega.privacy.android.app.presentation.bottomsheet.NodeOptionsBottomSheetDialogFragment
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.mapper.GetOptionsForToolbarMapper
+import mega.privacy.android.app.presentation.search.view.MiniAudioPlayerView
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionTab
 import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
 import mega.privacy.android.app.presentation.videosection.view.VideoSectionFeatureScreen
@@ -46,14 +54,17 @@ import mega.privacy.android.app.utils.Constants.AUTHORITY_STRING_FILE_PROVIDER
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_FILE_NAME
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_HANDLE
+import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_HANDLES_NODES_SEARCH
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ORDER_GET_CHILDREN
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_POSITION
 import mega.privacy.android.app.utils.Constants.ORDER_CLOUD
 import mega.privacy.android.app.utils.Constants.ORDER_VIDEO_PLAYLIST
+import mega.privacy.android.app.utils.Constants.SEARCH_BY_ADAPTER
 import mega.privacy.android.app.utils.Constants.VIDEO_BROWSE_ADAPTER
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.callManager
 import mega.privacy.android.domain.entity.ThemeMode
+import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.shared.theme.MegaAppTheme
 import timber.log.Timber
@@ -81,9 +92,6 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
     @Inject
     lateinit var getOptionsForToolbarMapper: GetOptionsForToolbarMapper
 
-    private var _binding: FragmentVideoSectionBinding? = null
-    private val binding get() = _binding!!
-
     private var actionMode: ActionMode? = null
 
     private val playlistMenuMoreProvider = object : MenuProvider {
@@ -98,6 +106,24 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
         override fun onMenuItemSelected(menuItem: MenuItem): Boolean = true
     }
 
+    private val videoSelectedActivityLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            when (result.resultCode) {
+                Activity.RESULT_OK -> {
+                    result.data?.getStringArrayListExtra(
+                        VideoSelectedActivity.INTENT_KEY_VIDEO_SELECTED
+                    )?.let { items ->
+                        videoSectionViewModel.state.value.currentVideoPlaylist?.let { currentPlaylist ->
+                            videoSectionViewModel.addVideosToPlaylist(
+                                currentPlaylist.id,
+                                items.map { NodeId(it.toLong()) })
+                        }
+
+                    }
+                }
+            }
+        }
+
     /**
      * onCreateView
      */
@@ -105,18 +131,216 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
-    ): View {
-        _binding = FragmentVideoSectionBinding.inflate(inflater, container, false)
-        return binding.root
+    ): View = ComposeView(requireContext()).apply {
+        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+        setContent {
+            val themeMode by getThemeMode()
+                .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
+            val uiState by videoSectionViewModel.state.collectAsStateWithLifecycle()
+            MegaAppTheme(isDark = themeMode.isDarkMode()) {
+                ConstraintLayout(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    val (audioPlayer, videoSectionFeatureScreen) = createRefs()
+
+                    MiniAudioPlayerView(
+                        modifier = Modifier
+                            .constrainAs(audioPlayer) {
+                                bottom.linkTo(parent.bottom)
+                            }
+                            .fillMaxWidth(),
+                        lifecycle = lifecycle,
+                    )
+
+                    VideoSectionFeatureScreen(
+                        modifier = Modifier
+                            .constrainAs(videoSectionFeatureScreen) {
+                                top.linkTo(parent.top)
+                                bottom.linkTo(audioPlayer.top)
+                                height = Dimension.fillToConstraints
+                            }
+                            .fillMaxWidth(),
+                        onSortOrderClick = { showSortByPanel() },
+                        videoSectionViewModel = videoSectionViewModel,
+                        onClick = { item, index ->
+                            if (uiState.isInSelection) {
+                                videoSectionViewModel.onItemClicked(item, index)
+                            } else {
+                                openVideoFile(
+                                    activity = requireActivity(),
+                                    item = item,
+                                    index = index
+                                )
+                            }
+                        },
+                        onLongClick = { item, index ->
+                            activateActionMode()
+                            videoSectionViewModel.onItemClicked(item, index)
+                        },
+                        onMenuClick = { item ->
+                            showOptionsMenuForItem(item)
+                        },
+                        onAddElementsClicked = {
+                            navigateToVideoSelectedActivity()
+                        },
+                        onPlaylistDetailItemClick = { item, index ->
+                            if (uiState.isInSelection) {
+                                videoSectionViewModel.onVideoItemOfPlaylistClicked(item, index)
+                            } else {
+                                openVideoFile(
+                                    activity = requireActivity(),
+                                    item = item,
+                                    index = index
+                                )
+                            }
+                        },
+                        onPlaylistItemLongClick = { item, index ->
+                            activateVideoPlaylistActionMode(ACTION_TYPE_VIDEO_PLAYLIST)
+                            videoSectionViewModel.onVideoPlaylistItemClicked(item, index)
+                        },
+                        onPlaylistDetailItemLongClick = { item, index ->
+                            activateVideoPlaylistActionMode(ACTION_TYPE_VIDEO_PLAYLIST_DETAIL)
+                            videoSectionViewModel.onVideoItemOfPlaylistClicked(item, index)
+                        },
+                        onActionModeFinished = { actionMode?.finish() },
+                        onPlayAllClicked = {
+                            uiState.currentVideoPlaylist?.videos?.firstOrNull()?.let {
+                                openVideoFile(
+                                    activity = requireActivity(),
+                                    item = it,
+                                    index = 0
+                                )
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    private fun navigateToVideoSelectedActivity() {
+        videoSelectedActivityLauncher.launch(
+            Intent(
+                requireActivity(),
+                VideoSelectedActivity::class.java
+            )
+        )
+    }
+
+    private fun showSortByPanel() {
+        val currentSelectTab = videoSectionViewModel.tabState.value.selectedTab
+        (requireActivity() as ManagerActivity).showNewSortByPanel(
+            if (currentSelectTab == VideoSectionTab.All) ORDER_CLOUD else ORDER_VIDEO_PLAYLIST
+        )
+    }
+
+    private fun openVideoFile(
+        activity: Activity,
+        item: VideoUIEntity,
+        index: Int,
+    ) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val nodeHandle = item.id.longValue
+            val nodeType = item.fileTypeInfo.mimeType
+            val intent = getIntent(item = item, index = index)
+
+            activity.startActivity(
+                videoSectionViewModel.isLocalFile(nodeHandle)?.let { localPath ->
+                    File(localPath).let { mediaFile ->
+                        runCatching {
+                            FileProvider.getUriForFile(
+                                activity,
+                                AUTHORITY_STRING_FILE_PROVIDER,
+                                mediaFile
+                            )
+                        }.onFailure {
+                            Uri.fromFile(mediaFile)
+                        }.map { mediaFileUri ->
+                            intent.setDataAndType(mediaFileUri, nodeType)
+                            intent.flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        }
+                    }
+                    intent
+                } ?: videoSectionViewModel.updateIntent(
+                    handle = nodeHandle,
+                    type = nodeType,
+                    intent = intent
+                )
+            )
+        }
+    }
+
+    private fun getIntent(
+        item: VideoUIEntity,
+        index: Int,
+    ) = Util.getMediaIntent(activity, item.name).apply {
+        val state = videoSectionViewModel.state.value
+        putExtra(INTENT_EXTRA_KEY_POSITION, index)
+        putExtra(INTENT_EXTRA_KEY_HANDLE, item.id.longValue)
+        putExtra(INTENT_EXTRA_KEY_FILE_NAME, item.name)
+        when (state.currentDestinationRoute) {
+            videoSectionRoute ->
+                if (state.searchMode) {
+                    putExtra(INTENT_EXTRA_KEY_ADAPTER_TYPE, SEARCH_BY_ADAPTER)
+                    putExtra(
+                        INTENT_EXTRA_KEY_HANDLES_NODES_SEARCH,
+                        state.allVideos.map { it.id.longValue }.toLongArray()
+                    )
+                } else {
+                    putExtra(INTENT_EXTRA_KEY_ADAPTER_TYPE, VIDEO_BROWSE_ADAPTER)
+                }
+
+            videoPlaylistDetailRoute -> {
+                putExtra(INTENT_EXTRA_KEY_ADAPTER_TYPE, SEARCH_BY_ADAPTER)
+                state.currentVideoPlaylist?.videos?.map { it.id.longValue }?.let {
+                    putExtra(INTENT_EXTRA_KEY_HANDLES_NODES_SEARCH, it.toLongArray())
+                }
+            }
+        }
+        putExtra(
+            INTENT_EXTRA_KEY_ORDER_GET_CHILDREN,
+            sortByHeaderViewModel.cloudSortOrder.value
+        )
+        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    }
+
+    private fun activateActionMode() {
+        if (actionMode == null) {
+            actionMode =
+                (requireActivity() as? AppCompatActivity)?.startSupportActionMode(
+                    VideoSectionActionModeCallback(
+                        managerActivity = requireActivity() as ManagerActivity,
+                        childFragmentManager = childFragmentManager,
+                        videoSectionViewModel = videoSectionViewModel,
+                        getOptionsForToolbarMapper = getOptionsForToolbarMapper
+                    ) {
+                        disableSelectMode()
+                    }
+                )
+            videoSectionViewModel.setActionMode(true)
+        }
+    }
+
+    private fun activateVideoPlaylistActionMode(actionType: Int) {
+        if (actionMode == null) {
+            actionMode =
+                (requireActivity() as? AppCompatActivity)?.startSupportActionMode(
+                    VideoPlaylistActionMode(
+                        managerActivity = requireActivity() as ManagerActivity,
+                        videoSectionViewModel = videoSectionViewModel,
+                        actionType = actionType
+                    ) {
+                        disableSelectMode()
+                    }
+                )
+            videoSectionViewModel.setActionMode(true)
+        }
     }
 
     /**
      * onViewCreated
      */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        initVideoSectionComposeView()
-        setupMiniAudioPlayer()
-
         sortByHeaderViewModel.orderChangeEvent.observe(
             viewLifecycleOwner, EventObserver { videoSectionViewModel.refreshWhenOrderChanged() }
         )
@@ -151,122 +375,45 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
         }
 
         viewLifecycleOwner.collectFlow(
-            videoSectionViewModel.state.map { it.currentDestinationRoute }.distinctUntilChanged()
+            videoSectionViewModel.state.map { it.currentDestinationRoute }.distinctUntilChanged(),
+            minActiveState = Lifecycle.State.CREATED
         ) { route ->
-            route?.let { updateToolbarWhenDestinationChanged(it) }
+            route?.let { updateToolbarWhenDestinationChanged(isAddMenu = true) }
         }
-    }
 
-    private fun initVideoSectionComposeView() {
-        binding.videoSectionComposeView.apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-            setContent {
-                val themeMode by getThemeMode()
-                    .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
-                val uiState by videoSectionViewModel.state.collectAsStateWithLifecycle()
-                MegaAppTheme(isDark = themeMode.isDarkMode()) {
-                    VideoSectionFeatureScreen(
-                        onSortOrderClick = { showSortByPanel() },
-                        videoSectionViewModel = videoSectionViewModel,
-                        onClick = { item, index ->
-                            if (uiState.isInSelection) {
-                                videoSectionViewModel.onItemClicked(item, index)
-                            } else {
-                                openVideoFile(
-                                    activity = requireActivity(),
-                                    item = item,
-                                    index = index
-                                )
-                            }
-                        },
-                        onLongClick = { item, index ->
-                            videoSectionViewModel.onLongItemClicked(item, index)
-                            activateActionMode()
-                        },
-                        onMenuClick = { item ->
-                            showOptionsMenuForItem(item)
-                        }
-                    )
-                }
-                updateActionModeTitle(count = uiState.selectedVideoHandles.size)
+        viewLifecycleOwner.collectFlow(
+            videoSectionViewModel.state.map { it.updateToolbarTitle }.distinctUntilChanged(),
+        ) { title ->
+            updateToolbarWhenDestinationChanged(title = title)
+        }
+
+        viewLifecycleOwner.collectFlow(
+            videoSectionViewModel.state.map { it.actionMode }.distinctUntilChanged()
+        ) { isActionMode ->
+            if (!isActionMode) {
+                actionMode?.finish()
             }
         }
-    }
 
-    private fun showSortByPanel() {
-        val currentSelectTab = videoSectionViewModel.tabState.value.selectedTab
-        (requireActivity() as ManagerActivity).showNewSortByPanel(
-            if (currentSelectTab == VideoSectionTab.All) ORDER_CLOUD else ORDER_VIDEO_PLAYLIST
-        )
-    }
-
-    private fun openVideoFile(
-        activity: Activity,
-        item: VideoUIEntity,
-        index: Int,
-    ) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            val nodeHandle = item.id.longValue
-            val nodeName = item.name
-            val intent = getIntent(item = item, index = index)
-
-            activity.startActivity(
-                videoSectionViewModel.isLocalFile(nodeHandle)?.let { localPath ->
-                    File(localPath).let { mediaFile ->
-                        runCatching {
-                            FileProvider.getUriForFile(
-                                activity,
-                                AUTHORITY_STRING_FILE_PROVIDER,
-                                mediaFile
-                            )
-                        }.onFailure {
-                            Uri.fromFile(mediaFile)
-                        }.map { mediaFileUri ->
-                            intent.setDataAndType(
-                                mediaFileUri,
-                                MimeTypeList.typeForName(nodeName).type
-                            )
-                            intent.flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        }
-                    }
-                    intent
-                } ?: videoSectionViewModel.updateIntent(
-                    handle = nodeHandle,
-                    name = nodeName,
-                    intent = intent
-                )
-            )
+        viewLifecycleOwner.collectFlow(
+            videoSectionViewModel.state.map { it.isVideoPlaylistCreatedSuccessfully }
+                .distinctUntilChanged()
+        ) { isSuccess ->
+            if (isSuccess) {
+                navigateToVideoSelectedActivity()
+            }
         }
-    }
 
-    private fun getIntent(
-        item: VideoUIEntity,
-        index: Int,
-    ) = Util.getMediaIntent(activity, item.name).apply {
-        putExtra(INTENT_EXTRA_KEY_POSITION, index)
-        putExtra(INTENT_EXTRA_KEY_HANDLE, item.id.longValue)
-        putExtra(INTENT_EXTRA_KEY_FILE_NAME, item.name)
-        putExtra(INTENT_EXTRA_KEY_ADAPTER_TYPE, VIDEO_BROWSE_ADAPTER)
-        putExtra(
-            INTENT_EXTRA_KEY_ORDER_GET_CHILDREN,
-            sortByHeaderViewModel.cloudSortOrder.value
-        )
-        addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-    }
-
-    private fun activateActionMode() {
-        if (actionMode == null) {
-            actionMode =
-                (requireActivity() as? AppCompatActivity)?.startSupportActionMode(
-                    VideoSectionActionModeCallback(
-                        managerActivity = requireActivity() as ManagerActivity,
-                        childFragmentManager = childFragmentManager,
-                        videoSectionViewModel = videoSectionViewModel,
-                        getOptionsForToolbarMapper = getOptionsForToolbarMapper
-                    ) {
-                        disableSelectMode()
-                    }
-                )
+        viewLifecycleOwner.lifecycleScope.launch {
+            merge(
+                videoSectionViewModel.state.map { it.selectedVideoHandles }.distinctUntilChanged(),
+                videoSectionViewModel.state.map { it.selectedVideoPlaylistHandles }
+                    .distinctUntilChanged(),
+                videoSectionViewModel.state.map { it.selectedVideoElementIDs }
+                    .distinctUntilChanged()
+            ).collectLatest { list ->
+                updateActionModeTitle(count = list.size)
+            }
         }
     }
 
@@ -288,7 +435,11 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
         )
     }
 
-    private fun updateToolbarWhenDestinationChanged(route: String) {
+    private fun updateToolbarWhenDestinationChanged(
+        title: String? = null,
+        isAddMenu: Boolean = false,
+    ) {
+        val route = videoSectionViewModel.state.value.currentDestinationRoute ?: return
         (activity as? ManagerActivity)?.let { managerActivity ->
             when (route) {
                 videoSectionRoute -> {
@@ -297,8 +448,10 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
                 }
 
                 videoPlaylistDetailRoute -> {
-                    managerActivity.addMenuProvider(playlistMenuMoreProvider)
-                    managerActivity.setToolbarTitle("")
+                    if (isAddMenu) {
+                        managerActivity.addMenuProvider(playlistMenuMoreProvider)
+                    }
+                    managerActivity.setToolbarTitle(title ?: "")
                 }
             }
             managerActivity.invalidateOptionsMenu()
@@ -308,21 +461,9 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
     private fun disableSelectMode() {
         actionMode = null
         videoSectionViewModel.clearAllSelectedVideos()
-    }
-
-    private fun setupMiniAudioPlayer() {
-        val audioPlayerController = MiniAudioPlayerController(binding.miniAudioPlayer).apply {
-            shouldVisible = true
-        }
-        lifecycle.addObserver(audioPlayerController)
-    }
-
-    /**
-     * onDestroyView
-     */
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
+        videoSectionViewModel.clearAllSelectedVideoPlaylists()
+        videoSectionViewModel.clearAllSelectedVideosOfPlaylist()
+        videoSectionViewModel.setActionMode(false)
     }
 
     /**
@@ -353,5 +494,17 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
      */
     override fun exitSearch() {
         videoSectionViewModel.exitSearch()
+    }
+
+    companion object {
+        /**
+         * The action type for video playlist
+         */
+        const val ACTION_TYPE_VIDEO_PLAYLIST = 10
+
+        /**
+         * The action type for video playlist detail
+         */
+        const val ACTION_TYPE_VIDEO_PLAYLIST_DETAIL = 11
     }
 }

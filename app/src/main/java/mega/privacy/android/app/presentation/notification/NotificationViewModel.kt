@@ -9,46 +9,72 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.notification.model.Notification
 import mega.privacy.android.app.presentation.notification.model.NotificationState
 import mega.privacy.android.app.presentation.notification.model.mapper.NotificationMapper
 import mega.privacy.android.domain.usecase.AcknowledgeUserAlertsUseCase
 import mega.privacy.android.domain.usecase.MonitorUserAlertsUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.domain.usecase.notifications.GetPromoNotificationsUseCase
+import mega.privacy.android.domain.usecase.notifications.SetLastReadNotificationUseCase
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * Notification view model
+ * NotificationViewModel
  *
- * @property acknowledgeUserAlertsUseCase
- * @property monitorUserAlertsUseCase
- * @property state
+ * @property acknowledgeUserAlertsUseCase Acknowledge user alerts use case
+ * @property monitorUserAlertsUseCase Monitor user alerts use case
+ * @property getPromoNotificationsUseCase Get promo notifications use case
+ * @property setLastReadNotificationUseCase Set last read notification use case
+ * @property getFeatureFlagValueUseCase Get feature flag value use case
+ * @property notificationMapper Notification mapper
+ * @constructor Create empty Notification view model
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class NotificationViewModel @Inject constructor(
     private val acknowledgeUserAlertsUseCase: AcknowledgeUserAlertsUseCase,
     private val monitorUserAlertsUseCase: MonitorUserAlertsUseCase,
+    private val getPromoNotificationsUseCase: GetPromoNotificationsUseCase,
+    private val setLastReadNotificationUseCase: SetLastReadNotificationUseCase,
+    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val notificationMapper: NotificationMapper,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(NotificationState(emptyList()))
+    private var isPromoNotificationsEnabled = false
+    private val _state = MutableStateFlow(NotificationState())
     val state = _state.asStateFlow()
-
 
     init {
         viewModelScope.launch {
             monitorUserAlertsUseCase().mapLatest { list ->
                 list.map { notificationMapper(it) }
-            }.collect {
-                _state.update { (notifications) ->
-                    NotificationState(
-                        notifications = it,
-                        scrollToTop = areNewItemsAdded(it, notifications)
+            }.collect { userAlerts ->
+                _state.update { state ->
+                    state.copy(
+                        notifications = userAlerts,
+                        promoNotifications = getPromoNotifications(),
+                        scrollToTop = areNewItemsAdded(userAlerts, state.notifications)
                     )
                 }
             }
         }
     }
+
+    private suspend fun getPromoNotifications() =
+        runCatching {
+            isPromoNotificationsEnabled = getFeatureFlagValueUseCase(AppFeatures.PromoNotifications)
+            if (isPromoNotificationsEnabled) {
+                getPromoNotificationsUseCase()
+            } else {
+                emptyList()
+            }
+        }.onFailure {
+            Timber.e("Failed to fetch promo notifications with error: ${it.message}")
+        }.getOrDefault(emptyList())
+
 
     private fun areNewItemsAdded(
         it: List<Notification>,
@@ -60,6 +86,23 @@ class NotificationViewModel @Inject constructor(
      *
      */
     fun onNotificationsLoaded() {
-        viewModelScope.launch { acknowledgeUserAlertsUseCase() }
+        viewModelScope.launch {
+            runCatching {
+                acknowledgeUserAlertsUseCase()
+            }.onFailure {
+                Timber.e("Failed to acknowledge user alerts with error: ${it.message}")
+            }
+        }
+        viewModelScope.launch {
+            val lastReadPromoNotificationID =
+                state.value.promoNotifications.firstOrNull()?.promoID
+            lastReadPromoNotificationID?.let {
+                runCatching {
+                    setLastReadNotificationUseCase(it)
+                }.onFailure {
+                    Timber.e("Failed to set last read notification with error: ${it.message}")
+                }
+            }
+        }
     }
 }

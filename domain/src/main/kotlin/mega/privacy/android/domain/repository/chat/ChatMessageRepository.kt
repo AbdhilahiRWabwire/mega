@@ -5,8 +5,11 @@ import kotlinx.coroutines.flow.Flow
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ChatMessageType
 import mega.privacy.android.domain.entity.chat.PendingMessage
+import mega.privacy.android.domain.entity.chat.PendingMessageState
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
+import mega.privacy.android.domain.entity.chat.messages.UserMessage
 import mega.privacy.android.domain.entity.chat.messages.pending.SavePendingMessageRequest
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageRequest
 import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
 import mega.privacy.android.domain.entity.node.NodeId
 
@@ -203,12 +206,13 @@ interface ChatMessageRepository {
     suspend fun savePendingMessage(savePendingMessageRequest: SavePendingMessageRequest): PendingMessage
 
     /**
-     * Save pending message
+     * Update pending message
      *
-     * @param savePendingMessageRequest
-     * @return saved PendingMessage
+     * @param updatePendingMessageRequest
      */
-    suspend fun updatePendingMessage(savePendingMessageRequest: SavePendingMessageRequest)
+    suspend fun updatePendingMessage(
+        updatePendingMessageRequest: UpdatePendingMessageRequest,
+    )
 
     /**
      * Monitor pending messages
@@ -318,11 +322,23 @@ interface ChatMessageRepository {
     suspend fun getPendingMessage(pendingMessageId: Long): PendingMessage?
 
     /**
-     * Delete pending message by id
+     * Get all pending messages in a specific state
+     */
+    suspend fun getPendingMessagesByState(state: PendingMessageState): List<PendingMessage>
+
+    /**
+     * Delete pending message
      *
      * @param pendingMessage
      */
     suspend fun deletePendingMessage(pendingMessage: PendingMessage)
+
+    /**
+     * Delete pending message by id
+     *
+     * @param pendingMessageId
+     */
+    suspend fun deletePendingMessageById(pendingMessageId: Long)
 
     /**
      * Get message ids by type
@@ -482,4 +498,40 @@ interface ChatMessageRepository {
      * @param truncateTimestamp
      */
     suspend fun truncateMessages(chatId: Long, truncateTimestamp: Long)
+
+    /**
+     * Delete all pending messages in a chat.
+     *
+     * @param chatId
+     */
+    suspend fun clearChatPendingMessages(chatId: Long)
+
+    /**
+     * Remove sent message
+     *
+     * @param message
+     */
+    suspend fun removeSentMessage(message: UserMessage)
+
+    /**
+     * Update does not exists in message.
+     *
+     * @param chatId Chat id.
+     * @param msgId Message id.
+     */
+    suspend fun updateDoesNotExistInMessage(chatId: Long, msgId: Long)
+
+    /**
+     * Get exists in message
+     *
+     * @param chatId Chat id.
+     * @param msgId Message id.
+     * @return Whether the content in message exists.
+     */
+    suspend fun getExistsInMessage(chatId: Long, msgId: Long): Boolean
+
+    /**
+     * Clear all data from chat database
+     */
+    suspend fun clearAllData()
 }

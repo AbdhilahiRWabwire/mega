@@ -9,18 +9,23 @@ import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineDispatcher
 import mega.privacy.android.data.mapper.transfer.ChatUploadNotificationMapper
 import mega.privacy.android.data.mapper.transfer.OverQuotaNotificationBuilder
+import mega.privacy.android.domain.entity.chat.PendingMessageState
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateRequest
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.transfer.ActiveTransferTotals
 import mega.privacy.android.domain.entity.transfer.TransferEvent
 import mega.privacy.android.domain.entity.transfer.TransferType
 import mega.privacy.android.domain.entity.transfer.pendingMessageId
+import mega.privacy.android.domain.monitoring.CrashReporter
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.usecase.chat.message.AttachNodeWithPendingMessageUseCase
+import mega.privacy.android.domain.usecase.chat.message.CheckFinishedChatUploadsUseCase
+import mega.privacy.android.domain.usecase.chat.message.UpdatePendingMessageUseCase
 import mega.privacy.android.domain.usecase.transfers.MonitorTransferEventsUseCase
-import mega.privacy.android.domain.usecase.transfers.active.AddOrUpdateActiveTransferUseCase
 import mega.privacy.android.domain.usecase.transfers.active.ClearActiveTransfersIfFinishedUseCase
 import mega.privacy.android.domain.usecase.transfers.active.CorrectActiveTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.active.GetActiveTransferTotalsUseCase
+import mega.privacy.android.domain.usecase.transfers.active.HandleTransferEventUseCase
 import mega.privacy.android.domain.usecase.transfers.active.MonitorOngoingActiveTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
 import timber.log.Timber
@@ -35,7 +40,7 @@ class ChatUploadsWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     monitorTransferEventsUseCase: MonitorTransferEventsUseCase,
-    addOrUpdateActiveTransferUseCase: AddOrUpdateActiveTransferUseCase,
+    handleTransferEventUseCase: HandleTransferEventUseCase,
     monitorOngoingActiveTransfersUseCase: MonitorOngoingActiveTransfersUseCase,
     areTransfersPausedUseCase: AreTransfersPausedUseCase,
     getActiveTransferTotalsUseCase: GetActiveTransferTotalsUseCase,
@@ -46,43 +51,66 @@ class ChatUploadsWorker @AssistedInject constructor(
     clearActiveTransfersIfFinishedUseCase: ClearActiveTransfersIfFinishedUseCase,
     private val chatUploadNotificationMapper: ChatUploadNotificationMapper,
     private val attachNodeWithPendingMessageUseCase: AttachNodeWithPendingMessageUseCase,
+    private val updatePendingMessageUseCase: UpdatePendingMessageUseCase,
+    private val checkFinishedChatUploadsUseCase: CheckFinishedChatUploadsUseCase,
+    crashReporter: CrashReporter,
+    foregroundSetter: ForegroundSetter? = null,
 ) : AbstractTransfersWorker(
-    context,
-    workerParams,
-    TransferType.CHAT_UPLOAD,
-    ioDispatcher,
-    monitorTransferEventsUseCase,
-    addOrUpdateActiveTransferUseCase,
-    monitorOngoingActiveTransfersUseCase,
-    areTransfersPausedUseCase,
-    getActiveTransferTotalsUseCase,
-    overQuotaNotificationBuilder,
-    notificationManager,
-    areNotificationsEnabledUseCase,
-    correctActiveTransfersUseCase,
-    clearActiveTransfersIfFinishedUseCase,
+    context = context,
+    workerParams = workerParams,
+    type = TransferType.CHAT_UPLOAD,
+    ioDispatcher = ioDispatcher,
+    monitorTransferEventsUseCase = monitorTransferEventsUseCase,
+    handleTransferEventUseCase = handleTransferEventUseCase,
+    monitorOngoingActiveTransfersUseCase = monitorOngoingActiveTransfersUseCase,
+    areTransfersPausedUseCase = areTransfersPausedUseCase,
+    getActiveTransferTotalsUseCase = getActiveTransferTotalsUseCase,
+    overQuotaNotificationBuilder = overQuotaNotificationBuilder,
+    notificationManager = notificationManager,
+    areNotificationsEnabledUseCase = areNotificationsEnabledUseCase,
+    correctActiveTransfersUseCase = correctActiveTransfersUseCase,
+    clearActiveTransfersIfFinishedUseCase = clearActiveTransfersIfFinishedUseCase,
+    crashReporter = crashReporter,
+    foregroundSetter = foregroundSetter,
 ) {
     override val updateNotificationId = NOTIFICATION_CHAT_UPLOAD
 
-    override suspend fun createUpdateNotification(
+    override fun createUpdateNotification(
         activeTransferTotals: ActiveTransferTotals,
         paused: Boolean,
     ) = chatUploadNotificationMapper(activeTransferTotals, null, paused)
 
+    override suspend fun onStart() {
+        checkFinishedChatUploadsUseCase()
+    }
+
     override suspend fun onTransferEventReceived(event: TransferEvent) {
-        (event as? TransferEvent.TransferFinishEvent)?.transfer?.pendingMessageId()
-            ?.let { pendingMessageId ->
-                runCatching {
-                    Timber.d("Node will be attached")
-                    //once uploaded, it can be attached to the chat
-                    attachNodeWithPendingMessageUseCase(
-                        pendingMessageId,
-                        NodeId(event.transfer.nodeHandle)
-                    )
-                }.onFailure {
-                    Timber.e(it, "Node could not be attached")
+        event.transfer.pendingMessageId()?.let { pendingMessageId ->
+            (event as? TransferEvent.TransferFinishEvent)?.let { finishEvent ->
+                if (finishEvent.error == null) {
+                    runCatching {
+                        Timber.d("Node will be attached")
+                        //once uploaded, it can be attached to the chat
+                        attachNodeWithPendingMessageUseCase(
+                            pendingMessageId,
+                            NodeId(event.transfer.nodeHandle)
+                        )
+                    }.onFailure {
+                        updateState(pendingMessageId, PendingMessageState.ERROR_ATTACHING)
+                        Timber.e(it, "Node could not be attached")
+                    }
+                } else {
+                    updateState(pendingMessageId, PendingMessageState.ERROR_UPLOADING)
                 }
             }
+        }
+    }
+
+    private suspend fun updateState(
+        pendingMessageId: Long,
+        state: PendingMessageState,
+    ) {
+        updatePendingMessageUseCase(UpdatePendingMessageStateRequest(pendingMessageId, state))
     }
 
     companion object {

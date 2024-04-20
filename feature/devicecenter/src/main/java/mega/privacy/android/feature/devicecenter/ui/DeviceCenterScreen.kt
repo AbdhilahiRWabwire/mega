@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -49,7 +50,7 @@ import mega.privacy.android.feature.devicecenter.ui.bottomsheet.DeviceBottomShee
 import mega.privacy.android.feature.devicecenter.ui.lists.DeviceCenterListViewItem
 import mega.privacy.android.feature.devicecenter.ui.lists.loading.DeviceCenterLoadingScreen
 import mega.privacy.android.feature.devicecenter.ui.model.BackupDeviceFolderUINode
-import mega.privacy.android.feature.devicecenter.ui.model.DeviceCenterState
+import mega.privacy.android.feature.devicecenter.ui.model.DeviceCenterUiState
 import mega.privacy.android.feature.devicecenter.ui.model.DeviceCenterUINode
 import mega.privacy.android.feature.devicecenter.ui.model.DeviceFolderUINode
 import mega.privacy.android.feature.devicecenter.ui.model.DeviceMenuAction
@@ -84,42 +85,30 @@ internal const val DEVICE_CENTER_NO_ITEMS_FOUND_STATE = "device_center_content:n
  * @param uiState The UI State
  * @param snackbarHostState The [SnackbarHostState]
  * @param onDeviceClicked Lambda that performs a specific action when a Device is clicked
- * @param onDeviceMenuClicked Lambda that performs a specific action when a Device's Menu Icon is
- * clicked
+ * @param onDeviceMenuClicked Lambda that performs a specific action when a Device's Menu Icon is clicked
  * @param onBackupFolderClicked Lambda that performs a specific action when a Backup Folder is clicked
- * @param onBackupFolderMenuClicked Lambda that performs a specific action when a Backup Folder's Menu
- * Icon is clicked
- * @param onNonBackupFolderClicked Lambda that performs a specific action when a Non Backup Folder
- * is clicked
- * @param onNonBackupFolderMenuClicked Lambda that performs a specific action when a Non-Backup
- * Folder's Menu Icon is clicked
- * @param onCameraUploadsClicked Lambda that performs a specific action when the User clicks the
- * "Camera uploads" Bottom Dialog Option
- * @param onRenameDeviceOptionClicked Lambda that performs a specific action when the User clicks
- * the "Rename" Bottom Dialog Option
- * @param onRenameDeviceCancelled Lambda that performs a specific action when cancelling the Rename
- * Device action
- * @param onRenameDeviceSuccessful Lambda that performs a specific action when the Rename Device
- * action is successful
- * @param onRenameDeviceSuccessfulSnackbarShown Lambda that performs a specific action when the
- * Rename Device success Snackbar has been displayed
- * @param onBackPressHandled Lambda that performs a specific action when the Composable handles the
- * Back Press
+ * @param onNonBackupFolderClicked Lambda that performs a specific action when a Non Backup Folder is clicked
+ * @param onCameraUploadsClicked Lambda that performs a specific action when the User clicks the "Camera uploads" Bottom Dialog Option
+ * @param onInfoOptionClicked Lambda that performs a specific action when the User clicks the "Info" Bottom Dialog Option
+ * @param onRenameDeviceOptionClicked Lambda that performs a specific action when the User clicks the "Rename" Bottom Dialog Option
+ * @param onRenameDeviceCancelled Lambda that performs a specific action when cancelling the Rename Device action
+ * @param onRenameDeviceSuccessful Lambda that performs a specific action when the Rename Device action is successful
+ * @param onRenameDeviceSuccessfulSnackbarShown Lambda that performs a specific action when the Rename Device success Snackbar has been displayed
+ * @param onBackPressHandled Lambda that performs a specific action when the Composable handles the Back Press
  * @param onFeatureExited Lambda that performs a specific action when the Device Center is exited
  * @param onActionPressed Action for each available option of the app bar menu
  */
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 internal fun DeviceCenterScreen(
-    uiState: DeviceCenterState,
+    uiState: DeviceCenterUiState,
     snackbarHostState: SnackbarHostState,
     onDeviceClicked: (DeviceUINode) -> Unit,
     onDeviceMenuClicked: (DeviceUINode) -> Unit,
     onBackupFolderClicked: (BackupDeviceFolderUINode) -> Unit,
-    onBackupFolderMenuClicked: (BackupDeviceFolderUINode) -> Unit,
     onNonBackupFolderClicked: (NonBackupDeviceFolderUINode) -> Unit,
-    onNonBackupFolderMenuClicked: (NonBackupDeviceFolderUINode) -> Unit,
     onCameraUploadsClicked: () -> Unit,
+    onInfoOptionClicked: (DeviceCenterUINode) -> Unit,
     onRenameDeviceOptionClicked: (DeviceUINode) -> Unit,
     onRenameDeviceCancelled: () -> Unit,
     onRenameDeviceSuccessful: () -> Unit,
@@ -157,6 +146,7 @@ internal fun DeviceCenterScreen(
             )
         },
     )
+    val keyboardController = LocalSoftwareKeyboardController.current
     // Handle the Back Press if the Bottom Dialog is visible and the User is in Folder View
     BackHandler(enabled = modalSheetState.isVisible || selectedDevice != null) {
         if (modalSheetState.isVisible) {
@@ -174,7 +164,7 @@ internal fun DeviceCenterScreen(
                 isCameraUploadsEnabled = uiState.isCameraUploadsEnabled,
                 onCameraUploadsClicked = onCameraUploadsClicked,
                 onRenameDeviceClicked = onRenameDeviceOptionClicked,
-                onInfoClicked = {},
+                onInfoClicked = onInfoOptionClicked,
                 onBottomSheetDismissed = {
                     coroutineScope.launch { modalSheetState.hide() }
                 }
@@ -221,15 +211,15 @@ internal fun DeviceCenterScreen(
                                     onDeviceClicked(deviceUiNode)
                                 },
                                 onDeviceMenuClicked = { deviceNode ->
+                                    keyboardController?.hide()
                                     onDeviceMenuClicked(deviceNode)
                                     if (!modalSheetState.isVisible) {
                                         coroutineScope.launch { modalSheetState.show() }
                                     }
                                 },
                                 onBackupFolderClicked = onBackupFolderClicked,
-                                onBackupFolderMenuClicked = onBackupFolderMenuClicked,
                                 onNonBackupFolderClicked = onNonBackupFolderClicked,
-                                onNonBackupFolderMenuClicked = onNonBackupFolderMenuClicked,
+                                onInfoClicked = onInfoOptionClicked,
                                 modifier = Modifier.padding(paddingValues),
                             )
                         }
@@ -252,7 +242,7 @@ internal fun DeviceCenterScreen(
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 private fun DeviceCenterAppBar(
-    uiState: DeviceCenterState,
+    uiState: DeviceCenterUiState,
     selectedDevice: DeviceUINode?,
     modalSheetState: ModalBottomSheetState,
     coroutineScope: CoroutineScope,
@@ -308,13 +298,13 @@ private fun DeviceCenterAppBar(
 
                 when (uiState.selectedDevice) {
                     is OwnDeviceUINode -> {
-//                        if (uiState.isCameraUploadsEnabled) {
-//                            list.add(DeviceMenuAction.Info)
-//                        }
+                        if (uiState.isCameraUploadsEnabled) {
+                            list.add(DeviceMenuAction.Info)
+                        }
                         list.add(DeviceMenuAction.CameraUploads)
                     }
 
-//                    else -> list.add(DeviceMenuAction.Info)
+                    else -> list.add(DeviceMenuAction.Info)
                 }
 
                 return@let list
@@ -410,13 +400,9 @@ private fun DeviceCenterEmptyState(
  *
  * @param itemsToDisplay The list of Backup Devices / Device Folders to be displayed
  * @param onDeviceClicked Lambda that performs a specific action when a Device is clicked
- * @param onDeviceMenuClicked Lambda that performs a specific action when a Device's Menu Icon is
- * clicked
+ * @param onDeviceMenuClicked Lambda that performs a specific action when a Device's Menu Icon is clicked
  * @param onBackupFolderClicked Lambda that performs a specific action when a Backup Folder is clicked
- * @param onBackupFolderMenuClicked Lambda that performs a specific action when a Backup Folder's
- * Menu Icon is clicked
- * @param onNonBackupFolderMenuClicked Lambda that performs a specific action when a Non-Backup Folder's
- * Menu Icon is clicked
+ * @param onInfoClicked Lambda that performs a specific action when the Info option is clicked
  * @param modifier The Modifier object
  */
 @Composable
@@ -425,9 +411,8 @@ private fun DeviceCenterContent(
     onDeviceClicked: (DeviceUINode) -> Unit,
     onDeviceMenuClicked: (DeviceUINode) -> Unit,
     onBackupFolderClicked: (BackupDeviceFolderUINode) -> Unit,
-    onBackupFolderMenuClicked: (BackupDeviceFolderUINode) -> Unit,
     onNonBackupFolderClicked: (NonBackupDeviceFolderUINode) -> Unit,
-    onNonBackupFolderMenuClicked: (NonBackupDeviceFolderUINode) -> Unit,
+    onInfoClicked: (DeviceCenterUINode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (itemsToDisplay.isNotEmpty()) {
@@ -447,9 +432,8 @@ private fun DeviceCenterContent(
                     DeviceCenterListViewItem(
                         uiNode = deviceFolders[itemIndex],
                         onBackupFolderClicked = onBackupFolderClicked,
-                        onBackupFolderMenuClicked = onBackupFolderMenuClicked,
                         onNonBackupFolderClicked = onNonBackupFolderClicked,
-                        onNonBackupFolderMenuClicked = onNonBackupFolderMenuClicked,
+                        onInfoClicked = onInfoClicked,
                     )
                 }
                 // The User's Devices are shown
@@ -503,14 +487,13 @@ private fun DeviceCenterContent(
 private fun DeviceCenterNoNetworkStatePreview() {
     MegaAppTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterScreen(
-            uiState = DeviceCenterState(isInitialLoadingFinished = true),
+            uiState = DeviceCenterUiState(isInitialLoadingFinished = true),
             snackbarHostState = SnackbarHostState(),
             onDeviceClicked = {},
             onDeviceMenuClicked = {},
             onBackupFolderClicked = {},
-            onBackupFolderMenuClicked = {},
             onNonBackupFolderClicked = {},
-            onNonBackupFolderMenuClicked = {},
+            onInfoOptionClicked = {},
             onCameraUploadsClicked = {},
             onRenameDeviceOptionClicked = {},
             onRenameDeviceCancelled = {},
@@ -530,7 +513,7 @@ private fun DeviceCenterNoNetworkStatePreview() {
 private fun DeviceCenterNoItemsFoundPreview() {
     MegaAppTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterScreen(
-            uiState = DeviceCenterState(
+            uiState = DeviceCenterUiState(
                 isInitialLoadingFinished = true,
                 searchQuery = "testing",
                 filteredUiItems = emptyList(),
@@ -541,9 +524,8 @@ private fun DeviceCenterNoItemsFoundPreview() {
             onDeviceClicked = {},
             onDeviceMenuClicked = {},
             onBackupFolderClicked = {},
-            onBackupFolderMenuClicked = {},
             onNonBackupFolderClicked = {},
-            onNonBackupFolderMenuClicked = {},
+            onInfoOptionClicked = {},
             onCameraUploadsClicked = {},
             onRenameDeviceOptionClicked = {},
             onRenameDeviceCancelled = {},
@@ -566,14 +548,13 @@ private fun DeviceCenterNoItemsFoundPreview() {
 private fun DeviceCenterInInitialLoadingPreview() {
     MegaAppTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterScreen(
-            uiState = DeviceCenterState(isNetworkConnected = true),
+            uiState = DeviceCenterUiState(isNetworkConnected = true),
             snackbarHostState = SnackbarHostState(),
             onDeviceClicked = {},
             onDeviceMenuClicked = {},
             onBackupFolderClicked = {},
-            onBackupFolderMenuClicked = {},
             onNonBackupFolderClicked = {},
-            onNonBackupFolderMenuClicked = {},
+            onInfoOptionClicked = {},
             onCameraUploadsClicked = {},
             onRenameDeviceOptionClicked = {},
             onRenameDeviceCancelled = {},
@@ -594,7 +575,7 @@ private fun DeviceCenterInInitialLoadingPreview() {
 @CombinedThemePreviews
 @Composable
 private fun DeviceCenterInDeviceViewPreview() {
-    val uiState = DeviceCenterState(
+    val uiState = DeviceCenterUiState(
         devices = listOf(
             ownDeviceUINode,
             otherDeviceUINodeOne,
@@ -611,9 +592,8 @@ private fun DeviceCenterInDeviceViewPreview() {
             onDeviceClicked = {},
             onDeviceMenuClicked = {},
             onBackupFolderClicked = {},
-            onBackupFolderMenuClicked = {},
             onNonBackupFolderClicked = {},
-            onNonBackupFolderMenuClicked = {},
+            onInfoOptionClicked = {},
             onCameraUploadsClicked = {},
             onRenameDeviceOptionClicked = {},
             onRenameDeviceCancelled = {},
@@ -635,7 +615,7 @@ private fun DeviceCenterInDeviceViewPreview() {
 @CombinedThemePreviews
 @Composable
 private fun DeviceCenterInFolderViewEmptyStatePreview() {
-    val uiState = DeviceCenterState(
+    val uiState = DeviceCenterUiState(
         devices = listOf(ownDeviceUINode),
         isInitialLoadingFinished = true,
         selectedDevice = ownDeviceUINode,
@@ -648,9 +628,8 @@ private fun DeviceCenterInFolderViewEmptyStatePreview() {
             onDeviceClicked = {},
             onDeviceMenuClicked = {},
             onBackupFolderClicked = {},
-            onBackupFolderMenuClicked = {},
             onNonBackupFolderClicked = {},
-            onNonBackupFolderMenuClicked = {},
+            onInfoOptionClicked = {},
             onCameraUploadsClicked = {},
             onRenameDeviceOptionClicked = {},
             onRenameDeviceCancelled = {},
@@ -671,7 +650,7 @@ private fun DeviceCenterInFolderViewEmptyStatePreview() {
 @CombinedThemePreviews
 @Composable
 private fun DeviceCenterInFolderViewPreview() {
-    val uiState = DeviceCenterState(
+    val uiState = DeviceCenterUiState(
         devices = listOf(ownDeviceUINodeTwo),
         isInitialLoadingFinished = true,
         selectedDevice = ownDeviceUINodeTwo,
@@ -684,9 +663,8 @@ private fun DeviceCenterInFolderViewPreview() {
             onDeviceClicked = {},
             onDeviceMenuClicked = {},
             onBackupFolderClicked = {},
-            onBackupFolderMenuClicked = {},
             onNonBackupFolderClicked = {},
-            onNonBackupFolderMenuClicked = {},
+            onInfoOptionClicked = {},
             onCameraUploadsClicked = {},
             onRenameDeviceOptionClicked = {},
             onRenameDeviceCancelled = {},
@@ -713,9 +691,8 @@ private fun DeviceCenterContentWithOwnDeviceSectionOnlyPreview() {
             onDeviceClicked = {},
             onDeviceMenuClicked = {},
             onBackupFolderClicked = {},
-            onBackupFolderMenuClicked = {},
             onNonBackupFolderClicked = {},
-            onNonBackupFolderMenuClicked = {},
+            onInfoClicked = {}
         )
     }
 }
@@ -732,9 +709,8 @@ private fun DeviceCenterContentWithOtherDevicesSectionOnlyPreview() {
             onDeviceClicked = {},
             onDeviceMenuClicked = {},
             onBackupFolderClicked = {},
-            onBackupFolderMenuClicked = {},
             onNonBackupFolderClicked = {},
-            onNonBackupFolderMenuClicked = {},
+            onInfoClicked = {},
         )
     }
 }
@@ -756,9 +732,8 @@ private fun DeviceCenterContentWithBothDeviceSectionsPreview() {
             onDeviceClicked = {},
             onDeviceMenuClicked = {},
             onBackupFolderClicked = {},
-            onBackupFolderMenuClicked = {},
             onNonBackupFolderClicked = {},
-            onNonBackupFolderMenuClicked = {},
+            onInfoClicked = {},
         )
     }
 }

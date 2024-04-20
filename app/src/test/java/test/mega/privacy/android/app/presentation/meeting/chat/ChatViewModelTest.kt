@@ -20,12 +20,12 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
 import mega.privacy.android.app.objects.GifData
 import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.meeting.chat.mapper.ForwardMessagesResultMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteParticipantResultMapper
-import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteUserAsContactResultOptionMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.ParticipantNameMapper
 import mega.privacy.android.app.presentation.meeting.chat.model.ActionToManage
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatRoomMenuAction
@@ -35,7 +35,6 @@ import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_LINK
 import mega.privacy.android.app.presentation.meeting.chat.model.ForwardMessagesToChatsResult
 import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
 import mega.privacy.android.app.presentation.meeting.chat.model.InviteContactToChatResult
-import mega.privacy.android.app.presentation.meeting.chat.model.InviteUserAsContactResultOption
 import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
 import mega.privacy.android.app.utils.CacheFolderManager
 import mega.privacy.android.app.utils.Constants
@@ -61,9 +60,10 @@ import mega.privacy.android.domain.entity.chat.messages.ContactAttachmentMessage
 import mega.privacy.android.domain.entity.chat.messages.ForwardResult
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.chat.messages.normal.NormalMessage
-import mega.privacy.android.domain.entity.contacts.InviteContactRequest
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
+import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
+import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.chat.ChatDefaultFile
@@ -79,6 +79,7 @@ import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.cache.GetCacheFileUseCase
 import mega.privacy.android.domain.usecase.chat.ArchiveChatUseCase
+import mega.privacy.android.domain.usecase.chat.BroadcastChatArchivedUseCase
 import mega.privacy.android.domain.usecase.chat.ClearChatHistoryUseCase
 import mega.privacy.android.domain.usecase.chat.CloseChatPreviewUseCase
 import mega.privacy.android.domain.usecase.chat.EnableGeolocationUseCase
@@ -92,9 +93,11 @@ import mega.privacy.android.domain.usecase.chat.InviteToChatUseCase
 import mega.privacy.android.domain.usecase.chat.IsAnonymousModeUseCase
 import mega.privacy.android.domain.usecase.chat.IsChatNotificationMuteUseCase
 import mega.privacy.android.domain.usecase.chat.IsGeolocationEnabledUseCase
+import mega.privacy.android.domain.usecase.chat.LeaveChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorCallInChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatConnectionStateUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatPendingChangesUseCase
+import mega.privacy.android.domain.usecase.chat.MonitorLeaveChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorLeavingChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorParticipatingInACallInOtherChatsUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorUserChatStatusByHandleUseCase
@@ -122,24 +125,27 @@ import mega.privacy.android.domain.usecase.contact.GetParticipantFirstNameUseCas
 import mega.privacy.android.domain.usecase.contact.GetParticipantFullNameUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserOnlineStatusByHandleUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserUseCase
-import mega.privacy.android.domain.usecase.contact.InviteContactUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorAllContactParticipantsInChatUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorHasAnyContactUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorUserLastGreenUpdatesUseCase
 import mega.privacy.android.domain.usecase.contact.RequestUserLastGreenUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.file.CreateNewImageUriUseCase
 import mega.privacy.android.domain.usecase.file.DeleteFileUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
+import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.IsChatStatusConnectedForCallUseCase
 import mega.privacy.android.domain.usecase.meeting.LoadMessagesUseCase
 import mega.privacy.android.domain.usecase.meeting.SendStatisticsMeetingsUseCase
+import mega.privacy.android.domain.usecase.meeting.SetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.StartCallUseCase
 import mega.privacy.android.domain.usecase.meeting.StartChatCallNoRingingUseCase
 import mega.privacy.android.domain.usecase.meeting.StartMeetingInWaitingRoomChatUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorUpdatePushNotificationSettingsUseCase
+import mega.privacy.mobile.analytics.event.ChatConversationUnmuteMenuToolbarEvent
 import nz.mega.sdk.MegaChatError
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -166,11 +172,13 @@ import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.verifyNoMoreInteractions
 import org.mockito.kotlin.whenever
 import org.mockito.kotlin.wheneverBlocking
+import test.mega.privacy.android.app.AnalyticsTestExtension
 import java.io.File
 import java.util.stream.Stream
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+
 internal class ChatViewModelTest {
 
     private val chatId = 123L
@@ -292,13 +300,19 @@ internal class ChatViewModelTest {
     private val deleteMessagesUseCase = mock<DeleteMessagesUseCase>()
     private val editMessageUseCase = mock<EditMessageUseCase>()
     private val editLocationMessageUseCase = mock<EditLocationMessageUseCase>()
-    private val inviteUserAsContactResultOptionMapper =
-        mock<InviteUserAsContactResultOptionMapper>()
-    private val inviteContactUseCase = mock<InviteContactUseCase>()
     private val getChatFromContactMessagesUseCase = mock<GetChatFromContactMessagesUseCase>()
     private val getCacheFileUseCase = mock<GetCacheFileUseCase>()
+    private val setUsersCallLimitRemindersUseCase = mock<SetUsersCallLimitRemindersUseCase>()
+    private val getUsersCallLimitRemindersUseCase = mock<GetUsersCallLimitRemindersUseCase>()
     private val recordAudioUseCase = mock<RecordAudioUseCase>()
     private val deleteFileUseCase = mock<DeleteFileUseCase>()
+    private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase>()
+    private val monitorLeaveChatUseCase = mock<MonitorLeaveChatUseCase> {
+        on { invoke() } doReturn emptyFlow()
+    }
+    private val leaveChatUseCase = mock<LeaveChatUseCase>()
+    private val broadcastChatArchivedUseCase = mock<BroadcastChatArchivedUseCase>()
+
 
     @BeforeEach
     fun resetMocks() {
@@ -357,14 +371,18 @@ internal class ChatViewModelTest {
             deleteMessagesUseCase,
             editMessageUseCase,
             editLocationMessageUseCase,
-            inviteUserAsContactResultOptionMapper,
-            inviteContactUseCase,
             getChatFromContactMessagesUseCase,
             getCacheFileUseCase,
             recordAudioUseCase,
             deleteFileUseCase,
+            getFeatureFlagValueUseCase,
+            leaveChatUseCase,
+            broadcastChatArchivedUseCase,
+            setUsersCallLimitRemindersUseCase,
+            getUsersCallLimitRemindersUseCase
         )
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
+        whenever(getUsersCallLimitRemindersUseCase()).thenReturn(flowOf(UsersCallLimitReminders.Enabled))
         wheneverBlocking { isAnonymousModeUseCase() } doReturn false
         wheneverBlocking { monitorChatRoomUpdates(any()) } doReturn emptyFlow()
         wheneverBlocking { monitorUpdatePushNotificationSettingsUseCase() } doReturn emptyFlow()
@@ -389,6 +407,8 @@ internal class ChatViewModelTest {
         wheneverBlocking { monitorJoiningChatUseCase(any()) } doReturn emptyFlow()
         wheneverBlocking { monitorLeavingChatUseCase(any()) } doReturn emptyFlow()
         whenever(monitorChatPendingChangesUseCase(any())) doReturn emptyFlow()
+        whenever(monitorLeaveChatUseCase()) doReturn emptyFlow()
+        wheneverBlocking { getFeatureFlagValueUseCase(AppFeatures.CallUnlimitedProPlan) } doReturn false
     }
 
     private fun initTestClass() {
@@ -462,12 +482,16 @@ internal class ChatViewModelTest {
             deleteMessagesUseCase = deleteMessagesUseCase,
             editMessageUseCase = editMessageUseCase,
             editLocationMessageUseCase = editLocationMessageUseCase,
-            inviteUserAsContactResultOptionMapper = inviteUserAsContactResultOptionMapper,
-            inviteContactUseCase = inviteContactUseCase,
             getChatFromContactMessagesUseCase = getChatFromContactMessagesUseCase,
             getCacheFileUseCase = getCacheFileUseCase,
             recordAudioUseCase = recordAudioUseCase,
             deleteFileUseCase = deleteFileUseCase,
+            getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
+            leaveChatUseCase = leaveChatUseCase,
+            monitorLeaveChatUseCase = monitorLeaveChatUseCase,
+            broadcastChatArchivedUseCase = broadcastChatArchivedUseCase,
+            setUsersCallLimitRemindersUseCase = setUsersCallLimitRemindersUseCase,
+            getUsersCallLimitRemindersUseCase = getUsersCallLimitRemindersUseCase
         )
     }
 
@@ -1691,6 +1715,9 @@ internal class ChatViewModelTest {
                 val result = ((awaitItem().infoToShowEvent as StateEventWithContentTriggered)
                     .content as InfoToShow.MuteOptionResult).result
                 assertThat(result).isInstanceOf(ChatPushNotificationMuteOption.Unmute::class.java)
+                assertThat(analyticsTestExtension.events).contains(
+                    ChatConversationUnmuteMenuToolbarEvent
+                )
             }
         }
 
@@ -1705,6 +1732,9 @@ internal class ChatViewModelTest {
             underTest.state.test {
                 assertThat(awaitItem().infoToShowEvent)
                     .isInstanceOf(StateEventWithContentConsumed::class.java)
+                assertThat(analyticsTestExtension.events).contains(
+                    ChatConversationUnmuteMenuToolbarEvent
+                )
             }
         }
 
@@ -1741,6 +1771,7 @@ internal class ChatViewModelTest {
     fun `test that archive finish with error and shows it`() = runTest {
         whenever(archiveChatUseCase(chatId = chatId, true)).thenThrow(RuntimeException())
         underTest.archiveChat()
+        verifyNoInteractions(broadcastChatArchivedUseCase)
         underTest.state.test {
             val result = ((awaitItem().infoToShowEvent as StateEventWithContentTriggered).content
                     as InfoToShow.StringWithParams).stringId
@@ -1752,8 +1783,12 @@ internal class ChatViewModelTest {
     fun `test that archive finish with success`() = runTest {
         whenever(archiveChatUseCase(chatId = chatId, true)).thenReturn(Unit)
         underTest.archiveChat()
+        verify(broadcastChatArchivedUseCase).invoke(any())
         underTest.state.test {
-            assertThat(awaitItem().infoToShowEvent)
+            val item = awaitItem()
+            assertThat((item.actionToManageEvent as StateEventWithContentTriggered).content)
+                .isInstanceOf(ActionToManage.CloseChat::class.java)
+            assertThat(item.infoToShowEvent)
                 .isInstanceOf(StateEventWithContentConsumed::class.java)
         }
     }
@@ -2405,7 +2440,7 @@ internal class ChatViewModelTest {
                     on { toString() } doReturn "file$index"
                 }
             }
-            val expected = files.map { it.toString() }
+            val expected = files.associate { it.toString() to null }
             underTest.onAttachFiles(files)
             verify(sendChatAttachmentsUseCase).invoke(chatId, expected, false)
         }
@@ -2712,7 +2747,7 @@ internal class ChatViewModelTest {
     }
 
     @Test
-    fun `test that onDownloadChatNode updates state correctly`() = runTest {
+    fun `test that on download node for preview updates state correctly`() = runTest {
         val node = mock<ChatDefaultFile>()
         initTestClass()
         underTest.onDownloadForPreviewChatNode(node)
@@ -2722,6 +2757,34 @@ internal class ChatViewModelTest {
                 .isInstanceOf(StateEventWithContentTriggered::class.java)
             val content = (actual.downloadEvent as StateEventWithContentTriggered).content
             assertThat(content).isInstanceOf(TransferTriggerEvent.StartDownloadForPreview::class.java)
+        }
+    }
+
+    @Test
+    fun `test that on download node for offline updates state correctly`() = runTest {
+        val node = mock<ChatDefaultFile>()
+        initTestClass()
+        underTest.onDownloadForOfflineChatNode(node)
+        underTest.state.test {
+            val actual = awaitItem()
+            assertThat(actual.downloadEvent)
+                .isInstanceOf(StateEventWithContentTriggered::class.java)
+            val content = (actual.downloadEvent as StateEventWithContentTriggered).content
+            assertThat(content).isInstanceOf(TransferTriggerEvent.StartDownloadForOffline::class.java)
+        }
+    }
+
+    @Test
+    fun `test that on download node updates state correctly`() = runTest {
+        val node = mock<ChatDefaultFile>()
+        initTestClass()
+        underTest.onDownloadNode(listOf(node))
+        underTest.state.test {
+            val actual = awaitItem()
+            assertThat(actual.downloadEvent)
+                .isInstanceOf(StateEventWithContentTriggered::class.java)
+            val content = (actual.downloadEvent as StateEventWithContentTriggered).content
+            assertThat(content).isInstanceOf(TransferTriggerEvent.StartDownloadNode::class.java)
         }
     }
 
@@ -2815,36 +2878,6 @@ internal class ChatViewModelTest {
         }
 
     @Test
-    fun `test that show successful info note when adding one new contact is sent successfully`() =
-        runTest {
-            val contactUserHandle = 1234L
-            val contactEmail = "a@b.c"
-            val contactMessage = mock<ContactAttachmentMessage> {
-                on { this.contactHandle } doReturn contactUserHandle
-                on { this.contactEmail } doReturn contactEmail
-            }
-            whenever(inviteContactUseCase(contactEmail, contactUserHandle, null)).thenReturn(
-                InviteContactRequest.Sent
-            )
-            whenever(
-                inviteUserAsContactResultOptionMapper(
-                    InviteContactRequest.Sent,
-                    contactEmail
-                )
-            ).thenReturn(
-                InviteUserAsContactResultOption.ContactInviteSent
-            )
-
-            initTestClass()
-            underTest.inviteContacts(setOf(contactMessage))
-            underTest.state.test {
-                val result = ((awaitItem().infoToShowEvent as StateEventWithContentTriggered)
-                    .content as InfoToShow.InviteUserAsContactResult).result
-                assertThat(result).isInstanceOf(InviteUserAsContactResultOption.ContactInviteSent::class.java)
-            }
-        }
-
-    @Test
     fun `test that open chat with invokes and updates correctly`() = runTest {
         val messages = listOf(mock<ContactAttachmentMessage>())
         whenever(getChatFromContactMessagesUseCase(messages)).thenReturn(chatId)
@@ -2895,6 +2928,73 @@ internal class ChatViewModelTest {
         }
     }
 
+    @Test
+    fun `test that leave chat call when monitorLeaveChatUseCase emit equals chat id`() = runTest {
+        val flow = MutableSharedFlow<Long>()
+        whenever(monitorLeaveChatUseCase()).thenReturn(flow)
+        initTestClass()
+        flow.emit(chatId)
+        verify(leaveChatUseCase).invoke(chatId)
+    }
+
+    @Test
+    fun `test that leave chat doesn't call when monitorLeaveChatUseCase emit differ chat id`() =
+        runTest {
+            val flow = MutableSharedFlow<Long>()
+            whenever(monitorLeaveChatUseCase()).thenReturn(flow)
+            initTestClass()
+            flow.emit(345L)
+            verifyNoInteractions(leaveChatUseCase)
+        }
+
+    @ParameterizedTest(name = " when call status is {0}")
+    @MethodSource("provideChatCallStatusParameters")
+    fun `test that has call is ended when user limit is reached`(chatCallStatus: ChatCallStatus) =
+        runTest {
+            val flow = MutableSharedFlow<ChatCall>()
+            val call = mock<ChatCall> {
+                on { this.chatId } doReturn chatId
+                on { status } doReturn chatCallStatus
+                on { termCode } doReturn ChatCallTermCodeType.CallUsersLimit
+            }
+            whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
+            whenever(monitorCallInChatUseCase(chatId)).thenReturn(flow)
+            whenever(getFeatureFlagValueUseCase(AppFeatures.CallUnlimitedProPlan)).thenReturn(true)
+            initTestClass()
+            flow.emit(call)
+            advanceUntilIdle()
+            underTest.state.test {
+                assertThat(awaitItem().callEndedDueToFreePlanLimits).isTrue()
+            }
+        }
+
+    @ParameterizedTest(name = " when call status is {0}")
+    @MethodSource("provideChatCallStatusParameters")
+    fun `test that has call is ended when call duration limit is reached`(chatCallStatus: ChatCallStatus) =
+        runTest {
+            val flow = MutableSharedFlow<ChatCall>()
+            val call = mock<ChatCall> {
+                on { this.chatId } doReturn chatId
+                on { status } doReturn chatCallStatus
+                on { termCode } doReturn ChatCallTermCodeType.CallDurationLimit
+                on { isOwnClientCaller } doReturn true
+            }
+            whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
+            whenever(monitorCallInChatUseCase(chatId)).thenReturn(flow)
+            whenever(getFeatureFlagValueUseCase(AppFeatures.CallUnlimitedProPlan)).thenReturn(true)
+            initTestClass()
+            flow.emit(call)
+            advanceUntilIdle()
+            underTest.state.test {
+                assertThat(awaitItem().shouldUpgradeToProPlan).isTrue()
+            }
+        }
+
+    private fun provideChatCallStatusParameters(): Stream<Arguments> = Stream.of(
+        Arguments.of(ChatCallStatus.TerminatingUserParticipation),
+        Arguments.of(ChatCallStatus.GenericNotification),
+    )
+
     @Nested
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     inner class VoiceClipTests {
@@ -2936,7 +3036,7 @@ internal class ChatViewModelTest {
             runTest {
                 underTest.onVoiceClipRecordEvent(VoiceClipRecordEvent.Start)
                 underTest.onVoiceClipRecordEvent(VoiceClipRecordEvent.Finish)
-                verify(sendChatAttachmentsUseCase).invoke(chatId, listOf(path), true)
+                verify(sendChatAttachmentsUseCase).invoke(chatId, mapOf(path to null), true)
             }
     }
 
@@ -2970,6 +3070,10 @@ internal class ChatViewModelTest {
         @JvmField
         @RegisterExtension
         val extension = CoroutineMainDispatcherExtension(testDispatcher)
+
+        @JvmField
+        @RegisterExtension
+        val analyticsTestExtension = AnalyticsTestExtension()
     }
 }
 

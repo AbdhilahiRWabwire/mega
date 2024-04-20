@@ -9,6 +9,7 @@ import mega.privacy.android.domain.entity.chat.messages.pending.SavePendingMessa
 import mega.privacy.android.domain.repository.chat.ChatMessageRepository
 import mega.privacy.android.domain.usecase.GetDeviceCurrentTimeUseCase
 import mega.privacy.android.domain.usecase.transfers.chatuploads.GetFileForChatUploadUseCase
+import mega.privacy.android.domain.usecase.transfers.chatuploads.GetMyChatsFilesFolderIdUseCase
 import mega.privacy.android.domain.usecase.transfers.chatuploads.StartChatUploadsWithWorkerUseCase
 import javax.inject.Inject
 
@@ -20,22 +21,28 @@ class SendChatAttachmentsUseCase @Inject constructor(
     private val getFileForChatUploadUseCase: GetFileForChatUploadUseCase,
     private val chatMessageRepository: ChatMessageRepository,
     private val deviceCurrentTimeUseCase: GetDeviceCurrentTimeUseCase,
+    private val getMyChatsFilesFolderIdUseCase: GetMyChatsFilesFolderIdUseCase,
 ) {
     /**
      * Invoke
      *
      * @param chatId the id of the chat where these files will be attached
-     * @param uris String representation of the files,
+     * @param urisWithNames String representation of the files associated with the desired node's name or null if there are no changes
+     * @param isVoiceClip
      */
-    operator fun invoke(chatId: Long, uris: List<String>, isVoiceClip: Boolean = false) =
+    operator fun invoke(
+        chatId: Long,
+        urisWithNames: Map<String, String?>,
+        isVoiceClip: Boolean = false,
+    ) =
         flow {
+            val chatFolderId = getMyChatsFilesFolderIdUseCase()
             emitAll(
                 //each file is sent as a single message in parallel
-                uris
-                    .mapNotNull { uriString ->
-                        getFileForChatUploadUseCase(uriString)
-                    }
-                    .map { file ->
+                urisWithNames.mapKeys {
+                    getFileForChatUploadUseCase(it.key)
+                }.mapNotNull { (file, name) ->
+                    file?.let {
                         val pendingMessageId = chatMessageRepository.savePendingMessage(
                             SavePendingMessageRequest(
                                 chatId = chatId,
@@ -47,12 +54,13 @@ class SendChatAttachmentsUseCase @Inject constructor(
                                 filePath = file.path,
                                 nodeHandle = -1,
                                 fingerprint = null,
-                                name = file.name,
+                                name = name,
                                 transferTag = -1,
                             )
                         ).id
-                        startChatUploadsWithWorkerUseCase(listOf(file), pendingMessageId)
-                    }.merge()
+                        startChatUploadsWithWorkerUseCase(file, pendingMessageId, chatFolderId)
+                    }
+                }.merge()
             )
         }
 }

@@ -18,7 +18,6 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.components.ChatManagement
-import mega.privacy.android.app.domain.usecase.GetBackupsNode
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.main.dialog.shares.RemoveShareResultMapper
@@ -41,9 +40,13 @@ import mega.privacy.android.domain.entity.StorageStateEvent
 import mega.privacy.android.domain.entity.UserAlert
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadFolderType
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRestartMode
+import mega.privacy.android.domain.entity.chat.ChatCall
 import mega.privacy.android.domain.entity.chat.ChatLinkContent
 import mega.privacy.android.domain.entity.contacts.ContactRequest
 import mega.privacy.android.domain.entity.contacts.ContactRequestStatus
+import mega.privacy.android.domain.entity.meeting.ChatCallStatus
+import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
+import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.MoveRequestResult
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeNameCollisionResult
@@ -60,7 +63,6 @@ import mega.privacy.android.domain.usecase.GetCloudSortOrder
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.GetNumUnreadUserAlertsUseCase
 import mega.privacy.android.domain.usecase.GetRootNodeUseCase
-import mega.privacy.android.domain.usecase.HasBackupsChildren
 import mega.privacy.android.domain.usecase.MonitorOfflineFileAvailabilityUseCase
 import mega.privacy.android.domain.usecase.MonitorUserUpdates
 import mega.privacy.android.domain.usecase.account.GetFullAccountInfoUseCase
@@ -83,10 +85,13 @@ import mega.privacy.android.domain.usecase.login.MonitorFinishActivityUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
+import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorCallEndedUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorCallRecordingConsentEventUseCase
+import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
+import mega.privacy.android.domain.usecase.meeting.SetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.StartMeetingInWaitingRoomChatUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
@@ -98,6 +103,7 @@ import mega.privacy.android.domain.usecase.node.MoveNodesToRubbishUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodesUseCase
 import mega.privacy.android.domain.usecase.node.RemoveShareUseCase
 import mega.privacy.android.domain.usecase.node.RestoreNodesUseCase
+import mega.privacy.android.domain.usecase.notifications.GetNumUnreadPromoNotificationsUseCase
 import mega.privacy.android.domain.usecase.photos.mediadiscovery.SendStatisticsMediaDiscoveryUseCase
 import mega.privacy.android.domain.usecase.psa.DismissPsaUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorUpdatePushNotificationSettingsUseCase
@@ -118,8 +124,11 @@ import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.EnumSource
+import org.junit.jupiter.params.provider.MethodSource
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.reset
@@ -129,6 +138,7 @@ import org.mockito.kotlin.whenever
 import org.mockito.kotlin.wheneverBlocking
 import test.mega.privacy.android.app.InstantExecutorExtension
 import test.mega.privacy.android.app.domain.usecase.FakeMonitorBackupFolder
+import java.util.stream.Stream
 import kotlin.test.assertFalse
 
 @ExperimentalCoroutinesApi
@@ -144,8 +154,8 @@ class ManagerViewModelTest {
     private val monitorSecurityUpgradeInApp = MutableStateFlow(false)
     private val getNumUnreadUserAlertsUseCase =
         mock<GetNumUnreadUserAlertsUseCase> { onBlocking { invoke() }.thenReturn(0) }
-    private val hasBackupsChildren =
-        mock<HasBackupsChildren> { onBlocking { invoke() }.thenReturn(false) }
+    private val getNumUnreadPromoNotificationsUseCase =
+        mock<GetNumUnreadPromoNotificationsUseCase>()
     private lateinit var monitorContactRequestUpdates: MutableStateFlow<List<ContactRequest>>
 
     private val initialIsFirsLoginValue = true
@@ -155,7 +165,6 @@ class ManagerViewModelTest {
             ManagerViewModel.isFirstLoginKey to initialIsFirsLoginValue
         )
     )
-    private val getBackupsNode = mock<GetBackupsNode> { onBlocking { invoke() }.thenReturn(null) }
     private val monitorStorageState = mock<MonitorStorageStateEventUseCase> {
         onBlocking { invoke() }.thenReturn(
             MutableStateFlow(
@@ -188,8 +197,7 @@ class ManagerViewModelTest {
     private val monitorSyncStalledIssuesUseCase = mock<MonitorSyncStalledIssuesUseCase> {
         onBlocking { invoke() }.thenReturn(emptyFlow())
     }
-    private val getFeatureFlagValueUseCase =
-        mock<GetFeatureFlagValueUseCase> { onBlocking { invoke(any()) }.thenReturn(false) }
+    private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase>()
     private val shareDataList = listOf(
         ShareData(
             user = "user",
@@ -285,6 +293,8 @@ class ManagerViewModelTest {
     private val startMeetingInWaitingRoomChatUseCase: StartMeetingInWaitingRoomChatUseCase = mock()
     private val answerChatCallUseCase: AnswerChatCallUseCase = mock()
     private val setChatVideoInDeviceUseCase: SetChatVideoInDeviceUseCase = mock()
+    private val setUsersCallLimitRemindersUseCase: SetUsersCallLimitRemindersUseCase = mock()
+    private val getUsersCallLimitRemindersUseCase: GetUsersCallLimitRemindersUseCase = mock()
     private val rtcAudioManagerGateway: RTCAudioManagerGateway = mock()
     private val chatManagement: ChatManagement = mock()
     private val passcodeManagement: PasscodeManagement = mock()
@@ -298,6 +308,12 @@ class ManagerViewModelTest {
     private val monitorCallEndedUseCase: MonitorCallEndedUseCase = mock {
         onBlocking { invoke() }.thenReturn(emptyFlow())
     }
+    private val fakeCallUpdatesFlow = MutableSharedFlow<ChatCall>()
+
+    private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase = mock {
+        onBlocking { invoke() }.thenReturn(fakeCallUpdatesFlow)
+    }
+
 
     private fun initViewModel() {
         underTest = ManagerViewModel(
@@ -307,21 +323,17 @@ class ManagerViewModelTest {
             monitorContactUpdates = { monitorContactUpdates },
             monitorUserAlertUpdates = { monitorUserAlertUpdates },
             monitorContactRequestUpdates = { monitorContactRequestUpdates },
-            getBackupsNode = getBackupsNode,
             getNumUnreadUserAlertsUseCase = getNumUnreadUserAlertsUseCase,
-            hasBackupsChildren = hasBackupsChildren,
+            getNumUnreadPromoNotificationsUseCase = getNumUnreadPromoNotificationsUseCase,
             sendStatisticsMediaDiscoveryUseCase = sendStatisticsMediaDiscoveryUseCase,
             savedStateHandle = savedStateHandle,
             monitorStorageStateEventUseCase = monitorStorageState,
             monitorCameraUploadsFolderDestinationUseCase = monitorCameraUploadsFolderDestinationUpdateUseCase,
-            getPrimarySyncHandleUseCase = getPrimarySyncHandleUseCase,
-            getSecondarySyncHandleUseCase = getSecondarySyncHandleUseCase,
             getCloudSortOrder = getCloudSortOrder,
             monitorConnectivityUseCase = monitorConnectivityUseCase,
             isConnectedToInternetUseCase = isConnectedToInternetUseCase,
             getExtendedAccountDetail = mock(),
             getFullAccountInfoUseCase = getFullAccountInfoUseCase,
-            getActiveSubscriptionUseCase = mock(),
             getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             getUnverifiedIncomingShares = getUnverifiedIncomingShares,
             getUnverifiedOutgoingShares = getUnverifiedOutgoingShares,
@@ -377,14 +389,15 @@ class ManagerViewModelTest {
             hangChatCallUseCase = hangChatCallUseCase,
             monitorCallRecordingConsentEventUseCase = monitorCallRecordingConsentEventUseCase,
             monitorCallEndedUseCase = monitorCallEndedUseCase,
+            monitorChatCallUpdatesUseCase = monitorChatCallUpdatesUseCase,
+            getUsersCallLimitRemindersUseCase = getUsersCallLimitRemindersUseCase,
+            setUsersCallLimitRemindersUseCase = setUsersCallLimitRemindersUseCase
         )
     }
 
     @BeforeEach
     fun reset() {
         reset(
-            getBackupsNode,
-            hasBackupsChildren,
             sendStatisticsMediaDiscoveryUseCase,
             isConnectedToInternetUseCase,
             getFullAccountInfoUseCase,
@@ -423,8 +436,11 @@ class ManagerViewModelTest {
             hangChatCallUseCase,
             monitorChatArchivedUseCase,
             monitorPushNotificationSettingsUpdate,
+            getUsersCallLimitRemindersUseCase,
+            setUsersCallLimitRemindersUseCase,
         )
         wheneverBlocking { getCloudSortOrder() }.thenReturn(SortOrder.ORDER_DEFAULT_ASC)
+        whenever(getUsersCallLimitRemindersUseCase()).thenReturn(flowOf(UsersCallLimitReminders.Enabled))
         wheneverBlocking { getFeatureFlagValueUseCase(any()) }.thenReturn(true)
         whenever(monitorUserUpdates()).thenReturn(emptyFlow())
         whenever(monitorCallRecordingConsentEventUseCase()).thenReturn(emptyFlow())
@@ -434,6 +450,7 @@ class ManagerViewModelTest {
         wheneverBlocking { getPrimarySyncHandleUseCase() }.thenReturn(0L)
         wheneverBlocking { getSecondarySyncHandleUseCase() }.thenReturn(0L)
         wheneverBlocking { getNumUnreadUserAlertsUseCase() }.thenReturn(0)
+        wheneverBlocking { getNumUnreadPromoNotificationsUseCase() }.thenReturn(0)
         wheneverBlocking { getIncomingContactRequestUseCase() }.thenReturn(emptyList())
         monitorContactRequestUpdates = MutableStateFlow(emptyList())
         monitorNodeUpdatesFakeFlow = MutableSharedFlow()
@@ -750,6 +767,7 @@ class ManagerViewModelTest {
             )
             whenever(getIncomingContactRequestUseCase()).thenReturn(contactRequests)
             whenever(getNumUnreadUserAlertsUseCase()).thenReturn(3)
+            whenever(getNumUnreadPromoNotificationsUseCase()).thenReturn(1)
             mutableMonitorUserAlertUpdates.emit(
                 listOf(
                     IncomingPendingContactRequestAlert(
@@ -789,6 +807,7 @@ class ManagerViewModelTest {
             )
             whenever(getIncomingContactRequestUseCase()).thenReturn(contactRequests)
             whenever(getNumUnreadUserAlertsUseCase()).thenReturn(3)
+            whenever(getNumUnreadPromoNotificationsUseCase()).thenReturn(1)
             monitorContactRequestUpdates.emit(contactRequests)
             advanceUntilIdle()
             verify(saveContactByEmailUseCase).invoke("sourceEmail@mega.co.nz")
@@ -812,6 +831,7 @@ class ManagerViewModelTest {
             )
             whenever(getIncomingContactRequestUseCase()).thenReturn(contactRequests)
             whenever(getNumUnreadUserAlertsUseCase()).thenReturn(3)
+            whenever(getNumUnreadPromoNotificationsUseCase()).thenReturn(1)
             monitorContactRequestUpdates.emit(contactRequests)
             advanceUntilIdle()
             verify(saveContactByEmailUseCase).invoke("targetEmail@mega.co.nz")
@@ -820,6 +840,9 @@ class ManagerViewModelTest {
     @Test
     fun `test that legacyNumUnreadUserAlerts update when there is accepted contact request event`() =
         runTest {
+            val expectedPromoNotificationsCount = 1
+            val expectedUserAlertsCount = 3
+            val expectedTotalCount = expectedPromoNotificationsCount + expectedUserAlertsCount
             advanceUntilIdle()
             assertThat(underTest.onGetNumUnreadUserAlerts().test().value().second).isEqualTo(0)
             val contactRequests = listOf(
@@ -836,15 +859,23 @@ class ManagerViewModelTest {
                 )
             )
             whenever(getIncomingContactRequestUseCase()).thenReturn(contactRequests)
-            whenever(getNumUnreadUserAlertsUseCase()).thenReturn(3)
+            whenever(getNumUnreadUserAlertsUseCase()).thenReturn(expectedUserAlertsCount)
+            whenever(getNumUnreadPromoNotificationsUseCase()).thenReturn(
+                expectedPromoNotificationsCount
+            )
             monitorContactRequestUpdates.emit(contactRequests)
             advanceUntilIdle()
-            assertThat(underTest.onGetNumUnreadUserAlerts().test().value().second).isEqualTo(3)
+            assertThat(underTest.onGetNumUnreadUserAlerts().test().value().second).isEqualTo(
+                expectedTotalCount
+            )
         }
 
     @Test
     fun `test that numUnreadUserAlerts update when there is accepted contact request event`() =
         runTest {
+            val expectedPromoNotificationsCount = 1
+            val expectedUserAlertsCount = 3
+            val expectedTotalCount = expectedPromoNotificationsCount + expectedUserAlertsCount
             advanceUntilIdle()
             assertThat(underTest.numUnreadUserAlerts.value.second).isEqualTo(0)
             val contactRequests = listOf(
@@ -861,10 +892,14 @@ class ManagerViewModelTest {
                 )
             )
             whenever(getIncomingContactRequestUseCase()).thenReturn(contactRequests)
-            whenever(getNumUnreadUserAlertsUseCase()).thenReturn(3)
+            whenever(getNumUnreadUserAlertsUseCase()).thenReturn(expectedUserAlertsCount)
+            whenever(getNumUnreadPromoNotificationsUseCase()).thenReturn(
+                expectedPromoNotificationsCount
+            )
+
             monitorContactRequestUpdates.emit(contactRequests)
             advanceUntilIdle()
-            assertThat(underTest.numUnreadUserAlerts.value.second).isEqualTo(3)
+            assertThat(underTest.numUnreadUserAlerts.value.second).isEqualTo(expectedTotalCount)
         }
 
     @Test
@@ -1291,6 +1326,54 @@ class ManagerViewModelTest {
             assertThat(awaitItem().deviceCenterPreviousBottomNavigationItem).isEqualTo(previousItem)
         }
     }
+
+    @ParameterizedTest(name = " when call status is {0}")
+    @MethodSource("provideChatCallStatusParameters")
+    fun `test that call is ended when user limit is reached`(chatCallStatus: ChatCallStatus) =
+        runTest {
+            whenever(
+                getFeatureFlagValueUseCase(
+                    AppFeatures.CallUnlimitedProPlan
+                )
+            ).thenReturn(true)
+            initViewModel()
+            advanceUntilIdle()
+            val call = mock<ChatCall> {
+                on { status } doReturn chatCallStatus
+                on { termCode } doReturn ChatCallTermCodeType.CallUsersLimit
+            }
+            fakeCallUpdatesFlow.emit(call)
+            underTest.state.test {
+                assertThat(awaitItem().callEndedDueToFreePlanLimits).isTrue()
+            }
+        }
+
+    @ParameterizedTest(name = " when call status is {0}")
+    @MethodSource("provideChatCallStatusParameters")
+    fun `test that call is ended when duration limit is reached`(chatCallStatus: ChatCallStatus) =
+        runTest {
+            whenever(
+                getFeatureFlagValueUseCase(
+                    AppFeatures.CallUnlimitedProPlan
+                )
+            ).thenReturn(true)
+            initViewModel()
+            advanceUntilIdle()
+            val call = mock<ChatCall> {
+                on { status } doReturn chatCallStatus
+                on { termCode } doReturn ChatCallTermCodeType.CallDurationLimit
+                on { isOwnClientCaller } doReturn true
+            }
+            fakeCallUpdatesFlow.emit(call)
+            underTest.state.test {
+                assertThat(awaitItem().shouldUpgradeToProPlan).isTrue()
+            }
+        }
+
+    private fun provideChatCallStatusParameters(): Stream<Arguments> = Stream.of(
+        Arguments.of(ChatCallStatus.TerminatingUserParticipation),
+        Arguments.of(ChatCallStatus.GenericNotification),
+    )
 
     companion object {
         @JvmField

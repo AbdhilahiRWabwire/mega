@@ -27,8 +27,12 @@ class CreateMetaMessageUseCase @Inject constructor() : CreateTypedMessageUseCase
                 shouldShowAvatar = shouldShowAvatar,
                 reactions = reactions,
                 content = content.orEmpty(),
-                isEdited = isEdited,
+                // Rich preview messages are always edited because are sent as normal messages,
+                // but then edited after getting the preview info from API.
+                // So we cannot manage any real edited status.
+                isEdited = false,
                 status = status,
+                rowId = rowId,
             )
 
             ContainsMetaType.GEOLOCATION -> LocationMessage(
@@ -45,6 +49,7 @@ class CreateMetaMessageUseCase @Inject constructor() : CreateTypedMessageUseCase
                 isEdited = isEdited,
                 status = status,
                 content = content,
+                rowId = rowId,
             )
 
             ContainsMetaType.GIPHY -> GiphyMessage(
@@ -60,6 +65,7 @@ class CreateMetaMessageUseCase @Inject constructor() : CreateTypedMessageUseCase
                 reactions = reactions,
                 status = status,
                 content = content,
+                rowId = rowId,
             )
 
             else -> InvalidMetaMessage(
@@ -74,6 +80,7 @@ class CreateMetaMessageUseCase @Inject constructor() : CreateTypedMessageUseCase
                 reactions = reactions,
                 status = status,
                 content = content,
+                rowId = rowId,
             )
         }
     }

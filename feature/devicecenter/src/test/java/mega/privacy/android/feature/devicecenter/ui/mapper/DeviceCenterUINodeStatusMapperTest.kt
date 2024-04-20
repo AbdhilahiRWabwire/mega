@@ -1,10 +1,11 @@
 package mega.privacy.android.feature.devicecenter.ui.mapper
 
 import com.google.common.truth.Truth.assertThat
-import mega.privacy.android.domain.entity.backup.BackupInfoSubState
+import mega.privacy.android.domain.entity.sync.SyncError
 import mega.privacy.android.feature.devicecenter.R
 import mega.privacy.android.feature.devicecenter.domain.entity.DeviceCenterNodeStatus
 import mega.privacy.android.feature.devicecenter.ui.model.status.DeviceCenterUINodeStatus
+import mega.privacy.android.shared.sync.DeviceFolderUINodeErrorMessageMapper
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -47,7 +48,7 @@ internal class DeviceCenterUINodeStatusMapperTest {
 
     @Test
     fun `test that an error UI node status is returned with a specific error message`() {
-        val errorSubState = BackupInfoSubState.INSUFFICIENT_DISK_SPACE
+        val errorSubState = SyncError.INSUFFICIENT_DISK_SPACE
         val specificErrorMessage =
             R.string.device_center_list_view_item_sub_state_insufficient_disk_space
 
@@ -69,7 +70,7 @@ internal class DeviceCenterUINodeStatusMapperTest {
 
     @Test
     fun `test that a blocked UI node status is returned with a specific error message`() {
-        val errorSubState = BackupInfoSubState.ACCOUNT_BLOCKED
+        val errorSubState = SyncError.ACCOUNT_BLOCKED
         val specificErrorMessage = R.string.device_center_list_view_item_sub_state_account_blocked
 
         whenever(deviceFolderUINodeErrorMessageMapper(errorSubState)).thenReturn(
@@ -90,7 +91,7 @@ internal class DeviceCenterUINodeStatusMapperTest {
 
     @Test
     fun `test that an overquota UI node status is returned with a specific error message`() {
-        val errorSubState = BackupInfoSubState.STORAGE_OVERQUOTA
+        val errorSubState = SyncError.STORAGE_OVERQUOTA
         val specificErrorMessage = R.string.device_center_list_view_item_sub_state_storage_overquota
 
         whenever(deviceFolderUINodeErrorMessageMapper(errorSubState)).thenReturn(

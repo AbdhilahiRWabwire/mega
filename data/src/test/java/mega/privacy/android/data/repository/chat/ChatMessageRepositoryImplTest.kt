@@ -21,7 +21,10 @@ import mega.privacy.android.data.mapper.handles.MegaHandleListMapper
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ChatMessageType
 import mega.privacy.android.domain.entity.chat.PendingMessage
+import mega.privacy.android.domain.entity.chat.PendingMessageState
+import mega.privacy.android.domain.entity.chat.messages.UserMessage
 import mega.privacy.android.domain.entity.chat.messages.pending.SavePendingMessageRequest
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateRequest
 import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
 import mega.privacy.android.domain.entity.node.NodeId
 import nz.mega.sdk.MegaChatError
@@ -34,6 +37,8 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
@@ -277,16 +282,10 @@ class ChatMessageRepositoryImplTest {
     }
 
     @Test
-    fun `test that updatePendingMessage saves the mapped entities`() = runTest {
-        val savePendingMessageRequest = mock<SavePendingMessageRequest> {
-            on { state } doReturn mock()
-            on { filePath } doReturn "file"
-        }
-        val pendingMessageEntity = mock<PendingMessageEntity>()
-        whenever(pendingMessageEntityMapper(savePendingMessageRequest))
-            .thenReturn(pendingMessageEntity)
-        underTest.updatePendingMessage(savePendingMessageRequest)
-        verify(chatStorageGateway).updatePendingMessage(pendingMessageEntity)
+    fun `test that updatePendingMessage invokes gateway update`() = runTest {
+        val updatePendingMessageRequest = mock<UpdatePendingMessageStateRequest>()
+        underTest.updatePendingMessage(updatePendingMessageRequest)
+        verify(chatStorageGateway).updatePendingMessage(updatePendingMessageRequest)
     }
 
     @Test
@@ -347,6 +346,18 @@ class ChatMessageRepositoryImplTest {
         val actual = underTest.getPendingMessage(pendingMessageId)
         assertThat(actual).isEqualTo(expected)
     }
+
+    @ParameterizedTest
+    @EnumSource(PendingMessageState::class)
+    fun `test that getPendingMessagesByState returns the mapped entities from gateway`(state: PendingMessageState) =
+        runTest {
+            val entity = mock<PendingMessageEntity>()
+            val expected = mock<PendingMessage>()
+            whenever(chatStorageGateway.getPendingMessagesByState(state)).thenReturn(listOf(entity))
+            whenever(pendingMessageMapper(entity)).thenReturn(expected)
+            val actual = underTest.getPendingMessagesByState(state)
+            assertThat(actual).isEqualTo(listOf(expected))
+        }
 
     @Test
     fun `test that get message ids by type invokes chat storage gateway correctly`() = runTest {
@@ -446,10 +457,55 @@ class ChatMessageRepositoryImplTest {
     @Test
     internal fun `test that truncate messages calls the function on the message gateway`() =
         runTest {
-            val expectedChatId = 5432L
             val truncateTimestamp = 23456L
-            underTest.truncateMessages(expectedChatId, truncateTimestamp)
+            underTest.truncateMessages(chatId, truncateTimestamp)
 
-            verify(chatStorageGateway).truncateMessages(expectedChatId, truncateTimestamp)
+            verify(chatStorageGateway).truncateMessages(chatId, truncateTimestamp)
         }
+
+    @Test
+    internal fun `test that clear chat pending messages invokes gateway`() = runTest {
+        underTest.clearChatPendingMessages(chatId)
+
+        verify(chatStorageGateway).clearChatPendingMessages(chatId)
+    }
+
+    @Test
+    internal fun `test that remove message calls the api with the chat and row Id`() = runTest {
+        val expectedChatId = 1243L
+        val expectedRowId = 3456L
+        val message = mock<UserMessage> {
+            on { chatId } doReturn expectedChatId
+            on { rowId } doReturn expectedRowId
+        }
+        underTest.removeSentMessage(message)
+
+        verify(megaChatApiGateway).removeFailedMessage(expectedChatId, expectedRowId)
+    }
+
+    @Test
+    internal fun `test that update exists in message invokes gateway`() = runTest {
+        val chatId = 123L
+        val msgId = 456L
+        underTest.updateDoesNotExistInMessage(chatId, msgId)
+
+        verify(chatStorageGateway).updateExistsInMessage(chatId, msgId, false)
+    }
+
+    @Test
+    internal fun `test that get exists in message invokes gateway and returns correctly`() =
+        runTest {
+            val chatId = 123L
+            val msgId = 456L
+
+            whenever(chatStorageGateway.getExistsInMessage(chatId, msgId)).thenReturn(true)
+            assertThat(underTest.getExistsInMessage(chatId, msgId)).isTrue()
+        }
+
+    @Test
+    internal fun `test that clear all data invokes gateway`() = runTest {
+        underTest.clearAllData()
+
+        verify(chatStorageGateway).clearAllData()
+    }
 }

@@ -34,11 +34,6 @@ interface FileSystemRepository {
     suspend fun getOfflineBackupsPath(): String
 
     /**
-     * Create Folder
-     */
-    suspend fun createFolder(name: String): Long?
-
-    /**
      * Downloads a file node in background.
      *
      * @param viewerNode File node to download.
@@ -301,13 +296,12 @@ interface FileSystemRepository {
     suspend fun isSDCardCachePath(localPath: String): Boolean
 
     /**
-     * Moves a [file] to a [targetPath] on the sd. It first copies the file to the [targetPath] and then deletes the original one
+     * Moves a [file] to a [destinationUri] on the sd. It first copies the file to the [destinationUri] and then deletes the original one
      *
      * @param file the file to be moved
-     * @param targetPath the target path where the file will be moved (excluding the name of the file itself)
-     * @param sdCardUriString an uri pointing to the Sd card for permission reasons. It should point the same path than [targetPath] or an ancestor in its folder hierarchy. In android we can't access the Sd card directly (except cache folder)
+     * @param destinationUri the target uri where the file will be moved (excluding the name of the file itself)
      */
-    suspend fun moveFileToSd(file: File, targetPath: String, sdCardUriString: String): Boolean
+    suspend fun moveFileToSd(file: File, destinationUri: String, subFolders: List<String>): Boolean
 
     /**
      * Create new image uri
@@ -318,9 +312,22 @@ interface FileSystemRepository {
     suspend fun createNewImageUri(fileName: String): String?
 
     /**
+     * Create new video uri
+     *
+     * @param fileName file name
+     * @return uri string
+     */
+    suspend fun createNewVideoUri(fileName: String): String?
+
+    /**
      * @return true if the [uriString] represents a file Uri
      */
     suspend fun isFileUri(uriString: String): Boolean
+
+    /**
+     * @return true if the [path] represents a file, not a folder
+     */
+    suspend fun isFilePath(path: String): Boolean
 
     /**
      * Get the file represented by [uriString]
@@ -333,6 +340,11 @@ interface FileSystemRepository {
      * @return true if the [uriString] represents a content Uri
      */
     suspend fun isContentUri(uriString: String): Boolean
+
+    /**
+     * @return true if the [uriString] represents an external storage content Uri
+     */
+    suspend fun isExternalStorageContentUri(uriString: String): Boolean
 
     /**
      * @return the file name of the file represented by [uriString]

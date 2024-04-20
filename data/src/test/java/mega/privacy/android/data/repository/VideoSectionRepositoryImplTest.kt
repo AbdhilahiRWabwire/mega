@@ -1,8 +1,10 @@
 package mega.privacy.android.data.repository
 
+import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -13,11 +15,13 @@ import mega.privacy.android.data.mapper.UserSetMapper
 import mega.privacy.android.data.mapper.node.FileNodeMapper
 import mega.privacy.android.data.mapper.videos.TypedVideoNodeMapper
 import mega.privacy.android.data.mapper.videosection.VideoPlaylistMapper
+import mega.privacy.android.data.model.GlobalUpdate
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedVideoNode
 import mega.privacy.android.domain.entity.set.UserSet
 import mega.privacy.android.domain.entity.videosection.VideoPlaylist
+import mega.privacy.android.domain.repository.NodeRepository
 import mega.privacy.android.domain.repository.VideoSectionRepository
 import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaApiJava.ORDER_DEFAULT_DESC
@@ -30,7 +34,6 @@ import nz.mega.sdk.MegaSet
 import nz.mega.sdk.MegaSetElementList
 import nz.mega.sdk.MegaSetList
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -54,6 +57,7 @@ class VideoSectionRepositoryImplTest {
     private val megaLocalRoomGateway = mock<MegaLocalRoomGateway>()
     private val userSetMapper: UserSetMapper = ::createUserSet
     private val videoPlaylistMapper = mock<VideoPlaylistMapper>()
+    private val nodeRepository = mock<NodeRepository>()
 
     @BeforeAll
     fun setUp() {
@@ -70,6 +74,7 @@ class VideoSectionRepositoryImplTest {
             megaLocalRoomGateway = megaLocalRoomGateway,
             userSetMapper = userSetMapper,
             videoPlaylistMapper = videoPlaylistMapper,
+            nodeRepository = nodeRepository,
             ioDispatcher = UnconfinedTestDispatcher()
         )
     }
@@ -82,7 +87,8 @@ class VideoSectionRepositoryImplTest {
             fileNodeMapper,
             typedVideoNodeMapper,
             megaLocalRoomGateway,
-            videoPlaylistMapper
+            videoPlaylistMapper,
+            nodeRepository
         )
     }
 
@@ -99,7 +105,7 @@ class VideoSectionRepositoryImplTest {
         whenever(megaApiGateway.searchByType(any(), any(), any(), any()))
             .thenReturn(listOf(mock(), mock()))
         whenever(megaLocalRoomGateway.getAllOfflineInfo()).thenReturn(emptyList())
-        whenever(typedVideoNodeMapper(any(), any())).thenReturn(mock())
+        whenever(typedVideoNodeMapper(any(), any(), any())).thenReturn(mock())
 
         val actual = underTest.getAllVideos(SortOrder.ORDER_MODIFICATION_DESC)
         assertThat(actual.isNotEmpty()).isTrue()
@@ -188,7 +194,7 @@ class VideoSectionRepositoryImplTest {
         whenever(megaApiGateway.getSets()).thenReturn(megaSetList)
         whenever(megaApiGateway.getSetElements(any())).thenReturn(megaSetElementList)
         whenever(megaApiGateway.getMegaNodeByHandle(any())).thenReturn(megaNode)
-        whenever(typedVideoNodeMapper(any(), any())).thenReturn(typedVideoNode)
+        whenever(typedVideoNodeMapper(any(), any(), any())).thenReturn(typedVideoNode)
     }
 
     @Test
@@ -324,6 +330,56 @@ class VideoSectionRepositoryImplTest {
         }
 
     @Test
+    fun `test that removeVideosFromPlaylist returns correctly`() =
+        runTest {
+            val testPlaylistId = NodeId(1L)
+            val testVideoElementIDs = listOf(1L, 2L)
+
+            whenever(megaApiGateway.removeSetElement(any(), any(), any())).thenAnswer {
+                (it.arguments[2] as MegaRequestListenerInterface).onRequestFinish(
+                    mock(),
+                    mock(),
+                    mock {
+                        on { errorCode }.thenReturn(MegaError.API_OK)
+                    }
+                )
+            }
+
+            initUnderTest()
+            val actual =
+                underTest.removeVideosFromPlaylist(
+                    playlistID = testPlaylistId,
+                    videoElementIDs = testVideoElementIDs
+                )
+            assertThat(actual).isEqualTo(2)
+        }
+
+    @Test
+    fun `test that removeVideosFromPlaylist returns 0 when removeSetElement returns a MegaError`() =
+        runTest {
+            val testPlaylistId = NodeId(1L)
+            val testVideoIDs = listOf(1L, 2L)
+
+            whenever(megaApiGateway.removeSetElement(any(), any(), any())).thenAnswer {
+                (it.arguments[2] as MegaRequestListenerInterface).onRequestFinish(
+                    mock(),
+                    mock(),
+                    mock {
+                        on { errorCode }.thenReturn(MegaError.API_EBLOCKED)
+                    }
+                )
+            }
+
+            initUnderTest()
+            val actual =
+                underTest.removeVideosFromPlaylist(
+                    playlistID = testPlaylistId,
+                    videoElementIDs = testVideoIDs
+                )
+            assertThat(actual).isEqualTo(0)
+        }
+
+    @Test
     fun `test that removing video playlists returns the removed ids`() = runTest {
         val videoPlaylistIDs = listOf(
             NodeId(1L),
@@ -378,5 +434,42 @@ class VideoSectionRepositoryImplTest {
 
         val actual = underTest.updateVideoPlaylistTitle(NodeId(1L), newTitle)
         assertThat(actual).isEqualTo(newTitle)
+    }
+
+    @Test
+    fun `test that monitorVideoPlaylistSetsUpdate emits correct result`() = runTest {
+        val expectedUserSets = (1..3L).map {
+            createUserSet(
+                id = it,
+                name = "Playlist $it",
+                type = MegaSet.SET_TYPE_PLAYLIST,
+                cover = -1L,
+                creationTime = it,
+                modificationTime = it,
+                isExported = false,
+            )
+        }
+
+        val megaSets = expectedUserSets.map { set ->
+            mock<MegaSet> {
+                on { id() }.thenReturn(set.id)
+                on { name() }.thenReturn(set.name)
+                on { ts() }.thenReturn(set.modificationTime)
+                on { type() }.thenReturn(MegaSet.SET_TYPE_PLAYLIST)
+            }
+        }
+
+        whenever(megaApiGateway.globalUpdates)
+            .thenReturn(flowOf(GlobalUpdate.OnSetsUpdate(ArrayList(megaSets))))
+
+        initUnderTest()
+        underTest.monitorVideoPlaylistSetsUpdate().test {
+            val actual = awaitItem()
+            assertThat(actual).isNotEmpty()
+            assertThat(actual[0]).isEqualTo(1L)
+            assertThat(actual[1]).isEqualTo(2L)
+            assertThat(actual[2]).isEqualTo(3L)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

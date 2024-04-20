@@ -3,14 +3,12 @@ package mega.privacy.android.domain.usecase.transfers.sd
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mega.privacy.android.domain.entity.SdTransfer
-import mega.privacy.android.domain.entity.transfer.TransferAppData
+import mega.privacy.android.domain.entity.transfer.DestinationUriAndSubFolders
 import mega.privacy.android.domain.entity.transfer.TransferEvent
-import mega.privacy.android.domain.entity.transfer.getSDCardTransferPath
+import mega.privacy.android.domain.entity.transfer.TransferType
 import mega.privacy.android.domain.entity.transfer.isSDCardDownload
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.repository.FileSystemRepository
-import mega.privacy.android.domain.repository.TransferRepository
-import mega.privacy.android.domain.usecase.transfers.downloads.GetOrCreateStorageDownloadLocationUseCase
 import java.io.File
 import javax.inject.Inject
 
@@ -23,77 +21,57 @@ import javax.inject.Inject
 class HandleSDCardEventUseCase @Inject constructor(
     private val insertSdTransferUseCase: InsertSdTransferUseCase,
     private val deleteSdTransferByTagUseCase: DeleteSdTransferByTagUseCase,
-    private val getOrCreateStorageDownloadLocationUseCase: GetOrCreateStorageDownloadLocationUseCase,
     private val moveFileToSdCardUseCase: MoveFileToSdCardUseCase,
     private val fileSystemRepository: FileSystemRepository,
-    private val transferRepository: TransferRepository,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     /**
      * Invoke
      */
-    suspend operator fun invoke(transferEvent: TransferEvent) {
+    suspend operator fun invoke(
+        transferEvent: TransferEvent,
+        destinationUriAndSubFolders: DestinationUriAndSubFolders?,
+    ) {
         val transfer = transferEvent.transfer
+        val path = transfer.localPath.takeIf { it.isNotEmpty() } ?: transfer.parentPath
+        if (transfer.transferType != TransferType.DOWNLOAD
+            || !(transfer.isSDCardDownload() || fileSystemRepository.isSDCardCachePath(path))
+        ) return
+
         when (transferEvent) {
             is TransferEvent.TransferStartEvent -> {
-                if (transfer.isSDCardDownload()) {
-                    insertSdTransferUseCase(
-                        SdTransfer(
-                            transfer.tag,
-                            transfer.fileName,
-                            transfer.totalBytes.toString(),
-                            transfer.nodeHandle.toString(),
-                            transfer.localPath,
-                            transfer.appData
-                        )
+                insertSdTransferUseCase(
+                    SdTransfer(
+                        transfer.tag,
+                        transfer.fileName,
+                        transfer.totalBytes.toString(),
+                        transfer.nodeHandle.toString(),
+                        path,
+                        transfer.appData
                     )
-                }
+                )
             }
 
             is TransferEvent.TransferFinishEvent -> {
                 if (transferEvent.error != null) return
-                scope.launch {
-                    if (!transfer.isFolderTransfer
-                        && fileSystemRepository.isSDCardCachePath(transfer.localPath)
-                    ) {
-                        val movePath =
-                            transfer.getSDCardTransferPath()?.takeIf { transfer.isRootTransfer }
-                                ?: getChildFinalDestination(transfer.localPath)
-
-                        movePath?.let { path ->
+                if (!transfer.isFolderTransfer) {
+                    scope.launch {
+                        destinationUriAndSubFolders?.let { (path, subFolders) ->
                             moveFileToSdCardUseCase(
-                                File(transferEvent.transfer.localPath),
-                                path
+                                File(transfer.localPath),
+                                path,
+                                subFolders
                             )
                         }
                     }
-                    if (transfer.isRootTransfer && transfer.isSDCardDownload()) {
-                        //if it's a root sd card transfer we can remove the sd transfer from the data base
-                        deleteSdTransferByTagUseCase(transferEvent.transfer.tag)
-                    }
+                }
+                if (transfer.isRootTransfer && transfer.isSDCardDownload()) {
+                    //if it's a root sd card transfer we can remove the sd transfer from the data base
+                    deleteSdTransferByTagUseCase(transferEvent.transfer.tag)
                 }
             }
 
             else -> {} //nothing here
-        }
-    }
-
-    /**
-     * Child transfers doesn't have app data, so we can't get [TransferAppData.SdCardDownload]
-     * To know the destination on the sd card we replace the cache folder by the destination folder
-     */
-    private suspend fun getChildFinalDestination(currentFilePath: String): String? {
-        val file = File(currentFilePath)
-        val currentFolderPath = file.parent
-        val cacheRoot = transferRepository.getOrCreateSDCardTransfersCacheFolder()?.path
-        val destinationRoot = getOrCreateStorageDownloadLocationUseCase()
-        return if (cacheRoot != null
-            && destinationRoot != null
-            && currentFolderPath.startsWith(cacheRoot)
-        ) {
-            destinationRoot.plus(currentFolderPath.removePrefix(cacheRoot))
-        } else {
-            null
         }
     }
 }

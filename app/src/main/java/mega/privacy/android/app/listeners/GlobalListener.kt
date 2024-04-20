@@ -1,15 +1,15 @@
 package mega.privacy.android.app.listeners
 
-import mega.privacy.android.core.R as CoreUiR
-import mega.privacy.android.icon.pack.R as iconPackR
+import mega.privacy.android.icon.pack.R as IconPackR
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.Drawable
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.media.RingtoneManager
+import androidx.annotation.DrawableRes
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.text.HtmlCompat
@@ -27,6 +27,7 @@ import mega.privacy.android.app.constants.BroadcastConstants
 import mega.privacy.android.app.constants.EventConstants.EVENT_MEETING_AVATAR_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_USER_VISIBILITY_CHANGE
 import mega.privacy.android.app.fcm.ContactsAdvancedNotificationBuilder
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.globalmanagement.MegaChatNotificationHandler
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.presentation.login.LoginActivity
@@ -103,7 +104,10 @@ class GlobalListener @Inject constructor(
                 .catch { Timber.e(it) }
                 .collect {
                     runCatching {
-                        val notifications = getNotificationCountUseCase(false)
+                        val notifications = getNotificationCountUseCase(
+                            withChatNotifications = false,
+                            promoFeatureFlag = AppFeatures.PromoNotifications
+                        )
                         broadcastHomeBadgeCountUseCase(notifications)
                     }.getOrElse { Timber.e(it) }
                 }
@@ -166,7 +170,12 @@ class GlobalListener @Inject constructor(
     }
 
     private fun notifyNotificationCountChange() = applicationScope.launch {
-        val notificationCount = runCatching { getNotificationCountUseCase(false) }
+        val notificationCount = runCatching {
+            getNotificationCountUseCase(
+                withChatNotifications = false,
+                promoFeatureFlag = AppFeatures.PromoNotifications
+            )
+        }
             .getOrNull() ?: 0
 
         broadcastHomeBadgeCountUseCase(notificationCount)
@@ -386,11 +395,12 @@ class GlobalListener @Inject constructor(
             )
             channel.setShowBadge(true)
             notificationManager.createNotificationChannel(channel)
-            val d: Drawable = appContext.resources
-                .getDrawable(CoreUiR.drawable.ic_folder_incoming, appContext.theme)
+            val icon: Bitmap? = getBitmapFromVectorDrawable(
+                IconPackR.drawable.ic_folder_incoming_medium_solid
+            )
             val notificationBuilder: NotificationCompat.Builder =
                 NotificationCompat.Builder(appContext, notificationChannelId)
-                    .setSmallIcon(iconPackR.drawable.ic_stat_notify)
+                    .setSmallIcon(IconPackR.drawable.ic_stat_notify)
                     .setContentTitle(notificationTitle)
                     .setContentText(notificationContent)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent))
@@ -398,7 +408,7 @@ class GlobalListener @Inject constructor(
                     .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
                     .setContentIntent(pendingIntent)
                     .setColor(ContextCompat.getColor(appContext, R.color.red_600_red_300))
-                    .setLargeIcon((d as BitmapDrawable).bitmap)
+                    .setLargeIcon(icon)
                     .setPriority(NotificationManager.IMPORTANCE_HIGH)
             notificationManager.notify(
                 Constants.NOTIFICATION_PUSH_CLOUD_DRIVE,
@@ -407,6 +417,20 @@ class GlobalListener @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e)
         }
+    }
+
+    private fun getBitmapFromVectorDrawable(
+        @DrawableRes drawableId: Int,
+    ): Bitmap? {
+        val drawable = ContextCompat.getDrawable(appContext, drawableId) ?: return null
+        val bitmap = Bitmap.createBitmap(
+            drawable.intrinsicWidth,
+            drawable.intrinsicHeight, Bitmap.Config.ARGB_8888
+        )
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
     }
 
     /**

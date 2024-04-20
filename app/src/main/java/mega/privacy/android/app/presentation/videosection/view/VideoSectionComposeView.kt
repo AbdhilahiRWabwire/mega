@@ -22,19 +22,18 @@ import mega.privacy.android.app.presentation.videosection.view.allvideos.AllVide
 import mega.privacy.android.app.presentation.videosection.view.playlist.VideoPlaylistsView
 import mega.privacy.android.domain.entity.SortOrder
 
-internal const val videoSectionRoute = "videoSection/video_section"
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun VideoSectionComposeView(
     videoSectionViewModel: VideoSectionViewModel,
     onClick: (item: VideoUIEntity, index: Int) -> Unit,
-    onSortOrderClick: () -> Unit = {},
-    onMenuClick: (VideoUIEntity) -> Unit = {},
-    onLongClick: (item: VideoUIEntity, index: Int) -> Unit = { _, _ -> },
-    onPlaylistItemClick: (item: VideoPlaylistUIEntity, index: Int) -> Unit = { _, _ -> },
-    onPlaylistItemMenuClick: (VideoPlaylistUIEntity) -> Unit = { _ -> },
-    onPlaylistItemLongClick: (VideoPlaylistUIEntity, index: Int) -> Unit = { _, _ -> },
+    onSortOrderClick: () -> Unit,
+    onMenuClick: (VideoUIEntity) -> Unit,
+    onLongClick: (item: VideoUIEntity, index: Int) -> Unit,
+    onPlaylistItemClick: (item: VideoPlaylistUIEntity, index: Int) -> Unit,
+    onPlaylistItemMenuClick: (VideoPlaylistUIEntity) -> Unit,
+    onPlaylistItemLongClick: (VideoPlaylistUIEntity, index: Int) -> Unit,
+    onDeleteDialogButtonClicked: () -> Unit,
 ) {
     val uiState by videoSectionViewModel.state.collectAsStateWithLifecycle()
     val tabState by videoSectionViewModel.tabState.collectAsStateWithLifecycle()
@@ -48,10 +47,6 @@ internal fun VideoSectionComposeView(
         initialPageOffsetFraction = 0f
     ) {
         tabState.tabs.size
-    }
-
-    LaunchedEffect(Unit) {
-        videoSectionViewModel.updateCurrentVideoPlaylist(null)
     }
 
     LaunchedEffect(pagerState.currentPage) {
@@ -128,22 +123,37 @@ internal fun VideoSectionComposeView(
                 shouldDeleteVideoPlaylistDialog = uiState.shouldDeleteVideoPlaylist,
                 setShouldDeleteVideoPlaylist = videoSectionViewModel::setShouldDeleteVideoPlaylist,
                 onDeleteDialogPositiveButtonClicked = { playlist ->
-                    videoSectionViewModel.removeVideoPlaylists(
-                        listOf(playlist)
-                    )
+                    videoSectionViewModel.setShouldDeleteSingleVideoPlaylist(false)
+                    videoSectionViewModel.removeVideoPlaylists(listOf(playlist))
                 },
                 onDeletedMessageShown = videoSectionViewModel::clearDeletedVideoPlaylistTitles,
-                deletedVideoPlaylistTitles = uiState.deletedVideoPlaylistTitles
+                deletedVideoPlaylistTitles = uiState.deletedVideoPlaylistTitles,
+                onDeletePlaylistsDialogPositiveButtonClicked = {
+                    videoSectionViewModel.setShouldDeleteVideoPlaylist(false)
+                    val removedPlaylists =
+                        uiState.selectedVideoPlaylistHandles.mapNotNull {
+                            uiState.videoPlaylists.firstOrNull { playlist ->
+                                playlist.id.longValue == it
+                            }
+                        }
+                    videoSectionViewModel.removeVideoPlaylists(removedPlaylists)
+                    onDeleteDialogButtonClicked()
+                }
             )
         },
         selectedTab = tabState.selectedTab,
         allLazyListState = allLazyListState,
         playlistsLazyListState = playlistsLazyListState,
         onTabSelected = { tab ->
-            videoSectionViewModel.onTabSelected(selectTab = tab)
-            coroutineScope.launch {
-                pagerState.scrollToPage(tab.ordinal)
+            if (!uiState.searchMode && !uiState.actionMode) {
+                videoSectionViewModel.onTabSelected(selectTab = tab)
+                coroutineScope.launch {
+                    pagerState.scrollToPage(tab.ordinal)
+                }
             }
-        }
+        },
+        swipeEnabled = !uiState.searchMode && !uiState.actionMode
     )
 }
+
+internal const val videoSectionRoute = "videoSection/video_section"

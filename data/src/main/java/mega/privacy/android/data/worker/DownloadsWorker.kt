@@ -13,16 +13,16 @@ import mega.privacy.android.data.mapper.transfer.TransfersFinishedNotificationMa
 import mega.privacy.android.domain.entity.transfer.ActiveTransferTotals
 import mega.privacy.android.domain.entity.transfer.TransferEvent
 import mega.privacy.android.domain.entity.transfer.TransferType
+import mega.privacy.android.domain.monitoring.CrashReporter
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.usecase.qrcode.ScanMediaFileUseCase
 import mega.privacy.android.domain.usecase.transfers.MonitorTransferEventsUseCase
-import mega.privacy.android.domain.usecase.transfers.active.AddOrUpdateActiveTransferUseCase
 import mega.privacy.android.domain.usecase.transfers.active.ClearActiveTransfersIfFinishedUseCase
 import mega.privacy.android.domain.usecase.transfers.active.CorrectActiveTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.active.GetActiveTransferTotalsUseCase
+import mega.privacy.android.domain.usecase.transfers.active.HandleTransferEventUseCase
 import mega.privacy.android.domain.usecase.transfers.active.MonitorOngoingActiveTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
-import mega.privacy.android.domain.usecase.transfers.sd.HandleSDCardEventUseCase
 import timber.log.Timber
 
 /**
@@ -35,7 +35,7 @@ class DownloadsWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     monitorTransferEventsUseCase: MonitorTransferEventsUseCase,
-    addOrUpdateActiveTransferUseCase: AddOrUpdateActiveTransferUseCase,
+    handleTransferEventUseCase: HandleTransferEventUseCase,
     monitorOngoingActiveTransfersUseCase: MonitorOngoingActiveTransfersUseCase,
     areTransfersPausedUseCase: AreTransfersPausedUseCase,
     getActiveTransferTotalsUseCase: GetActiveTransferTotalsUseCase,
@@ -46,29 +46,32 @@ class DownloadsWorker @AssistedInject constructor(
     clearActiveTransfersIfFinishedUseCase: ClearActiveTransfersIfFinishedUseCase,
     private val downloadNotificationMapper: DownloadNotificationMapper,
     private val transfersFinishedNotificationMapper: TransfersFinishedNotificationMapper,
-    private val handleSDCardEventUseCase: HandleSDCardEventUseCase,
     private val scanMediaFileUseCase: ScanMediaFileUseCase,
+    crashReporter: CrashReporter,
+    foregroundSetter: ForegroundSetter? = null,
 ) : AbstractTransfersWorker(
-    context,
-    workerParams,
-    TransferType.DOWNLOAD,
-    ioDispatcher,
-    monitorTransferEventsUseCase,
-    addOrUpdateActiveTransferUseCase,
-    monitorOngoingActiveTransfersUseCase,
-    areTransfersPausedUseCase,
-    getActiveTransferTotalsUseCase,
-    overQuotaNotificationBuilder,
-    notificationManager,
-    areNotificationsEnabledUseCase,
-    correctActiveTransfersUseCase,
-    clearActiveTransfersIfFinishedUseCase,
+    context = context,
+    workerParams = workerParams,
+    type = TransferType.DOWNLOAD,
+    ioDispatcher = ioDispatcher,
+    monitorTransferEventsUseCase = monitorTransferEventsUseCase,
+    handleTransferEventUseCase = handleTransferEventUseCase,
+    monitorOngoingActiveTransfersUseCase = monitorOngoingActiveTransfersUseCase,
+    areTransfersPausedUseCase = areTransfersPausedUseCase,
+    getActiveTransferTotalsUseCase = getActiveTransferTotalsUseCase,
+    overQuotaNotificationBuilder = overQuotaNotificationBuilder,
+    notificationManager = notificationManager,
+    areNotificationsEnabledUseCase = areNotificationsEnabledUseCase,
+    correctActiveTransfersUseCase = correctActiveTransfersUseCase,
+    clearActiveTransfersIfFinishedUseCase = clearActiveTransfersIfFinishedUseCase,
+    crashReporter = crashReporter,
+    foregroundSetter = foregroundSetter,
 ) {
 
     override val finalNotificationId = DOWNLOAD_NOTIFICATION_ID
     override val updateNotificationId = NOTIFICATION_DOWNLOAD_FINAL
 
-    override suspend fun createUpdateNotification(
+    override fun createUpdateNotification(
         activeTransferTotals: ActiveTransferTotals,
         paused: Boolean,
     ) = downloadNotificationMapper(activeTransferTotals, paused)
@@ -77,7 +80,6 @@ class DownloadsWorker @AssistedInject constructor(
         transfersFinishedNotificationMapper(activeTransferTotals)
 
     override suspend fun onTransferEventReceived(event: TransferEvent) {
-        handleSDCardEventUseCase(event)
         if (event is TransferEvent.TransferFinishEvent) {
             runCatching {
                 scanMediaFileUseCase(arrayOf(event.transfer.localPath), arrayOf(""))

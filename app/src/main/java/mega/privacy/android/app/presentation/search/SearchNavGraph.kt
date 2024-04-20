@@ -18,10 +18,12 @@ import mega.privacy.android.app.presentation.search.navigation.nodeBottomSheetNa
 import mega.privacy.android.app.presentation.search.navigation.overQuotaDialogNavigation
 import mega.privacy.android.app.presentation.search.navigation.removeShareFolderDialogNavigation
 import mega.privacy.android.app.presentation.search.navigation.renameDialogNavigation
+import mega.privacy.android.app.presentation.search.navigation.searchFilterBottomSheetNavigation
 import mega.privacy.android.app.presentation.search.navigation.shareFolderAccessDialogNavigation
 import mega.privacy.android.app.presentation.search.navigation.shareFolderDialogNavigation
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.feature.sync.data.mapper.ListToStringWithDelimitersMapper
+import mega.privacy.android.feature.sync.ui.mapper.FileTypeIconMapper
 
 
 /**
@@ -48,6 +50,7 @@ internal fun NavGraphBuilder.searchNavGraph(
     onBackPressed: () -> Unit,
     nodeActionsViewModel: NodeActionsViewModel,
     handleClick: (TypedNode?) -> Unit,
+    fileTypeIconMapper: FileTypeIconMapper,
     listToStringWithDelimitersMapper: ListToStringWithDelimitersMapper,
 ) {
     composable(searchRoute) {
@@ -59,6 +62,7 @@ internal fun NavGraphBuilder.searchNavGraph(
             searchActivityViewModel = searchActivityViewModel,
             onBackPressed = onBackPressed,
             nodeActionHandler = nodeActionHandler,
+            fileTypeIconMapper = fileTypeIconMapper,
             handleClick = handleClick
         )
     }
@@ -72,6 +76,10 @@ internal fun NavGraphBuilder.searchNavGraph(
     nodeBottomSheetNavigation(
         nodeActionHandler = nodeActionHandler,
         navHostController = navHostController,
+    )
+    searchFilterBottomSheetNavigation(
+        navHostController = navHostController,
+        searchActivityViewModel = searchActivityViewModel,
     )
     changeLabelBottomSheetNavigation(navHostController)
     changeNodeExtensionDialogNavigation(navHostController)

@@ -1,5 +1,6 @@
 package mega.privacy.android.app.main;
 
+import static mega.privacy.android.app.presentation.meeting.model.MeetingState.FREE_PLAN_PARTICIPANTS_LIMIT;
 import static mega.privacy.android.app.utils.CallUtil.isNecessaryDisableLocalCamera;
 import static mega.privacy.android.app.utils.CallUtil.showConfirmationOpenCamera;
 import static mega.privacy.android.app.utils.Constants.ACTION_OPEN_QR;
@@ -13,6 +14,7 @@ import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_CHAT_ID;
 import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_CONTACTS_SELECTED;
 import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_CONTACT_TYPE;
 import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_MAIL;
+import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_MAX_USER;
 import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_TOOL_BAR_TITLE;
 import static mega.privacy.android.app.utils.Constants.INVALID_POSITION;
 import static mega.privacy.android.app.utils.Constants.INVITE_CONTACT;
@@ -112,7 +114,6 @@ import mega.privacy.android.app.components.TopSnappedStickyLayoutManager;
 import mega.privacy.android.app.components.scrollBar.FastScroller;
 import mega.privacy.android.app.components.scrollBar.FastScrollerScrollListener;
 import mega.privacy.android.app.components.twemoji.EmojiEditText;
-import mega.privacy.android.app.featuretoggle.AppFeatures;
 import mega.privacy.android.app.main.adapters.AddContactsAdapter;
 import mega.privacy.android.app.main.adapters.MegaAddContactsAdapter;
 import mega.privacy.android.app.main.adapters.MegaContactsAdapter;
@@ -121,7 +122,7 @@ import mega.privacy.android.app.main.adapters.ShareContactsAdapter;
 import mega.privacy.android.app.main.adapters.ShareContactsHeaderAdapter;
 import mega.privacy.android.app.main.controllers.ContactController;
 import mega.privacy.android.app.main.tasks.AddContactViewModel;
-import mega.privacy.android.app.presentation.qrcode.QRCodeActivity;
+import mega.privacy.android.app.presentation.meeting.view.ParticipantsLimitWarningView;
 import mega.privacy.android.app.presentation.qrcode.QRCodeComposeActivity;
 import mega.privacy.android.app.psa.PsaWebBrowser;
 import mega.privacy.android.app.usecase.chat.GetChatChangesUseCase;
@@ -182,6 +183,8 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
     private long[] nodeHandles;
     private long chatId = -1;
 
+    private int maxParticipants = -1;
+
     private AddContactActivity addContactActivity;
 
     private Toolbar tB;
@@ -238,6 +241,8 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
     private ArrayList<ShareContactInfo> queryContactsShare = new ArrayList<>();
 
     private RelativeLayout relativeLayout;
+
+    private ParticipantsLimitWarningView participantsLimitWarningView;
 
     private ArrayList<String> savedaddedContacts = new ArrayList<>();
 
@@ -336,7 +341,8 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
     }
 
     @Override
-    public void onGlobalSyncStateChanged(@NonNull MegaApiJava api) {}
+    public void onGlobalSyncStateChanged(@NonNull MegaApiJava api) {
+    }
 
     private class GetPhoneContactsTask extends AsyncTask<Void, Void, Void> {
 
@@ -1540,6 +1546,7 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
             emailsContactsSelected = getIntent().getStringArrayListExtra(INTENT_EXTRA_KEY_CONTACTS_SELECTED);
             isFromMeeting = getIntent().getBooleanExtra(INTENT_EXTRA_IS_FROM_MEETING, false);
             chatId = getIntent().getLongExtra(INTENT_EXTRA_KEY_CHAT_ID, -1);
+            maxParticipants = getIntent().getIntExtra(INTENT_EXTRA_KEY_MAX_USER, FREE_PLAN_PARTICIPANTS_LIMIT);
             newGroup = getIntent().getBooleanExtra("newGroup", false);
             comesFromRecent = getIntent().getBooleanExtra(FROM_RECENT, false);
             if (newGroup) {
@@ -1592,6 +1599,8 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
         aB.setDisplayHomeAsUpEnabled(true);
         aB.setTitle("");
         aB.setSubtitle("");
+
+        participantsLimitWarningView = findViewById(R.id.participants_limit_warning_view);
 
         relativeLayout = (RelativeLayout) findViewById(R.id.relative_container_add_contact);
 
@@ -1755,7 +1764,7 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
             allowAddParticipantsSwitch.setChecked(isAllowAddParticipantsEnabled);
             onlyCreateGroup = savedInstanceState.getBoolean("onlyCreateGroup", false);
             isWarningMessageShown = savedInstanceState.getBoolean("warningBannerShown", false);
-            mWarningMessage.setVisibility( isWarningMessageShown&& isContactVerificationOn ? View.VISIBLE : View.GONE);
+            mWarningMessage.setVisibility(isWarningMessageShown && isContactVerificationOn ? View.VISIBLE : View.GONE);
             if (contactType == CONTACT_TYPE_MEGA || contactType == CONTACT_TYPE_BOTH) {
                 savedaddedContacts = savedInstanceState.getStringArrayList("savedaddedContacts");
 
@@ -1984,7 +1993,7 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
         }
         adapterShare.setContacts(addedContactsShare);
         isWarningMessageShown = checkForUnVerifiedContacts();
-        mWarningMessage.setVisibility( isWarningMessageShown&& isContactVerificationOn ? View.VISIBLE : View.GONE);
+        mWarningMessage.setVisibility(isWarningMessageShown && isContactVerificationOn ? View.VISIBLE : View.GONE);
         if (adapterShare.getItemCount() - 1 >= 0) {
             mLayoutManager.scrollToPosition(adapterShare.getItemCount() - 1);
         }
@@ -2366,7 +2375,8 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
                 MegaChatRoom chat = megaChatApi.getChatRoom(chatId);
                 if (chat != null) {
                     long participantsCount = chat.getPeerCount();
-
+                    boolean isModerator = chat.getOwnPrivilege() == MegaChatRoom.PRIV_MODERATOR;
+                    showParticipantsLimitWarning(participantsCount, isModerator);
                     for (int i = 0; i < contactsMEGA.size(); i++) {
                         if (contactsMEGA.get(i).getVisibility() == MegaUser.VISIBILITY_VISIBLE) {
 
@@ -2462,6 +2472,11 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
                 }
             }
         }
+    }
+
+    private void showParticipantsLimitWarning(long participantsCount, boolean isModerator) {
+        participantsLimitWarningView.setModerator(isModerator);
+        viewModel.shouldShowParticipantsLimitWarning(participantsCount >= maxParticipants);
     }
 
     @SuppressLint("InlinedApi")
@@ -2906,12 +2921,7 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
     }
 
     public void initScanQR() {
-        Intent intent;
-        if (viewModel.isFeatureEnabled(AppFeatures.QRCodeCompose)) {
-            intent = new Intent(this, QRCodeComposeActivity.class);
-        } else {
-            intent = new Intent(this, QRCodeActivity.class);
-        }
+        Intent intent = new Intent(this, QRCodeComposeActivity.class);
         intent.putExtra(INVITE_CONTACT, true);
         startActivityForResult(intent, SCAN_QR_FOR_ADD_CONTACTS);
     }
@@ -3537,8 +3547,8 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
                 adapterShare = new ShareContactsAdapter(addContactActivity, addedContactsShare);
             }
             adapterShare.updateContactVerification(addContactState.isContactVerificationWarningEnabled());
-
             isContactVerificationOn = addContactState.isContactVerificationWarningEnabled();
+            participantsLimitWarningView.setVisibility(addContactState.getShouldShowParticipantsLimitWarning() ? View.VISIBLE : View.GONE);
             return Unit.INSTANCE;
         });
     }

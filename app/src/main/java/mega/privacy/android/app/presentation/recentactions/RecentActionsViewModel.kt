@@ -13,19 +13,18 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.presentation.recentactions.model.RecentActionItemType
-import mega.privacy.android.app.presentation.recentactions.model.RecentActionsSharesType
 import mega.privacy.android.app.presentation.recentactions.model.RecentActionsState
 import mega.privacy.android.domain.entity.RecentActionBucket
+import mega.privacy.android.domain.entity.RecentActionsSharesType
 import mega.privacy.android.domain.entity.contacts.ContactItem
 import mega.privacy.android.domain.entity.node.FolderNode
-import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.usecase.GetAccountDetailsUseCase
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.GetVisibleContactsUseCase
 import mega.privacy.android.domain.usecase.contact.AreCredentialsVerifiedUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
-import mega.privacy.android.domain.usecase.recentactions.GetRecentActionsUseCase
+import mega.privacy.android.domain.usecase.recentactions.LegacyGetRecentActionsUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorHideRecentActivityUseCase
 import mega.privacy.android.domain.usecase.setting.SetHideRecentActivityUseCase
 import timber.log.Timber
@@ -43,9 +42,10 @@ import javax.inject.Inject
  * @param monitorHideRecentActivityUseCase
  * @param monitorNodeUpdatesUseCase
  */
+@Deprecated("Should be removed when Compose implementation is released")
 @HiltViewModel
 class RecentActionsViewModel @Inject constructor(
-    private val getRecentActionsUseCase: GetRecentActionsUseCase,
+    private val getRecentActionsUseCase: LegacyGetRecentActionsUseCase,
     private val getVisibleContactsUseCase: GetVisibleContactsUseCase,
     private val setHideRecentActivityUseCase: SetHideRecentActivityUseCase,
     private val getNodeByIdUseCase: GetNodeByIdUseCase,
@@ -144,10 +144,8 @@ class RecentActionsViewModel @Inject constructor(
                 getRecentActionsUseCase().also { _buckets = it }
             }
             val getVisibleContacts = async { getVisibleContactsUseCase() }
-
             val formattedList =
                 formatRecentActions(getRecentActions.await(), getVisibleContacts.await())
-
             setUiRecentActionsItems(formattedList)
         }.onFailure {
             Timber.e(it)
@@ -164,14 +162,16 @@ class RecentActionsViewModel @Inject constructor(
         buckets: List<RecentActionBucket>,
         visibleContacts: List<ContactItem>,
     ): List<RecentActionItemType> {
-
         val recentItemList = arrayListOf<RecentActionItemType>()
         var previousDate: Long? = null
+        val currentUserEmail = runCatching { getAccountDetailsUseCase(false).email }.getOrNull()
+
+        // For caching the verified credentials
+        val verifiedCredentialsMap = mutableMapOf<String, Boolean>()
 
         buckets.forEach { bucket ->
             // if nodes is null or empty, do not add to the list
             if (bucket.nodes.isEmpty()) return@forEach
-
             val currentDate = bucket.timestamp
 
             if (currentDate != previousDate) {
@@ -182,20 +182,19 @@ class RecentActionsViewModel @Inject constructor(
             val userName =
                 visibleContacts.find { bucket.userEmail == it.email }?.contactData?.fullName.orEmpty()
 
-            val currentUserIsOwner = isCurrentUserOwner(bucket)
-            val areCredentialsVerified =
-                runCatching { areCredentialsVerifiedUseCase(bucket.userEmail) }
-                    .onFailure { Timber.e(it) }
-                    .getOrDefault(false)
-            val isNodeKeyVerified =
-                bucket.nodes[0].isNodeKeyDecrypted || areCredentialsVerified
-            val parentNode = getNodeByIdUseCase(NodeId(bucket.parentHandle))
+            val currentUserIsOwner = currentUserEmail == bucket.userEmail
+            val isNodeKeyVerified = bucket.nodes[0].isNodeKeyDecrypted
+                    || currentUserIsOwner
+                    || verifiedCredentialsMap.getOrPut(bucket.userEmail) {
+                areCredentialsVerified(bucket.userEmail)
+            }
+            val parentNode = getNodeByIdUseCase(bucket.parentNodeId)
             val sharesType = getParentSharesType(parentNode)
             recentItemList.add(
                 RecentActionItemType.Item(
                     bucket,
                     userName,
-                    parentNode?.name ?: "",
+                    parentNode?.name.orEmpty(),
                     sharesType,
                     currentUserIsOwner,
                     isNodeKeyVerified,
@@ -206,10 +205,11 @@ class RecentActionsViewModel @Inject constructor(
         return recentItemList
     }
 
-    private suspend fun isCurrentUserOwner(
-        bucket: RecentActionBucket,
-    ) = kotlin.runCatching { getAccountDetailsUseCase(false).email == bucket.userEmail }
-        .getOrDefault(false)
+    private suspend fun areCredentialsVerified(
+        userEmail: String,
+    ) = runCatching {
+        areCredentialsVerifiedUseCase(userEmail)
+    }.getOrDefault(false)
 
     /**
      * Retrieve the parent folder shares type of a node

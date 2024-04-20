@@ -16,7 +16,7 @@ import mega.privacy.android.domain.entity.chat.CombinedChatRoom
 import mega.privacy.android.domain.entity.chat.ConnectionState
 import mega.privacy.android.domain.entity.chat.PendingMessage
 import mega.privacy.android.domain.entity.chat.RichLinkConfig
-import mega.privacy.android.domain.entity.chat.messages.paging.MessagePagingInfo
+import mega.privacy.android.domain.entity.chat.messages.ChatMessageInfo
 import mega.privacy.android.domain.entity.chat.messages.reactions.ReactionUpdate
 import mega.privacy.android.domain.entity.chat.messages.request.CreateTypedMessageRequest
 import mega.privacy.android.domain.entity.chat.notification.ChatMessageNotification
@@ -906,7 +906,7 @@ interface ChatRepository {
      * @param timestamp
      * @return next chronological message if it exists
      */
-    suspend fun getNextMessagePagingInfo(chatId: Long, timestamp: Long): MessagePagingInfo?
+    suspend fun getNextMessagePagingInfo(chatId: Long, timestamp: Long): ChatMessageInfo?
 
     /**
      * Monitor if chat is in joining state.
@@ -983,4 +983,34 @@ interface ChatRepository {
      * @param sfuId New SFU id
      */
     suspend fun setSFUid(sfuId: Int)
+
+    /**
+     * Set limits in call
+     *
+     * @param chatId       Chat id
+     * @param callDur      Call duration in seconds
+     * @param numUsers     Number of users
+     * @param numClients   Number of clients
+     * @param divider      A divider that divides all existing limits by the specified number, rounding the result (except for callDur).
+     * @param numClientsPerUser Number of clients per user
+     */
+    suspend fun setLimitsInCall(
+        chatId: Long,
+        callDur: Long?,
+        numUsers: Long?,
+        numClients: Long?,
+        divider: Long?,
+        numClientsPerUser: Long?,
+    )
+
+    /**
+     * Set the chat's retention time
+     *
+     * @param chatId MegaChatHandle that identifies the chat room
+     * @param period retention timeframe in seconds, after which older messages in the chat are automatically deleted
+     */
+    suspend fun setChatRetentionTime(
+        chatId: Long,
+        period: Long,
+    )
 }

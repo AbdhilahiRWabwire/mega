@@ -5,7 +5,6 @@ import android.content.Context
 import android.os.Build
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
-import androidx.work.WorkInfo
 import androidx.work.WorkInfo.Companion.STOP_REASON_CANCELLED_BY_APP
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
@@ -23,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.update
@@ -71,37 +71,33 @@ import mega.privacy.android.domain.entity.transfer.Transfer
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.NotEnoughStorageException
 import mega.privacy.android.domain.exception.QuotaExceededMegaException
+import mega.privacy.android.domain.monitoring.CrashReporter
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.qualifier.LoginMutex
 import mega.privacy.android.domain.repository.FileSystemRepository
 import mega.privacy.android.domain.repository.TimeSystemRepository
-import mega.privacy.android.domain.usecase.CreateCameraUploadFolder
 import mega.privacy.android.domain.usecase.CreateCameraUploadTemporaryRootDirectoryUseCase
-import mega.privacy.android.domain.usecase.DisableMediaUploadSettings
-import mega.privacy.android.domain.usecase.IsChargingRequired
-import mega.privacy.android.domain.usecase.IsNotEnoughQuota
 import mega.privacy.android.domain.usecase.IsSecondaryFolderEnabled
 import mega.privacy.android.domain.usecase.IsWifiNotSatisfiedUseCase
-import mega.privacy.android.domain.usecase.MonitorBatteryInfo
-import mega.privacy.android.domain.usecase.SetPrimarySyncHandle
-import mega.privacy.android.domain.usecase.SetSecondarySyncHandle
+import mega.privacy.android.domain.usecase.account.IsStorageOverQuotaUseCase
 import mega.privacy.android.domain.usecase.backup.InitializeBackupsUseCase
 import mega.privacy.android.domain.usecase.camerauploads.AreCameraUploadsFoldersInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.camerauploads.BroadcastCameraUploadsSettingsActionUseCase
 import mega.privacy.android.domain.usecase.camerauploads.BroadcastStorageOverQuotaUseCase
+import mega.privacy.android.domain.usecase.camerauploads.CheckOrCreateCameraUploadsNodeUseCase
 import mega.privacy.android.domain.usecase.camerauploads.DeleteCameraUploadsTemporaryRootDirectoryUseCase
 import mega.privacy.android.domain.usecase.camerauploads.DisableCameraUploadsUseCase
+import mega.privacy.android.domain.usecase.camerauploads.DisableMediaUploadsSettingsUseCase
 import mega.privacy.android.domain.usecase.camerauploads.DoesCameraUploadsRecordExistsInTargetNodeUseCase
 import mega.privacy.android.domain.usecase.camerauploads.EstablishCameraUploadsSyncHandlesUseCase
 import mega.privacy.android.domain.usecase.camerauploads.ExtractGpsCoordinatesUseCase
-import mega.privacy.android.domain.usecase.camerauploads.GetDefaultNodeHandleUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetPendingCameraUploadsRecordsUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetPrimaryFolderPathUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetUploadFolderHandleUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetUploadVideoQualityUseCase
 import mega.privacy.android.domain.usecase.camerauploads.HandleLocalIpChangeUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsEnabledUseCase
-import mega.privacy.android.domain.usecase.camerauploads.IsChargingUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsChargingRequiredUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsPrimaryFolderPathValidUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsSecondaryFolderSetUseCase
 import mega.privacy.android.domain.usecase.camerauploads.MonitorStorageOverQuotaUseCase
@@ -110,23 +106,21 @@ import mega.privacy.android.domain.usecase.camerauploads.RenameCameraUploadsReco
 import mega.privacy.android.domain.usecase.camerauploads.SendBackupHeartBeatSyncUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetPrimaryFolderLocalPathUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetSecondaryFolderLocalPathUseCase
-import mega.privacy.android.domain.usecase.camerauploads.SetupPrimaryFolderUseCase
-import mega.privacy.android.domain.usecase.camerauploads.SetupSecondaryFolderUseCase
 import mega.privacy.android.domain.usecase.camerauploads.UpdateCameraUploadsBackupHeartbeatStatusUseCase
 import mega.privacy.android.domain.usecase.camerauploads.UpdateCameraUploadsBackupStatesUseCase
 import mega.privacy.android.domain.usecase.camerauploads.UploadCameraUploadsRecordsUseCase
+import mega.privacy.android.domain.usecase.environment.MonitorBatteryInfoUseCase
 import mega.privacy.android.domain.usecase.file.GetFileByPathUseCase
 import mega.privacy.android.domain.usecase.login.BackgroundFastLoginUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
-import mega.privacy.android.domain.usecase.node.IsNodeInRubbishOrDeletedUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.permisison.HasMediaPermissionUseCase
+import mega.privacy.android.domain.usecase.transfers.CancelTransferByTagUseCase
+import mega.privacy.android.domain.usecase.transfers.GetTransferByTagUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.MonitorPausedTransfersUseCase
-import mega.privacy.android.domain.usecase.transfers.uploads.CancelAllUploadTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.uploads.ResetTotalUploadsUseCase
 import mega.privacy.android.domain.usecase.workers.ScheduleCameraUploadUseCase
-import nz.mega.sdk.MegaApiJava
 import timber.log.Timber
 import java.time.Instant
 import java.util.Hashtable
@@ -138,7 +132,7 @@ import java.util.Hashtable
 class CameraUploadsWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted workerParams: WorkerParameters,
-    private val isNotEnoughQuota: IsNotEnoughQuota,
+    private val isStorageOverQuotaUseCase: IsStorageOverQuotaUseCase,
     private val getPrimaryFolderPathUseCase: GetPrimaryFolderPathUseCase,
     private val isPrimaryFolderPathValidUseCase: IsPrimaryFolderPathValidUseCase,
     private val isSecondaryFolderSetUseCase: IsSecondaryFolderSetUseCase,
@@ -147,33 +141,27 @@ class CameraUploadsWorker @AssistedInject constructor(
     private val isWifiNotSatisfiedUseCase: IsWifiNotSatisfiedUseCase,
     private val setPrimaryFolderLocalPathUseCase: SetPrimaryFolderLocalPathUseCase,
     private val setSecondaryFolderLocalPathUseCase: SetSecondaryFolderLocalPathUseCase,
-    private val isChargingRequired: IsChargingRequired,
+    private val isChargingRequiredUseCase: IsChargingRequiredUseCase,
     private val getUploadFolderHandleUseCase: GetUploadFolderHandleUseCase,
-    private val setPrimarySyncHandle: SetPrimarySyncHandle,
-    private val setSecondarySyncHandle: SetSecondarySyncHandle,
-    private val getDefaultNodeHandleUseCase: GetDefaultNodeHandleUseCase,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     private val monitorPausedTransfersUseCase: MonitorPausedTransfersUseCase,
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
-    private val monitorBatteryInfo: MonitorBatteryInfo,
+    private val monitorBatteryInfoUseCase: MonitorBatteryInfoUseCase,
     private val backgroundFastLoginUseCase: BackgroundFastLoginUseCase,
-    private val isNodeInRubbishOrDeletedUseCase: IsNodeInRubbishOrDeletedUseCase,
     private val monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase,
     private val handleLocalIpChangeUseCase: HandleLocalIpChangeUseCase,
-    private val cancelAllUploadTransfersUseCase: CancelAllUploadTransfersUseCase,
-    private val createCameraUploadFolder: CreateCameraUploadFolder,
-    private val setupPrimaryFolderUseCase: SetupPrimaryFolderUseCase,
-    private val setupSecondaryFolderUseCase: SetupSecondaryFolderUseCase,
+    private val cancelTransferByTagUseCase: CancelTransferByTagUseCase,
+    private val getTransferByTagUseCase: GetTransferByTagUseCase,
+    private val checkOrCreateCameraUploadsNodeUseCase: CheckOrCreateCameraUploadsNodeUseCase,
     private val establishCameraUploadsSyncHandlesUseCase: EstablishCameraUploadsSyncHandlesUseCase,
     private val resetTotalUploadsUseCase: ResetTotalUploadsUseCase,
-    private val disableMediaUploadSettings: DisableMediaUploadSettings,
+    private val disableMediaUploadSettingsUseCase: DisableMediaUploadsSettingsUseCase,
     private val createCameraUploadTemporaryRootDirectoryUseCase: CreateCameraUploadTemporaryRootDirectoryUseCase,
     private val deleteCameraUploadsTemporaryRootDirectoryUseCase: DeleteCameraUploadsTemporaryRootDirectoryUseCase,
     private val scheduleCameraUploadUseCase: ScheduleCameraUploadUseCase,
     private val updateCameraUploadsBackupStatesUseCase: UpdateCameraUploadsBackupStatesUseCase,
     private val sendBackupHeartBeatSyncUseCase: SendBackupHeartBeatSyncUseCase,
     private val updateCameraUploadsBackupHeartbeatStatusUseCase: UpdateCameraUploadsBackupHeartbeatStatusUseCase,
-    private val isChargingUseCase: IsChargingUseCase,
     private val monitorStorageOverQuotaUseCase: MonitorStorageOverQuotaUseCase,
     private val broadcastStorageOverQuotaUseCase: BroadcastStorageOverQuotaUseCase,
     private val cameraUploadsNotificationManagerWrapper: CameraUploadsNotificationManagerWrapper,
@@ -194,6 +182,7 @@ class CameraUploadsWorker @AssistedInject constructor(
     private val getFileByPathUseCase: GetFileByPathUseCase,
     private val fileSystemRepository: FileSystemRepository,
     private val timeSystemRepository: TimeSystemRepository,
+    private val crashReporter: CrashReporter,
     @LoginMutex private val loginMutex: Mutex,
 ) : CoroutineWorker(context, workerParams) {
 
@@ -301,74 +290,79 @@ class CameraUploadsWorker @AssistedInject constructor(
     private var restartMode = CameraUploadsRestartMode.Reschedule
 
     override suspend fun doWork(): Result = withContext(ioDispatcher) {
-        try {
-            runCatching {
-                Timber.d("Start CU Worker")
+        runCatching {
+            Timber.d("Start CU Worker")
+            crashReporter.log("${CameraUploadsWorker::class.java.simpleName} Started")
+            // Signal to not kill the worker if the app is killed
+            setForegroundAsync(getForegroundInfo())
 
-                // Signal to not kill the worker if the app is killed
-                setForegroundAsync(getForegroundInfo())
+            monitorConnectivityStatusJob = monitorConnectivityStatus()
+            monitorBatteryLevelStatusJob = monitorBatteryLevelStatus()
+            monitorStorageOverQuotaStatusJob = monitorStorageOverQuotaStatus()
+            monitorParentNodesDeletedJob = monitorParentNodesDeleted()
 
-                monitorConnectivityStatusJob = monitorConnectivityStatus()
-                monitorBatteryLevelStatusJob = monitorBatteryLevelStatus()
-                monitorStorageOverQuotaStatusJob = monitorStorageOverQuotaStatus()
-                monitorParentNodesDeletedJob = monitorParentNodesDeleted()
+            handleLocalIpChangeUseCase(shouldRetryChatConnections = false)
 
-                handleLocalIpChangeUseCase(shouldRetryChatConnections = false)
-
-                canRunCameraUploads()?.let { finishedReason ->
-                    when (finishedReason) {
-                        CameraUploadsFinishedReason.MEDIA_PERMISSION_NOT_GRANTED,
-                        CameraUploadsFinishedReason.LOCAL_PRIMARY_FOLDER_NOT_VALID
-                        ->
-                            abortWork(
-                                reason = finishedReason,
-                                restartMode = CameraUploadsRestartMode.StopAndDisable,
-                            )
-
-                        else -> abortWork(reason = finishedReason)
-                    }
-                } ?: run {
-                    Timber.d("Starting upload process")
-                    sendStartUploadStatus()
-
-                    val primaryUploadNodeId =
-                        NodeId(getUploadFolderHandleUseCase(CameraUploadFolderType.Primary))
-                    val secondaryUploadNodeId =
-                        NodeId(getUploadFolderHandleUseCase(CameraUploadFolderType.Secondary))
-
-                    val records = async(retrieveFilesJob) {
-                        scanFiles()
-                        return@async getAndPrepareRecords(
-                            primaryUploadNodeId,
-                            secondaryUploadNodeId,
+            canRunCameraUploads()?.let { finishedReason ->
+                when (finishedReason) {
+                    CameraUploadsFinishedReason.MEDIA_PERMISSION_NOT_GRANTED,
+                    CameraUploadsFinishedReason.LOCAL_PRIMARY_FOLDER_NOT_VALID,
+                    ->
+                        abortWork(
+                            reason = finishedReason,
+                            restartMode = CameraUploadsRestartMode.StopAndDisable,
                         )
-                    }.await()
 
-                    records?.let {
-                        monitorUploadPauseStatusJob = monitorUploadPauseStatus()
-                        sendBackupHeartbeatJob = sendPeriodicBackupHeartBeat()
-                        uploadJob = launch {
-                            uploadFiles(it, primaryUploadNodeId, secondaryUploadNodeId, tempRoot)
-                        }
-                        uploadJob?.join()
+                    else -> abortWork(reason = finishedReason)
+                }
+            } ?: run {
+                Timber.d("Starting upload process")
+                sendStartUploadStatus()
+
+                val primaryUploadNodeId =
+                    NodeId(getUploadFolderHandleUseCase(CameraUploadFolderType.Primary))
+                val secondaryUploadNodeId =
+                    NodeId(getUploadFolderHandleUseCase(CameraUploadFolderType.Secondary))
+
+                val records = async(retrieveFilesJob) {
+                    scanFiles()
+                    return@async getAndPrepareRecords(
+                        primaryUploadNodeId,
+                        secondaryUploadNodeId,
+                    )
+                }.await()
+
+                records?.let {
+                    monitorUploadPauseStatusJob = monitorUploadPauseStatus()
+                    sendBackupHeartbeatJob = sendPeriodicBackupHeartBeat()
+                    uploadJob = launch {
+                        uploadFiles(it, primaryUploadNodeId, secondaryUploadNodeId, tempRoot)
                     }
+                    uploadJob?.join()
                 }
             }
-        } catch (throwable: Throwable) {
-            // Only capture worker system exceptions, not worker logic exceptions
+        }.onFailure { throwable ->
             withContext(NonCancellable) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    Timber.e(throwable, "Camera Uploads process aborted: $stopReason")
-                    finishedReason =
-                        if (stopReason != WorkInfo.STOP_REASON_NOT_STOPPED)
-                            CameraUploadsFinishedReason.UNKNOWN
-                        else null
-                    if (stopReason == STOP_REASON_CANCELLED_BY_APP) {
-                        restartMode = CameraUploadsRestartMode.Stop
+                Timber.e(
+                    t = throwable,
+                    message = "Camera Uploads process aborted".apply {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                            "$this, worker stopReason is $stopReason"
                     }
-                } else {
+                )
+
+                // Known finished reason should have been already handled in abortWork
+                // If finishedReason is null, it means the worker was stopped by an error unhandled by the worker logic
+                if (finishedReason == null) {
+                    // The actual stop reason will be automatically sent through monitorCameraUploadsStatusInfo
+                    // There is no need to know the exact stop reason here
                     finishedReason = CameraUploadsFinishedReason.UNKNOWN
-                    Timber.e(throwable)
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (stopReason == STOP_REASON_CANCELLED_BY_APP) {
+                            restartMode = CameraUploadsRestartMode.Stop
+                        }
+                    }
                 }
             }
         }
@@ -376,7 +370,9 @@ class CameraUploadsWorker @AssistedInject constructor(
         return@withContext withContext(NonCancellable) {
             cleanResources()
             sendFinishedStatus(finishedReason ?: CameraUploadsFinishedReason.COMPLETED)
-            endWork(finishedReason, restartMode)
+            endWork(finishedReason ?: CameraUploadsFinishedReason.COMPLETED, restartMode).also {
+                crashReporter.log("${CameraUploadsWorker::class.java.simpleName} Finished")
+            }
         }
     }
 
@@ -392,36 +388,43 @@ class CameraUploadsWorker @AssistedInject constructor(
      *         needs to be restarted immediately, Result.failure otherwise
      */
     private suspend fun endWork(
-        finishedReason: CameraUploadsFinishedReason?,
+        finishedReason: CameraUploadsFinishedReason,
         restartMode: CameraUploadsRestartMode,
-    ): Result = if (finishedReason != null) {
-        Timber.d("Camera Uploads process aborted with restart mode: $restartMode")
-        cancelAllPendingTransfers()
-        sendTransfersInterruptedInfoToBackupCenter()
-
-        when (restartMode) {
-            CameraUploadsRestartMode.RestartImmediately -> {
-                Result.retry()
+    ): Result =
+        when (finishedReason) {
+            CameraUploadsFinishedReason.COMPLETED -> {
+                Timber.d("Camera Uploads process ended successfully: Process completed")
+                resetTotalUploads()
+                sendTransfersUpToDateInfoToBackupCenter()
+                Result.success()
             }
 
-            CameraUploadsRestartMode.Reschedule -> {
-                scheduleCameraUploads()
-                Result.failure()
-            }
+            else -> {
+                Timber.d("Camera Uploads process aborted with restart mode: $restartMode")
+                cancelAllTransfers()
+                resetTotalUploads()
+                sendTransfersInterruptedInfoToBackupCenter()
+                when (restartMode) {
+                    CameraUploadsRestartMode.RestartImmediately -> {
+                        Result.retry()
+                    }
 
-            CameraUploadsRestartMode.StopAndDisable -> {
-                disableCameraUploads()
-                Result.failure()
-            }
+                    CameraUploadsRestartMode.Reschedule -> {
+                        scheduleCameraUploads()
+                        Result.failure()
+                    }
 
-            else -> Result.failure()
+                    CameraUploadsRestartMode.StopAndDisable -> {
+                        disableCameraUploads()
+                        Result.failure()
+                    }
+
+                    CameraUploadsRestartMode.Stop -> {
+                        Result.failure()
+                    }
+                }
+            }
         }
-    } else {
-        Timber.d("Camera Uploads process ended successfully: Process completed")
-        resetTotalUploads()
-        sendTransfersUpToDateInfoToBackupCenter()
-        Result.success()
-    }
 
     override suspend fun getForegroundInfo() =
         cameraUploadsNotificationManagerWrapper.getForegroundInfo()
@@ -443,7 +446,7 @@ class CameraUploadsWorker @AssistedInject constructor(
     }
 
     private fun CoroutineScope.monitorBatteryLevelStatus() = launch {
-        monitorBatteryInfo().collect {
+        monitorBatteryInfoUseCase().collect {
             deviceAboveMinimumBatteryLevel = (it.level > LOW_BATTERY_LEVEL || it.isCharging)
             if (!deviceAboveMinimumBatteryLevel) {
                 abortWork(reason = CameraUploadsFinishedReason.BATTERY_LEVEL_TOO_LOW)
@@ -507,13 +510,19 @@ class CameraUploadsWorker @AssistedInject constructor(
     }
 
     /**
-     * Cancels all pending [Transfer] items through [CancelAllUploadTransfersUseCase],
-     * and call [resetTotalUploadsUseCase] afterwards
+     * Cancels all [Transfer] initiated by the process,
      */
-    private suspend fun cancelAllPendingTransfers() {
-        runCatching { cancelAllUploadTransfersUseCase() }
-            .onSuccess { resetTotalUploads() }
-            .onFailure { Timber.e(it) }
+    private suspend fun cancelAllTransfers() {
+        runCatching {
+            with(state.value) {
+                (primaryCameraUploadsState.uploadTags + secondaryCameraUploadsState.uploadTags).forEach {
+                    getTransferByTagUseCase(it)?.let { transfer ->
+                        if (!transfer.isFinished)
+                            cancelTransferByTagUseCase(it)
+                    }
+                }
+            }
+        }.onFailure { Timber.e(it) }
     }
 
     /**
@@ -588,7 +597,7 @@ class CameraUploadsWorker @AssistedInject constructor(
      *
      * @return true if the device has not enough cloud storage space
      */
-    private suspend fun isStorageQuotaExceeded() = isNotEnoughQuota().also {
+    private fun isStorageQuotaExceeded() = isStorageOverQuotaUseCase().also {
         if (it) Timber.e("Storage Quota exceeded")
     }
 
@@ -652,17 +661,6 @@ class CameraUploadsWorker @AssistedInject constructor(
         }
 
     /**
-     * Checks whether the Upload Node is valid
-     *
-     * @param cameraUploadFolderType
-     * @return true if the Upload Node handle is a valid handle, and false if otherwise
-     */
-    private suspend fun isUploadNodeHandleValid(cameraUploadFolderType: CameraUploadFolderType): Boolean =
-        getUploadFolderHandleUseCase(cameraUploadFolderType).let {
-            !(it == MegaApiJava.INVALID_HANDLE || isNodeInRubbishOrDeletedUseCase(it))
-        }
-
-    /**
      * Check if the Primary Upload Node is valid.
      * When the Primary Upload Node does not exist, this function will create the corresponding node
      *
@@ -670,23 +668,10 @@ class CameraUploadsWorker @AssistedInject constructor(
      */
     private suspend fun checkOrCreatePrimaryUploadNodes(): Boolean {
         return runCatching {
-            // Setup the Primary Folder if it is missing
-            if (!isUploadNodeHandleValid(CameraUploadFolderType.Primary)) {
-                Timber.d("The Primary Folder is missing")
-
-                val primaryHandle =
-                    getDefaultNodeHandleUseCase(context.getString(R.string.section_photo_sync))
-
-                if (primaryHandle == MegaApiJava.INVALID_HANDLE
-                    || isNodeInRubbishOrDeletedUseCase(primaryHandle)
-                ) {
-                    Timber.d("Proceed to create the Primary Folder")
-                    createAndSetupPrimaryUploadFolder()
-                } else {
-                    Timber.d("Primary Handle retrieved from getPrimaryFolderHandle(): $primaryHandle")
-                    setPrimarySyncHandle(primaryHandle)
-                }
-            }
+            checkOrCreateCameraUploadsNodeUseCase(
+                folderName = context.getString(R.string.section_photo_sync),
+                folderType = CameraUploadFolderType.Primary,
+            )
         }.onFailure {
             Timber.e(it)
         }.isSuccess
@@ -700,23 +685,10 @@ class CameraUploadsWorker @AssistedInject constructor(
      */
     private suspend fun checkOrCreateSecondaryUploadNodes(): Boolean {
         return runCatching {
-            // If Secondary Media Uploads is enabled, setup the Secondary Folder if it is missing
-            if (!isUploadNodeHandleValid(CameraUploadFolderType.Secondary)) {
-                Timber.d("The local secondary folder is missing")
-
-                val secondaryHandle =
-                    getDefaultNodeHandleUseCase(context.getString(R.string.section_secondary_media_uploads))
-
-                if (secondaryHandle == MegaApiJava.INVALID_HANDLE
-                    || isNodeInRubbishOrDeletedUseCase(secondaryHandle)
-                ) {
-                    Timber.d("Proceed to create the Secondary Folder")
-                    createAndSetupSecondaryUploadFolder()
-                } else {
-                    Timber.d("Secondary Handle retrieved from getSecondaryFolderHandle(): $secondaryHandle")
-                    setSecondarySyncHandle(secondaryHandle)
-                }
-            }
+            checkOrCreateCameraUploadsNodeUseCase(
+                folderName = context.getString(R.string.section_secondary_media_uploads),
+                folderType = CameraUploadFolderType.Secondary,
+            )
         }.onFailure {
             Timber.e(it)
         }.isSuccess
@@ -924,8 +896,10 @@ class CameraUploadsWorker @AssistedInject constructor(
     private suspend fun processProgressEvent(progressEvent: CameraUploadsTransferProgress) {
         when (progressEvent) {
             is CameraUploadsTransferProgress.ToUpload,
+            -> processToUploadEvent(progressEvent)
+
             is CameraUploadsTransferProgress.ToCopy,
-            -> processToCopyOrUploadEvent(progressEvent)
+            -> processToCopyEvent(progressEvent)
 
             is CameraUploadsTransferProgress.Copied,
             -> processCopiedEvent(progressEvent)
@@ -957,14 +931,34 @@ class CameraUploadsWorker @AssistedInject constructor(
     }
 
     /**
-     * Process a progress event of type [CameraUploadsTransferProgress.ToUpload] or [CameraUploadsTransferProgress.ToCopy]
+     * Process a progress event of type [CameraUploadsTransferProgress.ToUpload]
      *
      * Update to upload transfer count
      *
      * @param progressEvent
      */
-    private suspend fun processToCopyOrUploadEvent(
-        progressEvent: CameraUploadsTransferProgress,
+    private suspend fun processToUploadEvent(
+        progressEvent: CameraUploadsTransferProgress.ToUpload,
+    ) {
+        updateToUploadCount(
+            filePath = progressEvent.record.tempFilePath
+                .takeIf { fileSystemRepository.doesFileExist(it) }
+                ?: progressEvent.record.filePath,
+            folderType = progressEvent.record.folderType,
+            tag = progressEvent.transferEvent.transfer.tag,
+        )
+    }
+
+
+    /**
+     * Process a progress event of type [CameraUploadsTransferProgress.ToCopy]
+     *
+     * Update to upload transfer count
+     *
+     * @param progressEvent
+     */
+    private suspend fun processToCopyEvent(
+        progressEvent: CameraUploadsTransferProgress.ToCopy,
     ) {
         updateToUploadCount(
             filePath = progressEvent.record.tempFilePath
@@ -1130,7 +1124,7 @@ class CameraUploadsWorker @AssistedInject constructor(
      */
     private suspend fun handleInvalidLocalSecondaryFolder() {
         sendFolderUnavailableStatus(CameraUploadFolderType.Secondary)
-        disableMediaUploadSettings()
+        disableMediaUploadSettingsUseCase()
         setSecondaryFolderLocalPathUseCase("")
         broadcastCameraUploadsSettingsActionUseCase(CameraUploadsSettingsAction.DisableMediaUploads)
     }
@@ -1164,32 +1158,6 @@ class CameraUploadsWorker @AssistedInject constructor(
             Timber.e("isLoggingIn lock not available, cannot perform backgroundFastLogin. Stop process")
             false
         }
-    }
-
-    /**
-     * Create the primary upload folder on the cloud drive
-     * If the creation succeed, set up the primary folder
-     *
-     * @throws Exception if the creation of the primary upload folder failed
-     */
-    private suspend fun createAndSetupPrimaryUploadFolder() {
-        createCameraUploadFolder(context.getString(R.string.section_photo_sync))?.let {
-            Timber.d("Primary Folder successfully created with handle $it. Setting up Primary Folder")
-            setupPrimaryFolderUseCase(it)
-        } ?: throw Exception("Failed to create primary upload folder")
-    }
-
-    /**
-     * Create the secondary upload folder on the cloud drive
-     * If the creation succeed, set up the secondary folder in local
-     *
-     * @throws Exception if the creation of the secondary upload folder failed
-     */
-    private suspend fun createAndSetupSecondaryUploadFolder() {
-        createCameraUploadFolder(context.getString(R.string.section_secondary_media_uploads))?.let {
-            Timber.d("Secondary Folder successfully created with handle $it. Setting up Secondary Folder")
-            setupSecondaryFolderUseCase(it)
-        } ?: throw Exception("Failed to create secondary upload folder")
     }
 
     /**
@@ -1297,15 +1265,18 @@ class CameraUploadsWorker @AssistedInject constructor(
      *
      *  @param filePath
      *  @param folderType
+     *  @param tag the tag associated to the transfer, null if no transfer (ie. copy)
      */
     private suspend fun updateToUploadCount(
         filePath: String,
         folderType: CameraUploadFolderType,
+        tag: Int? = null,
     ) {
         val bytes = getFileByPathUseCase(filePath)?.length() ?: 0
         increaseTotalToUpload(
             cameraUploadFolderType = folderType,
             bytesToUpload = bytes,
+            tag = tag,
         )
         displayUploadProgress()
     }
@@ -1352,6 +1323,7 @@ class CameraUploadsWorker @AssistedInject constructor(
             nodeHandle = transfer.nodeHandle,
             recordId = id,
             bytesUploaded = transfer.transferredBytes,
+            tag = transfer.tag,
         )
     }
 
@@ -1364,6 +1336,7 @@ class CameraUploadsWorker @AssistedInject constructor(
      *  @param recordId the recordId associated to the file uploaded.
      *                  It is used to identifies the bytes transferred for a unique filed transferred
      *  @param bytesUploaded the bytes transferred for this file
+     *  @param tag the tag associated to the transfer
      */
     private suspend fun updateUploadedCount(
         cameraUploadFolderType: CameraUploadFolderType,
@@ -1371,6 +1344,7 @@ class CameraUploadsWorker @AssistedInject constructor(
         nodeHandle: Long?,
         recordId: Long,
         bytesUploaded: Long,
+        tag: Int? = null,
     ) {
         increaseTotalUploaded(
             cameraUploadFolderType = cameraUploadFolderType,
@@ -1378,12 +1352,13 @@ class CameraUploadsWorker @AssistedInject constructor(
             nodeHandle = nodeHandle,
             recordId = recordId,
             bytesUploaded = bytesUploaded,
+            tag = tag,
         )
         displayUploadProgress()
     }
 
     private suspend fun canCompressVideo(queueSize: Long): Boolean =
-        (isChargingUseCase() || !isChargingRequired(queueSize)).also {
+        (monitorBatteryInfoUseCase().first().isCharging || !isChargingRequiredUseCase(queueSize)).also {
             if (!it) Timber.d("Charging required for video compression of $queueSize MB")
         }
 
@@ -1652,10 +1627,12 @@ class CameraUploadsWorker @AssistedInject constructor(
      *
      * @param cameraUploadFolderType the type of the CU folder
      * @param bytesToUpload bytes to be added to the total bytes to upload count
+     * @param tag the tag associated to the transfer
      */
     private suspend fun increaseTotalToUpload(
         cameraUploadFolderType: CameraUploadFolderType,
         bytesToUpload: Long,
+        tag: Int?,
     ) = stateUpdateMutex.withLock {
         when (cameraUploadFolderType) {
             CameraUploadFolderType.Primary -> state.value.primaryCameraUploadsState
@@ -1664,7 +1641,8 @@ class CameraUploadsWorker @AssistedInject constructor(
             updateState(
                 cameraUploadFolderType = cameraUploadFolderType,
                 toUploadCount = state.toUploadCount + 1,
-                bytesToUploadCount = state.bytesToUploadCount + bytesToUpload
+                bytesToUploadCount = state.bytesToUploadCount + bytesToUpload,
+                tag = tag
             )
         }
     }
@@ -1678,6 +1656,7 @@ class CameraUploadsWorker @AssistedInject constructor(
      * @param nodeHandle the node handle of the file uploaded
      * @param recordId the recordId associated to the file uploaded
      * @param bytesUploaded bytes to be added to the total bytes to uploaded count
+     * @param tag the tag associated to the transfer
      */
     private suspend fun increaseTotalUploaded(
         cameraUploadFolderType: CameraUploadFolderType,
@@ -1685,6 +1664,7 @@ class CameraUploadsWorker @AssistedInject constructor(
         bytesUploaded: Long,
         nodeHandle: Long?,
         recordId: Long,
+        tag: Int?,
     ) = stateUpdateMutex.withLock {
         when (cameraUploadFolderType) {
             CameraUploadFolderType.Primary -> state.value.primaryCameraUploadsState
@@ -1698,6 +1678,7 @@ class CameraUploadsWorker @AssistedInject constructor(
                     lastHandle = nodeHandle,
                     recordId = recordId,
                     bytesFinishedUploadedCount = state.bytesFinishedUploadedCount + bytesUploaded,
+                    tag = tag,
                 )
             } else {
                 updateState(
@@ -1725,6 +1706,7 @@ class CameraUploadsWorker @AssistedInject constructor(
         bytesUploaded: Long? = null,
         bytesUploadedTable: Hashtable<Long, Long>? = null,
         bytesFinishedUploadedCount: Long? = null,
+        tag: Int? = null,
     ) {
         when (cameraUploadFolderType) {
             CameraUploadFolderType.Primary -> state.value.primaryCameraUploadsState
@@ -1742,6 +1724,17 @@ class CameraUploadsWorker @AssistedInject constructor(
                         }
                     } ?: bytesUploadedTable
 
+                val tagList =
+                    ArrayList(this.uploadTags).apply {
+                        tag?.let {
+                            if (bytesFinishedUploadedCount == null) {
+                                if (!this.contains(tag)) this.add(tag)
+                            } else {
+                                if (this.contains(tag)) this.remove(tag)
+                            }
+                        }
+                    }.toList()
+
                 copy(
                     lastTimestamp = lastTimestamp ?: this.lastTimestamp,
                     lastHandle = lastHandle ?: this.lastHandle,
@@ -1751,7 +1744,8 @@ class CameraUploadsWorker @AssistedInject constructor(
                     bytesInProgressUploadedTable = bytesTable
                         ?: this.bytesInProgressUploadedTable,
                     bytesFinishedUploadedCount = bytesFinishedUploadedCount
-                        ?: this.bytesFinishedUploadedCount
+                        ?: this.bytesFinishedUploadedCount,
+                    uploadTags = tagList
                 )
             }
             _state.update {

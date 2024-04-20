@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.whenever
@@ -53,31 +54,40 @@ class CreatePendingAttachmentMessageUseCaseTest {
         val time = 72834578L
         val userHandle = 245L
         val filePath = "filepath"
+        val fileName = "fileName"
+        val transferTag = 344
         val fileTypeInfo = mock<UnknownFileTypeInfo>()
+        val fileSize = 89475L
         whenever(getMyUserHandleUseCase()).thenReturn(userHandle)
-        whenever(fileSystemRepository.getFileTypeInfo(File(filePath)))
-            .thenReturn(fileTypeInfo)
+        whenever(fileSystemRepository.getFileTypeInfo(File(filePath))) doReturn fileTypeInfo
+        whenever(fileSystemRepository.getTotalSize(File(filePath))) doReturn fileSize
         val pendingMessage = PendingMessage(
             id = msgId,
             chatId = chatId,
             uploadTimestamp = time,
             state = state.value,
             filePath = filePath,
+            transferTag = transferTag,
+            name = fileName,
         )
         val expected = PendingFileAttachmentMessage(
             chatId = chatId,
             msgId = msgId,
             time = time,
-            isDeletable = false,
+            isDeletable = true,
             isEditable = false,
             userHandle = userHandle,
             shouldShowAvatar = false,
             reactions = emptyList(),
             status = getChatMessageStatus(state),
             content = null,
-            file = File(filePath),
+            filePath = filePath,
             fileType = fileTypeInfo,
-            isError = state == PendingMessageState.ERROR_ATTACHING || state == PendingMessageState.ERROR_UPLOADING,
+            transferTag = transferTag,
+            nodeId = null,
+            state = state,
+            fileName = fileName,
+            fileSize = fileSize,
         )
         val actual = underTest(pendingMessage)
         assertThat(actual).isEqualTo(expected)
@@ -93,7 +103,9 @@ class CreatePendingAttachmentMessageUseCaseTest {
         val time = 72834578L
         val userHandle = 245L
         val filePath = "filepath"
+        val transferTag = 344
         val fileTypeInfo = mock<UnknownFileTypeInfo>()
+        val fileName = "fileName"
         whenever(getMyUserHandleUseCase()).thenReturn(userHandle)
         whenever(fileSystemRepository.getFileTypeInfo(File(filePath)))
             .thenReturn(fileTypeInfo)
@@ -104,12 +116,14 @@ class CreatePendingAttachmentMessageUseCaseTest {
             state = state.value,
             filePath = filePath,
             type = PendingMessage.TYPE_VOICE_CLIP,
+            transferTag = transferTag,
+            name = fileName,
         )
         val expected = PendingVoiceClipMessage(
             chatId = chatId,
             msgId = msgId,
             time = time,
-            isDeletable = false,
+            isDeletable = true,
             isEditable = false,
             userHandle = userHandle,
             shouldShowAvatar = false,
@@ -117,7 +131,11 @@ class CreatePendingAttachmentMessageUseCaseTest {
             status = getChatMessageStatus(state),
             content = null,
             fileType = fileTypeInfo,
-            isError = state == PendingMessageState.ERROR_ATTACHING || state == PendingMessageState.ERROR_UPLOADING,
+            transferTag = transferTag,
+            nodeId = null,
+            state = state,
+            filePath = filePath,
+            fileName = fileName,
         )
         val actual = underTest(pendingMessage)
         assertThat(actual).isEqualTo(expected)
@@ -128,6 +146,7 @@ class CreatePendingAttachmentMessageUseCaseTest {
             PendingMessageState.ATTACHING -> ChatMessageStatus.SENDING
             PendingMessageState.SENT -> ChatMessageStatus.DELIVERED
             PendingMessageState.ERROR_ATTACHING -> ChatMessageStatus.SERVER_REJECTED
+            PendingMessageState.ERROR_UPLOADING -> ChatMessageStatus.SENDING_MANUAL
             else -> ChatMessageStatus.UNKNOWN
         }
 }

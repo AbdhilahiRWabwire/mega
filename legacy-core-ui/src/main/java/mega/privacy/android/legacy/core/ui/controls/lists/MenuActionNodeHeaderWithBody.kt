@@ -1,5 +1,6 @@
 package mega.privacy.android.legacy.core.ui.controls.lists
 
+import mega.privacy.android.icon.pack.R as IconPackR
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -99,7 +100,7 @@ fun MenuActionNodeHeaderWithBody(
                     Icon(
                         modifier = modifier
                             .testTag(HEADER_NODE_BODY_ICON)
-                            .padding(top = 2.dp, end = 8.dp)
+                            .padding(top = 2.dp, end = 4.dp)
                             .size(16.dp),
                         painter = painterResource(nonNullBodyIcon),
                         contentDescription = "Body Icon",
@@ -107,7 +108,9 @@ fun MenuActionNodeHeaderWithBody(
                     )
                 }
                 Text(
-                    modifier = modifier.testTag(HEADER_NODE_BODY),
+                    modifier = modifier
+                        .testTag(HEADER_NODE_BODY)
+                        .padding(top = 2.dp),
                     text = body,
                     style = MaterialTheme.typography.subtitle2,
                     color = bodyColor,
@@ -127,7 +130,7 @@ private fun HeaderPreview() {
         MenuActionNodeHeaderWithBody(
             title = "Node Title",
             body = "Node Body",
-            nodeIcon = R.drawable.ic_folder_list,
+            nodeIcon = IconPackR.drawable.ic_folder_medium_solid,
         )
     }
 }
@@ -139,7 +142,7 @@ private fun HeaderWithVeryLongTitlePreview() {
         MenuActionNodeHeaderWithBody(
             title = "This is a very long Title that exceeds the maximum number of two lines. An ellipsis is added for additional text",
             body = "Node Body",
-            nodeIcon = R.drawable.ic_folder_list,
+            nodeIcon = IconPackR.drawable.ic_folder_medium_solid,
         )
     }
 }
@@ -154,7 +157,7 @@ private fun HeaderWithBodyIconPreview() {
         MenuActionNodeHeaderWithBody(
             title = "Node Title",
             body = "Node Body",
-            nodeIcon = R.drawable.ic_folder_list,
+            nodeIcon = IconPackR.drawable.ic_folder_medium_solid,
             bodyIcon = R.drawable.ic_info,
             bodyIconColor = MaterialTheme.colors.textColorSecondary,
         )
@@ -174,7 +177,7 @@ private fun HeaderWithVeryLongBodyPreview() {
             title = "Backup Folder",
             body = "Sync or backup has been stopped as you’ve logged out or closed the session. To re-enable, go to Settings in the desktop app, select the Sync or Backup tab, and check the relevant folder.",
             bodyColor = red_500,
-            nodeIcon = R.drawable.ic_folder_list,
+            nodeIcon = IconPackR.drawable.ic_folder_medium_solid,
             bodyIconColor = MaterialTheme.colors.textColorSecondary,
         )
     }
@@ -193,7 +196,7 @@ private fun HeaderWithBodyIconAndVeryLongBodyPreview() {
             title = "Backup Folder",
             body = "Sync or backup has been stopped as you’ve logged out or closed the session. To re-enable, go to Settings in the desktop app, select the Sync or Backup tab, and check the relevant folder.",
             bodyColor = red_500,
-            nodeIcon = R.drawable.ic_folder_list,
+            nodeIcon = IconPackR.drawable.ic_folder_medium_solid,
             bodyIcon = R.drawable.ic_x_circle,
             bodyIconColor = red_500,
         )

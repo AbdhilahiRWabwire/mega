@@ -1,6 +1,7 @@
 package mega.privacy.android.core.ui.controls.dialogs.internal
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.AlertDialog
 import androidx.compose.material.LocalAbsoluteElevation
 import androidx.compose.material.MaterialTheme
@@ -9,15 +10,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import mega.privacy.android.core.ui.controls.buttons.TextMegaButton
 import mega.privacy.android.core.ui.theme.MegaTheme
+import mega.privacy.android.core.ui.theme.extensions.conditional
 import mega.privacy.android.core.ui.utils.composeLet
 
 @Composable
 internal fun BaseMegaAlertDialog(
-    text: String,
+    text: String?,
     confirmButtonText: String,
     cancelButtonText: String?,
     onConfirm: () -> Unit,
@@ -28,9 +31,10 @@ internal fun BaseMegaAlertDialog(
     dismissOnClickOutside: Boolean = true,
     dismissOnBackPress: Boolean = true,
 ) = BaseMegaAlertDialog(
-    content = {
+    content = text?.composeLet {
         Text(
             text = text,
+            fontWeight = FontWeight.Medium,
             style = MaterialTheme.typography.subtitle1,
             color = MegaTheme.colors.text.secondary
         )
@@ -48,12 +52,12 @@ internal fun BaseMegaAlertDialog(
 
 @Composable
 internal fun BaseMegaAlertDialog(
-    content: @Composable (() -> Unit),
     confirmButtonText: String,
     cancelButtonText: String?,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    content: @Composable (() -> Unit)? = null,
     title: String? = null,
     onCancel: () -> Unit = onDismiss,
     dismissOnClickOutside: Boolean = true,
@@ -76,7 +80,11 @@ internal fun BaseMegaAlertDialog(
             )
         }
     },
-    onDismiss, modifier, title, dismissOnClickOutside, dismissOnBackPress
+    onDismiss = onDismiss,
+    modifier = modifier,
+    title = title,
+    dismissOnClickOutside = dismissOnClickOutside,
+    dismissOnBackPress = dismissOnBackPress
 )
 
 @Composable
@@ -92,19 +100,25 @@ internal fun BaseMegaAlertDialog(
     text = {
         Text(
             text = text,
+            fontWeight = FontWeight.Medium,
             style = MaterialTheme.typography.subtitle1,
             color = MegaTheme.colors.text.secondary
         )
     },
-    buttons, onDismiss, modifier, title, dismissOnClickOutside, dismissOnBackPress
+    buttons = buttons,
+    onDismiss = onDismiss,
+    modifier = modifier,
+    title = title,
+    dismissOnClickOutside = dismissOnClickOutside,
+    dismissOnBackPress = dismissOnBackPress
 )
 
 @Composable
 private fun BaseMegaAlertDialog(
-    text: @Composable (() -> Unit),
     buttons: @Composable (() -> Unit),
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    text: @Composable (() -> Unit)? = null,
     title: String? = null,
     dismissOnClickOutside: Boolean = true,
     dismissOnBackPress: Boolean = true,
@@ -116,8 +130,13 @@ private fun BaseMegaAlertDialog(
             Text(
                 modifier = Modifier
                     .testTag(TITLE_TAG)
+                    .conditional(text == null) {
+                        // For dialog without text, add padding to the bottom of the title
+                        padding(bottom = 18.dp)
+                    }
                     .fillMaxWidth(),
                 text = it,
+                fontWeight = FontWeight.Medium,
                 style = MaterialTheme.typography.h6,
                 color = MegaTheme.colors.text.primary,
             )

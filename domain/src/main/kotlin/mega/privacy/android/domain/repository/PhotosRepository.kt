@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.ImageNode
 import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.photos.AlbumPhotoId
 import mega.privacy.android.domain.entity.photos.Photo
 import java.io.File
@@ -164,4 +165,32 @@ interface PhotosRepository {
      * Get imageNodes from files
      */
     suspend fun getImageNodesInFiles(files: List<File>): List<ImageNode>
+
+    /**
+     * Get imageNode by chatId and messageId
+     *
+     * @param chatId
+     * @param messageId
+     */
+    suspend fun getImageNodeFromChatMessage(
+        chatId: Long,
+        messageId: Long,
+    ): ImageNode?
+
+    /**
+     * Get link url by typedFileNode
+     *
+     * @param typedFileNode
+     */
+    suspend fun getHttpServerLocalLink(typedFileNode: TypedFileNode): String?
+
+    /**
+     * Check is hidden nodes onboarded
+     */
+    suspend fun isHiddenNodesOnboarded(): Boolean
+
+    /**
+     * Set hidden nodes onboarded
+     */
+    suspend fun setHiddenNodesOnboarded()
 }

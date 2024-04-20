@@ -12,6 +12,8 @@ import mega.privacy.android.domain.repository.FileSystemRepository
 import mega.privacy.android.domain.repository.TransferRepository
 import mega.privacy.android.domain.usecase.canceltoken.CancelCancelTokenUseCase
 import mega.privacy.android.domain.usecase.file.DoesPathHaveSufficientSpaceForNodesUseCase
+import mega.privacy.android.domain.usecase.file.GetExternalPathByContentUriUseCase
+import mega.privacy.android.domain.usecase.file.IsExternalStorageContentUriUseCase
 import mega.privacy.android.domain.usecase.transfers.shared.AbstractStartTransfersWithWorkerUseCase
 import java.io.File
 import javax.inject.Inject
@@ -30,6 +32,8 @@ class StartDownloadsWithWorkerUseCase @Inject constructor(
     private val transferRepository: TransferRepository,
     private val startDownloadWorkerUseCase: StartDownloadWorkerUseCase,
     private val isDownloadsWorkerStartedUseCase: IsDownloadsWorkerStartedUseCase,
+    private val getExternalPathByContentUriUseCase: GetExternalPathByContentUriUseCase,
+    private val isExternalStorageContentUriUseCase: IsExternalStorageContentUriUseCase,
     cancelCancelTokenUseCase: CancelCancelTokenUseCase,
 ) : AbstractStartTransfersWithWorkerUseCase(
     cancelCancelTokenUseCase,
@@ -37,49 +41,63 @@ class StartDownloadsWithWorkerUseCase @Inject constructor(
     /**
      * Invoke
      * @param nodes The desired nodes to download
-     * @param destinationPath Full path to the destination folder of [nodes]. If this path does not exist it will try to create it.
+     * @param destinationPathOrUri Full path to the destination folder of [nodes]. If this path does not exist it will try to create it.
      * @param isHighPriority Puts the transfer on top of the download queue.
      *
      * @return a flow of [MultiTransferEvent]s to monitor the download state and progress
      */
     operator fun invoke(
         nodes: List<TypedNode>,
-        destinationPath: String,
+        destinationPathOrUri: String,
         isHighPriority: Boolean,
     ): Flow<MultiTransferEvent> {
-        if (destinationPath.isEmpty()) {
+        if (destinationPathOrUri.isEmpty()) {
             return nodes.asFlow().map { MultiTransferEvent.TransferNotStarted(it.id, null) }
         }
-        //wrap the startDownloadFlow to be able to execute suspended functions
+        //wrap the downloadNodesUseCase flow to be able to execute suspended functions
         return flow {
             val appData: TransferAppData?
-            val finalDestinationPath = if (fileSystemRepository.isSDCardPath(destinationPath)) {
-                appData = TransferAppData.SdCardDownload(destinationPath, null)
-                transferRepository.getOrCreateSDCardTransfersCacheFolder()?.path?.plus(File.separator)
-                    ?: run {
-                        nodes.forEach {
-                            emit(
-                                MultiTransferEvent.TransferNotStarted(
-                                    it.id,
-                                    LocalStorageException(null, null)
-                                )
-                            )
-                        }
-                        return@flow
-                    }
-            } else {
-                appData = null
-                destinationPath
+            val destinationPathForSdk: String?
+            when {
+                fileSystemRepository.isSDCardPath(destinationPathOrUri)
+                        || fileSystemRepository.isContentUri(destinationPathOrUri) -> {
+                    destinationPathForSdk =
+                        transferRepository.getOrCreateSDCardTransfersCacheFolder()?.path?.ensureEndsWithFileSeparator()
+                    appData =
+                        TransferAppData.SdCardDownload(destinationPathOrUri, destinationPathOrUri)
+                }
+
+                isExternalStorageContentUriUseCase(destinationPathOrUri) -> {
+                    appData = null
+                    destinationPathForSdk =
+                        getExternalPathByContentUriUseCase(destinationPathOrUri)?.ensureEndsWithFileSeparator()
+                }
+
+                else -> {
+                    appData = null
+                    destinationPathForSdk = destinationPathOrUri.ensureEndsWithFileSeparator()
+                }
             }
-            fileSystemRepository.createDirectory(finalDestinationPath)
-            if (!doesPathHaveSufficientSpaceForNodesUseCase(finalDestinationPath, nodes)) {
+            if (destinationPathForSdk == null) {
+                nodes.forEach {
+                    emit(
+                        MultiTransferEvent.TransferNotStarted(
+                            it.id,
+                            LocalStorageException(null, null)
+                        )
+                    )
+                }
+                return@flow
+            }
+            fileSystemRepository.createDirectory(destinationPathForSdk)
+            if (!doesPathHaveSufficientSpaceForNodesUseCase(destinationPathForSdk, nodes)) {
                 emit(MultiTransferEvent.InsufficientSpace)
             } else {
                 startTransfersAndWorker(
                     doTransfers = {
                         downloadNodesUseCase(
                             nodes,
-                            finalDestinationPath,
+                            destinationPathForSdk,
                             appData = appData,
                             isHighPriority = isHighPriority
                         )
@@ -93,4 +111,11 @@ class StartDownloadsWithWorkerUseCase @Inject constructor(
             }
         }
     }
+
+    private fun String.ensureEndsWithFileSeparator() =
+        if (this.endsWith(File.separator)) {
+            this
+        } else {
+            this.plus(File.separator)
+        }
 }

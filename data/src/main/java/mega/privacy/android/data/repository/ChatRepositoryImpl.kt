@@ -59,7 +59,6 @@ import mega.privacy.android.data.mapper.chat.messages.reactions.ReactionUpdateMa
 import mega.privacy.android.data.mapper.chat.paging.ChatGeolocationEntityMapper
 import mega.privacy.android.data.mapper.chat.paging.ChatNodeEntityListMapper
 import mega.privacy.android.data.mapper.chat.paging.GiphyEntityMapper
-import mega.privacy.android.data.mapper.chat.paging.MessagePagingInfoMapper
 import mega.privacy.android.data.mapper.chat.paging.RichPreviewEntityMapper
 import mega.privacy.android.data.mapper.chat.paging.TypedMessageEntityMapper
 import mega.privacy.android.data.mapper.chat.update.ChatRoomMessageUpdateMapper
@@ -76,7 +75,7 @@ import mega.privacy.android.domain.entity.chat.ChatPendingChanges
 import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.CombinedChatRoom
 import mega.privacy.android.domain.entity.chat.RichLinkConfig
-import mega.privacy.android.domain.entity.chat.messages.paging.MessagePagingInfo
+import mega.privacy.android.domain.entity.chat.messages.ChatMessageInfo
 import mega.privacy.android.domain.entity.chat.messages.request.CreateTypedMessageRequest
 import mega.privacy.android.domain.entity.chat.notification.ChatMessageNotification
 import mega.privacy.android.domain.entity.chat.room.update.ChatRoomMessageUpdate
@@ -132,7 +131,6 @@ import kotlin.coroutines.suspendCoroutine
  * @property databaseHandler
  * @property chatStorageGateway
  * @property typedMessageEntityMapper
- * @property messagePagingInfoMapper
  * @property richPreviewEntityMapper
  * @property giphyEntityMapper
  * @property chatGeolocationEntityMapper
@@ -163,7 +161,6 @@ internal class ChatRepositoryImpl @Inject constructor(
     private val databaseHandler: DatabaseHandler,
     private val chatStorageGateway: ChatStorageGateway,
     private val typedMessageEntityMapper: TypedMessageEntityMapper,
-    private val messagePagingInfoMapper: MessagePagingInfoMapper,
     private val richPreviewEntityMapper: RichPreviewEntityMapper,
     private val giphyEntityMapper: GiphyEntityMapper,
     private val chatGeolocationEntityMapper: ChatGeolocationEntityMapper,
@@ -576,15 +573,6 @@ internal class ChatRepositoryImpl @Inject constructor(
                 MegaChatApi.CHAT_OPTION_WAITING_ROOM,
                 chatOptionsBitMask
             )
-        }
-
-    private fun onRequestQueryChatLinkCompleted(continuation: Continuation<ChatRequest>) =
-        { request: MegaChatRequest, error: MegaChatError ->
-            if (error.errorCode == MegaChatError.ERROR_OK || error.errorCode == MegaChatError.ERROR_NOENT) {
-                continuation.resumeWith(Result.success(chatRequestMapper(request)))
-            } else {
-                continuation.failWithError(error, "onRequestQueryChatLinkCompleted")
-            }
         }
 
     override suspend fun inviteContact(email: String): InviteContactRequest =
@@ -1295,11 +1283,9 @@ internal class ChatRepositoryImpl @Inject constructor(
     override suspend fun getNextMessagePagingInfo(
         chatId: Long,
         timestamp: Long,
-    ): MessagePagingInfo? =
+    ): ChatMessageInfo? =
         withContext(ioDispatcher) {
-            chatStorageGateway.getNextMessage(chatId, timestamp)?.let {
-                messagePagingInfoMapper(it)
-            }
+            chatStorageGateway.getNextMessage(chatId, timestamp)
         }
 
     override fun monitorJoiningChat(chatId: Long) = joiningIdsFlow
@@ -1360,4 +1346,48 @@ internal class ChatRepositoryImpl @Inject constructor(
     override suspend fun setSFUid(sfuId: Int) = withContext(ioDispatcher) {
         megaChatApiGateway.setSFUid(sfuId)
     }
+
+    override suspend fun setLimitsInCall(
+        chatId: Long,
+        callDur: Long?,
+        numUsers: Long?,
+        numClients: Long?,
+        numClientsPerUser: Long?,
+        divider: Long?,
+    ) = withContext(ioDispatcher) {
+        suspendCancellableCoroutine { continuation ->
+            val listener = continuation.getChatRequestListener("setLimitsInCall") {
+                Timber.d("setLimitsInCall: $it")
+            }
+            megaChatApiGateway.setLimitsInCall(
+                chatId,
+                callDur,
+                numUsers,
+                numClients,
+                numClientsPerUser,
+                divider,
+                listener
+            )
+            continuation.invokeOnCancellation { megaChatApiGateway.removeRequestListener(listener) }
+        }
+    }
+
+    override suspend fun setChatRetentionTime(chatId: Long, period: Long) =
+        withContext(ioDispatcher) {
+            suspendCancellableCoroutine { continuation ->
+                val listener = continuation.getChatRequestListener("setChatRetentionTime") {
+                    Timber.d("Establish the retention time successfully")
+                }
+                megaChatApiGateway.setChatRetentionTime(
+                    chatId = chatId,
+                    period = period,
+                    listener = listener
+                )
+                continuation.invokeOnCancellation {
+                    megaChatApiGateway.removeRequestListener(
+                        listener
+                    )
+                }
+            }
+        }
 }

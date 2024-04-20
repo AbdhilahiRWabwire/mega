@@ -1,32 +1,26 @@
 package mega.privacy.android.feature.devicecenter.ui.model.status
 
+import mega.privacy.android.icon.pack.R as iconPackR
 import mega.privacy.android.core.R as CoreR
 import mega.privacy.android.feature.devicecenter.R as DeviceCenterR
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.ui.graphics.Color
-import mega.privacy.android.core.ui.theme.blue_500
-import mega.privacy.android.core.ui.theme.jade_400
-import mega.privacy.android.core.ui.theme.orange_400
-import mega.privacy.android.core.ui.theme.red_500
+import mega.privacy.android.core.ui.controls.status.StatusColor
 import mega.privacy.android.feature.devicecenter.R
 
 /**
- * Sealed UI Node Status class that enumerates all possible UI Node Statuses with their respective
- * information
+ * Sealed UI Node Status class that enumerates all possible UI Node Statuses with their respective information
  *
  * @property name The generalized Status Name
- * @property localizedErrorMessage The specific Error Message for Error Statuses such as [Blocked] or
- * [Overquota]
+ * @property localizedErrorMessage The specific Error Message for Error Statuses such as [Blocked] or [Overquota]
  * @property icon The Status Icon. If no Icon should be displayed, leave it as null
- * @property color The Status Color to be applied for [name] and [icon]. If the Color should not be
- * changed, leave it as null
+ * @property color The Status Color to be applied for [name] and [icon]. If the Color should not be changed, leave it as null
  */
 sealed class DeviceCenterUINodeStatus(
     @StringRes val name: Int,
     @StringRes val localizedErrorMessage: Int?,
     @DrawableRes val icon: Int?,
-    val color: Color?,
+    val color: StatusColor?,
 ) {
 
     /**
@@ -36,7 +30,7 @@ sealed class DeviceCenterUINodeStatus(
     data object Unknown : DeviceCenterUINodeStatus(
         name = R.string.device_center_list_view_item_status_unknown_status,
         localizedErrorMessage = null,
-        icon = CoreR.drawable.ic_help_circle,
+        icon =iconPackR.drawable.ic_help_circle_medium_regular_outline,
         color = null,
     )
 
@@ -47,7 +41,7 @@ sealed class DeviceCenterUINodeStatus(
         name = DeviceCenterR.string.device_center_list_view_item_status_up_to_date,
         localizedErrorMessage = null,
         icon = CoreR.drawable.ic_check_circle,
-        color = jade_400,
+        color = StatusColor.Success,
     )
 
     /**
@@ -57,7 +51,7 @@ sealed class DeviceCenterUINodeStatus(
         name = DeviceCenterR.string.device_center_list_view_item_status_initialising,
         localizedErrorMessage = null,
         icon = CoreR.drawable.ic_sync_02,
-        color = blue_500,
+        color = StatusColor.Info,
     )
 
     /**
@@ -67,7 +61,7 @@ sealed class DeviceCenterUINodeStatus(
         name = DeviceCenterR.string.device_center_list_view_item_status_scanning,
         localizedErrorMessage = null,
         icon = CoreR.drawable.ic_sync_02,
-        color = blue_500,
+        color = StatusColor.Info,
     )
 
     /**
@@ -77,7 +71,7 @@ sealed class DeviceCenterUINodeStatus(
         name = DeviceCenterR.string.device_center_list_view_item_status_updating,
         localizedErrorMessage = null,
         icon = CoreR.drawable.ic_sync_02,
-        color = blue_500,
+        color = StatusColor.Info,
     )
 
     /**
@@ -89,7 +83,7 @@ sealed class DeviceCenterUINodeStatus(
         name = DeviceCenterR.string.device_center_list_view_item_status_updating_with_progress,
         localizedErrorMessage = null,
         icon = null,
-        color = blue_500,
+        color = StatusColor.Info,
     )
 
     /**
@@ -99,7 +93,7 @@ sealed class DeviceCenterUINodeStatus(
         name = DeviceCenterR.string.device_center_list_view_item_status_camera_uploads_disabled,
         localizedErrorMessage = null,
         icon = CoreR.drawable.ic_info,
-        color = orange_400,
+        color = StatusColor.Warning,
     )
 
     /**
@@ -109,7 +103,7 @@ sealed class DeviceCenterUINodeStatus(
         name = DeviceCenterR.string.device_center_list_view_item_status_disabled,
         localizedErrorMessage = null,
         icon = CoreR.drawable.ic_alert_triangle,
-        color = orange_400,
+        color = StatusColor.Warning,
     )
 
     /**
@@ -150,8 +144,8 @@ sealed class DeviceCenterUINodeStatus(
     data class Overquota(val specificErrorMessage: Int?) : DeviceCenterUINodeStatus(
         name = DeviceCenterR.string.device_center_list_view_item_status_out_of_quota,
         localizedErrorMessage = specificErrorMessage,
-        icon = CoreR.drawable.ic_alert_circle,
-        color = red_500,
+        icon = iconPackR.drawable.ic_alert_circle_regular_medium_outline,
+        color = StatusColor.Error,
     )
 
     /**
@@ -163,7 +157,7 @@ sealed class DeviceCenterUINodeStatus(
         name = DeviceCenterR.string.device_center_list_view_item_status_error,
         localizedErrorMessage = specificErrorMessage,
         icon = CoreR.drawable.ic_x_circle,
-        color = red_500,
+        color = StatusColor.Error,
     )
 
     /**
@@ -175,6 +169,6 @@ sealed class DeviceCenterUINodeStatus(
         name = DeviceCenterR.string.device_center_list_view_item_status_blocked,
         localizedErrorMessage = specificErrorMessage,
         icon = CoreR.drawable.ic_minus_circle,
-        color = red_500,
+        color = StatusColor.Error,
     )
 }

@@ -76,6 +76,8 @@ import mega.privacy.android.domain.exception.QuerySignupLinkException
 import mega.privacy.android.domain.exception.ResetPasswordLinkException
 import mega.privacy.android.domain.exception.account.ConfirmCancelAccountException
 import mega.privacy.android.domain.exception.account.ConfirmChangeEmailException
+import mega.privacy.android.domain.exception.account.QueryCancelLinkException
+import mega.privacy.android.domain.exception.account.QueryChangeEmailLinkException
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.repository.AccountRepository
 import nz.mega.sdk.MegaApiJava
@@ -897,10 +899,6 @@ internal class DefaultAccountRepository @Inject constructor(
         }
     }
 
-    override suspend fun setSecureFlag(enable: Boolean) = withContext(ioDispatcher) {
-        megaApiGateway.setSecureFlag(enable)
-    }
-
     override fun monitorSecurityUpgrade(): Flow<Boolean> =
         appEventGateway.monitorSecurityUpgrade()
 
@@ -1132,57 +1130,59 @@ internal class DefaultAccountRepository @Inject constructor(
             }
         }
 
-    override suspend fun confirmChangeEmail(changeEmailLink: String, accountPassword: String) =
-        withContext(ioDispatcher) {
-            suspendCancellableCoroutine { continuation ->
-                val listener = OptionalMegaRequestListenerInterface(
-                    onRequestFinish = { request, error ->
-                        when (error.errorCode) {
-                            MegaError.API_OK -> {
-                                continuation.resumeWith(Result.success(request.email))
-                            }
+    override suspend fun confirmChangeEmail(
+        changeEmailLink: String,
+        accountPassword: String,
+    ): String = withContext(ioDispatcher) {
+        suspendCancellableCoroutine { continuation ->
+            val listener = OptionalMegaRequestListenerInterface(
+                onRequestFinish = { request, error ->
+                    when (error.errorCode) {
+                        MegaError.API_OK -> {
+                            continuation.resumeWith(Result.success(request.email))
+                        }
 
-                            MegaError.API_EEXIST -> {
-                                continuation.resumeWith(
-                                    Result.failure(
-                                        ConfirmChangeEmailException.EmailAlreadyInUse(
-                                            error.errorCode,
-                                            error.errorString,
-                                        )
+                        MegaError.API_EEXIST -> {
+                            continuation.resumeWith(
+                                Result.failure(
+                                    ConfirmChangeEmailException.EmailAlreadyInUse(
+                                        error.errorCode,
+                                        error.errorString,
                                     )
                                 )
-                            }
+                            )
+                        }
 
-                            MegaError.API_ENOENT -> {
-                                continuation.resumeWith(
-                                    Result.failure(
-                                        ConfirmChangeEmailException.IncorrectPassword(
-                                            error.errorCode,
-                                            error.errorString,
-                                        )
+                        MegaError.API_ENOENT -> {
+                            continuation.resumeWith(
+                                Result.failure(
+                                    ConfirmChangeEmailException.IncorrectPassword(
+                                        error.errorCode,
+                                        error.errorString,
                                     )
                                 )
-                            }
+                            )
+                        }
 
-                            else -> {
-                                continuation.resumeWith(
-                                    Result.failure(
-                                        ConfirmChangeEmailException.Unknown(
-                                            error.errorCode,
-                                            error.errorString,
-                                        )
+                        else -> {
+                            continuation.resumeWith(
+                                Result.failure(
+                                    ConfirmChangeEmailException.Unknown(
+                                        error.errorCode,
+                                        error.errorString,
                                     )
                                 )
-                            }
+                            )
                         }
                     }
-                )
-                megaApiGateway.confirmChangeEmail(changeEmailLink, accountPassword, listener)
-                continuation.invokeOnCancellation {
-                    megaApiGateway.removeRequestListener(listener)
                 }
+            )
+            megaApiGateway.confirmChangeEmail(changeEmailLink, accountPassword, listener)
+            continuation.invokeOnCancellation {
+                megaApiGateway.removeRequestListener(listener)
             }
         }
+    }
 
     override suspend fun getUserData() = withContext(ioDispatcher) {
         suspendCancellableCoroutine { continuation ->
@@ -1216,6 +1216,111 @@ internal class DefaultAccountRepository @Inject constructor(
     override fun monitorUpdateUserData(): Flow<Unit> {
         return appEventGateway.monitorUpdateUserData()
     }
+
+    override suspend fun getLastRegisteredEmail() = withContext(ioDispatcher) {
+        accountPreferencesGateway.monitorLastRegisteredEmail().firstOrNull()
+    }
+
+    override suspend fun saveLastRegisteredEmail(email: String) = withContext(ioDispatcher) {
+        accountPreferencesGateway.setLastRegisteredEmail(email)
+    }
+
+    override suspend fun clearLastRegisteredEmail() = withContext(ioDispatcher) {
+        accountPreferencesGateway.clearLastRegisteredEmail()
+    }
+
+    override suspend fun queryCancelLink(accountCancellationLink: String): String =
+        withContext(ioDispatcher) {
+            suspendCancellableCoroutine { continuation ->
+                val listener = OptionalMegaRequestListenerInterface(
+                    onRequestFinish = { request, error ->
+                        when (error.errorCode) {
+                            MegaError.API_OK -> {
+                                continuation.resumeWith(Result.success(request.link))
+                            }
+
+                            MegaError.API_EACCESS -> {
+                                continuation.resumeWith(
+                                    Result.failure(
+                                        QueryCancelLinkException.UnrelatedAccountCancellationLink(
+                                            error.errorCode,
+                                            error.errorString,
+                                        )
+                                    )
+                                )
+                            }
+
+                            MegaError.API_EEXPIRED -> {
+                                continuation.resumeWith(
+                                    Result.failure(
+                                        QueryCancelLinkException.ExpiredAccountCancellationLink(
+                                            error.errorCode,
+                                            error.errorString,
+                                        )
+                                    )
+                                )
+                            }
+
+                            else -> {
+                                continuation.resumeWith(
+                                    Result.failure(
+                                        QueryCancelLinkException.Unknown(
+                                            error.errorCode,
+                                            error.errorString,
+                                        )
+                                    )
+                                )
+                            }
+                        }
+                    }
+                )
+                megaApiGateway.queryCancelLink(accountCancellationLink, listener)
+                continuation.invokeOnCancellation {
+                    megaApiGateway.removeRequestListener(listener)
+                }
+            }
+        }
+
+    override suspend fun queryChangeEmailLink(changeEmailLink: String): String =
+        withContext(ioDispatcher) {
+            suspendCancellableCoroutine { continuation ->
+                val listener = OptionalMegaRequestListenerInterface(
+                    onRequestFinish = { request, error ->
+                        when (error.errorCode) {
+                            MegaError.API_OK -> {
+                                continuation.resumeWith(Result.success(request.link))
+                            }
+
+                            MegaError.API_EACCESS -> {
+                                continuation.resumeWith(
+                                    Result.failure(
+                                        QueryChangeEmailLinkException.LinkNotGenerated(
+                                            error.errorCode,
+                                            error.errorString,
+                                        )
+                                    )
+                                )
+                            }
+
+                            else -> {
+                                continuation.resumeWith(
+                                    Result.failure(
+                                        QueryChangeEmailLinkException.Unknown(
+                                            error.errorCode,
+                                            error.errorString,
+                                        )
+                                    )
+                                )
+                            }
+                        }
+                    }
+                )
+                megaApiGateway.queryChangeEmailLink(changeEmailLink, listener)
+                continuation.invokeOnCancellation {
+                    megaApiGateway.removeRequestListener(listener)
+                }
+            }
+        }
 
     companion object {
         private const val LAST_SYNC_TIMESTAMP_FILE = "last_sync_timestamp"

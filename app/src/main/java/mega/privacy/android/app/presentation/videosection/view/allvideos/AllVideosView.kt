@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,7 @@ import mega.privacy.android.app.presentation.videosection.model.DurationFilterOp
 import mega.privacy.android.app.presentation.videosection.model.LocationFilterOption
 import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
 import mega.privacy.android.app.presentation.videosection.model.VideosFilterOptionEntity
+import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.core.formatter.formatFileSize
 import mega.privacy.android.core.ui.controls.progressindicator.MegaCircularProgressIndicator
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
@@ -38,26 +40,7 @@ import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
 import mega.privacy.android.legacy.core.ui.controls.lists.HeaderViewItem
 import mega.privacy.android.shared.theme.MegaAppTheme
-
-/**
- * Test tag for the videos progress bar.
- */
-const val VIDEOS_PROGRESS_BAR_TEST_TAG = "videos_progress_bar_test_tag"
-
-/**
- * Test tag for the videos empty view.
- */
-const val VIDEOS_EMPTY_VIEW_TEST_TAG = "videos_empty_view_test_tag"
-
-/**
- * Test tag for the videos filter button view.
- */
-const val VIDEOS_FILTER_BUTTON_VIEW_TEST_TAG = "videos_filter_button_view_test_tag"
-
-/**
- * Test tag for the videos list.
- */
-const val VIDEOS_LIST_TEST_TAG = "videos_list_test_tag"
+import nz.mega.sdk.MegaNode
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -69,10 +52,10 @@ internal fun AllVideosView(
     lazyListState: LazyListState,
     sortOrder: String,
     modifier: Modifier,
-    selectedLocationFilterOption: LocationFilterOption?,
-    selectedDurationFilterOption: DurationFilterOption?,
-    onLocationFilterItemClicked: (LocationFilterOption?) -> Unit,
-    onDurationFilterItemClicked: (DurationFilterOption?) -> Unit,
+    selectedLocationFilterOption: LocationFilterOption,
+    selectedDurationFilterOption: DurationFilterOption,
+    onLocationFilterItemClicked: (LocationFilterOption) -> Unit,
+    onDurationFilterItemClicked: (DurationFilterOption) -> Unit,
     onClick: (item: VideoUIEntity, index: Int) -> Unit,
     onMenuClick: (VideoUIEntity) -> Unit,
     onSortOrderClick: () -> Unit,
@@ -115,34 +98,35 @@ internal fun AllVideosView(
             val locationText = "Location"
             val durationText = "Duration"
 
+            val isAllLocations = selectedLocationFilterOption == LocationFilterOption.AllLocations
+            val isAllDurations = selectedDurationFilterOption == DurationFilterOption.AllDurations
+
             VideosFilterButtonView(
-                isLocationFilterSelected = selectedLocationFilterOption != null,
-                isDurationFilterSelected = selectedDurationFilterOption != null,
-                modifier = Modifier
-                    .padding(start = 10.dp, top = 10.dp, bottom = 10.dp)
-                    .testTag(VIDEOS_FILTER_BUTTON_VIEW_TEST_TAG),
+                isLocationFilterSelected = isAllLocations.not(),
+                isDurationFilterSelected = isAllDurations.not(),
+                modifier = Modifier.testTag(VIDEOS_FILTER_BUTTON_VIEW_TEST_TAG),
                 onDurationFilterClicked = {
-                    if (selectedDurationFilterOption == null) {
-                        coroutineScope.launch {
-                            durationModalSheetState.show()
-                        }
-                    } else {
-                        onDurationFilterItemClicked(null)
+                    coroutineScope.launch {
+                        durationModalSheetState.show()
                     }
                 },
                 onLocationFilterClicked = {
-                    if (selectedLocationFilterOption == null) {
-                        coroutineScope.launch {
-                            locationModalSheetState.show()
-                        }
-                    } else {
-                        onLocationFilterItemClicked(null)
+                    coroutineScope.launch {
+                        locationModalSheetState.show()
                     }
                 },
                 locationDefaultText = locationText,
                 durationDefaultText = durationText,
-                locationFilterSelectText = selectedLocationFilterOption?.title ?: locationText,
-                durationFilterSelectText = selectedDurationFilterOption?.title ?: durationText
+                locationFilterSelectText = if (isAllLocations) {
+                    locationText
+                } else {
+                    selectedLocationFilterOption.title
+                },
+                durationFilterSelectText = if (isAllDurations) {
+                    durationText
+                } else {
+                    selectedDurationFilterOption.title
+                }
             )
 
             when {
@@ -200,12 +184,19 @@ internal fun AllVideosView(
                         items(count = items.size, key = { items[it].id.longValue }) {
                             val videoItem = items[it]
                             VideoItemView(
-                                icon = iconPackR.drawable.ic_video_list,
+                                icon = iconPackR.drawable.ic_video_medium_solid,
                                 name = videoItem.name,
                                 fileSize = formatFileSize(videoItem.size, LocalContext.current),
                                 duration = videoItem.durationString,
                                 isFavourite = videoItem.isFavourite,
                                 isSelected = videoItem.isSelected,
+                                isSharedWithPublicLink = videoItem.isSharedItems,
+                                labelColor = if (videoItem.label != MegaNode.NODE_LBL_UNKNOWN)
+                                    colorResource(
+                                        id = MegaNodeUtil.getNodeLabelColor(
+                                            videoItem.label
+                                        )
+                                    ) else null,
                                 thumbnailData = if (videoItem.thumbnail?.exists() == true) {
                                     videoItem.thumbnail
                                 } else {
@@ -229,7 +220,7 @@ internal fun AllVideosView(
             options = LocationFilterOption.entries.map { option ->
                 VideosFilterOptionEntity(
                     option.ordinal,
-                    option.name,
+                    option.title,
                     option == selectedLocationFilterOption
                 )
             },
@@ -240,8 +231,9 @@ internal fun AllVideosView(
                 val locationOption =
                     if (item.id in LocationFilterOption.entries.indices) {
                         LocationFilterOption.entries.firstOrNull { it.ordinal == item.id }
+                            ?: LocationFilterOption.AllLocations
                     } else {
-                        null
+                        LocationFilterOption.AllLocations
                     }
                 onLocationFilterItemClicked(locationOption)
             }
@@ -266,8 +258,9 @@ internal fun AllVideosView(
                 val durationOption =
                     if (item.id in DurationFilterOption.entries.indices) {
                         DurationFilterOption.entries.firstOrNull { it.ordinal == item.id }
+                            ?: DurationFilterOption.AllDurations
                     } else {
-                        null
+                        DurationFilterOption.AllDurations
                     }
                 onDurationFilterItemClicked(durationOption)
             }
@@ -291,10 +284,30 @@ private fun AllVideosViewPreview() {
             onMenuClick = { },
             onSortOrderClick = { },
             onLongClick = { _, _ -> },
-            selectedLocationFilterOption = null,
+            selectedLocationFilterOption = LocationFilterOption.AllLocations,
             selectedDurationFilterOption = DurationFilterOption.MoreThan20,
             onLocationFilterItemClicked = { },
             onDurationFilterItemClicked = { }
         )
     }
 }
+
+/**
+ * Test tag for the videos progress bar.
+ */
+const val VIDEOS_PROGRESS_BAR_TEST_TAG = "all_videos:progress_bar"
+
+/**
+ * Test tag for the videos empty view.
+ */
+const val VIDEOS_EMPTY_VIEW_TEST_TAG = "all_videos:empty_view"
+
+/**
+ * Test tag for the videos filter button view.
+ */
+const val VIDEOS_FILTER_BUTTON_VIEW_TEST_TAG = "all_videos:button_filter"
+
+/**
+ * Test tag for the videos list.
+ */
+const val VIDEOS_LIST_TEST_TAG = "all_videos:videos_list"

@@ -8,10 +8,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -23,7 +26,7 @@ import mega.privacy.android.app.presentation.node.NodeOptionsBottomSheetViewMode
 import mega.privacy.android.app.presentation.view.extension.fileInfo
 import mega.privacy.android.app.presentation.view.extension.folderInfo
 import mega.privacy.android.app.presentation.view.extension.getIcon
-import mega.privacy.android.core.ui.controls.dividers.DividerSpacing
+import mega.privacy.android.core.ui.controls.dividers.DividerType
 import mega.privacy.android.core.ui.controls.dividers.MegaDivider
 import mega.privacy.android.core.ui.controls.lists.NodeListViewItem
 import mega.privacy.android.core.ui.controls.text.LongTextBehaviour
@@ -39,6 +42,7 @@ import timber.log.Timber
 /**
  * Node options bottom sheet
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun NodeOptionsBottomSheetContent(
     handler: NodeActionHandler,
@@ -55,7 +59,7 @@ internal fun NodeOptionsBottomSheetContent(
         keyboardController?.hide()
         viewModel.getBottomSheetOptions(nodeId)
     }
-    val sortedMap = remember(node?.id?.longValue) {
+    val sortedMap = remember(uiState.actions) {
         mutableStateOf(
             uiState.actions
                 .groupBy { it.group }
@@ -85,23 +89,26 @@ internal fun NodeOptionsBottomSheetContent(
         )
     }
 
-    NodeListViewItem(
-        title = node?.name.orEmpty(),
-        titleColor = if (node?.isTakenDown == true) TextColor.Error else TextColor.Primary,
-        titleOverflow = LongTextBehaviour.MiddleEllipsis,
-        subtitle = uiState.shareInfo ?: getOutShareInfo() ?: when (node) {
-            is FileNode -> node.fileInfo()
-            is FolderNode -> node.folderInfo()
-            else -> ""
-        },
-        showVersion = node?.hasVersion == true,
-        icon = (node as? TypedFolderNode)?.getIcon()
-            ?: MimeTypeList.typeForName(node?.name).iconResourceId,
-        thumbnailData = node?.id?.let { ThumbnailRequest(it) },
-        accessPermissionIcon = uiState.accessPermissionIcon,
-    )
-    MegaDivider(dividerSpacing = DividerSpacing.StartSmall)
-    LazyColumn {
+    if (uiState.node != null) {
+        NodeListViewItem(
+            modifier = Modifier.semantics { testTagsAsResourceId = true },
+            title = node?.name.orEmpty(),
+            titleColor = if (node?.isTakenDown == true) TextColor.Error else TextColor.Primary,
+            titleOverflow = LongTextBehaviour.MiddleEllipsis,
+            subtitle = uiState.shareInfo ?: getOutShareInfo() ?: when (node) {
+                is FileNode -> node.fileInfo()
+                is FolderNode -> node.folderInfo()
+                else -> ""
+            },
+            showVersion = node?.hasVersion == true,
+            icon = (node as? TypedFolderNode)?.getIcon()
+                ?: MimeTypeList.typeForName(node?.name).iconResourceId,
+            thumbnailData = node?.id?.let { ThumbnailRequest(it) },
+            accessPermissionIcon = uiState.accessPermissionIcon,
+        )
+    }
+    MegaDivider(dividerType = DividerType.SmallStartPadding)
+    LazyColumn(modifier = Modifier.semantics { testTagsAsResourceId = true }) {
         sortedMap.value
             .forEachIndexed { index, actions ->
                 items(actions) { item: BottomSheetMenuItem ->
@@ -116,7 +123,7 @@ internal fun NodeOptionsBottomSheetContent(
                 if (index < uiState.actions.size - 1 && index != sortedMap.value.size - 1) {
                     item {
                         MegaDivider(
-                            dividerSpacing = DividerSpacing.StartBig,
+                            dividerType = DividerType.BigStartPadding,
                             modifier = Modifier.testTag("$DIVIDER_TAG$index")
                         )
                     }

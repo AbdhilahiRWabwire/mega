@@ -54,6 +54,7 @@ class TypedMessageEntityMapperTest {
         val expectedIsMine = false
         val expectedTextMessage = "textMessage"
         val expectedReactions = emptyList<Reaction>()
+        val expectedExists = true
 
         val chatMessage = mock<ChatMessage> {
             on { status } doReturn expectedStatus
@@ -98,6 +99,7 @@ class TypedMessageEntityMapperTest {
             shouldShowAvatar = expectedShouldShowAvatar,
             isMine = expectedIsMine,
             reactions = expectedReactions,
+            exists = expectedExists,
         )
 
         val actual = underTest(requestResolver)
@@ -134,5 +136,6 @@ class TypedMessageEntityMapperTest {
         assertThat(actual.isMine).isEqualTo(expectedIsMine)
         assertThat(actual.textMessage).isEqualTo(expectedTextMessage)
         assertThat(actual.reactions).isEqualTo(expectedReactions)
+        assertThat(actual.exists).isEqualTo(expectedExists)
     }
 }

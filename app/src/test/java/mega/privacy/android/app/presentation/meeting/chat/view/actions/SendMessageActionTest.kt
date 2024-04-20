@@ -9,18 +9,25 @@ import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
 import mega.privacy.android.domain.entity.chat.messages.ContactAttachmentMessage
 import mega.privacy.android.domain.entity.chat.messages.normal.NormalMessage
 import mega.privacy.android.domain.entity.chat.messages.normal.TextMessage
+import mega.privacy.mobile.analytics.event.ChatConversationSendMessageActionMenuEvent
+import mega.privacy.mobile.analytics.event.ChatConversationSendMessageActionMenuItemEvent
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
+import test.mega.privacy.android.app.AnalyticsTestRule
 
 @RunWith(AndroidJUnit4::class)
 class SendMessageActionTest {
 
+    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+    private val analyticsRule = AnalyticsTestRule()
+
     @get:Rule
-    var composeTestRule = createAndroidComposeRule<ComponentActivity>()
+    val ruleChain: RuleChain = RuleChain.outerRule(analyticsRule).around(composeTestRule)
 
     private lateinit var underTest: SendMessageAction
 
@@ -64,5 +71,19 @@ class SendMessageActionTest {
         )
 
         composeTestRule.onNodeWithTag(underTest.bottomSheetItemTestTag).assertExists()
+    }
+
+    @Test
+    fun `test that analytics tracker sends the right event when message action is triggered from a bottom sheet`() {
+        underTest.trackTriggerEvent(source = MessageAction.TriggerSource.BottomSheet)
+
+        assertThat(analyticsRule.events).contains(ChatConversationSendMessageActionMenuItemEvent)
+    }
+
+    @Test
+    fun `test that analytics tracker sends the right event when message action is triggered from a toolbar`() {
+        underTest.trackTriggerEvent(source = MessageAction.TriggerSource.Toolbar)
+
+        assertThat(analyticsRule.events).contains(ChatConversationSendMessageActionMenuEvent)
     }
 }

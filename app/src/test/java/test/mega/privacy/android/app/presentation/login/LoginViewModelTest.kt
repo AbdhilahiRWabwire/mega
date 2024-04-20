@@ -13,7 +13,10 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.R
+import mega.privacy.android.app.globalmanagement.TransfersManagement
 import mega.privacy.android.app.logging.LegacyLoggingSettings
+import mega.privacy.android.app.middlelayer.installreferrer.InstallReferrerDetails
+import mega.privacy.android.app.middlelayer.installreferrer.InstallReferrerHandler
 import mega.privacy.android.app.presentation.login.LoginViewModel
 import mega.privacy.android.app.presentation.login.model.LoginError
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
@@ -27,9 +30,11 @@ import mega.privacy.android.domain.usecase.camerauploads.HasPreferencesUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsEnabledUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.login.ClearEphemeralCredentialsUseCase
+import mega.privacy.android.domain.usecase.login.ClearLastRegisteredEmailUseCase
 import mega.privacy.android.domain.usecase.login.FastLoginUseCase
 import mega.privacy.android.domain.usecase.login.FetchNodesUseCase
 import mega.privacy.android.domain.usecase.login.GetAccountCredentialsUseCase
+import mega.privacy.android.domain.usecase.login.GetLastRegisteredEmailUseCase
 import mega.privacy.android.domain.usecase.login.GetSessionUseCase
 import mega.privacy.android.domain.usecase.login.LocalLogoutUseCase
 import mega.privacy.android.domain.usecase.login.LoginUseCase
@@ -39,11 +44,13 @@ import mega.privacy.android.domain.usecase.login.MonitorFetchNodesFinishUseCase
 import mega.privacy.android.domain.usecase.login.QuerySignupLinkUseCase
 import mega.privacy.android.domain.usecase.login.SaveAccountCredentialsUseCase
 import mega.privacy.android.domain.usecase.login.SaveEphemeralCredentialsUseCase
+import mega.privacy.android.domain.usecase.login.SaveLastRegisteredEmailUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.photos.GetTimelinePhotosUseCase
 import mega.privacy.android.domain.usecase.setting.ResetChatSettingsUseCase
 import mega.privacy.android.domain.usecase.transfers.CancelTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.OngoingTransfersExistUseCase
+import mega.privacy.android.domain.usecase.transfers.chatuploads.StartChatUploadsWorkerUseCase
 import mega.privacy.android.domain.usecase.transfers.downloads.StartDownloadWorkerUseCase
 import mega.privacy.android.domain.usecase.workers.StopCameraUploadsUseCase
 import org.junit.jupiter.api.BeforeEach
@@ -53,7 +60,9 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
+import test.mega.privacy.android.app.AnalyticsTestExtension
 import test.mega.privacy.android.app.InstantExecutorExtension
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -93,6 +102,12 @@ internal class LoginViewModelTest {
     private val monitorAccountBlockedUseCase = mock<MonitorAccountBlockedUseCase>()
     private val getTimelinePhotosUseCase = mock<GetTimelinePhotosUseCase>()
     private val startDownloadWorkerUseCase = mock<StartDownloadWorkerUseCase>()
+    private val startChatUploadsWorkerUseCase = mock<StartChatUploadsWorkerUseCase>()
+    private val getLastRegisteredEmailUseCase = mock<GetLastRegisteredEmailUseCase>()
+    private val saveLastRegisteredEmailUseCase = mock<SaveLastRegisteredEmailUseCase>()
+    private val clearLastRegisteredEmailUseCase = mock<ClearLastRegisteredEmailUseCase>()
+    private val installReferrerHandler = mock<InstallReferrerHandler>()
+    private val transfersManagement = mock<TransfersManagement>()
 
     @BeforeEach
     fun setUp() {
@@ -125,7 +140,13 @@ internal class LoginViewModelTest {
             monitorAccountBlockedUseCase = monitorAccountBlockedUseCase,
             getTimelinePhotosUseCase = getTimelinePhotosUseCase,
             startDownloadWorkerUseCase = startDownloadWorkerUseCase,
-            loginMutex = mock()
+            startChatUploadsWorkerUseCase = startChatUploadsWorkerUseCase,
+            loginMutex = mock(),
+            getLastRegisteredEmailUseCase = getLastRegisteredEmailUseCase,
+            saveLastRegisteredEmailUseCase = saveLastRegisteredEmailUseCase,
+            clearLastRegisteredEmailUseCase = clearLastRegisteredEmailUseCase,
+            installReferrerHandler = installReferrerHandler,
+            transfersManagement = transfersManagement,
         )
     }
 
@@ -162,7 +183,7 @@ internal class LoginViewModelTest {
                 assertThat(isPendingToShowFragment).isNull()
                 assertThat(enabledFlags).isEmpty()
                 assertThat(isCheckingSignupLink).isFalse()
-                assertThat(snackbarMessage).isInstanceOf(consumed<Int>().javaClass)
+                assertThat(snackbarMessage).isInstanceOf(consumed().javaClass)
             }
         }
     }
@@ -226,13 +247,13 @@ internal class LoginViewModelTest {
             whenever(isConnectedToInternetUseCase()).thenReturn(false)
 
             with(underTest) {
-                state.map { it.snackbarMessage }.distinctUntilChanged()
+                state.map { it.snackbarMessage }
                     .test {
-                        assertThat(awaitItem()).isInstanceOf(consumed<Int>().javaClass)
+                        assertThat(awaitItem()).isInstanceOf(consumed().javaClass)
                         onEmailChanged("test@test.com")
-                        assertThat(awaitItem()).isInstanceOf(consumed<Int>().javaClass)
+                        assertThat(awaitItem()).isInstanceOf(consumed().javaClass)
                         onPasswordChanged("Password")
-                        assertThat(awaitItem()).isInstanceOf(consumed<Int>().javaClass)
+                        assertThat(awaitItem()).isInstanceOf(consumed().javaClass)
                         onLoginClicked(false)
                         assertThat(awaitItem()).isInstanceOf(triggered(R.string.error_server_connection_problem).javaClass)
                     }
@@ -253,7 +274,7 @@ internal class LoginViewModelTest {
                 assertThat(awaitItem().emailError).isNull()
                 assertThat(awaitItem().passwordError).isNull()
                 assertThat(awaitItem().ongoingTransfersExist).isNull()
-                assertThat(awaitItem().snackbarMessage).isInstanceOf(consumed<Int>().javaClass)
+                assertThat(awaitItem().snackbarMessage).isInstanceOf(consumed().javaClass)
             }
         }
     }
@@ -303,11 +324,50 @@ internal class LoginViewModelTest {
             verify(clearEphemeralCredentialsUseCase).invoke()
         }
 
+    @Test
+    fun `test that sendAnalyticsEventIfFirstTimeLogin sends event when logged email matched with last registered email`() =
+        runTest {
+            val email = "test@example.com"
+            val details = InstallReferrerDetails(
+                referrerUrl = "referrerUrl",
+                referrerClickTime = 123L,
+                appInstallTime = 456L
+            )
+            whenever(getLastRegisteredEmailUseCase()).thenReturn(email)
+            whenever(installReferrerHandler.getDetails()).thenReturn(details)
+
+            underTest.sendAnalyticsEventIfFirstTimeLogin(email)
+            advanceUntilIdle()
+
+            assertThat(analyticsExtension.events).hasSize(1)
+            verify(installReferrerHandler).getDetails()
+            verify(clearLastRegisteredEmailUseCase).invoke()
+        }
+
+    @Test
+    fun `test that sendAnalyticsEventIfFirstTimeLogin does not send event when emails do not match`() =
+        runTest {
+            val email = "test@example.com"
+            val lastRegisteredEmail = "lastRegistered@example.com"
+
+            whenever(getLastRegisteredEmailUseCase()).thenReturn(lastRegisteredEmail)
+
+            underTest.sendAnalyticsEventIfFirstTimeLogin(email)
+            advanceUntilIdle()
+
+            assertThat(analyticsExtension.events).isEmpty()
+            verifyNoInteractions(installReferrerHandler, clearLastRegisteredEmailUseCase)
+        }
+
     companion object {
         private val scheduler = TestCoroutineScheduler()
 
         @JvmField
         @RegisterExtension
         val extension = CoroutineMainDispatcherExtension(StandardTestDispatcher(scheduler))
+
+        @JvmField
+        @RegisterExtension
+        val analyticsExtension = AnalyticsTestExtension()
     }
 }

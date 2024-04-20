@@ -1,5 +1,6 @@
 package mega.privacy.android.core.ui.controls.sheets
 
+import mega.privacy.android.icon.pack.R as IconPackR
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -38,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import kotlinx.coroutines.launch
 import mega.privacy.android.core.R
-import mega.privacy.android.core.ui.controls.dividers.DividerSpacing
+import mega.privacy.android.core.ui.controls.dividers.DividerType
 import mega.privacy.android.core.ui.controls.dividers.MegaDivider
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.core.ui.theme.AndroidTheme
@@ -61,14 +62,14 @@ fun BottomSheet(
     sheetBody: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     scrimColor: Color = Color.Black.copy(alpha = 0.5f),
-    dividerSpacing: DividerSpacing = DividerSpacing.StartSmall,
+    dividerType: DividerType = DividerType.SmallStartPadding,
     content: (@Composable () -> Unit)? = null,
 ) {
     BottomSheet(
         modalSheetState = modalSheetState,
         sheetBody = {
             sheetHeader()
-            MegaDivider(dividerSpacing = dividerSpacing)
+            MegaDivider(dividerType = dividerType)
             sheetBody()
         },
         modifier = modifier,
@@ -163,7 +164,7 @@ private fun BottomSheetPreview() {
                                 modifier = Modifier
                                     .padding(end = 32.dp)
                                     .size(size = 24.dp),
-                                painter = painterResource(id = R.drawable.ic_folder_list),
+                                painter = painterResource(id = IconPackR.drawable.ic_folder_medium_solid),
                                 contentDescription = null,
                             )
                             Text(

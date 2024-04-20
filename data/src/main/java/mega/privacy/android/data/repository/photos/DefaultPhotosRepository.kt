@@ -38,7 +38,10 @@ import mega.privacy.android.data.mapper.SortOrderIntMapper
 import mega.privacy.android.data.mapper.VideoMapper
 import mega.privacy.android.data.mapper.node.ImageNodeFileMapper
 import mega.privacy.android.data.mapper.node.ImageNodeMapper
+import mega.privacy.android.data.mapper.node.MegaNodeMapper
 import mega.privacy.android.data.mapper.photos.ContentConsumptionMegaStringMapMapper
+import mega.privacy.android.data.mapper.photos.MegaStringMapSensitivesMapper
+import mega.privacy.android.data.mapper.photos.MegaStringMapSensitivesRetriever
 import mega.privacy.android.data.mapper.photos.TimelineFilterPreferencesJSONMapper
 import mega.privacy.android.data.wrapper.DateUtilWrapper
 import mega.privacy.android.domain.entity.ImageFileTypeInfo
@@ -51,6 +54,7 @@ import mega.privacy.android.domain.entity.node.ImageNode
 import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeUpdate
+import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.photos.AlbumPhotoId
 import mega.privacy.android.domain.entity.photos.Photo
 import mega.privacy.android.domain.entity.photos.TimelinePreferencesJSON
@@ -66,6 +70,7 @@ import nz.mega.sdk.MegaNode
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 @Singleton
@@ -86,9 +91,12 @@ internal class DefaultPhotosRepository @Inject constructor(
     private val imageNodeFileMapper: ImageNodeFileMapper,
     private val timelineFilterPreferencesJSONMapper: TimelineFilterPreferencesJSONMapper,
     private val contentConsumptionMegaStringMapMapper: ContentConsumptionMegaStringMapMapper,
+    private val sensitivesMapper: MegaStringMapSensitivesMapper,
+    private val sensitivesRetriever: MegaStringMapSensitivesRetriever,
     private val imageNodeMapper: ImageNodeMapper,
     private val cameraUploadsSettingsPreferenceGateway: CameraUploadsSettingsPreferenceGateway,
     private val sortOrderIntMapper: SortOrderIntMapper,
+    private val megaNodeMapper: MegaNodeMapper,
 ) : PhotosRepository {
     @Volatile
     private var isInitialized: Boolean = false
@@ -185,7 +193,7 @@ internal class DefaultPhotosRepository @Inject constructor(
         return node.isFile
                 && fileType is ImageFileTypeInfo
                 && (fileType !is SvgFileTypeInfo || !filterSvg)
-                && (!nodeRepository.isNodeInRubbish(node.handle) || includeRubbishBin)
+                && (!nodeRepository.isNodeInRubbishBin(NodeId(node.handle)) || includeRubbishBin)
                 && node.hasThumbnail()
     }
 
@@ -196,7 +204,7 @@ internal class DefaultPhotosRepository @Inject constructor(
         val fileType = fileTypeInfoMapper(node)
         return node.isFile
                 && fileType is VideoFileTypeInfo
-                && (!nodeRepository.isNodeInRubbish(node.handle) || includeRubbishBin)
+                && (!nodeRepository.isNodeInRubbishBin(NodeId(node.handle)) || includeRubbishBin)
                 && node.hasThumbnail()
     }
 
@@ -556,7 +564,7 @@ internal class DefaultPhotosRepository @Inject constructor(
      * Check valid Photo Node, not include Photo nodes that are in rubbish bin or without thumbnail
      */
     private suspend fun MegaNode.isValidPhotoNode() =
-        !nodeRepository.isNodeInRubbish(handle) && this.hasThumbnail()
+        !nodeRepository.isNodeInRubbishBin(NodeId(handle)) && this.hasThumbnail()
 
     /**
      * Convert the MegaNode to Image
@@ -638,15 +646,19 @@ internal class DefaultPhotosRepository @Inject constructor(
         messageId: Long,
     ): Photo? =
         withContext(ioDispatcher) {
-            val chatRoom = megaChatApiGateway.getChatRoom(chatId)
-            val chatMessage = megaChatApiGateway.getMessage(chatId, messageId)
-                ?: megaChatApiGateway.getMessageFromNodeHistory(chatId, messageId)
-            var node = chatMessage?.megaNodeList?.get(0)
-            if (chatRoom?.isPreview == true && node != null) {
-                node = megaApiFacade.authorizeChatNode(node, chatRoom.authorizationToken)
-            }
-            node?.let { mapMegaNodeToPhoto(it, filterSvg = false) }
+            getChatNode(chatId, messageId)?.let { mapMegaNodeToPhoto(it, filterSvg = false) }
         }
+
+    private fun getChatNode(chatId: Long, messageId: Long): MegaNode? {
+        val chatRoom = megaChatApiGateway.getChatRoom(chatId)
+        val chatMessage = megaChatApiGateway.getMessage(chatId, messageId)
+            ?: megaChatApiGateway.getMessageFromNodeHistory(chatId, messageId)
+        var node = chatMessage?.megaNodeList?.get(0)
+        if (chatRoom?.isPreview == true && node != null) {
+            node = megaApiFacade.authorizeChatNode(node, chatRoom.authorizationToken)
+        }
+        return node
+    }
 
     override suspend fun getPhotoByPublicLink(link: String): Photo? =
         withContext(ioDispatcher) {
@@ -896,6 +908,61 @@ internal class DefaultPhotosRepository @Inject constructor(
         return withContext(ioDispatcher) {
             files.map(imageNodeFileMapper::invoke)
                 .filter { it.type is ImageFileTypeInfo || it.type is VideoFileTypeInfo }
+        }
+    }
+
+    override suspend fun getImageNodeFromChatMessage(chatId: Long, messageId: Long): ImageNode? =
+        withContext(ioDispatcher) {
+            getChatNode(chatId, messageId)?.let { megaNode ->
+                if (isImageNodeValid(megaNode) ||
+                    isVideoNodeValid(megaNode)
+                ) {
+                    imageNodeMapper(
+                        megaNode = megaNode,
+                        requireSerializedData = true,
+                        offline = offlineNodesCache[megaNode.handle.toString()],
+                        numVersion = megaApiFacade::getNumVersions
+                    )
+                } else {
+                    null
+                }
+            }
+        }
+
+    override suspend fun getHttpServerLocalLink(typedFileNode: TypedFileNode): String? =
+        withContext(ioDispatcher) {
+            megaNodeMapper(typedFileNode)?.let { megaApiFacade.httpServerGetLocalLink(it) }
+        }
+
+    override suspend fun isHiddenNodesOnboarded(): Boolean = withContext(ioDispatcher) {
+        try {
+            val prefs = getContentConsumptionPreferences()
+            sensitivesRetriever(prefs)
+        } catch (t: Throwable) {
+            false
+        }
+    }
+
+    override suspend fun setHiddenNodesOnboarded() = withContext(ioDispatcher) {
+        val newPrefs = sensitivesMapper(
+            prefs = getContentConsumptionPreferences(),
+            data = mapOf(TimelinePreferencesJSON.JSON_SENSITIVES_ONBOARDED.value to true),
+        )
+
+        suspendCancellableCoroutine { continuation ->
+            val listener = OptionalMegaRequestListenerInterface(
+                onRequestFinish = { _, _ -> continuation.resume(Unit) },
+            )
+
+            megaApiFacade.setUserAttribute(
+                type = MegaApiJava.USER_ATTR_CC_PREFS,
+                value = newPrefs,
+                listener = listener,
+            )
+
+            continuation.invokeOnCancellation {
+                megaApiFacade.removeRequestListener(listener)
+            }
         }
     }
 

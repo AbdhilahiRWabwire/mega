@@ -32,7 +32,7 @@ class FileTypeIconMapperTest {
         }
         whenever(typeFileNode.type).thenReturn(fileTypeInfo)
         val iconRes = underTest(typeFileNode.type.extension)
-        Truth.assertThat(iconRes).isEqualTo(R.drawable.ic_generic_list)
+        Truth.assertThat(iconRes).isEqualTo(R.drawable.ic_generic_medium_solid)
     }
 
     @Test
@@ -43,7 +43,7 @@ class FileTypeIconMapperTest {
         }
         whenever(typeFileNode.type).thenReturn(fileTypeInfo)
         val iconRes = underTest(typeFileNode.type.extension)
-        Truth.assertThat(iconRes).isEqualTo(R.drawable.ic_image_list)
+        Truth.assertThat(iconRes).isEqualTo(R.drawable.ic_image_medium_solid)
     }
 
     companion object {
@@ -57,9 +57,9 @@ class FileTypeIconMapperTest {
                 "json",
                 "rtf"
             ).associateWith {
-                R.drawable.ic_text_list
+                R.drawable.ic_text_medium_solid
             } + arrayOf("3ds", "3dm", "max", "obj").associateWith {
-                R.drawable.ic_3d_list
+                R.drawable.ic_3d_medium_solid
             } + arrayOf(
                 "aec",
                 "aep",
@@ -68,7 +68,7 @@ class FileTypeIconMapperTest {
                 "aet",
                 "aetx"
             ).associateWith {
-                R.drawable.ic_aftereffects_list
+                R.drawable.ic_aftereffects_medium_solid
             } + arrayOf(
                 "aif",
                 "aiff",
@@ -82,11 +82,14 @@ class FileTypeIconMapperTest {
                 "mp3",
                 "3ga",
                 "opus",
-                "weba"
+                "weba",
+                "ra",
+                "ram",
+                "rm"
             ).associateWith {
-                R.drawable.ic_audio_list
+                R.drawable.ic_audio_medium_solid
             } + arrayOf("dwg", "dxf").associateWith {
-                R.drawable.ic_cad_list
+                R.drawable.ic_cad_medium_solid
             } + arrayOf(
                 "bz2",
                 "gz",
@@ -111,22 +114,8 @@ class FileTypeIconMapperTest {
                 "arc",
                 "pkg"
             ).associateWith {
-                R.drawable.ic_compressed_list
-            } + arrayOf(
-                "accdb",
-                "db",
-                "dbf",
-                "mdb",
-                "pdb",
-                "sql"
-            ).associateWith {
-                R.drawable.ic_database_list
-            } + mutableMapOf(Pair("dmg", R.drawable.ic_dmg_list)) + mutableMapOf(
-                Pair(
-                    "dwt",
-                    R.drawable.ic_dreamweaver_list
-                )
-            ) + arrayOf(
+                R.drawable.ic_compressed_medium_solid
+            } + mutableMapOf(Pair("dmg", R.drawable.ic_dmg_medium_solid)) + arrayOf(
                 "xla",
                 "xlam",
                 "xll",
@@ -138,7 +127,7 @@ class FileTypeIconMapperTest {
                 "xltm",
                 "xltx"
             ).associateWith {
-                R.drawable.ic_excel_list
+                R.drawable.ic_excel_medium_solid
             } + arrayOf(
                 "apk",
                 "app",
@@ -151,32 +140,22 @@ class FileTypeIconMapperTest {
                 "vb",
                 "wsf"
             ).associateWith {
-                R.drawable.ic_executable_list
+                R.drawable.ic_executable_medium_solid
             } + arrayOf("as", "asc", "ascs").associateWith {
-                R.drawable.ic_web_lang_list
-            } + mutableMapOf(Pair("flg", R.drawable.ic_flash_list)) + arrayOf(
+                R.drawable.ic_web_lang_medium_solid
+            } + arrayOf(
                 "fnt",
                 "fon",
                 "otf",
                 "ttf"
-            ).associateWith { R.drawable.ic_font_list } + arrayOf(
-                "gpx",
-                "kml",
-                "kmz"
-            ).associateWith { R.drawable.ic_gis_list } + arrayOf(
-                "dhtml",
-                "htm",
-                "html",
-                "shtml",
-                "xhtml"
-            ).associateWith { R.drawable.ic_html_list } + arrayOf(
+            ).associateWith { R.drawable.ic_font_medium_solid } + arrayOf(
                 "ai",
                 "aia",
                 "aip",
                 "ait",
                 "art",
                 "irs"
-            ).associateWith { R.drawable.ic_illustrator_list } + arrayOf(
+            ).associateWith { R.drawable.ic_illustrator_medium_solid } + arrayOf(
                 "jpg",
                 "jpeg",
                 "tga",
@@ -185,49 +164,40 @@ class FileTypeIconMapperTest {
                 "bmp",
                 "gif",
                 "png"
-            ).associateWith { R.drawable.ic_image_list } + mutableMapOf(
+            ).associateWith { R.drawable.ic_image_medium_solid } + mutableMapOf(
                 Pair(
                     "indd",
-                    R.drawable.ic_indesign_list
+                    R.drawable.ic_indesign_medium_solid
                 )
-            ) + arrayOf("class", "jar", "java").associateWith {
-                R.drawable.ic_java_list
-            } + arrayOf(
-                "mid",
-                "midi"
-            ).associateWith { R.drawable.ic_midi_list } + mutableMapOf(
+            ) + mutableMapOf(
                 Pair(
                     "pdf",
-                    R.drawable.ic_pdf_list
+                    R.drawable.ic_pdf_medium_solid
                 )
             ) + arrayOf(
                 "abr",
                 "csh",
                 "psb",
                 "psd"
-            ).associateWith { R.drawable.ic_photoshop_list } + arrayOf(
-                "asx",
-                "m3u",
-                "pls"
-            ).associateWith { R.drawable.ic_playlist_list } +
-                    mutableMapOf(Pair("pcast", R.drawable.ic_podcast_list)) + arrayOf(
-                "pot",
-                "potm",
-                "potx",
-                "ppam",
-                "ppc",
-                "pps",
-                "ppsm",
-                "ppsx",
-                "ppt",
-                "pptm",
-                "pptx",
-            ).associateWith { R.drawable.ic_powerpoint_list } + arrayOf(
+            ).associateWith { R.drawable.ic_photoshop_medium_solid } +
+                    arrayOf(
+                        "pot",
+                        "potm",
+                        "potx",
+                        "ppam",
+                        "ppc",
+                        "pps",
+                        "ppsm",
+                        "ppsx",
+                        "ppt",
+                        "pptm",
+                        "pptx",
+                    ).associateWith { R.drawable.ic_powerpoint_medium_solid } + arrayOf(
                 "plb",
                 "ppj",
                 "prproj",
                 "prtpset"
-            ).associateWith { R.drawable.ic_premiere_list } + arrayOf(
+            ).associateWith { R.drawable.ic_premiere_medium_solid } + arrayOf(
                 "3fr",
                 "mef",
                 "arw",
@@ -253,25 +223,7 @@ class FileTypeIconMapperTest {
                 "x3f",
                 "cr3",
                 "ciff",
-            ).associateWith { R.drawable.ic_raw_list } + arrayOf(
-                "ra",
-                "ram",
-                "rm"
-            ).associateWith { R.drawable.ic_real_audio_list } + arrayOf(
-                "c",
-                "cc",
-                "cgi",
-                "cpp",
-                "cxx",
-                "dll",
-                "h",
-                "hpp",
-                "pl",
-                "py",
-                "sh",
-                "cs",
-                "swift"
-            ).associateWith { R.drawable.ic_source_list } + arrayOf(
+            ).associateWith { R.drawable.ic_raw_medium_solid } + arrayOf(
                 "123",
                 "gsheet",
                 "nb",
@@ -279,26 +231,18 @@ class FileTypeIconMapperTest {
                 "ots",
                 "sxc",
                 "xlr"
-            ).associateWith { R.drawable.ic_spreadsheet_list } + mutableMapOf(
-                Pair(
-                    "srt",
-                    R.drawable.ic_subtitles_list
-                )
-            ) + arrayOf(
-                "swf",
-                "flv"
-            ).associateWith { R.drawable.ic_swf_list } + mutableMapOf(
+            ).associateWith { R.drawable.ic_spreadsheet_medium_solid } + mutableMapOf(
                 Pair(
                     "torrent",
-                    R.drawable.ic_torrent_list
+                    R.drawable.ic_torrent_medium_solid
                 )
-            ) + arrayOf("vcard", "vcf").associateWith { R.drawable.ic_vcard_list } + arrayOf(
+            ) + arrayOf(
                 "cdr",
                 "eps",
                 "ps",
                 "svg",
                 "svgz"
-            ).associateWith { R.drawable.ic_vector_list } + arrayOf(
+            ).associateWith { R.drawable.ic_vector_medium_solid } + arrayOf(
                 "3g2",
                 "3gp",
                 "asf",
@@ -331,12 +275,8 @@ class FileTypeIconMapperTest {
                 "mkv",
                 "mk3d",
                 "movie",
-            ).associateWith { R.drawable.ic_video_list } + mutableMapOf(
-                Pair(
-                    "vob",
-                    R.drawable.ic_video_vob_list
-                )
-            ) + arrayOf(
+                "vob"
+            ).associateWith { R.drawable.ic_video_medium_solid } + arrayOf(
                 "asp",
                 "aspx",
                 "php",
@@ -348,33 +288,33 @@ class FileTypeIconMapperTest {
                 "inc",
                 "js",
                 "xml",
-            ).associateWith { R.drawable.ic_web_data_list } + arrayOf(
+            ).associateWith { R.drawable.ic_web_data_medium_solid } + arrayOf(
                 "doc",
                 "docm",
                 "docx",
                 "dot",
                 "dotx",
                 "wps"
-            ).associateWith { R.drawable.ic_word_list } + mutableMapOf(
+            ).associateWith { R.drawable.ic_word_medium_solid } + mutableMapOf(
                 Pair(
                     "pages",
-                    R.drawable.ic_pages_list
+                    R.drawable.ic_pages_medium_solid
                 )
             ) + mutableMapOf(
                 Pair(
                     "Xd",
-                    R.drawable.ic_experiencedesign_list
+                    R.drawable.ic_experiencedesign_medium_solid
                 )
-            ) + mutableMapOf(Pair("key", R.drawable.ic_keynote_list)) + mutableMapOf(
+            ) + mutableMapOf(Pair("key", R.drawable.ic_keynote_medium_solid)) + mutableMapOf(
                 Pair(
                     "numbers",
-                    R.drawable.ic_numbers_list
+                    R.drawable.ic_numbers_medium_solid
                 )
-            ) + mutableMapOf(Pair("sketch", R.drawable.ic_sketch_list)) + mutableMapOf(
+            ) + mutableMapOf(
                 Pair(
                     "url",
-                    R.drawable.ic_url_list
+                    R.drawable.ic_url_medium_solid
                 )
-            ) + arrayOf("odp", "odt", "ods").associateWith { R.drawable.ic_openoffice_list }
+            ) + arrayOf("odp", "odt", "ods").associateWith { R.drawable.ic_openoffice_medium_solid }
     }
 }

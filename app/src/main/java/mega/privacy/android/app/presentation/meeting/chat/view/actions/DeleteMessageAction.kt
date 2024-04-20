@@ -5,10 +5,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
+import mega.privacy.android.app.presentation.meeting.chat.model.messages.actions.MessageActionGroup
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.DeleteMessagesConfirmationDialog
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
+import mega.privacy.mobile.analytics.event.ChatConversationDeleteActionMenuEvent
+import mega.privacy.mobile.analytics.event.ChatConversationRemoveActionMenuItemEvent
 
 internal class DeleteMessageAction(
     private val chatViewModel: ChatViewModel,
@@ -16,11 +20,12 @@ internal class DeleteMessageAction(
     text = R.string.context_delete,
     icon = R.drawable.ic_trash_medium_regular_outline,
     testTag = "action_delete",
+    group = MessageActionGroup.Delete,
 ) {
-    override fun appliesTo(messages: Set<TypedMessage>) = messages.isNotEmpty() &&
+    override fun shouldDisplayFor(messages: Set<TypedMessage>) = messages.isNotEmpty() &&
             messages.all { it.isDeletable && it.isMine }
 
-    override fun showBottomSheetItemSeparator(message: TypedMessage) = false
+    override val appliesToSendError = true
 
     override fun isBottomSheetItemDestructive() = true
 
@@ -40,6 +45,18 @@ internal class DeleteMessageAction(
                     showDialog = false
                     onHandled()
                 })
+        }
+    }
+
+    override fun trackTriggerEvent(source: TriggerSource) {
+        when (source) {
+            TriggerSource.BottomSheet -> {
+                Analytics.tracker.trackEvent(ChatConversationRemoveActionMenuItemEvent)
+            }
+
+            TriggerSource.Toolbar -> {
+                Analytics.tracker.trackEvent(ChatConversationDeleteActionMenuEvent)
+            }
         }
     }
 }

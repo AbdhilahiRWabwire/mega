@@ -31,6 +31,8 @@ internal class CreateNodeAttachmentMessageUseCase @Inject constructor(
             reactions = reactions,
             status = status,
             content = content,
+            exists = exists,
+            rowId = rowId,
         )
     }
 }

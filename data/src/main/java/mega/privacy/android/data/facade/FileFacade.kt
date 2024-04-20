@@ -319,22 +319,48 @@ class FileFacade @Inject constructor(
         val contentValues = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            put(
-                MediaStore.Images.Media.RELATIVE_PATH,
-                "${Environment.DIRECTORY_PICTURES}/$PHOTO_DIR"
-            )
+            // use default location for below Android Q
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                put(
+                    MediaStore.Images.Media.RELATIVE_PATH,
+                    "${Environment.DIRECTORY_PICTURES}/$PHOTO_DIR"
+                )
+            }
         }
 
         val contentResolver = context.contentResolver
         return contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
     }
 
+    override suspend fun createNewVideoUri(fileName: String): Uri? {
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
+            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                put(
+                    MediaStore.Video.Media.RELATIVE_PATH,
+                    "${Environment.DIRECTORY_MOVIES}/$PHOTO_DIR"
+                )
+            }
+        }
+
+        val contentResolver = context.contentResolver
+        return contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, contentValues)
+    }
+
     override suspend fun isFileUri(uriString: String) = uriString.toUri().scheme == "file"
+
+    override suspend fun isFilePath(path: String) = File(path).isFile
 
     override suspend fun getFileFromUriFile(uriString: String): File =
         uriString.toUri().toFile()
 
     override suspend fun isContentUri(uriString: String) = uriString.toUri().scheme == "content"
+
+    override suspend fun isExternalStorageContentUri(uriString: String) =
+        with(Uri.parse(uriString)) {
+            scheme == "content" && authority?.startsWith("com.android.externalstorage") == true
+        }
 
     override suspend fun getFileNameFromUri(uriString: String): String? {
         val cursor = context.contentResolver.query(uriString.toUri(), null, null, null, null)

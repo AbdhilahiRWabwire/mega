@@ -19,6 +19,7 @@ import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.File;
@@ -96,10 +97,6 @@ public class InvitationContactsAdapter extends RecyclerView.Adapter<InvitationCo
             if (callback != null && position >= 0 && position < contactData.size()) {
                 InvitationContactInfo invitationContactInfo = contactData.get(position);
                 if (invitationContactInfo.getType() == TYPE_PHONE_CONTACT) {
-                    if (!invitationContactInfo.hasMultipleContactInfos()) {
-                        boolean isSelected = !invitationContactInfo.isHighlighted();
-                        invitationContactInfo.setHighlighted(isSelected);
-                    }
                     callback.onItemClick(position);
                 }
             }
@@ -190,12 +187,12 @@ public class InvitationContactsAdapter extends RecyclerView.Adapter<InvitationCo
     }
 
     private void bindHeader(ViewHolderPhoneContacts holder, InvitationContactInfo contact) {
-        holder.headerTextView.setText(contact.getName());
+        holder.headerTextView.setText(contact.getContactName());
     }
 
     private void bindContact(ViewHolderPhoneContacts holder, InvitationContactInfo contact, boolean isMegaContact) {
         holder.displayLabel = contact.getDisplayInfo();
-        holder.contactName = contact.getName();
+        holder.contactName = contact.getContactName();
         holder.contactId = contact.getId();
         holder.contactNameTextView.setText(holder.contactName);
         holder.displayLabelTextView.setText(holder.displayLabel);
@@ -213,7 +210,8 @@ public class InvitationContactsAdapter extends RecyclerView.Adapter<InvitationCo
             // create default one if unable to get user pre-set avatar
             if (bitmap == null) {
                 Timber.d("create default avatar as unable to get user pre-set one");
-                bitmap = getDefaultAvatar(contact.getAvatarColor(), contact.getName(), AVATAR_SIZE, true, false);
+                int avatarColor = ContextCompat.getColor(context, contact.getAvatarColorResId());
+                bitmap = getDefaultAvatar(avatarColor, contact.getContactName(), AVATAR_SIZE, true, false);
             }
             contact.setBitmap(bitmap);
             holder.imageView.setImageBitmap(bitmap);

@@ -1,6 +1,6 @@
 package mega.privacy.android.app.presentation.folderlink.view
 
-import mega.privacy.android.core.R as CoreUiR
+import mega.privacy.android.icon.pack.R as IconPackR
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
@@ -120,7 +120,7 @@ private fun BottomSheetContent(
                     modifier = Modifier
                         .padding(16.dp)
                         .clip(RoundedCornerShape(5.dp)),
-                    painter = painterResource(id = CoreUiR.drawable.ic_folder_list),
+                    painter = painterResource(id = IconPackR.drawable.ic_folder_medium_solid),
                     contentDescription = "Image"
                 )
             }
@@ -146,7 +146,7 @@ private fun BottomSheetContent(
         )
         MenuItem(
             modifier = Modifier.testTag(Constants.BOTTOM_SHEET_SAVE),
-            res = R.drawable.ic_save_to_device,
+            res = IconPackR.drawable.ic_download_medium_regular_outline,
             text = R.string.general_save_to_device,
             description = "Save",
             onClick = {
@@ -157,7 +157,7 @@ private fun BottomSheetContent(
         if (showImport) {
             MenuItem(
                 modifier = Modifier.testTag(Constants.BOTTOM_SHEET_IMPORT),
-                res = R.drawable.ic_import_to_cloud_white,
+                res = R.drawable.ic_cloud_upload_medium_regular_outline,
                 text = R.string.add_to_cloud,
                 description = "Import",
                 onClick = {

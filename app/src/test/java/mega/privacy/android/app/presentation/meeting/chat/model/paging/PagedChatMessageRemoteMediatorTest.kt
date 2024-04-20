@@ -5,7 +5,8 @@ import androidx.paging.LoadType
 import androidx.paging.PagingConfig
 import androidx.paging.PagingState
 import androidx.paging.RemoteMediator
-import com.google.common.truth.Truth.*
+import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.domain.entity.chat.ChatHistoryLoadStatus
@@ -24,6 +25,7 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.stub
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 
 @OptIn(ExperimentalPagingApi::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -36,6 +38,7 @@ class PagedChatMessageRemoteMediatorTest {
     private val saveChatMessagesUseCase = mock<SaveChatMessagesUseCase>()
     private val clearChatMessagesUseCase = mock<ClearChatMessagesUseCase>()
 
+    val pageSize = 10
     private val state = PagingState<Int, TypedMessage>(
         emptyList(),
         null,
@@ -92,8 +95,15 @@ class PagedChatMessageRemoteMediatorTest {
 
     @Test
     internal fun `test fetched response is saved`() = runTest {
-
-        val response = mock<FetchMessagePageResponse>()
+        val messages = mutableListOf<ChatMessage>().apply {
+            repeat(pageSize * 3) {
+                add(mock())
+            }
+        }
+        val response = mock<FetchMessagePageResponse> {
+            on { this.messages }.thenReturn(messages)
+            on { this.chatId }.thenReturn(chatId)
+        }
         fetchMessages.stub {
             onBlocking {
                 invoke(
@@ -103,7 +113,7 @@ class PagedChatMessageRemoteMediatorTest {
             }.thenReturn(response)
         }
 
-        underTest.load(LoadType.PREPEND, state)
+        underTest.load(LoadType.APPEND, state)
 
         verify(saveChatMessagesUseCase).invoke(response.chatId, response.messages)
     }
@@ -120,7 +130,7 @@ class PagedChatMessageRemoteMediatorTest {
             }.thenAnswer { throw exception }
         }
 
-        val result = underTest.load(LoadType.PREPEND, state)
+        val result = underTest.load(LoadType.APPEND, state)
 
         assertThat(result).isInstanceOf(RemoteMediator.MediatorResult.Error::class.java)
         assertThat((result as RemoteMediator.MediatorResult.Error).throwable)
@@ -131,7 +141,7 @@ class PagedChatMessageRemoteMediatorTest {
     internal fun `test that message database is cleared when load type is refresh`() = runTest {
         underTest.load(LoadType.REFRESH, state)
 
-        verify(clearChatMessagesUseCase).invoke(chatId)
+        verify(clearChatMessagesUseCase).invoke(chatId, false)
     }
 
     @Test
@@ -154,10 +164,19 @@ class PagedChatMessageRemoteMediatorTest {
             }
 
             val firstResult = underTest.load(LoadType.REFRESH, state)
-            assertThat((firstResult as? RemoteMediator.MediatorResult.Success)?.endOfPaginationReached).isFalse()
-
-            val secondResult = underTest.load(LoadType.REFRESH, state)
-            assertThat((secondResult as? RemoteMediator.MediatorResult.Success)?.endOfPaginationReached).isTrue()
+            assertThat((firstResult as? RemoteMediator.MediatorResult.Success)?.endOfPaginationReached).isTrue()
         }
 
+    @Test
+    internal fun `test that timeout cancel exception returns when fetch message throw exception`() =
+        runTest {
+            val exception = mock<TimeoutCancellationException>()
+            whenever(fetchMessages(any(), any())).thenAnswer { throw exception }
+
+            val result = underTest.load(LoadType.APPEND, state)
+
+            assertThat(result).isInstanceOf(RemoteMediator.MediatorResult.Error::class.java)
+            assertThat((result as RemoteMediator.MediatorResult.Error).throwable)
+                .isInstanceOf(TimeoutCancellationException::class.java)
+        }
 }

@@ -35,6 +35,7 @@ import nz.mega.sdk.MegaPushNotificationSettingsAndroid
 import nz.mega.sdk.MegaRecentActionBucket
 import nz.mega.sdk.MegaRequest
 import nz.mega.sdk.MegaRequestListenerInterface
+import nz.mega.sdk.MegaSearchFilter
 import nz.mega.sdk.MegaSet
 import nz.mega.sdk.MegaSetElement
 import nz.mega.sdk.MegaSetElementList
@@ -519,7 +520,8 @@ internal class MegaApiFacade @Inject constructor(
     override fun getUserEmail(userHandle: Long, callback: MegaRequestListenerInterface) =
         megaApi.getUserEmail(userHandle, callback)
 
-    override suspend fun getContact(emailOrBase64Handle: String): MegaUser? = megaApi.getContact(emailOrBase64Handle)
+    override suspend fun getContact(emailOrBase64Handle: String): MegaUser? =
+        megaApi.getContact(emailOrBase64Handle)
 
     override suspend fun getUserAlerts(): List<MegaUserAlert> = megaApi.userAlerts
 
@@ -1204,6 +1206,18 @@ internal class MegaApiFacade @Inject constructor(
         )
     }
 
+    override suspend fun searchWithFilter(
+        filter: MegaSearchFilter,
+        order: Int,
+        megaCancelToken: MegaCancelToken,
+    ): List<MegaNode> {
+        return megaApi.search(
+            filter,
+            order,
+            megaCancelToken
+        )
+    }
+
     override fun openShareDialog(
         megaNode: MegaNode,
         listener: MegaRequestListenerInterface,
@@ -1211,9 +1225,6 @@ internal class MegaApiFacade @Inject constructor(
 
     override fun upgradeSecurity(listener: MegaRequestListenerInterface) =
         megaApi.upgradeSecurity(listener)
-
-    @Deprecated("This API is for testing purpose, will be deleted later")
-    override fun setSecureFlag(enable: Boolean) = megaApi.setSecureFlag(enable)
 
     override suspend fun getSmsAllowedState() = megaApi.smsAllowedState()
 
@@ -1548,4 +1559,10 @@ internal class MegaApiFacade @Inject constructor(
         pwd: String,
         listener: MegaRequestListenerInterface,
     ) = megaApi.confirmChangeEmail(link, pwd, listener)
+
+    override fun queryCancelLink(link: String, listener: MegaRequestListenerInterface) =
+        megaApi.queryCancelLink(link, listener)
+
+    override fun queryChangeEmailLink(link: String, listener: MegaRequestListenerInterface) =
+        megaApi.queryChangeEmailLink(link, listener)
 }

@@ -1,5 +1,6 @@
 package mega.privacy.android.feature.sync.ui.views
 
+import mega.privacy.android.icon.pack.R as iconPackR
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
@@ -30,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import mega.privacy.android.core.R as coreR
+import mega.privacy.android.icon.pack.R as IconPackR
 import mega.privacy.android.feature.sync.R
 import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
@@ -114,7 +116,7 @@ private fun SyncCardHeader(
                 .padding(top = 16.dp)
         ) {
             Image(
-                painter = painterResource(coreR.drawable.ic_folder_sync),
+                painter = painterResource(IconPackR.drawable.ic_folder_sync_medium_solid),
                 contentDescription = null,
                 modifier = Modifier.padding(end = 8.dp),
             )
@@ -131,7 +133,7 @@ private fun SyncCardHeader(
                 ) {
                     Image(
                         painter = when {
-                            hasStalledIssues -> painterResource(coreR.drawable.ic_alert_circle)
+                            hasStalledIssues -> painterResource(iconPackR.drawable.ic_alert_circle_regular_medium_outline)
                             status == SyncStatus.SYNCING -> painterResource(coreR.drawable.ic_sync_02)
                             status == SyncStatus.PAUSED -> painterResource(coreR.drawable.ic_pause)
                             else -> painterResource(coreR.drawable.ic_check_circle)

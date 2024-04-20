@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="ImpliedQuantity, ExtraTranslation, MissingTranslation">
+    <!-- The name of the Device or Folder Sub State when its code is NO_SYNC_ERROR -->
+    <string name="general_sync_no_error">同期エラーはありません</string>
+    <!-- The name of the Device or Folder Sub State when its code is UNSUPPORTED_FILE_SYSTEM -->
+    <string name="general_sync_unsupported_file_system">デバイスのファイルシステムがサポートされていないため、MEGAはこのフォルダを同期またはバックアップできません</string>
+    <!-- The name of the Device or Folder Sub State when its code is INVALID_REMOTE_TYPE -->
+    <string name="general_sync_invalid_remote_type">選択したフォルダは同期できません</string>
+    <!-- The name of the Device or Folder Sub State when its code is INVALID_LOCAL_TYPE -->
+    <string name="general_sync_invalid_local_type">ファイルを個別に同期することはできません。フォルダから同期を設定する必要があります。</string>
+    <!-- The name of the Device or Folder Sub State when its code is INITIAL_SCAN_FAILED -->
+    <string name="general_sync_initial_scan_failed">初期スキャンに失敗しました。デスクトップアプリから同期またはバックアップを再度有効にする必要があります。</string>
+    <!-- The name of the Device or Folder Sub State when its code is REMOTE_NODE_NOT_FOUND -->
+    <string name="general_sync_remote_node_not_found">MEGA内のフォルダは、移動または削除されたため見つからないか、アクセス権がない可能性があります</string>
+    <!-- The name of the Device or Folder Sub State when its code is STORAGE_OVERQUOTA -->
+    <string name="general_sync_storage_overquota">ストレージがいっぱいのため、このフォルダを同期またはバックアップできません</string>
+    <!-- The name of the Device or Folder Sub State when its code is ACCOUNT_EXPIRED -->
+    <string name="general_sync_account_expired">お客様のプランの有効期限が切れているため、このフォルダを同期またはバックアップできません</string>
+    <!-- The name of the Device or Folder Sub State when its code is FOREIGN_TARGET_OVERSTORAGE -->
+    <string name="general_sync_foreign_target_overshare">このフォルダを共有したユーザーはストレージ限度に達したため、フォルダを同期できません</string>
+    <!-- The name of the Device or Folder Sub State when its code is REMOTE_PATH_HAS_CHANGED -->
+    <string name="general_sync_remote_path_has_changed">MEGA内のフォルダは、移動または削除されたため見つからないか、アクセス権がない可能性があります</string>
+    <!-- The name of the Device or Folder Sub State when its code is SHARE_NON_FULL_ACCESS -->
+    <string name="general_sync_share_non_full_access">完全なアクセス権がない共有フォルダであるため、フォルダを同期できません</string>
+    <!-- The name of the Device or Folder Sub State when its code is PUT_NODES_ERROR -->
+    <string name="general_sync_put_nodes_error">このフォルダ内のファイルは同期またはバックアップできません。デスクトップアプリから同期またはバックアップを再度有効にする必要があります。</string>
+    <!-- The name of the Device or Folder Sub State when its code is ACTIVE_SYNC_BELOW_PATH -->
+    <string name="general_sync_active_sync_below_path">フォルダにはすでに同期フォルダが含まれているため、フォルダを同期できません。</string>
+    <!-- The name of the Device or Folder Sub State when its code is VBOXSHAREDFOLDER_UNSUPPORTED -->
+    <string name="general_sync_vboxsharedfolder_unsupported">MEGAはVirtualBoxフォルダを同期またはバックアップできません</string>
+    <!-- The name of the Device or Folder Sub State when its code is ACCOUNT_BLOCKED -->
+    <string name="general_sync_account_blocked">アカウントがブロックされているため、このフォルダを同期またはバックアップできません。</string>
+    <!-- The name of the Device or Folder Sub State when its code is UNKNOWN_TEMPORARY_ERROR -->
+    <string name="general_sync_unknown_temporary_error">このフォルダの同期またはバックアップ中に問題が発生しました。あとでもう一度お試しください。問題が解決しない場合は、サポートにお問い合わせください。</string>
+    <!-- The name of the Device or Folder Sub State when its code is TOO_MANY_ACTION_PACKETS -->
+    <string name="general_sync_too_many_action_packets">アカウントが再読み込みされました。バックアップまたは同期に対して欠落した更新は適用されていません。</string>
+    <!-- The name of the Device or Folder Sub State when its code is LOGGED_OUT -->
+    <string name="general_sync_logged_out">デスクトップアプリからログアウトしたようであるため、同期またはバックアップが停止されました。デスクトップアプリから再度ログインし、同期またはバックアップを再開してください。</string>
+    <!-- The name of the Device or Folder Sub State when its code is MISSING_PARENT_NODE -->
+    <string name="general_sync_missing_parent_node">N/A（該当なし）</string>
+    <!-- The name of the Device or Folder Sub State when its code is BACKUP_SOURCE_NOT_BELOW_DRIVE -->
+    <string name="general_sync_backup_source_not_below_drive">外付けドライブのフォルダが見つかりません。</string>
+    <!-- The name of the Device or Folder Sub State when its code is ACTIVE_SYNC_SAME_PATH -->
+    <string name="general_sync_active_sync_same_path">同じ場所に同期フォルダがすでに存在します</string>
+    <!-- The name of the Device or Folder Sub State when its code is COULD_NOT_MOVE_CLOUD_NODES -->
+    <string name="general_sync_could_not_move_cloud_nodes">名前の変更に失敗しました</string>
+    <!-- The name of the Device or Folder Sub State when its code is COULD_NOT_CREATE_IGNORE_FILE -->
+    <string name="general_sync_could_not_create_ignore_file">この同期用の.megaignoreファイルを作成できませんでした</string>
+    <!-- The name of the Device or Folder Sub State when its code is SYNC_CONFIG_READ_FAILURE -->
+    <string name="general_sync_config_read_failure">同期構成を読み取れませんでした。後でもう一度試すか、フォルダのアクセス許可を確認してください。</string>
+    <!-- The name of the Device or Folder Sub State when its code is UNKNOWN_DRIVE_PATH -->
+    <string name="general_sync_unknown_drive_path">同期場所が不明です</string>
+    <!-- The name of the Device or Folder Sub State when its code is INVALID_SCAN_INTERVAL -->
+    <string name="general_sync_invalid_scan_interval">無効なスキャン間隔です。スキャン間隔の設定を確認して、再試行してください。</string>
+    <!-- The name of the Device or Folder Sub State when its code is NOTIFICATION_SYSTEM_UNAVAILABLE -->
+    <string name="general_sync_notification_system_unavailable">フォルダの場所と通信できませんでした。場所がアクセス可能であること、およびフォルダの場所に対するアクセス許可が付与されていることを確認してください。</string>
+    <!-- The name of the Device or Folder Sub State when its code is UNABLE_TO_ADD_WATCH -->
+    <string name="general_sync_unable_to_add_watch">ファイルシステム監視を追加できません。十分な空き容量とメモリがあること、およびフォルダの場所に対するアクセス許可が付与されていることを確認してください。</string>
+    <!-- The name of the Device or Folder Sub State when its code is UNABLE_TO_RETRIEVE_ROOT_FSID -->
+    <string name="general_sync_unable_to_retrieve_root_fsid">同期の場所を読み取れませんでした。場所がアクセス可能であること、およびフォルダの場所に対するアクセス許可が付与されていることを確認してください。</string>
+    <!-- The name of the Device or Folder Sub State when its code is UNABLE_TO_OPEN_DATABASE -->
+    <string name="general_sync_unable_to_open_database">状態キャッシュデータベースを開けません</string>
+    <!-- The name of the Device or Folder Sub State when its code is INSUFFICIENT_DISK_SPACE -->
+    <string name="general_sync_insufficient_disk_space">デバイスのストレージ容量が不十分です</string>
+    <!-- The name of the Device or Folder Sub State when its code is FAILURE_ACCESSING_PERSISTENT_STORAGE -->
+    <string name="general_sync_failure_accessing_persistent_storage">同期の場所を読み取れませんでした。場所がアクセス可能であること、およびフォルダの場所に対するアクセス許可が付与されていることを確認してください。</string>
+    <!-- The name for specific Sub States to indicate that an unknown error occurred -->
+    <string name="general_sync_message_unknown_error">不明なエラーが発生しました。サポートにご連絡ください。</string>
+    <!-- The name for specific Sub States to indicate that something went wrong -->
+    <string name="general_sync_message_something_went_wrong">何か問題が発生しました。</string>
+    <!-- The name for specific Sub States to indicate that the Node is in the Rubbish Bin -->
+    <string name="general_sync_message_node_in_rubbish_bin">MEGAフォルダはごみ箱にあるため、フォルダを同期またはバックアップできません</string>
+    <!-- The name for specific Sub States to indicate that the local drive cannot be located at this time -->
+    <string name="general_sync_message_cannot_locate_local_drive_now">現在、デバイス内のフォルダが見つかりません。あとでもう一度お試しください。</string>
+    <!-- The name for specific Sub States to indicate that the local drive cannot be located -->
+    <string name="general_sync_message_cannot_locate_local_drive">デバイス内のフォルダが見つかりません</string>
+    <!-- The name for specific Sub States to indicate that a problem occurred when syncing or backing up the MEGA Folder due to some changes -->
+    <string name="general_sync_message_folder_backup_issue_due_to_recent_changes">MEGAフォルダへの変更により、このフォルダの同期またはバックアップ中に問題が発生しました。バックアップを停止し、デスクトップアプリでもう一度セットアップしてみるか、サポートにご連絡ください。</string>
+    <!-- The name for specific Sub States to indicate that a problem occurred when syncing or backing up the MEGA Folder -->
+    <string name="general_sync_message_folder_backup_issue">このフォルダの同期またはバックアップ中に問題が発生しました。同期またはバックアップを停止し、デスクトップアプリでもう一度設定してみるか、サポートにお問い合わせください。</string>
+    <!-- The name for specific Sub States to indicate that the MEGA Folder cannot be synced or backed up as it is inside another synced MEGA Folder -->
+    <string name="general_sync_message_folder_backup_issue_due_to_being_inside_another_backed_up_folder">フォルダは、すでに同期フォルダ内にあるため同期できません</string>
+    <!-- The name of the Device or Folder Sub State when its code is LOCAL_FILESYSTEM_MISMATCH -->
+    <string name="general_sync_local_filesystem_mismatch">このフォルダ内のファイルは同期またはバックアップできません。デスクトップアプリから同期またはバックアップを再度有効にする必要があります。</string>
+    <!-- Warning message to display when sync has been paused due a low battery level -->
+    <string name="general_message_sync_paused_low_battery_level">同期が一時停止されました。バッテリー残量が少なすぎます。同期を再開するにはバッテリーを充電してください。</string>
+    <!-- Title for File sharing feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_title_file_sharing">簡単で安全なファイル共有</string>
+    <!-- Description about File sharing feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_description_file_sharing">十分な転送容量により大容量ファイルを共有し、パスワードで保護されたリンクによりセキュリティを確保できます。</string>
+    <!-- Title for Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_title_backup_rewind">二度とデータを失わない</string>
+    <!-- Description about Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_description_backup_rewind">データをバックアップして同期すると、完全に自信が持てます。さらに、巻き戻しを使用すると、フォルダを最大180日以内の任意の日付に復元できます。</string>
+    <!-- Title for MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_title_vpn">MEGA&#160;VPN</string>
+    <!-- Description about MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_description_vpn">当社の高速VPNでオンラインでのプライバシーを確​​保</string>
+    <!-- Title for chats and meetings feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_title_chat">無制限の通話とミーティング</string>
+    <!-- Description about chats and meetings feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_description_chat">メッセージ、ビデオ通話、完全プライバシーで無制限の参加者とミーティングができます。</string>
+    <!-- Search drop down chips filter type file type -->
+    <string name="search_dropdown_chip_filter_type_file_type">種類</string>
+    <!-- Search drop down chips filter type file type images -->
+    <string name="search_dropdown_chip_filter_type_file_type_images">画像</string>
+    <!-- Search drop down chips filter type file type videos -->
+    <string name="search_dropdown_chip_filter_type_file_type_video">動画</string>
+    <!-- Search drop down chips filter type file type audio -->
+    <string name="search_dropdown_chip_filter_type_file_type_audio">音声</string>
+    <!-- Search drop down chips filter type file type documents -->
+    <string name="search_dropdown_chip_filter_type_file_type_documents">文書</string>
+    <!-- Search drop down chips filter type file type pdf -->
+    <string name="search_dropdown_chip_filter_type_file_type_pdf">PDF</string>
+    <!-- Search drop down chips filter type file type spreadsheets -->
+    <string name="search_dropdown_chip_filter_type_file_type_spreadsheets">スプレッドシート</string>
+    <!-- Search drop down chips filter type file type presentations -->
+    <string name="search_dropdown_chip_filter_type_file_type_presentations">プレゼンテーション</string>
+    <!-- Search drop down chips filter type file type folders -->
+    <string name="search_dropdown_chip_filter_type_file_type_folders">フォルダ</string>
+    <!-- Search drop down chips filter type file type others -->
+    <string name="search_dropdown_chip_filter_type_file_type_others">その他</string>
+    <!-- Search drop down chips filter type date added -->
+    <string name="search_dropdown_chip_filter_type_date_added">追加日</string>
+    <!-- Search drop down chips filter type last modified -->
+    <string name="search_dropdown_chip_filter_type_last_modified">最終更新</string>
+    <!-- Search drop down chips filter type date modified today -->
+    <string name="search_dropdown_chip_filter_type_date_today">今日</string>
+    <!-- Search drop down chips filter type date modified last 7 days -->
+    <string name="search_dropdown_chip_filter_type_date_last_seven_days">過去7日間</string>
+    <!-- Search drop down chips filter type date modified last 30 days -->
+    <string name="search_dropdown_chip_filter_type_date_last_thirty_days">過去30日間</string>
+    <!-- Search drop down chips filter type date modified this year -->
+    <string name="search_dropdown_chip_filter_type_date_this_year">今年</string>
+    <!-- Search drop down chips filter type date modified last year -->
+    <string name="search_dropdown_chip_filter_type_date_last_year">去年</string>
+    <!-- Search drop down chips filter type date modified older -->
+    <string name="search_dropdown_chip_filter_type_date_older">それ以前</string>
+    <!-- All videos tab title of the video section  -->
+    <string name="video_section_tab_title_all_videos">Videos</string>
+    <!-- Playlists tab title of the video section  -->
+    <string name="video_section_tab_title_playlists">Playlists</string>
+    <!-- Location filter title of the video section  -->
+    <string name="video_section_videos_location_filter_title">Location</string>
+    <!-- All locations option of the video section location filter  -->
+    <string name="video_section_videos_location_option_all_locations">All locations</string>
+    <!-- Cloud drive option of the video section location filter  -->
+    <string name="video_section_videos_location_option_cloud_drive">Cloud drive</string>
+    <!-- Camera uploads option of the video section location filter  -->
+    <string name="video_section_videos_location_option_camera_uploads">Camera uploads</string>
+    <!-- Shared items option of the video section location filter  -->
+    <string name="video_section_videos_location_option_shared_items">Shared items</string>
+    <!-- Duration filter title of the video section  -->
+    <string name="video_section_videos_duration_filter_title">Duration</string>
+    <!-- All Duration option of the video section duration filter  -->
+    <string name="video_section_videos_duration_option_all_duration">All durations</string>
+    <!-- Less than 10 seconds option of the video section duration filter  -->
+    <string name="video_section_videos_duration_option_less_than_10_seconds">Less than 10 seconds</string>
+    <!-- Between 10 and 60 seconds option of the video section duration filter  -->
+    <string name="video_section_videos_duration_option_between_10_and_60_seconds">Between 10 and 60 seconds</string>
+    <!-- Between 1 and 4 minutes option of the video section duration filter  -->
+    <string name="video_section_videos_duration_option_between_1_and_4_minutes">Between 1 and 4 minutes</string>
+    <!-- Between 4 and 20 minutes option of the video section duration filter  -->
+    <string name="video_section_videos_duration_option_between_4_and_20_minutes">Between 4 and 20 minutes</string>
+    <!-- More than 20 minutes option of the video section duration filter  -->
+    <string name="video_section_videos_duration_option_more_than_20_minutes">More than 20 minutes</string>
+    <!-- Create playlist dialog title of the video section playlists tab -->
+    <string name="video_section_playlists_create_playlist_dialog_title">Enter playlist name</string>
+    <!-- Rename playlist dialog title of the video section playlists tab -->
+    <string name="video_section_playlists_rename_playlist_dialog_title">Rename</string>
+    <!-- Error message when the playlist name already exists -->
+    <string name="video_section_playlists_error_message_playlist_name_exists">A playlist with this name already exists. Enter a different name.</string>
+    <!-- Delete playlist dialog title of the video section playlists tab -->
+    <string name="video_section_playlists_delete_playlist_dialog_title">Delete playlist\?</string>
+    <!-- Delete button title of the video section playlists tab delete playlist dialog -->
+    <string name="video_section_playlists_delete_playlist_dialog_delete_button">Delete</string>
+    <!-- Text that indicates that there’s no playlist to show. -->
+    <string name="video_section_playlists_empty_hint_playlist">No playlists found</string>
+    <!-- Delete option title of the video section playlist bottom sheet -->
+    <string name="video_section_playlist_bottom_sheet_option_title_delete">Delete playlist</string>
+    <!-- Remove videos dialog title of the video section playlist detail -->
+    <string name="video_section_playlist_detail_remove_videos_dialog_title">Remove from playlist\?</string>
+    <!-- Remove button title of the video section playlist detail remove videos dialog -->
+    <string name="video_section_playlist_detail_remove_videos_dialog_remove_button">Remove</string>
+    <!-- Play all button title of the video section playlist detail -->
+    <string name="video_section_playlist_detail_play_all_button">Play all</string>
+    <!-- Text that indicates that there’s no videos in the video playlist detail to show. -->
+    <string name="video_section_playlist_detail_empty_hint_videos">No videos</string>
+    <!-- Top bar title of the video section video selected page -->
+    <string name="video_section_video_selected_top_bar_title">Choose files</string>
+    <!-- Message when deleting the playlists of the video section playlists tab -->
+    <plurals name="video_section_playlists_delete_playlists_message">
+        <item quantity="other"></item>
+    </plurals>
+    <!-- Message when adding the videos to the video section playlist -->
+    <plurals name="video_section_playlist_detail_add_videos_message">
+        <item quantity="one">Added %1$d item to “%2$s”</item>
+        <item quantity="other">Added %1$d items to “%2$s”</item>
+    </plurals>
+    <!-- Message when removing the videos to the video section playlist -->
+    <plurals name="video_section_playlist_detail_remove_videos_message">
+        <item quantity="one">Removed %1$d item from “%2$s”</item>
+        <item quantity="other">Removed %1$d items from “%2$s”</item>
+    </plurals>
+    <!-- Text of the video section playlist detail video number -->
+    <plurals name="video_section_playlist_detail_video_number">
+        <item quantity="one">%1$d video</item>
+        <item quantity="other">%1$d videos</item>
+    </plurals>
+    <!-- Warning shown when the user clicks on a web link and there is no app available at the moment for opening it. -->
+    <string name="chat_click_link_in_message_intent_not_available">You may not have any apps installed which can open this website</string>
+</resources>

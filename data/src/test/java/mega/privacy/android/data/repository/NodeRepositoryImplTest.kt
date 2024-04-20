@@ -1033,6 +1033,115 @@ class NodeRepositoryImplTest {
             assertThat(actual?.serializedData).isEqualTo(serializedData)
         }
 
+    @Test
+    fun `test that does node exist returns true when node is found`() = runTest {
+        val node = NodeId(1L)
+        val megaNode = mock<MegaNode>()
+        whenever(megaApiGateway.getMegaNodeByHandle(node.longValue)).thenReturn(megaNode)
+        assertThat(underTest.doesNodeExist(node)).isTrue()
+    }
+
+    @Test
+    fun `test that does node exist returns false when node is not found`() = runTest {
+        val node = NodeId(1L)
+        whenever(megaApiGateway.getMegaNodeByHandle(node.longValue)).thenReturn(null)
+        assertThat(underTest.doesNodeExist(node)).isFalse()
+    }
+
+    @ParameterizedTest(name = "when parentNode handle is {0}")
+    @MethodSource("provideNodeId")
+    fun `test that the NodeId of the node is returned when createFolder is called`(
+        parentNodeId: NodeId?,
+    ) = runTest {
+        val folderName = "folderName"
+        val result = NodeId(1L)
+        val parentMegaNode = mock<MegaNode>()
+        when (parentNodeId) {
+            null -> whenever(megaApiGateway.getRootNode()).thenReturn(parentMegaNode)
+            else -> whenever(megaApiGateway.getMegaNodeByHandle(parentNodeId.longValue))
+                .thenReturn(parentMegaNode)
+        }
+        whenever(megaApiGateway.createFolder(eq(folderName), eq(parentMegaNode), any()))
+            .thenAnswer {
+                ((it.arguments[2]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    api = mock(),
+                    request = mock {
+                        on { nodeHandle }.thenReturn(result.longValue)
+                    },
+                    error = mock {
+                        on { errorCode }.thenReturn(
+                            MegaError.API_OK
+                        )
+                    },
+                )
+            }
+
+        val actual = underTest.createFolder(folderName, parentNodeId)
+
+        assertThat(actual).isEqualTo(result)
+    }
+
+    @ParameterizedTest(name = "when parentNode handle is {0}")
+    @MethodSource("provideNodeId")
+    fun `test that an illegal argument exception is thrown when the parent node cannot be found`(
+        parentNodeId: NodeId?,
+    ) = runTest {
+        val folderName = "folderName"
+        when (parentNodeId) {
+            null -> whenever(megaApiGateway.getRootNode()).thenReturn(null)
+            else -> whenever(megaApiGateway.getMegaNodeByHandle(parentNodeId.longValue))
+                .thenReturn(null)
+        }
+        assertThrows<IllegalArgumentException> {
+            underTest.createFolder(folderName, parentNodeId)
+        }
+    }
+
+    @Test
+    fun `test that get parent id returns the correct parent id`() = runTest {
+        val nodeId = NodeId(1L)
+        val megaNode = mock<MegaNode> {
+            on { parentHandle }.thenReturn(2L)
+        }
+        whenever(megaApiGateway.getMegaNodeByHandle(nodeId.longValue)).thenReturn(megaNode)
+        val actual = underTest.getParentNodeId(nodeId)
+        assertThat(actual).isEqualTo(NodeId(2L))
+    }
+
+    @Test
+    fun `test that isEmptyFolder returns true when folder is empty`() = runTest {
+        val typedNode = mock<TypedFolderNode> {
+            on { id }.thenReturn(NodeId(1L))
+        }
+        val parentNode = mock<MegaNode> {
+            on { handle }.thenReturn(1L)
+            on { isFolder }.thenReturn(true)
+        }
+        val childNode1 = mock<MegaNode> {
+            on { handle }.thenReturn(2L)
+            on { isFolder }.thenReturn(true)
+        }
+        val childNode2 = mock<MegaNode> {
+            on { handle }.thenReturn(3L)
+            on { isFolder }.thenReturn(true)
+        }
+        val childNodes = listOf(childNode1, childNode2)
+        whenever(megaApiGateway.getMegaNodeByHandle(1L)).thenReturn(parentNode)
+        whenever(megaApiGateway.getMegaNodeByHandle(2L)).thenReturn(null)
+        whenever(megaApiGateway.getMegaNodeByHandle(3L)).thenReturn(null)
+        whenever(megaApiGateway.getChildrenByNode(parentNode)).thenReturn(childNodes)
+        whenever(megaApiGateway.getChildrenByNode(childNode1)).thenReturn(emptyList())
+        whenever(megaApiGateway.getChildrenByNode(childNode2)).thenReturn(emptyList())
+
+        val actual = underTest.isEmptyFolder(typedNode)
+        assertThat(actual).isTrue()
+    }
+
+    private fun provideNodeId() = Stream.of(
+        Arguments.of(null),
+        Arguments.of(NodeId(2L)),
+    )
+
     companion object {
         private const val nodeHandle = 1L
         private val nodeId = NodeId(nodeHandle)

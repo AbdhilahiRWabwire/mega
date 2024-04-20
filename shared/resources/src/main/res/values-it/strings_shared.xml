@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="ImpliedQuantity, ExtraTranslation, MissingTranslation">
+    <!-- The name of the Device or Folder Sub State when its code is NO_SYNC_ERROR -->
+    <string name="general_sync_no_error">No sync error</string>
+    <!-- The name of the Device or Folder Sub State when its code is UNSUPPORTED_FILE_SYSTEM -->
+    <string name="general_sync_unsupported_file_system">MEGA non può sincronizzare o effettuare il backup di questa cartella perché il filesystem sul tuo dispositivo non è supportato</string>
+    <!-- The name of the Device or Folder Sub State when its code is INVALID_REMOTE_TYPE -->
+    <string name="general_sync_invalid_remote_type">La cartella che hai scelto non può essere sincronizzata</string>
+    <!-- The name of the Device or Folder Sub State when its code is INVALID_LOCAL_TYPE -->
+    <string name="general_sync_invalid_local_type">Un file non può essere sincronizzato individualmente. Devi impostare la sincronizzazione di una cartella.</string>
+    <!-- The name of the Device or Folder Sub State when its code is INITIAL_SCAN_FAILED -->
+    <string name="general_sync_initial_scan_failed">Scansione iniziale fallita. Dovrai riattivare la tua sincronizzazione o il tuo backup dall’app per desktop.</string>
+    <!-- The name of the Device or Folder Sub State when its code is REMOTE_NODE_NOT_FOUND -->
+    <string name="general_sync_remote_node_not_found">La cartella in MEGA non può essere trovata perché è stata eliminata o spostata, o potresti non avere accesso ad essa</string>
+    <!-- The name of the Device or Folder Sub State when its code is STORAGE_OVERQUOTA -->
+    <string name="general_sync_storage_overquota">Impossibile sincronizzare o effettuare il backup perché il tuo spazio di archiviazione è pieno</string>
+    <!-- The name of the Device or Folder Sub State when its code is ACCOUNT_EXPIRED -->
+    <string name="general_sync_account_expired">Impossibile sincronizzare o effettuare il backup perché il tuo piano è scaduto</string>
+    <!-- The name of the Device or Folder Sub State when its code is FOREIGN_TARGET_OVERSTORAGE -->
+    <string name="general_sync_foreign_target_overshare">La cartella non può essere sincronizzata poiché l’utente che ha condiviso questa cartella ha raggiunto il limite del suo spazio di archiviazione</string>
+    <!-- The name of the Device or Folder Sub State when its code is REMOTE_PATH_HAS_CHANGED -->
+    <string name="general_sync_remote_path_has_changed">La cartella in MEGA non può essere trovata perché è stata eliminata o spostata, o potresti non avere accesso ad essa</string>
+    <!-- The name of the Device or Folder Sub State when its code is SHARE_NON_FULL_ACCESS -->
+    <string name="general_sync_share_non_full_access">La cartella non può essere sincronizzata perché è una cartella condivisa a cui non hai pieno accesso</string>
+    <!-- The name of the Device or Folder Sub State when its code is PUT_NODES_ERROR -->
+    <string name="general_sync_put_nodes_error">I file in questa cartella non possono essere sincronizzati o effettuare il backup. Dovrai riattivare la sincronizzazione o il backup dall’app per desktop.</string>
+    <!-- The name of the Device or Folder Sub State when its code is ACTIVE_SYNC_BELOW_PATH -->
+    <string name="general_sync_active_sync_below_path">La cartella non può essere sincronizzata perché già contiene cartelle sincronizzate</string>
+    <!-- The name of the Device or Folder Sub State when its code is VBOXSHAREDFOLDER_UNSUPPORTED -->
+    <string name="general_sync_vboxsharedfolder_unsupported">MEGA non è in grado di sincronizzare o eseguire il backup delle cartelle VirtualBox</string>
+    <!-- The name of the Device or Folder Sub State when its code is ACCOUNT_BLOCKED -->
+    <string name="general_sync_account_blocked">Impossibile sincronizzare o effettuare il backup di questa cartella perché l’account è stato bloccato</string>
+    <!-- The name of the Device or Folder Sub State when its code is UNKNOWN_TEMPORARY_ERROR -->
+    <string name="general_sync_unknown_temporary_error">Problema nella sincronizzazione o nel backup di questa cartella. Riprova più tardi. Se il problema persiste, contatta il Supporto.</string>
+    <!-- The name of the Device or Folder Sub State when its code is TOO_MANY_ACTION_PACKETS -->
+    <string name="general_sync_too_many_action_packets">Account ricaricato. Qualsiasi aggiornamento mancato ai tuoi backup o alle tue sincronizzazioni non è stato applicato.</string>
+    <!-- The name of the Device or Folder Sub State when its code is LOGGED_OUT -->
+    <string name="general_sync_logged_out">La sincronizzazione o il backup è stato fermato perché sembra che tu abbia effettuato il logout dall’app per desktop. Effettua nuovamente l’accesso tramite l’app per desktop, e riprendi la sincronizzazione o il backup.</string>
+    <!-- The name of the Device or Folder Sub State when its code is MISSING_PARENT_NODE -->
+    <string name="general_sync_missing_parent_node">N/A</string>
+    <!-- The name of the Device or Folder Sub State when its code is BACKUP_SOURCE_NOT_BELOW_DRIVE -->
+    <string name="general_sync_backup_source_not_below_drive">La cartella nel drive esterno non può essere trovata.</string>
+    <!-- The name of the Device or Folder Sub State when its code is ACTIVE_SYNC_SAME_PATH -->
+    <string name="general_sync_active_sync_same_path">C’è già una cartella sincronizzata nella stessa posizione</string>
+    <!-- The name of the Device or Folder Sub State when its code is COULD_NOT_MOVE_CLOUD_NODES -->
+    <string name="general_sync_could_not_move_cloud_nodes">Rinominazione fallita</string>
+    <!-- The name of the Device or Folder Sub State when its code is COULD_NOT_CREATE_IGNORE_FILE -->
+    <string name="general_sync_could_not_create_ignore_file">Impossibile creare un file .megaignore per questa sincronizzazione</string>
+    <!-- The name of the Device or Folder Sub State when its code is SYNC_CONFIG_READ_FAILURE -->
+    <string name="general_sync_config_read_failure">Impossibile leggere la configurazione della sincronizzazione. Riprova più tardi o controlla le autorizzazioni della cartella.</string>
+    <!-- The name of the Device or Folder Sub State when its code is UNKNOWN_DRIVE_PATH -->
+    <string name="general_sync_unknown_drive_path">Sync location is unknown</string>
+    <!-- The name of the Device or Folder Sub State when its code is INVALID_SCAN_INTERVAL -->
+    <string name="general_sync_invalid_scan_interval">Intervallo della scansione invalido. Controlla l’impostazione dell’intervallo della scansione e riprova.</string>
+    <!-- The name of the Device or Folder Sub State when its code is NOTIFICATION_SYSTEM_UNAVAILABLE -->
+    <string name="general_sync_notification_system_unavailable">Impossibile comunicare con la cartella della posizione. Controlla che la posizione sia accessibile e i permessi per la cartella della posizione siano garantiti.</string>
+    <!-- The name of the Device or Folder Sub State when its code is UNABLE_TO_ADD_WATCH -->
+    <string name="general_sync_unable_to_add_watch">Impossibile aggiungere un orologio del filesystem. Assicurati che ci sia abbastanza spazio libero e di aver garantito le autorizzazioni per la posizione della cartella.</string>
+    <!-- The name of the Device or Folder Sub State when its code is UNABLE_TO_RETRIEVE_ROOT_FSID -->
+    <string name="general_sync_unable_to_retrieve_root_fsid">Impossibile leggere la posizione della sincronizzazione. Controlla che la posizione sia accessibile e i permessi per la cartella della posizione siano garantiti.</string>
+    <!-- The name of the Device or Folder Sub State when its code is UNABLE_TO_OPEN_DATABASE -->
+    <string name="general_sync_unable_to_open_database">Unable to open state cache database</string>
+    <!-- The name of the Device or Folder Sub State when its code is INSUFFICIENT_DISK_SPACE -->
+    <string name="general_sync_insufficient_disk_space">Spazio di archiviazione insufficiente sul tuo dispositivo</string>
+    <!-- The name of the Device or Folder Sub State when its code is FAILURE_ACCESSING_PERSISTENT_STORAGE -->
+    <string name="general_sync_failure_accessing_persistent_storage">Impossibile leggere la posizione della sincronizzazione. Controlla che la posizione sia accessibile e i permessi per la cartella della posizione siano garantiti.</string>
+    <!-- The name for specific Sub States to indicate that an unknown error occurred -->
+    <string name="general_sync_message_unknown_error">Si è verificato un errore sconosciuto. Contatta il supporto.</string>
+    <!-- The name for specific Sub States to indicate that something went wrong -->
+    <string name="general_sync_message_something_went_wrong">Something went wrong.</string>
+    <!-- The name for specific Sub States to indicate that the Node is in the Rubbish Bin -->
+    <string name="general_sync_message_node_in_rubbish_bin">La cartella non può essere sincronizzata o effettuare il backup in quanto la cartella corrispettiva su MEGA è nel Cestino</string>
+    <!-- The name for specific Sub States to indicate that the local drive cannot be located at this time -->
+    <string name="general_sync_message_cannot_locate_local_drive_now">La cartella nel tuo dispositivo non può essere trovata. Riprova più tardi.</string>
+    <!-- The name for specific Sub States to indicate that the local drive cannot be located -->
+    <string name="general_sync_message_cannot_locate_local_drive">La cartella nel dispositivo non può essere localizzata</string>
+    <!-- The name for specific Sub States to indicate that a problem occurred when syncing or backing up the MEGA Folder due to some changes -->
+    <string name="general_sync_message_folder_backup_issue_due_to_recent_changes">Problemi durante la sincronizzazione o il backup di questa cartella a causa di modifiche alla cartella MEGA. Interrompi la sincronizzazione o il backup e prova a configurarli nuovamente nell’app desktop oppure contatta il Supporto.</string>
+    <!-- The name for specific Sub States to indicate that a problem occurred when syncing or backing up the MEGA Folder -->
+    <string name="general_sync_message_folder_backup_issue">Problemi nella sincronizzazione o nel backup di questa cartella. Ferma la sincronizzazione o il backup e prova ad impostarlo nuovamente dall’app per desktop, o contatta il Supporto.</string>
+    <!-- The name for specific Sub States to indicate that the MEGA Folder cannot be synced or backed up as it is inside another synced MEGA Folder -->
+    <string name="general_sync_message_folder_backup_issue_due_to_being_inside_another_backed_up_folder">La cartella non può essere sincronizzata in quanto è già dentro una cartella sincronizzata</string>
+    <!-- The name of the Device or Folder Sub State when its code is LOCAL_FILESYSTEM_MISMATCH -->
+    <string name="general_sync_local_filesystem_mismatch">I file in questa cartella non possono essere sincronizzati o effettuare il backup. Dovrai riattivare la sincronizzazione o il backup dall’app per desktop.</string>
+    <!-- Warning message to display when sync has been paused due a low battery level -->
+    <string name="general_message_sync_paused_low_battery_level">Sincronizzazione interrotta, livello della batteria troppo basso. Carica la batteria per riprendere la sincronizzazione.</string>
+    <!-- Title for File sharing feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_title_file_sharing">Easy, secure file sharing</string>
+    <!-- Description about File sharing feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_description_file_sharing">Share large files thanks to a generous transfer quota and ensure security with password-protected links.</string>
+    <!-- Title for Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_title_backup_rewind">Never lose data again</string>
+    <!-- Description about Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_description_backup_rewind">Back up and sync your data for complete confidence. Plus, use Rewind to restore folders to any date up to 180 days.</string>
+    <!-- Title for MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_title_vpn">MEGA&#160;VPN</string>
+    <!-- Description about MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_description_vpn">Rimani nel privato anche quando sei online grazie alla nostra VPN ad alta velocità.</string>
+    <!-- Title for chats and meetings feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_title_chat">Chiamate e meeting senza limiti</string>
+    <!-- Description about chats and meetings feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
+    <string name="dialog_onboarding_feature_description_chat">Message, video call, and meet in total privacy with unlimited participants.</string>
+    <!-- Search drop down chips filter type file type -->
+    <string name="search_dropdown_chip_filter_type_file_type">Tipo</string>
+    <!-- Search drop down chips filter type file type images -->
+    <string name="search_dropdown_chip_filter_type_file_type_images">Immagini</string>
+    <!-- Search drop down chips filter type file type videos -->
+    <string name="search_dropdown_chip_filter_type_file_type_video">Video</string>
+    <!-- Search drop down chips filter type file type audio -->
+    <string name="search_dropdown_chip_filter_type_file_type_audio">Audio</string>
+    <!-- Search drop down chips filter type file type documents -->
+    <string name="search_dropdown_chip_filter_type_file_type_documents">Documenti</string>
+    <!-- Search drop down chips filter type file type pdf -->
+    <string name="search_dropdown_chip_filter_type_file_type_pdf">PDF</string>
+    <!-- Search drop down chips filter type file type spreadsheets -->
+    <string name="search_dropdown_chip_filter_type_file_type_spreadsheets">Fogli di calcolo</string>
+    <!-- Search drop down chips filter type file type presentations -->
+    <string name="search_dropdown_chip_filter_type_file_type_presentations">Presentazioni</string>
+    <!-- Search drop down chips filter type file type folders -->
+    <string name="search_dropdown_chip_filter_type_file_type_folders">Cartelle</string>
+    <!-- Search drop down chips filter type file type others -->
+    <string name="search_dropdown_chip_filter_type_file_type_others">Others</string>
+    <!-- Search drop down chips filter type date added -->
+    <string name="search_dropdown_chip_filter_type_date_added">Data aggiunta</string>
+    <!-- Search drop down chips filter type last modified -->
+    <string name="search_dropdown_chip_filter_type_last_modified">Ultima modifica</string>
+    <!-- Search drop down chips filter type date modified today -->
+    <string name="search_dropdown_chip_filter_type_date_today">Oggi</string>
+    <!-- Search drop down chips filter type date modified last 7 days -->
+    <string name="search_dropdown_chip_filter_type_date_last_seven_days">Ultimi 7 giorni</string>
+    <!-- Search drop down chips filter type date modified last 30 days -->
+    <string name="search_dropdown_chip_filter_type_date_last_thirty_days">Ultimi 30 giorni</string>
+    <!-- Search drop down chips filter type date modified this year -->
+    <string name="search_dropdown_chip_filter_type_date_this_year">Quest’anno</string>
+    <!-- Search drop down chips filter type date modified last year -->
+    <string name="search_dropdown_chip_filter_type_date_last_year">Ultimo anno</string>
+    <!-- Search drop down chips filter type date modified older -->
+    <string name="search_dropdown_chip_filter_type_date_older">Vecchio</string>
+    <!-- All videos tab title of the video section  -->
+    <string name="video_section_tab_title_all_videos">Videos</string>
+    <!-- Playlists tab title of the video section  -->
+    <string name="video_section_tab_title_playlists">Playlists</string>
+    <!-- Location filter title of the video section  -->
+    <string name="video_section_videos_location_filter_title">Location</string>
+    <!-- All locations option of the video section location filter  -->
+    <string name="video_section_videos_location_option_all_locations">All locations</string>
+    <!-- Cloud drive option of the video section location filter  -->
+    <string name="video_section_videos_location_option_cloud_drive">Cloud drive</string>
+    <!-- Camera uploads option of the video section location filter  -->
+    <string name="video_section_videos_location_option_camera_uploads">Camera uploads</string>
+    <!-- Shared items option of the video section location filter  -->
+    <string name="video_section_videos_location_option_shared_items">Shared items</string>
+    <!-- Duration filter title of the video section  -->
+    <string name="video_section_videos_duration_filter_title">Duration</string>
+    <!-- All Duration option of the video section duration filter  -->
+    <string name="video_section_videos_duration_option_all_duration">All durations</string>
+    <!-- Less than 10 seconds option of the video section duration filter  -->
+    <string name="video_section_videos_duration_option_less_than_10_seconds">Less than 10 seconds</string>
+    <!-- Between 10 and 60 seconds option of the video section duration filter  -->
+    <string name="video_section_videos_duration_option_between_10_and_60_seconds">Between 10 and 60 seconds</string>
+    <!-- Between 1 and 4 minutes option of the video section duration filter  -->
+    <string name="video_section_videos_duration_option_between_1_and_4_minutes">Between 1 and 4 minutes</string>
+    <!-- Between 4 and 20 minutes option of the video section duration filter  -->
+    <string name="video_section_videos_duration_option_between_4_and_20_minutes">Between 4 and 20 minutes</string>
+    <!-- More than 20 minutes option of the video section duration filter  -->
+    <string name="video_section_videos_duration_option_more_than_20_minutes">More than 20 minutes</string>
+    <!-- Create playlist dialog title of the video section playlists tab -->
+    <string name="video_section_playlists_create_playlist_dialog_title">Enter playlist name</string>
+    <!-- Rename playlist dialog title of the video section playlists tab -->
+    <string name="video_section_playlists_rename_playlist_dialog_title">Rename</string>
+    <!-- Error message when the playlist name already exists -->
+    <string name="video_section_playlists_error_message_playlist_name_exists">A playlist with this name already exists. Enter a different name.</string>
+    <!-- Delete playlist dialog title of the video section playlists tab -->
+    <string name="video_section_playlists_delete_playlist_dialog_title">Delete playlist\?</string>
+    <!-- Delete button title of the video section playlists tab delete playlist dialog -->
+    <string name="video_section_playlists_delete_playlist_dialog_delete_button">Delete</string>
+    <!-- Text that indicates that there’s no playlist to show. -->
+    <string name="video_section_playlists_empty_hint_playlist">No playlists found</string>
+    <!-- Delete option title of the video section playlist bottom sheet -->
+    <string name="video_section_playlist_bottom_sheet_option_title_delete">Delete playlist</string>
+    <!-- Remove videos dialog title of the video section playlist detail -->
+    <string name="video_section_playlist_detail_remove_videos_dialog_title">Remove from playlist\?</string>
+    <!-- Remove button title of the video section playlist detail remove videos dialog -->
+    <string name="video_section_playlist_detail_remove_videos_dialog_remove_button">Remove</string>
+    <!-- Play all button title of the video section playlist detail -->
+    <string name="video_section_playlist_detail_play_all_button">Play all</string>
+    <!-- Text that indicates that there’s no videos in the video playlist detail to show. -->
+    <string name="video_section_playlist_detail_empty_hint_videos">No videos</string>
+    <!-- Top bar title of the video section video selected page -->
+    <string name="video_section_video_selected_top_bar_title">Choose files</string>
+    <!-- Message when deleting the playlists of the video section playlists tab -->
+    <plurals name="video_section_playlists_delete_playlists_message">
+        <item quantity="one"></item>
+        <item quantity="many"></item>
+        <item quantity="other"></item>
+    </plurals>
+    <!-- Message when adding the videos to the video section playlist -->
+    <plurals name="video_section_playlist_detail_add_videos_message">
+        <item quantity="one">Added %1$d item to “%2$s”</item>
+        <item quantity="other">Added %1$d items to “%2$s”</item>
+    </plurals>
+    <!-- Message when removing the videos to the video section playlist -->
+    <plurals name="video_section_playlist_detail_remove_videos_message">
+        <item quantity="one">Removed %1$d item from “%2$s”</item>
+        <item quantity="other">Removed %1$d items from “%2$s”</item>
+    </plurals>
+    <!-- Text of the video section playlist detail video number -->
+    <plurals name="video_section_playlist_detail_video_number">
+        <item quantity="one">%1$d video</item>
+        <item quantity="other">%1$d videos</item>
+    </plurals>
+    <!-- Warning shown when the user clicks on a web link and there is no app available at the moment for opening it. -->
+    <string name="chat_click_link_in_message_intent_not_available">You may not have any apps installed which can open this website</string>
+</resources>

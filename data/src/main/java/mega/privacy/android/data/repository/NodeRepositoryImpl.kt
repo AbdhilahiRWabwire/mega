@@ -45,6 +45,7 @@ import mega.privacy.android.domain.entity.FolderTreeInfo
 import mega.privacy.android.domain.entity.NodeLabel
 import mega.privacy.android.domain.entity.Offline
 import mega.privacy.android.domain.entity.SortOrder
+import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeId
@@ -185,10 +186,10 @@ internal class NodeRepositoryImpl @Inject constructor(
             }
         }
 
-    override suspend fun isNodeInRubbish(handle: Long) = withContext(ioDispatcher) {
-        megaApiGateway.getMegaNodeByHandle(handle)?.let { megaApiGateway.isInRubbish(it) }
+    override suspend fun isNodeInRubbishBin(nodeId: NodeId) = withContext(ioDispatcher) {
+        megaApiGateway.getMegaNodeByHandle(nodeId.longValue)?.let { megaApiGateway.isInRubbish(it) }
             ?: run {
-                Timber.w("isNodeInRubbish returns false because the node with handle $handle was not found")
+                Timber.w("isNodeInRubbishBin returns false because the node with handle $nodeId was not found")
                 false
             }
     }
@@ -234,6 +235,16 @@ internal class NodeRepositoryImpl @Inject constructor(
         megaApiGateway.getMegaNodeByHandle(nodeId.longValue)?.let {
             convertToUnTypedNode(node = it, offline = offline)
         }
+    }
+
+    override suspend fun getParentNodeId(nodeId: NodeId): NodeId? = withContext(ioDispatcher) {
+        megaApiGateway.getMegaNodeByHandle(nodeId.longValue)?.let {
+            NodeId(it.parentHandle)
+        }
+    }
+
+    override suspend fun doesNodeExist(nodeId: NodeId): Boolean = withContext(ioDispatcher) {
+        megaApiGateway.getMegaNodeByHandle(nodeId.longValue) != null
     }
 
     override suspend fun getNodeFromSerializedData(serializedData: String) =
@@ -1053,5 +1064,48 @@ internal class NodeRepositoryImpl @Inject constructor(
         }.onFailure {
             Timber.e(it)
         }.getOrNull()
+    }
+
+    override suspend fun createFolder(name: String, parentNodeId: NodeId?) =
+        withContext(ioDispatcher) {
+            val parentMegaNode = when (parentNodeId) {
+                null -> megaApiGateway.getRootNode()
+                else -> megaApiGateway.getMegaNodeByHandle(parentNodeId.longValue)
+            }
+
+            requireNotNull(parentMegaNode) { "Parent node not found" }
+
+            suspendCancellableCoroutine { continuation ->
+                val listener = continuation.getRequestListener("createFolder") {
+                    NodeId(it.nodeHandle)
+                }
+                megaApiGateway.createFolder(name, parentMegaNode, listener)
+                continuation.invokeOnCancellation {
+                    megaApiGateway.removeRequestListener(listener)
+                }
+            }
+        }
+
+    override suspend fun isEmptyFolder(node: TypedNode): Boolean {
+        if (node is FileNode) return false
+        if (node is FolderNode) {
+            megaApiGateway.getMegaNodeByHandle(node.id.longValue)?.let { parent ->
+                isChildrenEmpty(parent)
+            }
+        }
+        return true
+    }
+
+    private suspend fun isChildrenEmpty(parent: MegaNode): Boolean {
+        megaApiGateway.getChildrenByNode(parent).let {
+            if (it.isNotEmpty()) {
+                it.forEach { childNode ->
+                    if (childNode.isFolder.not() || isChildrenEmpty(childNode).not()) {
+                        return false
+                    }
+                }
+            }
+            return true
+        }
     }
 }

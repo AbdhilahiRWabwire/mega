@@ -10,11 +10,14 @@ import de.palm.composestateevents.triggered
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import mega.privacy.android.app.MimeTypeList
 import mega.privacy.android.app.extensions.updateItemAt
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.globalmanagement.TransfersManagement
@@ -25,6 +28,9 @@ import mega.privacy.android.app.presentation.settings.model.MediaDiscoveryViewSe
 import mega.privacy.android.app.presentation.time.mapper.DurationInSecondsTextMapper
 import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
 import mega.privacy.android.data.mapper.FileDurationMapper
+import mega.privacy.android.domain.entity.ImageFileTypeInfo
+import mega.privacy.android.domain.entity.SvgFileTypeInfo
+import mega.privacy.android.domain.entity.VideoFileTypeInfo
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.Node
@@ -36,7 +42,6 @@ import mega.privacy.android.domain.entity.preference.ViewType
 import mega.privacy.android.domain.usecase.GetCloudSortOrder
 import mega.privacy.android.domain.usecase.GetParentNodeUseCase
 import mega.privacy.android.domain.usecase.GetRootNodeUseCase
-import mega.privacy.android.domain.usecase.IsNodeInRubbish
 import mega.privacy.android.domain.usecase.MonitorMediaDiscoveryView
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorRefreshSessionUseCase
@@ -44,6 +49,7 @@ import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCas
 import mega.privacy.android.domain.usecase.filebrowser.GetFileBrowserNodeChildrenUseCase
 import mega.privacy.android.domain.usecase.folderlink.ContainsMediaItemUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
+import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.quota.GetBandwidthOverQuotaDelayUseCase
@@ -61,7 +67,7 @@ import javax.inject.Inject
  * @param monitorMediaDiscoveryView Monitor media discovery view settings
  * @param monitorNodeUpdatesUseCase Monitor node updates
  * @param getParentNodeUseCase To get parent node of current node
- * @param getIsNodeInRubbish To get current node is in rubbish
+ * @param isNodeInRubbishBinUseCase To get current node is in rubbish
  * @param getFileBrowserNodeChildrenUseCase [GetFileBrowserNodeChildrenUseCase]
  * @param getCloudSortOrder [GetCloudSortOrder]
  * @param monitorViewType [MonitorViewType] check view type
@@ -79,7 +85,7 @@ class FileBrowserViewModel @Inject constructor(
     private val monitorMediaDiscoveryView: MonitorMediaDiscoveryView,
     private val monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase,
     private val getParentNodeUseCase: GetParentNodeUseCase,
-    private val getIsNodeInRubbish: IsNodeInRubbish,
+    private val isNodeInRubbishBinUseCase: IsNodeInRubbishBinUseCase,
     private val getFileBrowserNodeChildrenUseCase: GetFileBrowserNodeChildrenUseCase,
     private val getCloudSortOrder: GetCloudSortOrder,
     private val monitorViewType: MonitorViewType,
@@ -110,14 +116,12 @@ class FileBrowserViewModel @Inject constructor(
     private val handleStack = Stack<Long>()
 
     init {
-        monitorMediaDiscovery()
         refreshNodes()
-        monitorFileBrowserChildrenNodes()
+        monitorMediaDiscovery()
         checkViewType()
-        monitorRefreshSession()
         changeTransferOverQuotaBannerVisibility()
-        monitorOfflineNodes()
         monitorConnectivity()
+        monitorNodeUpdates()
     }
 
     private fun monitorConnectivity() {
@@ -134,14 +138,6 @@ class FileBrowserViewModel @Inject constructor(
      * @return the [FileBrowserState]
      */
     fun state() = _state.value
-
-    private fun monitorRefreshSession() {
-        viewModelScope.launch {
-            monitorRefreshSessionUseCase().collect {
-                setPendingRefreshNodes()
-            }
-        }
-    }
 
     /**
      * This will monitor media discovery from [MonitorMediaDiscoveryView] and update
@@ -171,25 +167,16 @@ class FileBrowserViewModel @Inject constructor(
         }
     }
 
-    /**
-     * This will monitor FileBrowserNodeUpdates from [MonitorNodeUpdatesUseCase] and
-     * will update [FileBrowserState.nodesList]
-     */
-    private fun monitorFileBrowserChildrenNodes() {
+    private fun monitorNodeUpdates() {
         viewModelScope.launch {
-            monitorNodeUpdatesUseCase().catch {
-                Timber.e(it)
-            }.collect {
-                checkForNodeIsInRubbish(it.changes)
-            }
-        }
-    }
-
-    private fun monitorOfflineNodes() {
-        viewModelScope.launch {
-            monitorOfflineNodeUpdatesUseCase().collect {
-                setPendingRefreshNodes()
-            }
+            merge(
+                monitorNodeUpdatesUseCase().map { checkForNodeIsInRubbish(it.changes) },
+                monitorOfflineNodeUpdatesUseCase().drop(1),
+                monitorRefreshSessionUseCase(),
+            ).conflate()
+                .collectLatest {
+                    setPendingRefreshNodes()
+                }
         }
     }
 
@@ -203,7 +190,7 @@ class FileBrowserViewModel @Inject constructor(
         changes.forEach { (node, _) ->
             if (node is FolderNode) {
                 if (node.isInRubbishBin && _state.value.fileBrowserHandle == node.id.longValue) {
-                    while (handleStack.isNotEmpty() && getIsNodeInRubbish(handleStack.peek())) {
+                    while (handleStack.isNotEmpty() && isNodeInRubbishBinUseCase(NodeId(handleStack.peek()))) {
                         handleStack.pop()
                     }
                     handleStack.takeIf { stack -> stack.isNotEmpty() }?.peek()?.let { parent ->
@@ -213,7 +200,6 @@ class FileBrowserViewModel @Inject constructor(
                 }
             }
         }
-        setPendingRefreshNodes()
     }
 
 
@@ -312,9 +298,9 @@ class FileBrowserViewModel @Inject constructor(
             } else {
                 nodes.firstOrNull { node ->
                     node is TypedFolderNode
-                            || MimeTypeList.typeForName(node.name).isSvgMimeType
-                            || (!MimeTypeList.typeForName(node.name).isImage
-                            && !MimeTypeList.typeForName(node.name).isVideoMimeType)
+                            || (node as? FileNode)?.type is SvgFileTypeInfo
+                            || (node as? FileNode)?.type !is ImageFileTypeInfo
+                            && (node as? FileNode)?.type !is VideoFileTypeInfo
                 }?.let {
                     false
                 } ?: true
@@ -802,7 +788,7 @@ class FileBrowserViewModel @Inject constructor(
      * Hide or unhide the node
      */
     fun hideOrUnhideNodes(nodeIds: List<NodeId>, hide: Boolean) = viewModelScope.launch {
-        for (nodeId in nodeIds) {
+        nodeIds.map { nodeId ->
             async {
                 runCatching {
                     updateNodeSensitiveUseCase(nodeId = nodeId, isSensitive = hide)
@@ -811,6 +797,12 @@ class FileBrowserViewModel @Inject constructor(
                 }
             }
         }
+    }
 
+    /**
+     * This method will handle the sort order change event
+     */
+    fun onCloudDriveSortOrderChanged() {
+        setPendingRefreshNodes()
     }
 }

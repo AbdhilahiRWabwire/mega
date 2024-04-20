@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
@@ -25,6 +26,7 @@ import mega.privacy.android.app.domain.usecase.offline.SetNodeAvailableOffline
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.namecollision.data.NameCollisionType
+import mega.privacy.android.app.namecollision.usecase.CheckNameCollisionUseCase
 import mega.privacy.android.app.presentation.imagepreview.fetcher.ImageNodeFetcher
 import mega.privacy.android.app.presentation.imagepreview.menu.ImagePreviewMenu
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewFetcherSource
@@ -37,6 +39,10 @@ import mega.privacy.android.domain.entity.imageviewer.ImageResult
 import mega.privacy.android.domain.entity.node.ImageNode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedNode
+import mega.privacy.android.domain.entity.node.chat.ChatImageFile
+import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
+import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
+import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.favourites.AddFavouritesUseCase
 import mega.privacy.android.domain.usecase.favourites.IsAvailableOfflineUseCase
 import mega.privacy.android.domain.usecase.favourites.RemoveFavouritesUseCase
@@ -48,6 +54,7 @@ import mega.privacy.android.domain.usecase.imageviewer.GetImageFromFileUseCase
 import mega.privacy.android.domain.usecase.imageviewer.GetImageUseCase
 import mega.privacy.android.domain.usecase.node.AddImageTypeUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodeUseCase
+import mega.privacy.android.domain.usecase.node.CopyTypedNodeUseCase
 import mega.privacy.android.domain.usecase.node.DeleteNodesUseCase
 import mega.privacy.android.domain.usecase.node.DisableExportNodesUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodeUseCase
@@ -71,8 +78,10 @@ class ImagePreviewViewModel @Inject constructor(
     private val getImageUseCase: GetImageUseCase,
     private val getImageFromFileUseCase: GetImageFromFileUseCase,
     private val areTransfersPausedUseCase: AreTransfersPausedUseCase,
+    private val checkNameCollisionUseCase: CheckNameCollisionUseCase,
     private val checkNameCollision: CheckNameCollision,
     private val copyNodeUseCase: CopyNodeUseCase,
+    private val copyTypedNodeUseCase: CopyTypedNodeUseCase,
     private val moveNodeUseCase: MoveNodeUseCase,
     private val addFavouritesUseCase: AddFavouritesUseCase,
     private val removeFavouritesUseCase: RemoveFavouritesUseCase,
@@ -90,6 +99,10 @@ class ImagePreviewViewModel @Inject constructor(
     private val getPublicNodeFromSerializedDataUseCase: GetPublicNodeFromSerializedDataUseCase,
     private val resetTotalDownloadsUseCase: ResetTotalDownloadsUseCase,
     private val deleteNodesUseCase: DeleteNodesUseCase,
+    private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase,
+    private val imagePreviewVideoLauncher: ImagePreviewVideoLauncher,
+    private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
+    private val isHiddenNodesOnboardedUseCase: IsHiddenNodesOnboardedUseCase,
 ) : ViewModel() {
     private val imagePreviewFetcherSource: ImagePreviewFetcherSource
         get() = savedStateHandle[IMAGE_NODE_FETCHER_SOURCE] ?: ImagePreviewFetcherSource.TIMELINE
@@ -117,6 +130,8 @@ class ImagePreviewViewModel @Inject constructor(
     init {
         monitorImageNodes()
         monitorOfflineNodeUpdates()
+        monitorAccountDetail()
+        monitorIsHiddenNodesOnboarded()
     }
 
     private fun monitorOfflineNodeUpdates() {
@@ -162,6 +177,31 @@ class ImagePreviewViewModel @Inject constructor(
                 }
             }
             .launchIn(viewModelScope)
+    }
+
+    private fun monitorAccountDetail() {
+        monitorAccountDetailUseCase()
+            .onEach { accountDetail ->
+                _state.update {
+                    it.copy(accountDetail = accountDetail)
+                }
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun monitorIsHiddenNodesOnboarded() {
+        viewModelScope.launch {
+            val isHiddenNodesOnboarded = isHiddenNodesOnboardedUseCase()
+            _state.update {
+                it.copy(isHiddenNodesOnboarded = isHiddenNodesOnboarded)
+            }
+        }
+    }
+
+    fun setHiddenNodesOnboarded() {
+        _state.update {
+            it.copy(isHiddenNodesOnboarded = true)
+        }
     }
 
     private fun findCurrentImageNode(imageNodes: List<ImageNode>): Pair<Int, ImageNode?> {
@@ -234,6 +274,16 @@ class ImagePreviewViewModel @Inject constructor(
 
     suspend fun isRenameMenuVisible(imageNode: ImageNode): Boolean {
         return menu?.isRenameMenuVisible(imageNode) ?: false
+    }
+
+    suspend fun isHideMenuVisible(imageNode: ImageNode): Boolean {
+        return getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)
+                && menu?.isHideMenuVisible(imageNode) ?: false
+    }
+
+    suspend fun isUnhideMenuVisible(imageNode: ImageNode): Boolean {
+        return getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)
+                && menu?.isUnhideMenuVisible(imageNode) ?: false
     }
 
     suspend fun isMoveMenuVisible(imageNode: ImageNode): Boolean {
@@ -399,6 +449,7 @@ class ImagePreviewViewModel @Inject constructor(
                 imagePreviewMenuSource in listOf(
                     ImagePreviewMenuSource.ALBUM_SHARING,
                     ImagePreviewMenuSource.PUBLIC_FILE,
+                    ImagePreviewMenuSource.CHAT
                 ) -> node.serializedData?.let { getPublicNodeFromSerializedDataUseCase(it) }
 
                 else -> addImageTypeUseCase(node)
@@ -487,19 +538,74 @@ class ImagePreviewViewModel @Inject constructor(
 
     fun importNode(context: Context, importHandle: Long, toHandle: Long) {
         viewModelScope.launch {
-            checkForNameCollision(
-                context = context,
-                nodeHandle = importHandle,
-                newParentHandle = toHandle,
-                type = NameCollisionType.COPY,
-                completeAction = {
-                    handleImportNodeNameCollision(
-                        importHandle,
-                        toHandle,
-                        context
+            when (imagePreviewFetcherSource) {
+                ImagePreviewFetcherSource.CHAT -> {
+                    importChatNode(
+                        context = context,
+                        newParentHandle = toHandle,
                     )
                 }
+
+                else -> {
+                    checkForNameCollision(
+                        context = context,
+                        nodeHandle = importHandle,
+                        newParentHandle = toHandle,
+                        type = NameCollisionType.COPY,
+                        completeAction = {
+                            handleImportNodeNameCollision(
+                                importHandle,
+                                toHandle,
+                                context
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun importChatNode(context: Context, newParentHandle: Long) {
+        val imageNode = _state.value.currentImageNode
+        val chatNode = MegaNode.unserialize(_state.value.currentImageNode?.serializedData)
+        runCatching {
+            checkNameCollisionUseCase.check(
+                node = chatNode,
+                parentHandle = newParentHandle,
+                type = NameCollisionType.COPY,
             )
+        }.onSuccess { nameCollision ->
+            _state.update {
+                it.copy(nameCollision = nameCollision)
+            }
+        }.onFailure {
+            when (it) {
+                is MegaNodeException.ChildDoesNotExistsException -> copyChatNode(
+                    context = context,
+                    imageNode = imageNode,
+                    parentHandle = newParentHandle,
+                )
+
+                else -> Timber.e(it)
+            }
+        }
+    }
+
+    private suspend fun copyChatNode(
+        context: Context,
+        imageNode: ImageNode?,
+        parentHandle: Long,
+    ) {
+        runCatching {
+            copyTypedNodeUseCase(
+                nodeToCopy = imageNode as ChatImageFile,
+                newNodeParent = NodeId(parentHandle),
+            )
+        }.onSuccess {
+            setResultMessage(context.getString(R.string.context_correctly_copied))
+        }.onFailure { throwable ->
+            Timber.e("Error not copied $throwable")
+            setCopyMoveException(throwable)
         }
     }
 
@@ -666,6 +772,31 @@ class ImagePreviewViewModel @Inject constructor(
         _state.update {
             it.copy(showDeletedMessage = false)
         }
+    }
+
+    /**
+     * Hide the node (mark as sensitive)
+     */
+    fun hideNode(nodeId: NodeId) = viewModelScope.launch {
+        updateNodeSensitiveUseCase(nodeId = nodeId, isSensitive = true)
+    }
+
+    /**
+     * Unhide the node (unmark as sensitive)
+     */
+    fun unhideNode(nodeId: NodeId) = viewModelScope.launch {
+        updateNodeSensitiveUseCase(nodeId = nodeId, isSensitive = false)
+    }
+
+    fun playVideo(
+        context: Context,
+        imageNode: ImageNode,
+    ) = viewModelScope.launch {
+        imagePreviewVideoLauncher.launchVideoScreen(
+            context = context,
+            imageNode = imageNode,
+            source = imagePreviewFetcherSource
+        )
     }
 
     companion object {

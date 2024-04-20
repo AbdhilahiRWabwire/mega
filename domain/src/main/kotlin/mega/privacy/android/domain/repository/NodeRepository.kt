@@ -81,7 +81,7 @@ interface NodeRepository {
      *
      * @return Boolean
      */
-    suspend fun isNodeInRubbish(handle: Long): Boolean
+    suspend fun isNodeInRubbishBin(nodeId: NodeId): Boolean
 
     /**
      * check whether the node is in Backups or not
@@ -109,6 +109,22 @@ interface NodeRepository {
      * @return The node if found else null
      */
     suspend fun getNodeById(nodeId: NodeId): Node?
+
+    /**
+     * Get parent node id
+     *
+     * @param nodeId
+     * @return
+     */
+    suspend fun getParentNodeId(nodeId: NodeId): NodeId?
+
+    /**
+     * Checks if a Node exists
+     *
+     * @param nodeId
+     * @return true if node exists
+     */
+    suspend fun doesNodeExist(nodeId: NodeId): Boolean
 
     /**
      * Get node by its serialized data
@@ -728,4 +744,20 @@ interface NodeRepository {
      * @return local link [String]
      */
     suspend fun getLocalLink(node: TypedNode): String?
+
+    /**
+     * Create a Folder
+     *
+     * @param name the name of the folder
+     * @param parentNodeId Parent node id under which the folder should be created
+     *                   If null, the folder will be created in the root folder
+     * @return the handle of the new folder
+     */
+    suspend fun createFolder(name: String, parentNodeId: NodeId?): NodeId
+
+    /**
+     * Checks if the folder node contains any files in any of its child nodes
+     * @param node the folder node to check
+     */
+    suspend fun isEmptyFolder(node: TypedNode): Boolean
 }

@@ -1,5 +1,6 @@
 package mega.privacy.android.core.ui.controls.chat
 
+import mega.privacy.android.icon.pack.R as IconPackR
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -61,7 +62,6 @@ internal const val TEST_TAG_FORWARD_ICON = "chat_message_container:forward_icon"
  * @param showForwardIcon
  * @param reactions
  * @param avatarOrIcon
- * @param time
  * @param content
  */
 @Composable
@@ -77,7 +77,6 @@ fun ChatMessageContainer(
     isSendError: Boolean = false,
     isSelectMode: Boolean = false,
     isSelected: Boolean = false,
-    onSendErrorClick: () -> Unit = {},
     onSelectionChanged: (Boolean) -> Unit = {},
     avatarOrIcon: @Composable ((modifier: Modifier) -> Unit)? = null,
     content: @Composable (interactionEnabled: Boolean) -> Unit,
@@ -169,7 +168,6 @@ fun ChatMessageContainer(
                 if (isSendError) {
                     MegaText(
                         modifier = Modifier
-                            .clickable(enabled = true, onClick = onSendErrorClick)
                             .padding(top = 2.dp),
                         text = stringResource(id = R.string.manual_retry_alert),
                         style = MaterialTheme.typography.body4,
@@ -227,17 +225,18 @@ private fun Preview(
         LazyColumn() {
             item {
                 ChatMessageContainer(
-                    modifier = Modifier,
                     isMine = parameter.isMe,
+                    showForwardIcon = true,
                     reactions = parameter.reactions,
                     onMoreReactionsClick = { },
                     onReactionClick = { },
                     onReactionLongClick = {},
                     onForwardClicked = {},
-                    onSelectionChanged = { isSelected = !isSelected },
+                    modifier = Modifier,
+                    isSendError = parameter.isMe && parameter.hasSendError,
                     isSelectMode = parameter.inSelectMode,
                     isSelected = isSelected,
-                    isSendError = parameter.isMe && parameter.hasSendError,
+                    onSelectionChanged = { isSelected = !isSelected },
                     avatarOrIcon = {
                         Icon(
                             modifier = it,
@@ -246,7 +245,6 @@ private fun Preview(
                             tint = MegaTheme.colors.icon.secondary
                         )
                     },
-                    showForwardIcon = true,
                     content = parameter.content,
                 )
             }
@@ -310,7 +308,7 @@ private class Provider : PreviewParameterProvider<ChatMessageContainerPreviewPar
                         isMe = true,
                         title = buildAnnotatedString { append("Pinned location") },
                         geolocation = "41.1472° N, 8.6179° W",
-                        map = ImageBitmap.imageResource(R.drawable.ic_folder_incoming),
+                        map = ImageBitmap.imageResource(IconPackR.drawable.ic_folder_incoming_medium_solid),
                     )
                 }
             ),
@@ -321,7 +319,7 @@ private class Provider : PreviewParameterProvider<ChatMessageContainerPreviewPar
                         isMe = true,
                         title = buildAnnotatedString { append("Pinned location") },
                         geolocation = "41.1472° N, 8.6179° W",
-                        map = ImageBitmap.imageResource(R.drawable.ic_folder_incoming),
+                        map = ImageBitmap.imageResource(IconPackR.drawable.ic_folder_incoming_medium_solid),
                     )
                 }
             ),
@@ -332,7 +330,7 @@ private class Provider : PreviewParameterProvider<ChatMessageContainerPreviewPar
                         isMe = false,
                         title = buildAnnotatedString { append("Pinned location") },
                         geolocation = "41.1472° N, 8.6179° W",
-                        map = ImageBitmap.imageResource(R.drawable.ic_folder_incoming),
+                        map = ImageBitmap.imageResource(IconPackR.drawable.ic_folder_incoming_medium_solid),
                     )
                 }
             ),

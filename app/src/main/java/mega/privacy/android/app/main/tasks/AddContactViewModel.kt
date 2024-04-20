@@ -9,9 +9,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.model.AddContactState
-import mega.privacy.android.domain.entity.Feature
 import mega.privacy.android.domain.usecase.contact.GetContactVerificationWarningUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
@@ -29,16 +29,19 @@ class AddContactViewModel @Inject constructor(
     val state = _state.asStateFlow()
 
     init {
-        getContactFeatureEnabled()
         getEnabledFeatures()
+        getContactFeatureEnabled()
     }
 
     private fun getEnabledFeatures() {
         viewModelScope.launch {
-            val enabledFeatures = setOfNotNull(
-                AppFeatures.QRCodeCompose.takeIf { getFeatureFlagValueUseCase(it) }
-            )
-            _state.update { it.copy(enabledFeatureFlags = enabledFeatures) }
+            getFeatureFlagValueUseCase(AppFeatures.CallUnlimitedProPlan).let { flag ->
+                _state.update { state ->
+                    state.copy(
+                        isCallUnlimitedProPlanFeatureFlagEnabled = flag,
+                    )
+                }
+            }
         }
     }
 
@@ -55,8 +58,21 @@ class AddContactViewModel @Inject constructor(
     }
 
     /**
-     * Check if given feature flag is enabled or not
+     * Check if Call Unlimited Pro Plan feature flag is enabled or not
      */
-    fun isFeatureEnabled(feature: Feature) = state.value.enabledFeatureFlags.contains(feature)
+    fun shouldShowParticipantsLimitWarning(shouldShow: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                val shouldShowParticipantsLimitWarning =
+                    getFeatureFlagValueUseCase(AppFeatures.CallUnlimitedProPlan) && shouldShow
+
+                _state.update {
+                    it.copy(shouldShowParticipantsLimitWarning = shouldShowParticipantsLimitWarning)
+                }
+            }.onFailure {
+                Timber.e(it)
+            }
+        }
+    }
 
 }

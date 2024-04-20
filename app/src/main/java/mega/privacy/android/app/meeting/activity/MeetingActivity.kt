@@ -29,7 +29,6 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.PasscodeActivity
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.databinding.ActivityMeetingBinding
-import mega.privacy.android.app.main.megachat.ChatActivity
 import mega.privacy.android.app.meeting.CallNotificationIntentService
 import mega.privacy.android.app.meeting.fragments.CreateMeetingFragment
 import mega.privacy.android.app.meeting.fragments.InMeetingFragment
@@ -41,7 +40,6 @@ import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
 import mega.privacy.android.app.myAccount.MyAccountActivity
 import mega.privacy.android.app.presentation.contactinfo.ContactInfoActivity
 import mega.privacy.android.app.presentation.extensions.changeStatusBarColor
-import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.meeting.WaitingRoomManagementViewModel
 import mega.privacy.android.app.presentation.meeting.model.MeetingState
 import mega.privacy.android.app.presentation.meeting.model.WaitingRoomManagementState
@@ -52,12 +50,11 @@ import mega.privacy.android.app.presentation.meeting.view.UsersInWaitingRoomDial
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.REQUIRE_PASSCODE_INVALID
 import mega.privacy.android.app.utils.ScheduledMeetingDateUtil.getAppropriateStringForScheduledMeetingDate
-import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.android.domain.entity.ChatRoomPermission
-import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
 import mega.privacy.android.domain.entity.meeting.ParticipantsSection
-import mega.privacy.android.domain.usecase.GetThemeMode
+import mega.privacy.android.navigation.MegaNavigator
+import mega.privacy.android.shared.theme.MegaAppTheme
 import nz.mega.sdk.MegaChatApiJava.MEGACHAT_INVALID_HANDLE
 import timber.log.Timber
 import javax.inject.Inject
@@ -94,9 +91,11 @@ class MeetingActivity : PasscodeActivity() {
         const val MEETING_BOTTOM_PANEL_EXPANDED = "meeting_bottom_panel_expanded"
         const val MEETING_CALL_RECORDING = "meeting_call_recording"
         const val MEETING_IS_RINGIN_ALL = "meeting_is_ringing_all"
+        const val MEETING_FREE_PLAN_USERS_LIMIT = "meeting_free_plan_users_limit"
+
 
         fun getIntentOngoingCall(context: Context, chatId: Long): Intent {
-            return Intent(context, MeetingActivity::class.java).apply {
+           return Intent(context, MeetingActivity::class.java).apply {
                 putExtra(MEETING_CHAT_ID, chatId)
                 action = MEETING_ACTION_IN
             }
@@ -107,7 +106,7 @@ class MeetingActivity : PasscodeActivity() {
     lateinit var notificationManager: NotificationManagerCompat
 
     @Inject
-    lateinit var getThemeMode: GetThemeMode
+    lateinit var navigator: MegaNavigator
 
     /**
      * Rtc audio manager gateway
@@ -390,11 +389,17 @@ class MeetingActivity : PasscodeActivity() {
 
     private fun collectFlows() {
         collectFlow(meetingViewModel.state) { state: MeetingState ->
+
             if (state.shouldLaunchLeftMeetingActivity) {
                 startActivity(
                     Intent(this, LeftMeetingActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        .putExtra(MEETING_FREE_PLAN_USERS_LIMIT, state.callEndedDueToFreePlanLimits)
                 )
+                finish()
+            }
+
+            if (state.callEndedDueToFreePlanLimits) {
                 finish()
             }
 
@@ -414,12 +419,10 @@ class MeetingActivity : PasscodeActivity() {
             }
 
             if (state.chatIdToOpen != -1L) {
-                startActivity(
-                    Intent(
-                        this,
-                        ChatActivity::class.java
-                    ).setAction(Constants.ACTION_CHAT_SHOW_MESSAGES)
-                        .putExtra(Constants.CHAT_ID, state.chatIdToOpen)
+                navigator.openChat(
+                    context = this,
+                    chatId = state.chatIdToOpen,
+                    action = Constants.ACTION_CHAT_SHOW_MESSAGES
                 )
                 meetingViewModel.onConsumeNavigateToChatEvent()
             }
@@ -524,6 +527,7 @@ class MeetingActivity : PasscodeActivity() {
             }
 
             meetingAction = it.action
+            meetingViewModel.setAction(meetingAction)
         }
     }
 

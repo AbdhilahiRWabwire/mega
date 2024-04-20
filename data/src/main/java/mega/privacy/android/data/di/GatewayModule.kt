@@ -27,7 +27,8 @@ import mega.privacy.android.data.facade.SDCardFacade
 import mega.privacy.android.data.facade.TelephonyFacade
 import mega.privacy.android.data.facade.VerifyPurchaseFacade
 import mega.privacy.android.data.facade.VideoCompressionFacade
-import mega.privacy.android.data.facade.WorkManagerFacade
+import mega.privacy.android.data.facade.WorkManagerGatewayImpl
+import mega.privacy.android.data.facade.WorkerClassGatewayImpl
 import mega.privacy.android.data.facade.chat.ChatStorageFacade
 import mega.privacy.android.data.gateway.AdsGateway
 import mega.privacy.android.data.gateway.AndroidDeviceGateway
@@ -57,12 +58,15 @@ import mega.privacy.android.data.gateway.TelephonyGateway
 import mega.privacy.android.data.gateway.VerifyPurchaseGateway
 import mega.privacy.android.data.gateway.VideoCompressorGateway
 import mega.privacy.android.data.gateway.WorkManagerGateway
+import mega.privacy.android.data.gateway.WorkerClassGateway
 import mega.privacy.android.data.gateway.ZipFileCompressionGateway
 import mega.privacy.android.data.gateway.api.MegaApiFolderGateway
 import mega.privacy.android.data.gateway.api.MegaApiGateway
 import mega.privacy.android.data.gateway.api.MegaChatApiGateway
 import mega.privacy.android.data.gateway.api.StreamingGateway
 import mega.privacy.android.data.gateway.chat.ChatStorageGateway
+import mega.privacy.android.data.gateway.contact.ContactGateway
+import mega.privacy.android.data.gateway.contact.ContactGatewayImpl
 import mega.privacy.android.data.gateway.preferences.AccountPreferencesGateway
 import mega.privacy.android.data.gateway.preferences.AppInfoPreferencesGateway
 import mega.privacy.android.data.gateway.preferences.AppPreferencesGateway
@@ -253,7 +257,7 @@ internal abstract class GatewayModule {
 
     @Binds
     @Singleton
-    abstract fun bindWorkManagerGateway(implementation: WorkManagerFacade): WorkManagerGateway
+    abstract fun bindWorkManagerGateway(implementation: WorkManagerGatewayImpl): WorkManagerGateway
 
     @Binds
     @Singleton
@@ -291,4 +295,10 @@ internal abstract class GatewayModule {
     @Singleton
     abstract fun bindMediaRecorderGateway(implementation: MediaRecorderFacade): MediaRecorderGateway
 
+    @Binds
+    @Singleton
+    abstract fun bindWorkerClassGateway(implementation: WorkerClassGatewayImpl): WorkerClassGateway
+
+    @Binds
+    abstract fun bindContactGateway(implementation: ContactGatewayImpl): ContactGateway
 }

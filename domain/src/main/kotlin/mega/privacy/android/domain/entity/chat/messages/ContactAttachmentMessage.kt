@@ -12,6 +12,7 @@ import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
  * @property status Status
  * @property isMe True if the contact is me
  * @property isContact True if it is a contact, false otherwise
+ * @property isVerified True if the contact is verified
  */
 @Serializable
 data class ContactAttachmentMessage(
@@ -26,9 +27,11 @@ data class ContactAttachmentMessage(
     override val reactions: List<Reaction>,
     override val status: ChatMessageStatus,
     override val content: String?,
+    override val rowId: Long,
     val contactEmail: String,
     val contactUserName: String,
     val contactHandle: Long,
     val isMe: Boolean,
     val isContact: Boolean,
-) : TypedMessage
+    val isVerified: Boolean,
+) : UserMessage

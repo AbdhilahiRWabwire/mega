@@ -72,6 +72,7 @@ tasks.withType<Test> {
 }
 
 dependencies {
+    implementation(project(":core:formatter"))
     lintChecks(project(":lint"))
 
     implementation(project(":analytics"))
@@ -80,6 +81,8 @@ dependencies {
     implementation(project(":data"))
     implementation(project(":core-ui"))
     implementation(project(":shared:theme"))
+    implementation(project(":shared:sync"))
+    implementation(project(":shared:resources"))
     implementation(project(":legacy-core-ui"))
     implementation(project(":icon-pack"))
 

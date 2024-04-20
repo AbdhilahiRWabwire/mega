@@ -84,8 +84,6 @@
     <string name="action_refresh">إعادة تحميل</string>
     <!-- Menu item -->
     <string name="action_sort_by">ترتيب حسب</string>
-    <!-- Menu item -->
-    <string name="action_help">المساعدة</string>
     <!-- Change from a free account to paying MEGA -->
     <string name="action_upgrade_account">ترقية الحساب</string>
     <!-- Menu item to select all the elements of a list -->
@@ -793,7 +791,7 @@
     <!-- Title of the alert dialog to inform the user that have to check the email -->
     <string name="email_verification_title">توثيق عنوان البريد الإلكتروني</string>
     <!-- Text of the alert dialog to inform the user that have to check the email -->
-    <string name="email_verification_text">الرجاء تفقد بريدك الالكتروني للاستمرار.</string>
+    <string name="email_verification_text">تحقق من صندوق البريد الإلكتروني الخاص بك للمتابعة.</string>
     <!-- Text to inform the user when an error occurs -->
     <string name="general_text_error">خطأ حصل. الرجاء المحاولة مرة أخرى.</string>
     <!-- Alert to inform the user that have to be logged in to perform the action -->
@@ -817,7 +815,7 @@
     <!-- Button to park an account -->
     <string name="park_account_button">ركن</string>
     <!-- Text shown in the last alert dialog to park an account -->
-    <string name="park_account_text_last_step">This is the last step to park your account, please enter your new password. Your data will be retained for at least 60&#160;days. If you recall your parked account’s password, please contact support&#64;mega.nz</string>
+    <string name="park_account_text_last_step">هذه هي الخطوة الأخيرة لركن حسابك يرجى إدخال كلمة المرور الجديدة. سيتم الاحتفاظ ببياناتك لمدة 60 يومًا على الأقل. إذا كنت تتذكر كلمة مرور حسابك المركون فتواصل مع support&#64;mega.nz</string>
     <!-- Title of the screen to write the new password after opening the recovery link -->
     <string name="title_enter_new_password">أدخل كلمة مرور جديدة</string>
     <!-- Message when the user tries to open a recovery pass link and it has expired -->
@@ -837,7 +835,7 @@
     <!-- Error shown when the user tries to change his mail while the email is the same as the old -->
     <string name="mail_same_as_old">هذا هو عنوان بريدك الإلكتروني الحالي.</string>
     <!-- Text shown in the last alert dialog to change the email associated to an account -->
-    <string name="change_mail_text_last_step">هذه هي الخطوة الأخيرة لتغيير البريد الإلكتروني الخاص بك. يرجى إدخال كلمة المرور أدناه.</string>
+    <string name="change_mail_text_last_step">هذه هي الخطوة الأخيرة لتغيير عنوان بريدك الإلكتروني. أدخل كلمة المرور الخاصة بك أدناه.</string>
     <!-- Title of the alert dialog to change the email associated to an account -->
     <string name="change_mail_title_last_step">تغيير البريد الإلكتروني</string>
     <!-- Option of the sliding panel to capture a new picture to upload to Cloud Drive or to set as user avatar -->
@@ -853,7 +851,7 @@
     <!-- Message shown meanwhile the app is waiting for a request -->
     <string name="recovering_info">جاري الحصول على المعلومات&#8230;</string>
     <!-- Text of the alert dialog to inform the user that have to check the email to validate his new email -->
-    <string name="email_verification_text_change_mail">عنوان بريدك الإلكتروني الجديد يحتاج إلى التحقق من صحته. يرجى التحقق من البريد الإلكتروني الخاص بك والاستمرار.</string>
+    <string name="email_verification_text_change_mail">يجب التحقق من صحة عنوان بريدك الإلكتروني الجديد. تحقق من البريد الوارد لعنوان البريد الإلكتروني الجديد للمتابعة.</string>
     <!-- Confirmation before deleting the avatar of the user’s profile -->
     <string name="confirmation_delete_avatar">هل تريد حذف صورة ملفك الشخصي؟</string>
     <!-- Title of the Dialog to edit the profile attributes of the user’s account -->
@@ -886,7 +884,7 @@
     <!-- Error message when to many attempts to login. -->
     <string name="too_many_attempts_login">هناك الكثير من المحاولات الفاشلة لتسجيل الدخول، يرجى الانتظار لمدة ساعة.</string>
     <!-- Error message when trying to login to an account not validated. -->
-    <string name="account_not_validated_login">لم يتم التحقق من هذا الحساب بعد. من فضلك تفقد بريدك الالكتروني.</string>
+    <string name="account_not_validated_login">لم يتم التحقق من صحة هذا الحساب حتى الآن. تحقق من صندوق البريد الإلكتروني الخاص بك.</string>
     <!-- Error message shown when opening a folder link which doesn’t exist -->
     <string name="general_error_folder_not_found">رابط المجلد غير متوفر</string>
     <!-- Error message shown when opening a folder link which has been removed due to ToS/AUP violation -->
@@ -900,7 +898,7 @@
     <!-- Title of the screen after creating the account. That screen asks the user to confirm the account by checking the email -->
     <string name="confirm_email_text">بانتظار تأكيد البريد الإلكتروني</string>
     <!-- Text below the title that explains the user should check the email and click the link to confirm the account -->
-    <string name="confirm_email_explanation">يُرجى التحقق من البريد الإلكتروني الخاص بك واضغط على الرابط لتأكيد حسابك.</string>
+    <string name="confirm_email_explanation">تحقق من صندوق البريد الإلكتروني الخاص بك واتبع الرابط لتأكيد حسابك.</string>
     <!-- Plural of items which contains a folder. 2 items -->
     <plurals name="general_num_items">
         <item quantity="zero">%1$d عنصر</item>
@@ -1656,10 +1654,6 @@
     <string name="save_cloud_drive">إلى السواقة السحابية</string>
     <!-- Option shown in QR code bottom sheet dialog to save QR code in File System -->
     <string name="save_file_system">إلى نظام الملفات</string>
-    <!-- Title of QR code section -->
-    <string name="section_my_code">الرمز الخاص بي</string>
-    <!-- Title of QR code scan section -->
-    <string name="section_scan_code">ارسال الرمز</string>
     <!-- Subtitle of QR code settings auto-accept -->
     <string name="setting_subtitle_qrcode_autoccept">مستخدمو ميغا MEGA الذين يقومون بمسح رمز الاستجابة السريعة QR الخاص بك، سيتم إضافتهم إلى قائمة الاتصال الخاصة بك تلقائياً.</string>
     <!-- Text shown when it has been copied the QR code link -->
@@ -2025,7 +2019,7 @@
     <!-- Description of the screen shown when the user enabled correctly Two-Factor Authentication -->
     <string name="description_2fa_enabled">في المرة القادمة التي تسجل فيها الدخول الى حسابك سيطلب منك إدخال رمز من 6 أرقام ستزود به من تطبيق المصادقة الخاص بك.</string>
     <!-- Recommendation displayed after enable Two-Factor Authentication -->
-    <string name="recommendation_2fa_enabled">Please save your                                                                         <b>recovery key</b>                                                                         in a safe location, to avoid issues in case you lose access to your app, or if you want to disable two-factor authentication.</string>
+    <string name="recommendation_2fa_enabled">يرجى حفظ <b>مفتاح الاستعادة</b> الخاص بك في مكان آمن لتجنب المشكلات في حالة فقدان الوصول إلى تطبيقك أو إذا كنت تريد تعطيل توثيق المصادقة المزدوجة.</string>
     <!-- Error shown when a user tries to enable Two-Factor Authentication and introduce an invalid code -->
     <string name="pin_error_2fa">الرمز غير صالح</string>
     <!-- Title of screen Lost authenticator decive -->
@@ -2244,7 +2238,7 @@
     <plurals name="plural_select_file">
         <item quantity="zero">اختر ملف</item>
         <item quantity="one">اختر ملف</item>
-        <item quantity="two">اختر ملفات</item>
+        <item quantity="two">اختر ملفين</item>
         <item quantity="few">اختر ملفات</item>
         <item quantity="many">اختر ملفات</item>
         <item quantity="other">اختر ملفات</item>
@@ -2416,18 +2410,8 @@
     <string name="subtitle_incoming_contact_request_accepted">[B]طلبك للتواصل من [/B][A]%s [/A][B]قم تم قبوله[/B]</string>
     <!-- Subtitle of the historic notification for incoming contact request declined -->
     <string name="subtitle_incoming_contact_request_denied">[B]طلب التواصل من [/B][A]%s [/A][B]قد تم رفضه[/B]</string>
-    <!-- Subtitle of the Upgrade account section -->
-    <string name="type_of_my_account">حسابك الحالي هو [A]%s[/A]</string>
     <!-- Footnote to clarify the storage space is subject to the achievement program -->
     <string name="footnote_achievements">خاضع لمشاركتك في برنامج الإنجازات الخاص بنا.</string>
-    <!-- Title label for the current payment method during account upgrading -->
-    <string name="payment_method">طريقة الدفع</string>
-    <!-- title of billing period -->
-    <string name="billing_period_title">فترة الفاتورة</string>
-    <!-- Option of monthly billing period. Placeholder: purchase price -->
-    <string name="billed_monthly_text">[A]الفوترة شهرياً[/A] %s/شهر</string>
-    <!-- Option of yearly billing period. Placeholder: purchase price -->
-    <string name="billed_yearly_text">[A]الفوترة سنوياً[/A] %s/سنة</string>
     <!-- dialog option cancel in alert dialog -->
     <string name="button_cancel">الغاء</string>
     <!-- dialog option continue in alert dialog -->
@@ -2436,8 +2420,6 @@
     <string name="payment_method_google_wallet">[A]دفع عن طريق غوغل[/A] (اشتراك)</string>
     <!-- Capital letters. Text of the label of a new historic notifications -->
     <string name="new_label_notification_item">جديد</string>
-    <!-- When user is on PRO 3 plan, we will display an extra label to notify user that they can still contact support to have a customised plan. -->
-    <string name="label_custom_plan">لترقية اشتراكك الحالي، يرجى الاتصال بقسم الدعم للحصول على [A]باقة مخصصة[/A].</string>
     <!-- Input field description in the create file dialog. -->
     <string name="context_new_file_name_hint">اسم الملف</string>
     <!-- Option in Settings section to enable the last active connection in chat -->
@@ -2558,7 +2540,7 @@
     <!-- Title of the screen asking permissions for microphone and write in log calls -->
     <string name="allow_acces_calls_title">تمكين المكالمات</string>
     <!-- Title of the screen asking permissions for contacts -->
-    <string name="allow_acces_contact_title">منح حق الوصول إلى دفتر العناوين الخاص بك</string>
+    <string name="allow_acces_contact_title">Allow access to your address book</string>
     <!-- Subtitle of the screen asking permissions for contacts -->
     <string name="allow_acces_contact_subtitle">اكتشف جهات الاتصال بسهولة من دفتر العناوين الخاص بك على ميغا MEGA.</string>
     <!-- Explanation under the subtitle of asking permissions for contacts to explain that MEGA will never use the address book data for any other purpose -->
@@ -2632,8 +2614,6 @@
     <string name="current_location_label">إرسال موقعك الحالي</string>
     <!-- Label layout on maps activity that permits send current location. Placeholder is the current location -->
     <string name="current_location_landscape_label">إرسال موقعك الحالي: [A]%1$s[/A]</string>
-    <!-- Label layout on maps activity indicating nearby places -->
-    <string name="nearby_places_label">الاماكن المجاورة</string>
     <!-- Message shown in a dialog explaining the consequences of accesing the location -->
     <string name="explanation_send_location">سيتم فتح هذا الموقع باستخدام طرف ثالث مزود خرائط من خارج منصة ميغا MEGA المشفرة من طرف إلى طرف.</string>
     <!-- Title of the location marker set by the user -->
@@ -2722,8 +2702,6 @@
     </plurals>
     <!-- Alert shown when the user tries to realize some action in chat and has not contacts -->
     <string name="no_contacts_invite">ليس لديك جهات اتصال على ميغا MEGA. يرجى دعوة أصدقاء من قائمة جهات الاتصال.</string>
-    <!-- Invite button for chat top cell -->
-    <string name="invite_more">أدعو أكثر</string>
     <!-- Title of first tour screen -->
     <string name="title_tour_one">انت تحتفظ بالمفاتيح</string>
     <!-- Content of first tour screen -->
@@ -2913,12 +2891,6 @@
     <string name="error_remove_business_contact">لا يمكنك إزالة %1$s كجهة اتصال لأنها جزء من حساب الأعمال الخاص بك.</string>
     <!-- When logging in during the grace period, the administrator of the Business account will be notified that their payment is overdue, indicating that they need to access MEGA using a desktop browser for more information -->
     <string name="grace_period_admin_alert">حدثت مشكلة في الدفعة الأخيرة. يرجى الوصول إلى ميغا MEGA باستخدام متصفح سطح المكتب لمزيد من المعلومات.</string>
-    <!-- A dialog title shown to users when their business account is expired. -->
-    <string name="expired_business_title">الحساب غير مفعل</string>
-    <!-- Details shown when a Business account is expired due a payment issue. The account is opened in a view-only mode. -->
-    <string name="expired_admin_business_text">تم إلغاء تفعيل حساب الأعمال Business الخاص بك بسبب فشل الدفع. لن تتمكن من الوصول إلى البيانات المخزنة في حسابك. للقيام بالدفع وإعادة تفعيل اشتراكك، قم بتسجيل الدخول إلى ميغا MEGA من المتصفح.</string>
-    <!-- A message which is shown to sub-users of expired business accounts. -->
-    <string name="expired_user_business_text">حسابك [B]معلق[/B] حالياً. يمكنك فقط تصفح بياناتك.</string>
     <!-- Message shown when users with a business account (no administrators of a business account) try to enable the Camera Uploads, to advise them that the administrator do have the ability to view their data. -->
     <string name="camera_uploads_business_alert">لا يمكن لميغا MEGA الوصول إلى بياناتك. ومع ذلك، يمكن لمسؤول حساب الأعمال الوصول إلى ترفيعات الكاميرا الخاصة بك.</string>
     <!-- General label to alert user that somehting went wrong -->
@@ -3383,15 +3355,6 @@
     <string name="months_view_button">أشهر</string>
     <!-- Text of a button on Camera Uploads section to show the content of the section organized by years-->
     <string name="years_view_button">سنين</string>
-    <!-- Text to show on Camera Uploads section, indicating the upload progress. The placeholder %1$d is for set the number of pending uploads. E.g.: "Upload in progress, 300 files pending". -->
-    <plurals name="cu_upload_progress">
-        <item quantity="zero">جاري الترفيع، %1$d ملف معلق</item>
-        <item quantity="one">جاري الترفيع، %1$d ملف معلق</item>
-        <item quantity="two">جاري الترفيع، %1$d ملفان معلقان</item>
-        <item quantity="few">جاري الترفيع، %1$d ملفات معلقة</item>
-        <item quantity="many">جاري الترفيع، %1$d ملف معلق</item>
-        <item quantity="other">جاري الترفيع، %1$d ملف معلق</item>
-    </plurals>
     <!-- Text to show as production api server option -->
     <string name="production_api_server">Production</string>
     <!-- Title to show in a dialog to change api server -->
@@ -3708,8 +3671,6 @@
     <string name="show_activity_action">اعرض التفاعل</string>
     <!-- Text informing the recent activity is hidden. -->
     <string name="recents_activity_hidden">التفاعل[B]مؤخراً[/B] مخفي</string>
-    <!-- Label indicating video original quality -->
-    <string name="original_quality">الجودة الاصلية</string>
     <!-- Settings label which allows to enable or disable fingerprint unlock. -->
     <string name="setting_fingerprint">معرف بصمة الإصبع</string>
     <!-- Title of the dialog which allows to enable the fingerprint unlock. -->
@@ -3768,8 +3729,6 @@
     <string name="backup_remove_root_folder">أنت تقوم بحذف مجلد النسخ الاحتياطي. سيؤدي هذا إلى حذف جميع النسخ الاحتياطية التي قمت بتعيينها. هل انت متأكد من أنك تريد أن تفعل هذا؟</string>
     <!-- The title of warning dialog for single folder deleting -->
     <string name="backup_remove_folder_title">نقل “%1s” إلى سلة المحذوفات</string>
-    <!-- The confirm information of warning dialog for deleting -->
-    <string name="backup_disable_confirm">تعطيل النسخ الاحتياطي</string>
     <!-- If users want to share items in the "My backup" folder, Warning dialog will show to confirm -->
     <string name="backup_share_permission_title">للقراءة فقط</string>
     <!-- If users want to share items in the "My backup" folder, Warning dialog will show to confirm -->
@@ -3786,12 +3745,6 @@
     <string name="upload_files">ترفيع ملفات</string>
     <!-- Action button to upload a folder. -->
     <string name="upload_folder">ترفيع مجلد</string>
-    <!-- Title of the Payments screen -->
-    <string name="payment">دفعات</string>
-    <!-- Label indicating payment methods -->
-    <string name="payment_methods">طرق الدفع</string>
-    <!-- Button to proceed with a payment -->
-    <string name="proceed">تابع</string>
     <!-- Remove moderator permission and assign standard permission to a meeting participant-->
     <string name="remove_moderator">إزالة كمضيف</string>
     <!-- Title message of existing subscription dialog -->
@@ -3805,7 +3758,7 @@
     <!-- Dialog message when the existing subscription is from other platform (Stripe and ECP)  -->
     <string name="message_subscription_from_other_platform">لديك بالفعل اشتراك. إذا اشتريت واحدة أخرى ، فسيتم محاسبتك مرتين. لتجنب ذلك، قم بإلغاء اشتراكك الحالي بالانتقال إلى ميغا MEGA في متصفح الحاسوب المكتبي أو الهاتف المحمول. قم بزيارة مركز المساعدة للحصول على مزيد من المعلومات.</string>
     <!-- Warning show to the user when the app needs bluetooth connect permissions to get the best meeting experience and the user has denied them.-->
-    <string name="meeting_bluetooth_connect_required_permissions_warning">انتقل إلى الإعدادات لمنح ميغا MEGA الإذن للوصول إلى أجهزتك القريبة باستخدام البلوتوث.</string>
+    <string name="meeting_bluetooth_connect_required_permissions_warning">Go to Settings to allow MEGA permission to access your nearby devices using Bluetooth.</string>
     <!-- Warning indicating the billing is not available and giving some indications to continue with the upgrade. -->
     <string name="upgrade_billing_warning">نحن غير قادرين على المضي قدماً في الفواتير. إذا كنت تستخدم تطبيقًا مزدوجًا ، فالرجاء تسجيل الدخول إلى ميغا MEGA بدونه. إذا لم يكن كذلك، فحاول الترقية من خلال متصفح الويب الخاص بك.</string>
     <!-- Title for subscription dialog that shows before delete account -->
@@ -4187,7 +4140,7 @@
     <!-- Description of the Backups feature when no Backup files or folders exist -->
     <string name="backups_empty_state_body">هذا هو المكان الذي يتم فيه تخزين الملفات والمجلدات التي تم نسخها احتياطيًا. العناصر التي تم نسخها احتياطيًا هي ”للقراءة فقط“ لحمايتها من التعديل العرضي في السواقة السحابية الخاص بك.\nيمكنك نسخ العناصر احتياطيًا من جهاز الكمبيوتر الخاص بك إلى ميغا MEGA باستخدام تطبيق الحاسوب المكتبي الخاص بنا.</string>
     <!-- Message error shown when trying to log in on an account that has been suspended due to breaches of copyright -->
-    <string name="dialog_account_suspended_ToS_copyright_message">تم تعليق حساب ميغا MEGA الخاص بك بسبب الادعاءات المتكررة بانتهاكات حقوق النشر. هذا يعني أنه لا يمكنك الوصول إلى حسابك أو البيانات الموجودة فيه.\n تحقق من بريدنا الإلكتروني للحصول على مزيد من المعلومات حول كيفية تقديم إشعار مضاد.</string>
+    <string name="dialog_account_suspended_ToS_copyright_message">Your MEGA account has been suspended due to repeated allegations of copyright infringements. This means you cannot access your account or data within it.\nCheck your email inbox for more information on how to file a counter-notice.</string>
     <!-- Message error shown when trying to log in on an account that has been terminated due to breaches of all reasons of breaching Terms of Service, except copyright. -->
     <string name="dialog_account_suspended_ToS_non_copyright_message">تم إنهاء حسابك بسبب خرق لشروط خدمة ميغا MEGA.\n لن تتمكن من استعادة الوصول إلى بياناتك المخزنة أو لن يُسمح لك بتسجيل حساب ميغا MEGA جديد.</string>
     <!-- Title of the Meetings tab for the chat section -->
@@ -4338,9 +4291,9 @@
     <!-- Dialog confirmation text for removing photos in an album -->
     <string name="photos_album_remove_from_album_confirmation_text">إزالة من الألبوم؟</string>
     <!-- This is the Body of the Dialog that appears when the user has denied the Media Permissions in Settings Camera Uploads -->
-    <string name="settings_camera_uploads_grant_media_permissions_body">لتمكين ترفيعات الكاميرا، امنح ميغا MEGA إمكانية الوصول إلى صورك والوسائط الأخرى على جهازك.</string>
+    <string name="settings_camera_uploads_grant_media_permissions_body">To enable camera uploads, allow MEGA access to your photos and other media on your device.</string>
     <!-- This is the "Positive Button" of the Dialog that appears when the user has denied the Media Permissions in Settings Camera Uploads. Upon click, the Android OS will attempt to request the Media Permission again -->
-    <string name="settings_camera_uploads_grant_media_permissions_positive_button">منح اذن الوصول</string>
+    <string name="settings_camera_uploads_grant_media_permissions_positive_button">السماح بالوصول</string>
     <!-- This is the "Positive Button" of the Dialog that appears when the user has denied the Media Permissions in Settings Camera Uploads. Upon click, the Dialog will simply be dismissed. -->
     <string name="settings_camera_uploads_grant_media_permissions_negative_button">لا تمنح</string>
     <!--  -->
@@ -5602,10 +5555,8 @@
     <string name="account_upgrade_account_description_feature_link">&#8226;&#160;روابط مع تواريخ انتهاء الصلاحية</string>
     <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to share his transfer quota with other users. Keep the bullet point, as this string is part of the bullet point list. -->
     <string name="account_upgrade_account_description_feature_transfer">&#8226;&#160;تشارك تراسل المعطيات</string>
-    <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to back up automatically his files. Keep the bullet point, as this string is part of the bullet point list. -->
-    <string name="account_upgrade_account_description_feature_backup">&#8226;&#160;نسخ احتياطية تلقائية</string>
     <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to recover accidentally changed or deleted files. Keep the bullet point, as this string is part of the bullet point list. -->
-    <string name="account_upgrade_account_description_feature_rewind">&#8226;&#160; ترجيع لمدة تصل إلى 90 يومًا على برو لايت Pro&#160;Lite وما يصل إلى 180 يومًا على برو Pro&#160;I و II و III</string>
+    <string name="account_upgrade_account_description_feature_rewind">&#8226;&#160;ترجيع لمدة تصل إلى 90 يومًا من البيانات المحذوفة على برو لايت Pro&#160;Lite وما يصل إلى 180 يومًا على برو Pro&#160;I و II و III.</string>
     <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to schedule when the rubbish bin will be cleared. Keep the bullet point, as this string is part of the bullet point list. -->
     <string name="account_upgrade_account_description_feature_rubbish_bin">&#8226;&#160;جدولة سلة المحذوفات بين 7 أيام و 10 سنوات</string>
     <!-- Button title, when user taps on Pro Lite plan on Upgrade account screen, where user can choose plan to buy. -->
@@ -5616,8 +5567,6 @@
     <string name="account_upgrade_account_buy_button_title_pro_ii">اشتر برو Pro&#160;II</string>
     <!-- Button title, when user taps on Pro III plan on Upgrade account screen, where user can choose plan to buy. -->
     <string name="account_upgrade_account_buy_button_title_pro_iii">اشتر برو Pro&#160;III</string>
-    <!-- Link to Mega Terms of Service page - https://mega.io/terms -->
-    <string name="account_upgrade_account_terms_of_service_link">شروط الخدمة</string>
     <!-- SubTitle of the link access section where information is displayed to the user about links access where only user who has password can access link-->
     <string name="cloud_drive_subtitle_link_access_password">يمكن فقط للأشخاص الذين لديهم كلمة المرور فتح الرابط</string>
     <!-- Option given to the user in a name collision. If is marked, then the action chosen will be applied for the rest of collisions. The placeholder is for the number of pending name collisions conflicts that remain unsolved. -->
@@ -5944,9 +5893,9 @@
         <item quantity="other">تمت إزالة %1$d مشارك</item>
     </plurals>
     <!-- Message to user when app update is downloaded -->
-    <string name="general_app_update_message_download_success">تم تحميل التحديث الآن</string>
+    <string name="general_app_update_message_download_success">تم تحديث التطبيق</string>
     <!-- Action allowing user to restart the app after downloading the update -->
-    <string name="general_app_update_action_restart">إعادة تشغيل</string>
+    <string name="general_app_update_action_restart">أعد تشغيل التطبيق</string>
     <!-- Title of the screen asking permissions for Audio files -->
     <string name="allow_access_audio_title">السماح بالوصول إلى الملفات الصوتية</string>
     <!-- Photos action menu zoom in -->
@@ -5997,15 +5946,15 @@
     <!-- Message after selected albums are deleted (singular) -->
     <string name="photos_album_deleted_message_singular">تم حذف ”%s“ ألبوم</string>
     <!-- Descriptive text in the dialogue, outside the call screen, to admit a participant to the call. The first placeholder indicates the name of the participant in the waiting room and the second placeholder indicates the name of the meeting -->
-    <string name="meetings_waiting_room_admit_user_to_call_outside_call_screen_dialog_message">%1$s في انتظار الانضمام إلى ”%2$s\“.</string>
+    <string name="meetings_waiting_room_admit_user_to_call_outside_call_screen_dialog_message">%1$s في انتظار الانضمام إلى ”%2$s”.</string>
     <!-- Descriptive text in the dialogue, outside the call screen, to admit several participants to the call. The first placeholder indicates the name of the participant in the waiting room and the second placeholder indicates the name of the meeting. -->
     <plurals name="meetings_waiting_room_admit_users_to_call_outside_call_screen_dialog_message">
-        <item quantity="zero">%1$d مشارك ينتظرون الانضمام إلى ”%2$s\“.</item>
-        <item quantity="one">%1$d مشارك ينتظر الانضمام إلى ”%2$s\“.</item>
-        <item quantity="two">%1$d مشاركان ينتظران الانضمام إلى ”%2$s\“.</item>
-        <item quantity="few">%1$d مشاركون ينتظرون الانضمام إلى ”%2$s\“.</item>
-        <item quantity="many">%1$d مشاركاً ينتظرون الانضمام إلى ”%2$s\“.</item>
-        <item quantity="other">%1$d مشارك ينتظرون الانضمام إلى ”%2$s\“.</item>
+        <item quantity="zero">%1$d مشارك ينتظرون الانضمام إلى ”%2$s”.</item>
+        <item quantity="one">%1$d مشارك ينتظر الانضمام إلى ”%2$s”.</item>
+        <item quantity="two">%1$d مشاركان ينتظران الانضمام إلى ”%2$s”.</item>
+        <item quantity="few">%1$d مشاركون ينتظرون الانضمام إلى ”%2$s”.</item>
+        <item quantity="many">%1$d مشاركاً ينتظرون الانضمام إلى ”%2$s”.</item>
+        <item quantity="other">%1$d مشارك ينتظرون الانضمام إلى ”%2$s”.</item>
     </plurals>
     <!-- Title of video option of snapshot-->
     <string name="media_player_video_option_snapshot_title">لقطة</string>
@@ -6081,24 +6030,16 @@
     <string name="chat_chatroom_first_message_header_authenticity_info_text">يضمن النظام عرض البيانات الواردة من المرسل، وعدم التلاعب بمحتواها أثناء النقل.</string>
     <!-- Title about Pro plans on Onboarding dialog (for user to choose account - Free or Pro).  -->
     <string name="dialog_onboarding_get_pro_title">احصل على المزيد مع باقة برو Pro</string>
-    <!-- Short description about Pro plans on Onboarding dialog (for user to choose account - Free or Pro). %s placeholder will be replaced with correct localised price (e.g. $4.99). -->
-    <string name="dialog_onboarding_get_pro_description">قم بالترقية إلى باقة برو Pro لمزيد من مساحة التخزين والكثير من الميزات الإضافية. تبدأ باقاتنا من %s في الشهر الواحد.</string>
+    <!-- Short description about Pro plans on Onboarding dialog (for user to choose account - Free or Pro). %1$s placeholder will be replaced with correct localised price (e.g. $4.99). -->
+    <string name="dialog_onboarding_get_pro_description">Upgrade to a Pro plan and get more storage and access to Pro features. Plans start from as low as %1$s a month.</string>
     <!-- Title about features available on Pro plan on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_some_features_title">بعض الميزات التي تتطلع إليها هي:</string>
+    <string name="dialog_onboarding_some_features_title">MEGA&#160;Pro plans include:</string>
     <!-- Title for Storage feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_feature_title_storage">مساحة تخزين سخية</string>
-    <!-- Description about Storage feature on Onboarding dialog (for user to choose account - Free or Pro). %s placeholder will be replaced with correct localised storage size (e.g. 400GB or 2TB)  -->
-    <string name="dialog_onboarding_feature_description_storage">قم بتخزين بيانات غير محدودة، بدءًا من %s</string>
-    <!-- Title for Transfer feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_feature_title_transfer">مشاركة تراسل المعطيات</string>
-    <!-- Description about Transfer feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_feature_description_transfer">يمكن للأشخاص الذين تشارك البيانات معهم استخدام حجم تراسل المعطيات المتاح لك لتنزيل وبث العناصر التي شاركتها.</string>
-    <!-- Title for Security feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_feature_title_security">أمان إضافي عند المشاركة</string>
-    <!-- Description about Security feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_feature_description_security">قم بتعيين كلمات المرور وتواريخ انتهاء الصلاحية لروابط الملفات والمجلدات.</string>
+    <string name="dialog_onboarding_feature_title_storage">Ultimate storage flexibility</string>
+    <!-- Description about Storage feature on Onboarding dialog (for user to choose account - Free or Pro). %1$s placeholder will be replaced with correct localised storage size (e.g. 400GB or 2TB)  -->
+    <string name="dialog_onboarding_feature_description_storage">Starting from %1$s, find the perfect fit for your storage needs.</string>
     <!-- Title for Button to view Pro plans on Onboarding dialog (for user to choose account - Free or Pro). After clicking on the button user will redirecting to Upgrade Account screen.  -->
-    <string name="dialog_onboarding_button_view_pro_plan">عرض باقات برو Pro</string>
+    <string name="dialog_onboarding_button_view_pro_plan">Upgrade to Pro today</string>
     <!-- Label indicating that a participant is presenting in the main view of the call -->
     <string name="meetings_meeting_screen_main_view_participant_is_presenting_label">%1$s يقوم بالتقديم</string>
     <!-- Warning indicating that a participant is sharing the screen-->
@@ -6208,9 +6149,10 @@
     <string name="account_upgrade_account_description_subscription_title">تفاصيل الاشتراك</string>
     <!-- Details body for the subscription details section, which shows to the user to provide details about subscription. -->
     <string name="account_upgrade_subscription_details">يتم تجديد الاشتراكات تلقائيًا لفترات اشتراك متتالية من نفس المدة وبنفس سعر الفترة الأولية المختارة. يمكنك إيقاف التجديد التلقائي لاشتراك ميغا برو MEGA&#160;Pro الخاص بك في موعد لا يتجاوز 24 ساعة قبل استحقاق دفعة الاشتراك التالية عبر الاشتراكات في [A]غوغل بلاي Google Play[/A].</string>
-    <!-- Add new strings to this file (the string code must be unique). Add edits for strings to this file (the string code must match the existing string). -->
-    <string name="chat_toolbar_bottom_sheet_allow_gallery_access_title">السماح بالوصول إلى معرض الصور الخاص بك</string>
-    <string name="chat_toolbar_bottom_sheet_grant_gallery_access_button">منح اذن الوصول</string>
+    <!-- Text content for the chat bottom sheet when gallery permission is not granted -->
+    <string name="chat_toolbar_bottom_sheet_allow_gallery_access_title">Allow access to your Gallery</string>
+    <!-- Button text to grant permission in the chat bottom sheet -->
+    <string name="chat_toolbar_bottom_sheet_grant_gallery_access_button">السماح بالوصول</string>
     <!-- The title of the Dialog shown to Update the application from playstore -->
     <string name="meetings_chat_screen_app_update_dialog_title">التحديث مطلوب</string>
     <!-- The Body of the Dialog shown to Update the application from playstore -->
@@ -6234,7 +6176,7 @@
     <!-- Camera uploads low battery info in Photos screen. -->
     <string name="photos_camera_uploads_low_battery">تم إيقاف الترفيع مؤقتًا. شحن البطارية أقل من %1$d%% و ليست تُشحن الآن.</string>
     <!-- Camera uploads general issue info in Photos screen. -->
-    <string name="photos_camera_uploads_general_issue">Camera uploads stopped working. Try re-enabling camera uploads to solve it. If the problem persists, contact support.</string>
+    <string name="photos_camera_uploads_general_issue">توقفت ترفيعات الكاميرا عن العمل. حاول إعادة تمكين ترفيعات الكاميرا لحلها. في حالة استمرار المشكلة، تواصل مع الدعم.</string>
     <!-- Camera uploads pending info in Photos screen. -->
     <plurals name="photos_camera_uploads_pending">
         <item quantity="zero">ترفيعات الكاميرا قيد الإنجاز، %1$d ملف معلق</item>
@@ -6254,17 +6196,17 @@
         <item quantity="other">اكتملت عمليات ترفيعات الكاميرا، وتم ترفيع %1$d ملف</item>
     </plurals>
     <!-- Free plan limitation text for scheduled meetings calls longer than 60 minutes. -->
-    <string name="meetings_schedule_meeting_free_plan_60_minute_limit_warning">[A]Your free plan has a 60&#160;minute limit on meetings. Pro users have unlimited calls and up to 1000&#160;participants.[/A] [B]Upgrade now.[/B]</string>
+    <string name="meetings_schedule_meeting_free_plan_60_minute_limit_warning">[A]باقتك المجانية لها حد 60 دقيقة للاجتماعات. يتمتع مستخدمو برو Pro بمكالمات غير محدودة وما يصل إلى 1000 مشارك.[/A] [B]قم بالترقية الآن.[/B]</string>
     <!-- Bottom sheet button to hide a node/file -->
     <string name="general_hide_node">إخفاء</string>
     <!-- Bottom sheet button to unhide a node/file -->
-    <string name="general_unhide_node">Unhide</string>
+    <string name="general_unhide_node">إلغاء الإخفاء</string>
     <!-- Promo label for promo notification section -->
     <string name="notifications_screen_notification_label_promo">ترويج</string>
     <!-- Promo notification section title for promo notification section -->
     <string name="notifications_screen_notification_section_title">عرض لفترة محدودة</string>
     <!-- The title of the Dialog shown to Change the SFU Server Id  -->
-    <string name="meetings_change_sfu_dialog_title">Change SFU Server</string>
+    <string name="meetings_change_sfu_dialog_title">قم بتغيير مخدم SFU</string>
     <!-- The body of the Dialog shown to Change the SFU Server Id  -->
     <string name="meetings_change_sfu_dialog_subtitle">الافتراضي هو -1</string>
     <!-- The placeholder text to prompt user to enter the SFU Server Id -->
@@ -6272,21 +6214,135 @@
     <!-- Button text to change SFU Server Id  -->
     <string name="meetings_change_sfu_dialog_action_button">تغيير</string>
     <!-- Free plan limitation text for scheduled meetings calls longer than 60 minutes in edit occurrence dialog. -->
-    <string name="meetings_edit_occurrence_free_plan_60_minute_limit_warning">Free plans have a limit of 60&#160;minutes per meeting. [A]Upgrade now.[/A]</string>
+    <string name="meetings_edit_occurrence_free_plan_60_minute_limit_warning">[A]باقتك المجانية لها حد 60 دقيقة للاجتماعات. يتمتع مستخدمو برو Pro بمكالمات غير محدودة وما يصل إلى 1000 مشارك.[/A] [B]قم بالترقية الآن.[/B]</string>
     <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user selects monthly subscription. The placeholders %1$s and %2$s will be replaced with localised price and currency sign (based on Google localisation), for example $4.99. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string. -->
-    <string name="account_upgrade_account_subscription_details_body_monthly_with_price">You will be charged %1$s immediately and your subscription will automatically renew after 1&#160;month for %2$s per month. Your Google&#160;Play account will be charged for renewal within 24&#160;hours of the end of each billing period. To cancel your subscription, you must disable automatic renewal of your MEGA&#160;Pro subscription at least 24&#160;hours before the end of your billing period via Subscriptions in [A]Google&#160;Play[/A].\nBy upgrading your account, you agree to MEGA’s [B]Terms of Service[/B] and [C]Privacy Policy[/C].</string>
+    <string name="account_upgrade_account_subscription_details_body_monthly_with_price">سيتم محاسبتك بمبلغ %1$s على الفور وسيتم تجديد اشتراكك تلقائيًا بعد 1&#160;شهر بمبلغ %2$s في الشهر. سيتم فرض رسوم على حساب غوغل بلاي Google&#160;Play الخاص بك للتجديد في غضون 24&#160;ساعة من نهاية كل فترة دفع. لإلغاء اشتراكك يجب عليك إيقاف التجديد التلقائي لاشتراك MEGA&#160;Pro ميغا برو الخاص بك قبل 24&#160;ساعة على الأقل من نهاية فترة الفاتورة عبر الاشتراكات في [A]غوغل بلاي Google&#160;Play[/A].\nمن خلال ترقية حسابك فإنك توافق على [B]شروط خدمة[/B] و [C]سياسة الخصوصية[/C] الخاصين بميغا MEGA.</string>
     <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user selects yearly subscription. The placeholders %1$s and %2$s will be replaced with localised price and currency sign (based on Google localisation), for example $4.99. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string. -->
-    <string name="account_upgrade_account_subscription_details_body_yearly_with_price">You will be charged %1$s immediately and your subscription will automatically renew after 12&#160;months for %2$s per year. Your Google&#160;Play account will be charged for renewal within 24&#160;hours of the end of each billing period. To cancel your subscription, you must disable automatic renewal of your MEGA&#160;Pro subscription at least 24&#160;hours before the end of your billing period via Subscriptions in [A]Google&#160;Play[/A].\nBy upgrading your account, you agree to MEGA’s [B]Terms of Service[/B] and [C]Privacy Policy[/C].</string>
+    <string name="account_upgrade_account_subscription_details_body_yearly_with_price">سيتم محاسبتك %1$s على الفور وسيتم تجديد اشتراكك تلقائيًا بعد 12&#160;شهرًا بمبلغ %2$s في السنة. سيتم فرض رسوم على حساب غوغل بلاي Google&#160;Play الخاص بك للتجديد في غضون 24&#160;ساعة من نهاية كل فترة دفع. لإلغاء اشتراكك يجب عليك إلغاء التجديد التلقائي لاشتراك ميغا برو MEGA&#160;Pro الخاص بك قبل 24&#160;ساعة على الأقل من نهاية فترة الفاتورة عبر الاشتراكات في [A]غوغل بلاي Google&#160;Play[/A].\nمن خلال ترقية حسابك فإنك توافق على[B]شروط الخدمة[/B] و [C]سياسة الخصوصية[/C] الخاصين بميغا MEGA.</string>
     <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user is in monthly tab and no subscription plan was selected. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string. -->
-    <string name="account_upgrade_account_subscription_details_body_monthly_without_price">You will be charged immediately and your subscription will automatically renew after 1&#160;month. Your Google&#160;Play account will be charged for renewal within 24&#160;hours of the end of each billing period. To cancel your subscription, you must disable automatic renewal of your MEGA&#160;Pro subscription at least 24&#160;hours before the end of your billing period via Subscriptions in [A]Google&#160;Play[/A].\nBy upgrading your account, you agree to MEGA’s [B]Terms of Service[/B] and [C]Privacy Policy[/C].</string>
+    <string name="account_upgrade_account_subscription_details_body_monthly_without_price">سيتم محاسبتك بمبلغ %1$s على الفور وسيتم تجديد اشتراكك تلقائيًا بعد 1&#160;شهر. سيتم فرض رسوم على حساب غوغل بلاي Google&#160;Play الخاص بك للتجديد في غضون 24&#160;ساعة من نهاية كل فترة دفع. لإلغاء اشتراكك يجب عليك إيقاف التجديد التلقائي لاشتراك MEGA&#160;Pro ميغا برو الخاص بك قبل 24&#160;ساعة على الأقل من نهاية فترة الفاتورة عبر الاشتراكات في [A]غوغل بلاي Google&#160;Play[/A].\nمن خلال ترقية حسابك فإنك توافق على [B]شروط خدمة[/B] و [C]سياسة الخصوصية[/C] الخاصين بميغا MEGA.</string>
     <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user is in yearly tab and no subscription plan was selected. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string -->
-    <string name="account_upgrade_account_subscription_details_body_yearly_without_price">You will be charged immediately and your subscription will automatically renew after 12&#160;months. Your Google&#160;Play account will be charged for renewal within 24&#160;hours of the end of each billing period. To cancel your subscription, you must disable automatic renewal of your MEGA&#160;Pro subscription at least 24&#160;hours before the end of your billing period via Subscriptions in [A]Google&#160;Play[/A].\nBy upgrading your account, you agree to MEGA’s [B]Terms of Service[/B] and [C]Privacy Policy[/C].</string>
+    <string name="account_upgrade_account_subscription_details_body_yearly_without_price">سيتم محاسبتك على الفور وسيتم تجديد اشتراكك تلقائيًا بعد 12&#160;شهر. سيتم فرض رسوم على حساب غوغل بلاي Google&#160;Play الخاص بك للتجديد في غضون 24&#160;ساعة من نهاية كل فترة دفع. لإلغاء اشتراكك يجب عليك إيقاف التجديد التلقائي لاشتراك MEGA&#160;Pro ميغا برو الخاص بك قبل 24&#160;ساعة على الأقل من نهاية فترة الفاتورة عبر الاشتراكات في [A]غوغل بلاي Google&#160;Play[/A].\nمن خلال ترقية حسابك فإنك توافق على [B]شروط خدمة[/B] و [C]سياسة الخصوصية[/C] الخاصين بميغا MEGA.</string>
     <!-- The title of the Dialog shown to a suspended Business Account User, regardless if the User is a Sub-User or Administrator -->
-    <string name="account_business_account_deactivated_dialog_title">Business account deactivated</string>
+    <string name="account_business_account_deactivated_dialog_title">تم إلغاء تفعيل حساب الأعمال Business</string>
     <!-- The body of the Dialog shown to a suspended Business Account Sub-User -->
-    <string name="account_business_account_deactivated_dialog_sub_user_body">Your Business account has been deactivated due to payment failure. You can only browse your data.\nAsk your Business account administrator to resolve the issue.</string>
+    <string name="account_business_account_deactivated_dialog_sub_user_body">تم إلغاء تفعيل حساب الأعمال Business الخاص بك بسبب فشل الدفع. يمكنك فقط تصفح البيانات الخاصة بك.\nاطلب من مسؤول حساب الأعمال Business الخاص بك حل المشكلة.</string>
     <!-- The body of the Dialog shown to a suspended Business Account Administrator -->
-    <string name="account_business_account_deactivated_dialog_admin_body">Your Business account has been deactivated due to payment failure. You can only browse your data.\nTo make a payment and reactivate your subscription, log in to MEGA through a browser.</string>
+    <string name="account_business_account_deactivated_dialog_admin_body">تم إلغاء تفعيل حساب الأعمال Business الخاص بك بسبب فشل الدفع. يمكنك فقط تصفح البيانات الخاصة بك.\nلإجراء الدفع وإعادة تفعيل اشتراكك قم بتسجيل الدخول إلى ميغا MEGA من خلال متصفح.</string>
     <!-- The button of the Dialog shown to a suspended Business Account User, regardless if the User is a Sub-User or Administrator -->
     <string name="account_business_account_deactivated_dialog_button">حسنًا، فهمت ذلك</string>
+    <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to host call or meetings without any restrictions. -->
+    <string name="account_upgrade_account_description_feature_meetings">&#8226;&#160;استضافة المكالمات والاجتماعات مع عدد غير محدود من المشاركين وبدون قيود زمنية</string>
+    <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to use MEGA VPN product. -->
+    <string name="account_upgrade_account_description_feature_vpn">&#8226;&#160; حافظ على خصوصيتك عبر الإنترنت من خلال في بي إن VPN عالي السرعة</string>
+    <!-- The body of the Dialog shown to upgrade meeting from the free version -->
+    <string name="meetings_in_call_warning_dialog_body">هل تحتاج إلى مزيد من الوقت؟ تحتوي باقات برو Pro على مكالمات غير محدودة المدة.</string>
+    <!-- The action button text of the Dialog shown to upgrade meeting from the free version -->
+    <string name="meetings_in_call_warning_dialog_action_button">ترقية</string>
+    <!-- The negative button text of the Dialog shown to upgrade meeting from the free version -->
+    <string name="meetings_in_call_warning_dialog_negative_button">ليس الآن</string>
+    <!-- The snackbar message of the time left for the current free call -->
+    <string name="meetings_in_call_warning_timer_message">ستنتهي هذه المكالمة المجانية في %s</string>
+    <!-- The title of the Dialog shown to upgrade meeting from the free version -->
+    <plurals name="meetings_in_call_warning_dialog_title">
+        <item quantity="zero">ستنتهي مكالمتك المجانية في %d دقيقة</item>
+        <item quantity="one">ستنتهي مكالمتك المجانية في %d دقيقة</item>
+        <item quantity="two">ستنتهي مكالمتك المجانية في %d دقيقتين</item>
+        <item quantity="few">ستنتهي مكالمتك المجانية في %d دقائق</item>
+        <item quantity="many">ستنتهي مكالمتك المجانية في %d دقيقة</item>
+        <item quantity="other">ستنتهي مكالمتك المجانية في %d دقيقة</item>
+    </plurals>
+    <!-- Expiration date and time for promotional notifications. Shown on Notifications screen under each promotional notification. The placeholder %1$s will be replaced with localised date and the placeholder %2$s will be replaced with localised time.  -->
+    <string name="notifications_screen_notification_promo_expiration_time">تنتهي الصلاحية في %1$s الساعة %2$s</string>
+    <!-- Warning Message and upgrade link for organiser for Free Call -->
+    <string name="meetings_free_call_organiser_number_of_participants_warning">Only 100 participants can join the call. Any additional participants will only be able to send and receive messages. The organiser can upgrade to Pro to remove these restrictions.</string>
+    <!-- Warning Message for non organiser for Free Call -->
+    <string name="meetings_free_call_non_organiser_number_of_participants_warning">يمكن لـ 100&#160;مشارك فقط الانضمام إلى المكالمة. لن يتمكن أي مشارك إضافي إلا من إرسال المحادثات وقراءتها. اطلب من المنظم إزالة هذا التقييد.</string>
+    <!-- The Video Quality Option shown in a Dialog in Settings Camera Uploads, indicating that the Videos will be compressed to Low Quality before being uploaded by Camera Uploads -->
+    <string name="settings_camera_uploads_video_quality_dialog_option_low">منخفضة</string>
+    <!-- The Video Quality Option shown in a Dialog in Settings Camera Uploads, indicating that the Videos will be compressed to Medium Quality before being uploaded by Camera Uploads -->
+    <string name="settings_camera_uploads_video_quality_dialog_option_medium">متوسط</string>
+    <!-- The Video Quality Option shown in a Dialog in Settings Camera Uploads, indicating that the Videos will be compressed to High Quality before being uploaded by Camera Uploads -->
+    <string name="settings_camera_uploads_video_quality_dialog_option_high">عالية</string>
+    <!-- The Video Quality Option shown in a Dialog in Settings Camera Uploads, indicating that the Videos are automatically uploaded by Camera Uploads without any Video Compression -->
+    <string name="settings_camera_uploads_video_quality_dialog_option_original">الأصلي</string>
+    <!-- Warning shown when the recording of audio permission is required for sending a voice clip and it has been denied by the user -->
+    <string name="chat_microphone_permissions_denied_for_voice_clip">You denied MEGA access to your microphone. If you’d like to record a voice clip, allow MEGA permission to do so.</string>
+    <!-- Free plan limitation dialog title for scheduled meeting calls with more than 100 participants -->
+    <string name="meetings_schedule_meeting_free_plan_100_participants_limit_dialog_title">لا يمكن الانضمام</string>
+    <!-- Free plan limitation dialogue description for scheduled meeting calls with more than 100 participants -->
+    <string name="meetings_schedule_meeting_free_plan_100_participants_limit_dialog_description">يمكن لهذه المكالمة دعم 100 مشارك فقط. اطلب من المنظم إزالة هذا التقييد.</string>
+    <!-- Free plan limitation dialogue button for scheduled meeting calls with more than 100 participants -->
+    <string name="meetings_schedule_meeting_free_plan_100_participants_limit_dialog_button">حسنًا، فهمت ذلك</string>
+    <!-- The title of the hidden nodes feature -->
+    <string name="hidden_nodes">الملفات والمجلدات المخفية</string>
+    <!-- Hidden nodes benefit: hide files and folders -->
+    <string name="hidden_nodes_benefit_title_hide_files_folders">إخفاء الملفات والمجلدات المهمة</string>
+    <!-- Hidden nodes benefit description: hide files and folders -->
+    <string name="hidden_nodes_benefit_description_hide_files_folders">يمكنك إخفاء الملفات والمجلدات الحساسة للخصوصية. يمكنك فقط الكشف عنها إما بشكل فردي أو عن طريق عرض العناصر المخفية مؤقتًا من الإعدادات.</string>
+    <!-- Hidden nodes benefit: exclude from timeline -->
+    <string name="hidden_nodes_benefit_title_exclude_timeline">الاستبعاد من المخطط الزمني</string>
+    <!-- Hidden nodes benefit description: exclude from timeline -->
+    <string name="hidden_nodes_benefit_description_exclude_timeline">لا يمكن الوصول إلى العناصر المخفية إلا من خلال السواقة السحابية ولن تظهر في الصور أو الألبومات أو الأحداث الأخيرة.</string>
+    <!-- Hidden nodes benefit: out of sight -->
+    <string name="hidden_nodes_benefit_title_out_of_sight">بعيدًا عن الأنظار</string>
+    <!-- Hidden nodes benefit description: out of sight -->
+    <string name="hidden_nodes_benefit_description_out_of_sight">عليك أن تقرر متى تكون الملفات المخفية مرئية. هناك إعداد جديد لإظهار العناصر المخفية مؤقتًا.</string>
+    <!-- The snackbar message of hidden nodes operation -->
+    <plurals name="hidden_nodes_result_message">
+        <item quantity="one">%1$d item hidden</item>
+        <item quantity="other">%1$d items hidden</item>
+    </plurals>
+    <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be prioritised when customer support is needed. Keep the bullet point, as this string is part of the bullet point list. -->
+    <string name="account_upgrade_account_description_priority_support">&#8226;&#160;Priority support</string>
+    <!-- The title of the Upgrade bottom sheet dialog  -->
+    <string name="meetings_upgrade_pro_plan_title">قم بالترقية إلى برو Pro للحصول على مكالمات غير محدودة</string>
+    <!-- The body of the Upgrade bottom sheet dialog  -->
+    <string name="meetings_upgrade_pro_plan_body">وصلت مكالمتك إلى حد 60 دقيقة وانتهت. يتمتع مستخدمو برو Pro بمدة مكالمات غير محدودة ويمكنهم دعوة ما يصل إلى 1000 مشارك.</string>
+    <!-- The button text of the Upgrade bottom sheet dialog  -->
+    <string name="meetings_upgrade_pro_plan_button">رق حسابك الآن</string>
+    <!-- Search drop down chips filter type file type -->
+    <string name="search_dropdown_chip_filter_type_file_type">النوع</string>
+    <!-- Search drop down chips filter type file type images -->
+    <string name="search_dropdown_chip_filter_type_file_type_images">صور</string>
+    <!-- Search drop down chips filter type file type videos -->
+    <string name="search_dropdown_chip_filter_type_file_type_video">فيديو</string>
+    <!-- Search drop down chips filter type file type audio -->
+    <string name="search_dropdown_chip_filter_type_file_type_audio">صوتي</string>
+    <!-- Search drop down chips filter type file type documents -->
+    <string name="search_dropdown_chip_filter_type_file_type_documents">مستندات</string>
+    <!-- Search drop down chips filter type date added -->
+    <string name="search_dropdown_chip_filter_type_date_added">تاريخ الإضافة</string>
+    <!-- Search drop down chips filter type last modified -->
+    <string name="search_dropdown_chip_filter_type_last_modified">آخر تعديل</string>
+    <!-- Search drop down chips filter type date modified today -->
+    <string name="search_dropdown_chip_filter_type_date_today">اليوم</string>
+    <!-- Search drop down chips filter type date modified last 7 days -->
+    <string name="search_dropdown_chip_filter_type_date_last_seven_days">اخر 7 أيام</string>
+    <!-- Search drop down chips filter type date modified last 30 days -->
+    <string name="search_dropdown_chip_filter_type_date_last_thirty_days">أخر 30 أيام</string>
+    <!-- Search drop down chips filter type date modified this year -->
+    <string name="search_dropdown_chip_filter_type_date_this_year">هذا العام</string>
+    <!-- Search drop down chips filter type date modified last year -->
+    <string name="search_dropdown_chip_filter_type_date_last_year">السنة الماضية</string>
+    <!-- Search drop down chips filter type date modified older -->
+    <string name="search_dropdown_chip_filter_type_date_older">أقدم</string>
+    <!-- String below login button next to button for reporting a login issue -->
+    <string name="general_login_label_trouble_logging_in">Trouble logging in?</string>
+    <!-- Button text for reporting an issue on the login screen -->
+    <string name="general_login_button_report_your_issue">Report your issue</string>
+    <!-- Hidden nodes show items -->
+    <string name="hidden_nodes_show_items">عرض العناصر المخفية</string>
+    <!-- Hidden nodes show items description -->
+    <string name="hidden_nodes_show_items_description">All hidden items will be visible, but blurred to indicate their “hidden” status</string>
+    <!-- Button text for photo option in camera screen -->
+    <string name="camera_photo_button">Photo</string>
+    <!--  -->
+    <string name="camera_flash_mode_on">Flash mode on</string>
+    <!--  -->
+    <string name="camera_flash_mode_off">Flash mode off</string>
+    <!--  -->
+    <string name="camera_flash_mode_auto">Flash mode auto</string>
+    <!--  -->
+    <string name="camera_send_to">Send to %1$s</string>
 </resources>

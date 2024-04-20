@@ -24,17 +24,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionTab
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 @Composable
 internal fun VideoSectionBodyView(
     pagerState: PagerState,
+    swipeEnabled: Boolean,
     tabs: List<VideoSectionTab> = listOf(),
     allVideoView: @Composable () -> Unit = {},
     playlistsView: @Composable () -> Unit = {},
@@ -59,7 +63,7 @@ internal fun VideoSectionBodyView(
     val isScrollingDownPlaylists by playlistsLazyListState.isScrollingDown()
     val isScrollingToEndPlaylists by playlistsLazyListState.isScrolledToEnd()
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
         VideoSectionTabs(tabs = tabs, selectedTab = selectedTab, onTabSelected = onTabSelected) {
             when (selectedTab) {
                 VideoSectionTab.All ->
@@ -73,7 +77,8 @@ internal fun VideoSectionBodyView(
             tabs = tabs,
             pagerState = pagerState,
             allVideoView = allVideoView,
-            playlistsView = playlistsView
+            playlistsView = playlistsView,
+            swipeEnabled = swipeEnabled
         )
     }
 }
@@ -155,6 +160,7 @@ internal fun VideoSectionTabs(
 internal fun PagerView(
     tabs: List<VideoSectionTab>,
     pagerState: PagerState,
+    swipeEnabled: Boolean,
     allVideoView: @Composable () -> Unit,
     playlistsView: @Composable () -> Unit,
     modifier: Modifier = Modifier,
@@ -162,6 +168,7 @@ internal fun PagerView(
     HorizontalPager(
         state = pagerState,
         modifier = modifier,
+        userScrollEnabled = swipeEnabled
     ) { pageIndex ->
         when (tabs[pageIndex]) {
             VideoSectionTab.All -> allVideoView()

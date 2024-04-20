@@ -12,18 +12,25 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.Scaffold
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.SnackbarDuration
-import androidx.compose.material.SnackbarHost
 import androidx.compose.material.SnackbarHostState
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.constraintlayout.compose.ConstraintLayout
+import androidx.constraintlayout.compose.Dimension
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -38,6 +45,7 @@ import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.WebViewActivity
 import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
+import mega.privacy.android.app.components.session.SessionContainer
 import mega.privacy.android.app.components.transferWidget.TransfersWidgetView
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.globalmanagement.TransfersManagement
@@ -68,6 +76,7 @@ import mega.privacy.android.app.presentation.search.navigation.contactArraySepar
 import mega.privacy.android.app.presentation.search.navigation.searchForeignNodeDialog
 import mega.privacy.android.app.presentation.search.navigation.searchOverQuotaDialog
 import mega.privacy.android.app.presentation.search.navigation.shareFolderAccessDialog
+import mega.privacy.android.app.presentation.search.view.MiniAudioPlayerView
 import mega.privacy.android.app.presentation.snackbar.MegaSnackbarDuration
 import mega.privacy.android.app.presentation.snackbar.MegaSnackbarShower
 import mega.privacy.android.app.presentation.transfers.TransfersManagementViewModel
@@ -76,7 +85,7 @@ import mega.privacy.android.app.textEditor.TextEditorActivity
 import mega.privacy.android.app.textEditor.TextEditorViewModel
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.zippreview.ui.ZipBrowserActivity
-import mega.privacy.android.core.ui.controls.snackbars.MegaSnackbar
+import mega.privacy.android.core.ui.controls.layouts.MegaScaffold
 import mega.privacy.android.domain.entity.AudioFileTypeInfo
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.VideoFileTypeInfo
@@ -91,6 +100,7 @@ import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.search.SearchCategory
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.feature.sync.data.mapper.ListToStringWithDelimitersMapper
+import mega.privacy.android.feature.sync.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.mobile.analytics.event.SearchAudioFilterPressedEvent
 import mega.privacy.mobile.analytics.event.SearchDocsFilterPressedEvent
@@ -104,6 +114,7 @@ import javax.inject.Inject
 /**
  * Search activity to search Nodes and display
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @AndroidEntryPoint
 class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
     private val viewModel: SearchActivityViewModel by viewModels()
@@ -149,6 +160,12 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
      */
     @Inject
     lateinit var moveRequestMessageMapper: MoveRequestMessageMapper
+
+    /**
+     * File type icon mapper
+     */
+    @Inject
+    lateinit var fileTypeIconMapper: FileTypeIconMapper
 
     private val snackbarHostState = SnackbarHostState()
 
@@ -207,6 +224,7 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
             // Remember a SystemUiController
             val systemUiController = rememberSystemUiController()
             val useDarkIcons = themeMode.isDarkMode().not()
+
             systemUiController.setSystemBarsColor(
                 color = Color.Transparent,
                 darkIcons = useDarkIcons
@@ -216,65 +234,93 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
             val bottomSheetNavigator = rememberBottomSheetNavigator()
             val navHostController = rememberNavController(bottomSheetNavigator)
             val coroutineScope = rememberCoroutineScope()
-
-            MegaAppTheme(isDark = themeMode.isDarkMode()) {
-                Scaffold(
-                    modifier = Modifier,
-                    scaffoldState = scaffoldState,
-                    snackbarHost = {
-                        SnackbarHost(
-                            modifier = Modifier.navigationBarsPadding(),
-                            hostState = snackbarHostState
-                        ) { data ->
-                            MegaSnackbar(snackbarData = data)
-                        }
-                    },
-                    floatingActionButton = {
-                        AnimatedVisibility(
-                            visible = transferState.widgetVisible,
-                            enter = scaleIn(animationSpecs, initialScale = animationScale) +
-                                    fadeIn(animationSpecs),
-                            exit = scaleOut(animationSpecs, targetScale = animationScale) +
-                                    fadeOut(animationSpecs),
-                            modifier = Modifier.navigationBarsPadding(),
-                        ) {
-                            TransfersWidgetView(
-                                transfersData = transferState.transfersInfo,
-                                onClick = ::transfersWidgetClicked,
-                            )
-                        }
-                    },
-                ) { padding ->
-                    SearchNavHostController(
+            SessionContainer {
+                MegaAppTheme(isDark = themeMode.isDarkMode()) {
+                    MegaScaffold(
                         modifier = Modifier
-                            .padding(padding)
-                            .statusBarsPadding(),
-                        viewModel = viewModel,
-                        nodeActionsViewModel = nodeActionsViewModel,
-                        navigateToLink = ::navigateToLink,
-                        showSortOrderBottomSheet = ::showSortOrderBottomSheet,
-                        trackAnalytics = ::trackAnalytics,
-                        nodeActionHandler = bottomSheetActionHandler,
-                        navHostController = navHostController,
-                        bottomSheetNavigator = bottomSheetNavigator,
-                        listToStringWithDelimitersMapper = listToStringWithDelimitersMapper,
-                        handleClick = {
-                            coroutineScope.launch {
-                                when (it) {
-                                    is TypedFileNode -> openFileClicked(it)
-                                    is TypedFolderNode -> openFolderClicked(it.id.longValue)
-                                    else -> Timber.e("Unsupported click")
-                                }
+                            .fillMaxSize()
+                            .systemBarsPadding()
+                            .imePadding()
+                            .semantics { testTagsAsResourceId = true },
+                        scaffoldState = scaffoldState,
+                        floatingActionButton = {
+                            AnimatedVisibility(
+                                visible = transferState.widgetVisible,
+                                enter = scaleIn(animationSpecs, initialScale = animationScale) +
+                                        fadeIn(animationSpecs),
+                                exit = scaleOut(animationSpecs, targetScale = animationScale) +
+                                        fadeOut(animationSpecs),
+                                modifier = Modifier.navigationBarsPadding(),
+                            ) {
+                                TransfersWidgetView(
+                                    transfersData = transferState.transfersInfo,
+                                    onClick = ::transfersWidgetClicked,
+                                    modifier = Modifier.testTag(
+                                        SEARCH_SCREEN_TRANSFERS_WIDGET_TEST_TAG
+                                    )
+                                )
                             }
                         },
-                        onBackPressed = {
-                            if (viewModel.state.value.selectedNodes.isNotEmpty()) {
-                                viewModel.clearSelection()
-                            } else {
-                                onBackPressedDispatcher.onBackPressed()
-                            }
+                    ) { padding ->
+                        ConstraintLayout(
+                            modifier = Modifier
+                                .padding(padding)
+                                .fillMaxSize()
+                        ) {
+                            val (audioPlayer, searchContainer) = createRefs()
+                            MiniAudioPlayerView(
+                                modifier = Modifier
+                                    .constrainAs(audioPlayer) {
+                                        bottom.linkTo(parent.bottom)
+                                    }
+                                    .fillMaxWidth()
+                                    .testTag(SEARCH_SCREEN_MINI_AUDIO_PLAYER_TEST_TAG),
+                                lifecycle = lifecycle,
+                            )
+
+                            SearchNavHostController(
+                                modifier = Modifier
+                                    .constrainAs(searchContainer) {
+                                        top.linkTo(parent.top)
+                                        bottom.linkTo(audioPlayer.top)
+                                        height = Dimension.fillToConstraints
+                                    }
+                                    .fillMaxWidth(),
+                                viewModel = viewModel,
+                                nodeActionsViewModel = nodeActionsViewModel,
+                                navigateToLink = ::navigateToLink,
+                                showSortOrderBottomSheet = ::showSortOrderBottomSheet,
+                                trackAnalytics = ::trackAnalytics,
+                                nodeActionHandler = bottomSheetActionHandler,
+                                navHostController = navHostController,
+                                bottomSheetNavigator = bottomSheetNavigator,
+                                listToStringWithDelimitersMapper = listToStringWithDelimitersMapper,
+                                handleClick = {
+                                    coroutineScope.launch {
+                                        when (it) {
+                                            is TypedFileNode -> openFileClicked(it)
+                                            is TypedFolderNode -> viewModel.openFolder(
+                                                folderHandle = it.id.longValue,
+                                                name = it.name
+                                            )
+
+                                            else -> Timber.e("Unsupported click")
+                                        }
+                                    }
+                                },
+                                fileTypeIconMapper = fileTypeIconMapper,
+                                onBackPressed = {
+                                    if (viewModel.state.value.selectedNodes.isNotEmpty()) {
+                                        viewModel.clearSelection()
+                                    } else if (viewModel.state.value.navigationLevel.isNotEmpty()) {
+                                        viewModel.navigateBack()
+                                    } else {
+                                        onBackPressedDispatcher.onBackPressed()
+                                    }
+                                }
+                            )
                         }
-                    )
+                    }
                 }
 
                 EventEffect(
@@ -332,7 +378,6 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
         }
     }
 
-
     /**
      * Clicked on link
      * @param link
@@ -343,21 +388,6 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             .setData(uriUrl)
         startActivity(launchBrowser)
-    }
-
-    /**
-     * On Item click event received from [FileBrowserViewModel]
-     *
-     * @param folderHandle FolderHandle of current selected Folder
-     */
-    private fun openFolderClicked(folderHandle: Long?) {
-        folderHandle?.let {
-            val intent = Intent().apply {
-                putExtra(SEARCH_NODE_HANDLE, it)
-            }
-            setResult(RESULT_OK, intent)
-            finish()
-        }
     }
 
     /**
@@ -697,5 +727,14 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
             transfersManagement.setHasNotToBeShowDueToTransferOverQuota(true)
         }
     }
-
 }
+
+/**
+ * search screen mini audio player test tag
+ */
+const val SEARCH_SCREEN_MINI_AUDIO_PLAYER_TEST_TAG = "search_screen:mini_audio_player"
+
+/**
+ * search screen transfers widget test tag
+ */
+const val SEARCH_SCREEN_TRANSFERS_WIDGET_TEST_TAG = "search_screen:transfers_widget_view"

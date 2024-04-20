@@ -53,36 +53,6 @@ import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
 import mega.privacy.android.legacy.core.ui.controls.lists.HeaderViewItem
 import mega.privacy.android.shared.theme.MegaAppTheme
 
-/**
- * Test tag for creating video playlist fab button
- */
-const val FAB_BUTTON_TEST_TAG = "fab_button_test_tag"
-
-/**
- * Test tag for CreateVideoPlaylistDialog
- */
-const val CREATE_VIDEO_PLAYLIST_DIALOG_TEST_TAG = "create_video_playlist_dialog_test_tag"
-
-/**
- * Test tag for RenameVideoPlaylistDialog
- */
-const val RENAME_VIDEO_PLAYLIST_DIALOG_TEST_TAG = "rename_video_playlist_dialog_test_tag"
-
-/**
- * Test tag for DeleteVideoPlaylistDialog
- */
-const val DELETE_VIDEO_PLAYLIST_DIALOG_TEST_TAG = "delete_video_playlist_dialog_test_tag"
-
-/**
- * Test tag for progressBar
- */
-const val PROGRESS_BAR_TEST_TAG = "progress_bar_test_tag"
-
-/**
- * Test tag for empty view
- */
-const val VIDEO_PLAYLISTS_EMPTY_VIEW_TEST_TAG = "video_playlists_empty_view_test_tag"
-
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 internal fun VideoPlaylistsView(
@@ -105,6 +75,7 @@ internal fun VideoPlaylistsView(
     onCreateDialogPositiveButtonClicked: (String) -> Unit,
     onRenameDialogPositiveButtonClicked: (playlistID: NodeId, newTitle: String) -> Unit,
     onDeleteDialogPositiveButtonClicked: (VideoPlaylistUIEntity) -> Unit,
+    onDeletePlaylistsDialogPositiveButtonClicked: () -> Unit,
     setInputValidity: (Boolean) -> Unit,
     onClick: (item: VideoPlaylistUIEntity, index: Int) -> Unit,
     onSortOrderClick: () -> Unit,
@@ -228,15 +199,22 @@ internal fun VideoPlaylistsView(
             }
 
             if (shouldDeleteVideoPlaylistDialog) {
-                DeleteVideoPlaylistDialog(
+                DeleteItemsDialog(
                     modifier = Modifier.testTag(DELETE_VIDEO_PLAYLIST_DIALOG_TEST_TAG),
+                    title = "Delete playlist?",
+                    text = "Do we need additional explanation to delete playlists?",
+                    confirmButtonText = "Delete",
                     onDeleteButtonClicked = {
                         if (clickedItem != -1) {
                             onDeleteDialogPositiveButtonClicked(items[clickedItem])
+                        } else {
+                            onDeletePlaylistsDialogPositiveButtonClicked()
                         }
+                        clickedItem = -1
                     },
                     onDismiss = {
                         setShouldDeleteVideoPlaylist(false)
+                        clickedItem = -1
                     }
                 )
             }
@@ -296,11 +274,11 @@ internal fun VideoPlaylistsView(
                                 numberOfVideos = videoPlaylistItem.numberOfVideos,
                                 thumbnailList = videoPlaylistItem.thumbnailList,
                                 totalDuration = videoPlaylistItem.totalDuration,
+                                isSelected = videoPlaylistItem.isSelected,
                                 onClick = { onClick(videoPlaylistItem, it) },
                                 onMenuClick = {
                                     clickedItem = it
                                     coroutineScope.launch { modalSheetState.show() }
-
                                 },
                                 onLongClick = { onLongClick(videoPlaylistItem, it) }
                             )
@@ -348,16 +326,19 @@ internal fun CreateVideoPlaylistFabButton(
 }
 
 @Composable
-internal fun DeleteVideoPlaylistDialog(
+internal fun DeleteItemsDialog(
+    title: String,
+    text: String?,
+    confirmButtonText: String,
     onDeleteButtonClicked: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     MegaAlertDialog(
         modifier = modifier,
-        title = "Delete playlist?",
-        text = "Do we need additional explanation to delete playlists?",
-        confirmButtonText = "Delete",
+        title = title,
+        text = text ?: "",
+        confirmButtonText = confirmButtonText,
         cancelButtonText = stringResource(id = R.string.button_cancel),
         onConfirm = onDeleteButtonClicked,
         onDismiss = onDismiss
@@ -368,7 +349,24 @@ internal fun DeleteVideoPlaylistDialog(
 @Composable
 private fun DeleteVideoPlaylistDialogPreview() {
     MegaAppTheme(isDark = isSystemInDarkTheme()) {
-        DeleteVideoPlaylistDialog(
+        DeleteItemsDialog(
+            title = "Delete playlist?",
+            text = "Do we need additional explanation to delete playlists?",
+            confirmButtonText = "Delete",
+            onDeleteButtonClicked = {},
+            onDismiss = {}
+        )
+    }
+}
+
+@CombinedThemePreviews
+@Composable
+private fun DeleteVideosDialogPreview() {
+    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+        DeleteItemsDialog(
+            title = "Remove from playlist?",
+            text = null,
+            confirmButtonText = "Remove",
             onDeleteButtonClicked = {},
             onDismiss = {}
         )
@@ -403,6 +401,7 @@ private fun VideoPlaylistsViewPreview() {
             onDeleteDialogPositiveButtonClicked = {},
             onDeletedMessageShown = {},
             setInputValidity = {},
+            onDeletePlaylistsDialogPositiveButtonClicked = {}
         )
     }
 }
@@ -434,7 +433,8 @@ private fun VideoPlaylistsViewCreateDialogShownPreview() {
             onRenameDialogPositiveButtonClicked = { _, _ -> },
             onDeleteDialogPositiveButtonClicked = {},
             setInputValidity = {},
-            onDeletedMessageShown = {}
+            onDeletedMessageShown = {},
+            onDeletePlaylistsDialogPositiveButtonClicked = {}
         )
     }
 }
@@ -446,3 +446,33 @@ private fun FabButtonPreview() {
         CreateVideoPlaylistFabButton(onCreateVideoPlaylistClick = {})
     }
 }
+
+/**
+ * Test tag for creating video playlist fab button
+ */
+const val FAB_BUTTON_TEST_TAG = "video_playlists:fab_button_create_video_playlist"
+
+/**
+ * Test tag for CreateVideoPlaylistDialog
+ */
+const val CREATE_VIDEO_PLAYLIST_DIALOG_TEST_TAG = "video_playlists:dialog_create_video_playlist"
+
+/**
+ * Test tag for RenameVideoPlaylistDialog
+ */
+const val RENAME_VIDEO_PLAYLIST_DIALOG_TEST_TAG = "video_playlists:dialog_rename_video_playlist"
+
+/**
+ * Test tag for DeleteVideoPlaylistDialog
+ */
+const val DELETE_VIDEO_PLAYLIST_DIALOG_TEST_TAG = "video_playlists:dialog_delete_video_playlist"
+
+/**
+ * Test tag for progressBar
+ */
+const val PROGRESS_BAR_TEST_TAG = "video_playlists:progress_bar"
+
+/**
+ * Test tag for empty view
+ */
+const val VIDEO_PLAYLISTS_EMPTY_VIEW_TEST_TAG = "video_playlists:empty_view"

@@ -1,10 +1,8 @@
 package mega.privacy.android.domain.usecase.camerauploads
 
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.repository.CameraUploadRepository
-import mega.privacy.android.domain.usecase.SetPrimarySyncHandle
-import mega.privacy.android.domain.usecase.SetSecondarySyncHandle
 import mega.privacy.android.domain.usecase.node.IsNodeInRubbishOrDeletedUseCase
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -22,7 +20,6 @@ import java.util.stream.Stream
 /**
  * Test class for [EstablishCameraUploadsSyncHandlesUseCase]
  */
-@ExperimentalCoroutinesApi
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class EstablishCameraUploadsSyncHandlesUseCaseTest {
 
@@ -31,8 +28,8 @@ class EstablishCameraUploadsSyncHandlesUseCaseTest {
     private val cameraUploadRepository = mock<CameraUploadRepository>()
     private val getCameraUploadsSyncHandlesUseCase = mock<GetCameraUploadsSyncHandlesUseCase>()
     private val isNodeInRubbishOrDeletedUseCase = mock<IsNodeInRubbishOrDeletedUseCase>()
-    private val setPrimarySyncHandle = mock<SetPrimarySyncHandle>()
-    private val setSecondarySyncHandle = mock<SetSecondarySyncHandle>()
+    private val setSetPrimaryNodeIdUseCase = mock<SetPrimaryNodeIdUseCase>()
+    private val setSecondaryNodeIdUseCase = mock<SetSecondaryNodeIdUseCase>()
 
     @BeforeAll
     fun setUp() {
@@ -40,8 +37,8 @@ class EstablishCameraUploadsSyncHandlesUseCaseTest {
             cameraUploadRepository = cameraUploadRepository,
             getCameraUploadsSyncHandlesUseCase = getCameraUploadsSyncHandlesUseCase,
             isNodeInRubbishOrDeletedUseCase = isNodeInRubbishOrDeletedUseCase,
-            setPrimarySyncHandle = setPrimarySyncHandle,
-            setSecondarySyncHandle = setSecondarySyncHandle,
+            setPrimaryNodeIdUseCase = setSetPrimaryNodeIdUseCase,
+            setSecondaryNodeIdUseCase = setSecondaryNodeIdUseCase,
         )
     }
 
@@ -51,8 +48,8 @@ class EstablishCameraUploadsSyncHandlesUseCaseTest {
             cameraUploadRepository,
             getCameraUploadsSyncHandlesUseCase,
             isNodeInRubbishOrDeletedUseCase,
-            setPrimarySyncHandle,
-            setSecondarySyncHandle,
+            setSetPrimaryNodeIdUseCase,
+            setSecondaryNodeIdUseCase,
         )
     }
 
@@ -71,10 +68,10 @@ class EstablishCameraUploadsSyncHandlesUseCaseTest {
         underTest()
 
         if (!primaryHandleDeleted) {
-            verify(setPrimarySyncHandle).invoke(testPair.first)
+            verify(setSetPrimaryNodeIdUseCase).invoke(NodeId(testPair.first))
         }
         if (!secondaryHandleDeleted) {
-            verify(setSecondarySyncHandle).invoke(testPair.second)
+            verify(setSecondaryNodeIdUseCase).invoke(NodeId(testPair.second))
         }
     }
 
@@ -85,8 +82,8 @@ class EstablishCameraUploadsSyncHandlesUseCaseTest {
 
             underTest()
 
-            verify(setPrimarySyncHandle).invoke(cameraUploadRepository.getInvalidHandle())
-            verify(setSecondarySyncHandle).invoke(cameraUploadRepository.getInvalidHandle())
+            verify(setSetPrimaryNodeIdUseCase).invoke(NodeId(cameraUploadRepository.getInvalidHandle()))
+            verify(setSecondaryNodeIdUseCase).invoke(NodeId(cameraUploadRepository.getInvalidHandle()))
         }
 
     companion object {

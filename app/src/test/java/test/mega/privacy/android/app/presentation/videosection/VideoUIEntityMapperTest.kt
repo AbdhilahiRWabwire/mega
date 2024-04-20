@@ -5,6 +5,7 @@ import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.presentation.time.mapper.DurationInSecondsTextMapper
 import mega.privacy.android.app.presentation.videosection.mapper.VideoUIEntityMapper
 import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
+import mega.privacy.android.domain.entity.VideoFileTypeInfo
 import mega.privacy.android.domain.entity.node.ExportedData
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedVideoNode
@@ -30,7 +31,10 @@ class VideoUIEntityMapperTest {
     private val expectedAvailableOffline = true
     private val expectedDurationTime = 10.minutes
     private val expectedIsFavourite = false
+    private val expectedElementID = 2L
+    private val expectedLabel = 1
     private val expectedExportedData = mock<ExportedData>()
+    private val expectedType = mock<VideoFileTypeInfo>()
 
     @BeforeAll
     fun setUp() {
@@ -69,6 +73,9 @@ class VideoUIEntityMapperTest {
         on { duration }.thenReturn(expectedDurationTime)
         on { thumbnailPath }.thenReturn(expectedThumbnail)
         on { exportedData }.thenReturn(exportData)
+        on { elementID }.thenReturn(expectedElementID)
+        on { label }.thenReturn(expectedLabel)
+        on { type }.thenReturn(expectedType)
     }
 
     private fun assertMappedVideoUIEntity(
@@ -83,11 +90,14 @@ class VideoUIEntityMapperTest {
                 { assertThat(it.name).isEqualTo(expectedName) },
                 { assertThat(it.size).isEqualTo(expectedSize) },
                 { assertThat(it.durationString).isEqualTo(expectedDurationString) },
-                { assertThat(it.durationInMinutes).isEqualTo(10) },
+                { assertThat(it.duration).isEqualTo(expectedDurationTime) },
                 { assertThat(it.thumbnail?.path).isEqualTo(expectedThumbnail) },
                 { assertThat(it.nodeAvailableOffline).isEqualTo(expectedAvailableOffline) },
                 { assertThat(it.isFavourite).isEqualTo(expectedIsFavourite) },
                 { assertThat(it.isSharedItems).isEqualTo(expectedIsShared) },
+                { assertThat(it.elementID).isEqualTo(expectedElementID) },
+                { assertThat(it.label).isEqualTo(expectedLabel) },
+                { assertThat(it.fileTypeInfo).isEqualTo(expectedType) }
             )
         }
     }

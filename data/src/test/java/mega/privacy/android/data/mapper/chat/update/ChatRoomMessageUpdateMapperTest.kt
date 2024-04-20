@@ -54,6 +54,7 @@ class ChatRoomMessageUpdateMapperTest {
 
     private fun provideMessageUpdates(): Stream<Arguments>? {
         val megaMessage = mock<MegaChatMessage>()
+
         return Stream.of(
             Arguments.of(mock<ChatRoomUpdate.OnHistoryTruncatedByRetentionTime> {
                 on { msg }.thenReturn(

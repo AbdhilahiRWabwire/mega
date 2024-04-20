@@ -21,7 +21,10 @@ import mega.privacy.android.data.mapper.handles.MegaHandleListMapper
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ChatMessageType
 import mega.privacy.android.domain.entity.chat.PendingMessage
+import mega.privacy.android.domain.entity.chat.PendingMessageState
+import mega.privacy.android.domain.entity.chat.messages.UserMessage
 import mega.privacy.android.domain.entity.chat.messages.pending.SavePendingMessageRequest
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageRequest
 import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.qualifier.IoDispatcher
@@ -143,10 +146,11 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun updatePendingMessage(savePendingMessageRequest: SavePendingMessageRequest) {
+    override suspend fun updatePendingMessage(
+        updatePendingMessageRequest: UpdatePendingMessageRequest,
+    ) {
         return withContext(ioDispatcher) {
-            val pendingMessage = pendingMessageEntityMapper(savePendingMessageRequest)
-            chatStorageGateway.updatePendingMessage(pendingMessage)
+            chatStorageGateway.updatePendingMessage(updatePendingMessageRequest)
         }
     }
 
@@ -205,9 +209,22 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
             }
         }
 
+    override suspend fun getPendingMessagesByState(state: PendingMessageState): List<PendingMessage> =
+        withContext(ioDispatcher) {
+            chatStorageGateway.getPendingMessagesByState(state).map {
+                pendingMessageMapper(it)
+            }
+        }
+
     override suspend fun deletePendingMessage(pendingMessage: PendingMessage) {
         withContext(ioDispatcher) {
             chatStorageGateway.deletePendingMessage(pendingMessage.id)
+        }
+    }
+
+    override suspend fun deletePendingMessageById(pendingMessageId: Long) {
+        withContext(ioDispatcher) {
+            chatStorageGateway.deletePendingMessage(pendingMessageId)
         }
     }
 
@@ -283,5 +300,29 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
                 truncateTimestamp = truncateTimestamp
             )
         }
+    }
+
+    override suspend fun clearChatPendingMessages(chatId: Long) = withContext(ioDispatcher) {
+        chatStorageGateway.clearChatPendingMessages(chatId)
+    }
+
+    override suspend fun removeSentMessage(message: UserMessage) {
+        withContext(ioDispatcher) {
+            megaChatApiGateway.removeFailedMessage(chatId = message.chatId, rowId = message.rowId)
+        }
+    }
+
+    override suspend fun updateDoesNotExistInMessage(chatId: Long, msgId: Long) =
+        withContext(ioDispatcher) {
+            chatStorageGateway.updateExistsInMessage(chatId, msgId, false)
+        }
+
+    override suspend fun getExistsInMessage(chatId: Long, msgId: Long) =
+        withContext(ioDispatcher) {
+            chatStorageGateway.getExistsInMessage(chatId, msgId) ?: true
+        }
+
+    override suspend fun clearAllData() = withContext(ioDispatcher) {
+        chatStorageGateway.clearAllData()
     }
 }

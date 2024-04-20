@@ -43,7 +43,6 @@ import mega.privacy.android.app.mediaplayer.gateway.MediaPlayerServiceGateway
 import mega.privacy.android.app.mediaplayer.gateway.PlayerServiceViewModelGateway
 import mega.privacy.android.app.mediaplayer.service.AudioPlayerService
 import mega.privacy.android.app.mediaplayer.service.MediaPlayerServiceBinder
-import mega.privacy.android.app.mediaplayer.trackinfo.TrackInfoFragment
 import mega.privacy.android.app.mediaplayer.trackinfo.TrackInfoFragmentArgs
 import mega.privacy.android.app.presentation.extensions.getStorageState
 import mega.privacy.android.app.usecase.exception.MegaException
@@ -63,14 +62,17 @@ import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_COPY_FROM
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_MOVE_FROM
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_REBUILD_PLAYLIST
 import mega.privacy.android.app.utils.Constants.INVALID_VALUE
+import mega.privacy.android.app.utils.Constants.LINKS_ADAPTER
 import mega.privacy.android.app.utils.Constants.MEDIA_PLAYER_TOOLBAR_SHOW_HIDE_DURATION_MS
 import mega.privacy.android.app.utils.Constants.OFFLINE_ADAPTER
+import mega.privacy.android.app.utils.Constants.OUTGOING_SHARES_ADAPTER
 import mega.privacy.android.app.utils.Constants.URL_FILE_LINK
 import mega.privacy.android.app.utils.Constants.ZIP_ADAPTER
 import mega.privacy.android.app.utils.FileUtil
 import mega.privacy.android.app.utils.LinksUtil
 import mega.privacy.android.app.utils.MegaNodeDialogUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
+import mega.privacy.android.app.utils.MegaNodeUtil.getRootParentNode
 import mega.privacy.android.app.utils.MenuUtils.toggleAllMenuItemsVisibility
 import mega.privacy.android.app.utils.RunOnUIThreadUtils
 import mega.privacy.android.app.utils.Util.isDarkMode
@@ -138,7 +140,8 @@ class AudioPlayerActivity : MediaPlayerActivity() {
 
                 refreshMenuOptionsVisibility()
 
-                collectFlow(service.serviceGateway.metadataUpdate()) {
+                collectFlow(service.serviceGateway.metadataUpdate()) { metadata ->
+                    viewModel.updateMetaData(metadata)
                     dragToExit.nodeChanged(
                         service.playerServiceViewModelGateway.getCurrentPlayingHandle()
                     )
@@ -177,6 +180,9 @@ class AudioPlayerActivity : MediaPlayerActivity() {
         }
     }
 
+    /**
+     * onCreate
+     */
     @androidx.annotation.OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -268,7 +274,6 @@ class AudioPlayerActivity : MediaPlayerActivity() {
                         actionNodeCallback = object : ActionNodeCallback {
                             override fun finishRenameActionWithSuccess(newName: String) {
                                 playerServiceGateway?.updateItemName(it.handle, newName)
-                                updateTrackInfoNodeNameIfNeeded(it.handle, newName)
                                 //Avoid the dialog is shown repeatedly when screen is rotated.
                                 viewModel.renameUpdate(null)
                             }
@@ -370,7 +375,8 @@ class AudioPlayerActivity : MediaPlayerActivity() {
 
                         FILE_LINK_ADAPTER -> {
                             val mediaItem = serviceGateway?.getCurrentMediaItem()
-                            val nodeName = playerServiceGateway?.getPlaylistItem(mediaItem?.mediaId)?.nodeName
+                            val nodeName =
+                                playerServiceGateway?.getPlaylistItem(mediaItem?.mediaId)?.nodeName
                             MegaNodeUtil.shareLink(
                                 context = this,
                                 fileLink = launchIntent.getStringExtra(URL_FILE_LINK),
@@ -528,16 +534,25 @@ class AudioPlayerActivity : MediaPlayerActivity() {
         showSnackbar(getString(R.string.not_allow_play_alert))
     }
 
+    /**
+     * onResume
+     */
     override fun onResume() {
         super.onResume()
         refreshMenuOptionsVisibility()
     }
 
+    /**
+     * onAttachedToWindow
+     */
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         window.setFormat(PixelFormat.RGBA_8888) // Needed to fix bg gradient banding
     }
 
+    /**
+     * onSaveInstanceState
+     */
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
 
@@ -576,6 +591,9 @@ class AudioPlayerActivity : MediaPlayerActivity() {
         }
     }
 
+    /**
+     * onDestroy
+     */
     override fun onDestroy() {
         super.onDestroy()
 
@@ -592,6 +610,9 @@ class AudioPlayerActivity : MediaPlayerActivity() {
         AlertDialogUtil.dismissAlertDialogIfExists(takenDownDialog)
     }
 
+    /**
+     * onCreateOptionsMenu
+     */
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         optionsMenu = menu
 
@@ -632,6 +653,9 @@ class AudioPlayerActivity : MediaPlayerActivity() {
         return true
     }
 
+    /**
+     * onOptionsItemSelected
+     */
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         val launchIntent = playerServiceGateway?.getCurrentIntent() ?: return false
         val playingHandle = playerServiceGateway?.getCurrentPlayingHandle() ?: return false
@@ -666,21 +690,8 @@ class AudioPlayerActivity : MediaPlayerActivity() {
     }
 
     /**
-     * Update node name if current displayed fragment is TrackInfoFragment.
-     *
-     * @param handle node handle
-     * @param newName new node name
+     * onRequestPermissionsResult
      */
-    private fun updateTrackInfoNodeNameIfNeeded(handle: Long, newName: String) {
-        val navHostFragment =
-            supportFragmentManager.findFragmentById(R.id.nav_host_fragment) ?: return
-        navHostFragment.childFragmentManager.fragments.firstOrNull()?.let { firstChild ->
-            if (firstChild is TrackInfoFragment) {
-                firstChild.updateNodeNameIfNeeded(handle, newName)
-            }
-        }
-    }
-
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -873,6 +884,13 @@ class AudioPlayerActivity : MediaPlayerActivity() {
         playerServiceGateway?.let {
             it.getCurrentIntent()?.getIntExtra(INTENT_EXTRA_KEY_ADAPTER_TYPE, INVALID_VALUE)
                 ?.let { adapterType ->
+                    val isInSharedItems = adapterType in listOf(
+                        INCOMING_SHARES_ADAPTER,
+                        OUTGOING_SHARES_ADAPTER,
+                        LINKS_ADAPTER,
+                    )
+
+
                     when (currentFragmentId) {
                         R.id.audio_playlist -> {
                             menu.toggleAllMenuItemsVisibility(false)
@@ -986,12 +1004,21 @@ class AudioPlayerActivity : MediaPlayerActivity() {
                                     menu.findItem(R.id.chat_import).isVisible = false
                                     menu.findItem(R.id.chat_save_for_offline).isVisible = false
 
-                                    Timber.d("isHiddenNodesEnabled: $isHiddenNodesEnabled ; isMarkedSensitive: ${node.isMarkedSensitive}")
-                                    menu.findItem(R.id.hide).isVisible =
-                                        isHiddenNodesEnabled && !node.isMarkedSensitive
+                                    val shouldShowHideNode =
+                                        isHiddenNodesEnabled
+                                                && !isInSharedItems
+                                                && !megaApi.getRootParentNode(node).isInShare
+                                                && !node.isMarkedSensitive
 
-                                    menu.findItem(R.id.unhide).isVisible =
-                                        isHiddenNodesEnabled && node.isMarkedSensitive
+                                    val shouldShowUnhideNode =
+                                        isHiddenNodesEnabled
+                                                && !isInSharedItems
+                                                && !megaApi.getRootParentNode(node).isInShare
+                                                && node.isMarkedSensitive
+
+                                    menu.findItem(R.id.hide).isVisible = shouldShowHideNode
+
+                                    menu.findItem(R.id.unhide).isVisible = shouldShowUnhideNode
 
                                     when (access) {
                                         MegaShare.ACCESS_READWRITE,

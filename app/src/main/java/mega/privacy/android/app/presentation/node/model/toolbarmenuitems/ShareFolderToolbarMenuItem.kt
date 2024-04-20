@@ -2,9 +2,9 @@ package mega.privacy.android.app.presentation.node.model.toolbarmenuitems
 
 import androidx.navigation.NavHostController
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import mega.privacy.android.app.presentation.extensions.isOutShare
 import mega.privacy.android.app.presentation.node.model.menuaction.ShareFolderMenuAction
 import mega.privacy.android.app.presentation.search.navigation.searchFolderShareDialog
 import mega.privacy.android.core.ui.model.MenuAction
@@ -15,7 +15,6 @@ import mega.privacy.android.domain.entity.node.backup.BackupNodeType
 import mega.privacy.android.domain.usecase.node.backup.CheckBackupNodeTypeByHandleUseCase
 import mega.privacy.android.feature.sync.data.mapper.ListToStringWithDelimitersMapper
 import timber.log.Timber
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 /**
@@ -38,7 +37,9 @@ class ShareFolderToolbarMenuItem @Inject constructor(
         noNodeTakenDown: Boolean,
         allFileNodes: Boolean,
         resultCount: Int,
-    ) = noNodeTakenDown && selectedNodes.isNotEmpty() && selectedNodes.first() is FolderNode
+    ) = noNodeTakenDown && selectedNodes.run {
+        isNotEmpty() && all { it is FolderNode } && any { it.isOutShare() }
+    }
 
     override fun getOnClick(
         selectedNodes: List<TypedNode>,
@@ -51,7 +52,6 @@ class ShareFolderToolbarMenuItem @Inject constructor(
             parentScope.launch {
                 val hasBackUpNodes = it.find { handle ->
                     runCatching {
-                        delay(TimeUnit.MINUTES.toMillis(1))
                         checkBackupNodeTypeByHandleUseCase(handle) != BackupNodeType.NonBackupNode
                     }.getOrElse {
                         Timber.e(it)

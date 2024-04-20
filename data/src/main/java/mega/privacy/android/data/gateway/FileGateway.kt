@@ -248,9 +248,21 @@ interface FileGateway {
     suspend fun createNewImageUri(fileName: String): Uri?
 
     /**
+     * Create new video uri
+     *
+     * @param fileName
+     */
+    suspend fun createNewVideoUri(fileName: String): Uri?
+
+    /**
      * @return true if the [uriString] represents a file Uri
      */
     suspend fun isFileUri(uriString: String): Boolean
+
+    /**
+     * @return true if the [path] represents a file, not a folder
+     */
+    suspend fun isFilePath(path: String): Boolean
 
     /**
      * Get the file represented by [uriString]
@@ -263,6 +275,11 @@ interface FileGateway {
      * @return true if the [uriString] represents a content Uri
      */
     suspend fun isContentUri(uriString: String): Boolean
+
+    /**
+     * @return true if the [uriString] represents an external storage content Uri
+     */
+    suspend fun isExternalStorageContentUri(uriString: String): Boolean
 
     /**
      * @return the file name of the file represented by [uriString]

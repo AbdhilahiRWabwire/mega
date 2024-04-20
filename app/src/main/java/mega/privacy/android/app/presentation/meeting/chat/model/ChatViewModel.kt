@@ -21,17 +21,19 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.megachat.MapsActivity
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
 import mega.privacy.android.app.objects.GifData
 import mega.privacy.android.app.objects.PasscodeManagement
+import mega.privacy.android.app.presentation.extensions.getErrorStringId
 import mega.privacy.android.app.presentation.extensions.isPast
 import mega.privacy.android.app.presentation.meeting.chat.extension.isJoined
 import mega.privacy.android.app.presentation.meeting.chat.mapper.ForwardMessagesResultMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteParticipantResultMapper
-import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteUserAsContactResultOptionMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.ParticipantNameMapper
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.INVALID_LOCATION_MESSAGE_ID
 import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
@@ -50,6 +52,9 @@ import mega.privacy.android.domain.entity.chat.messages.ContactAttachmentMessage
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.contacts.User
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
+import mega.privacy.android.domain.entity.meeting.ChatCallStatus
+import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
+import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
@@ -57,6 +62,7 @@ import mega.privacy.android.domain.entity.node.chat.ChatFile
 import mega.privacy.android.domain.entity.statistics.EndCallForAll
 import mega.privacy.android.domain.entity.transfer.MultiTransferEvent
 import mega.privacy.android.domain.entity.user.UserId
+import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.chat.CreateChatException
 import mega.privacy.android.domain.exception.chat.ResourceDoesNotExistChatException
 import mega.privacy.android.domain.qualifier.ApplicationScope
@@ -67,6 +73,7 @@ import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.cache.GetCacheFileUseCase
 import mega.privacy.android.domain.usecase.chat.ArchiveChatUseCase
+import mega.privacy.android.domain.usecase.chat.BroadcastChatArchivedUseCase
 import mega.privacy.android.domain.usecase.chat.ClearChatHistoryUseCase
 import mega.privacy.android.domain.usecase.chat.CloseChatPreviewUseCase
 import mega.privacy.android.domain.usecase.chat.EnableGeolocationUseCase
@@ -79,9 +86,11 @@ import mega.privacy.android.domain.usecase.chat.InviteToChatUseCase
 import mega.privacy.android.domain.usecase.chat.IsAnonymousModeUseCase
 import mega.privacy.android.domain.usecase.chat.IsChatNotificationMuteUseCase
 import mega.privacy.android.domain.usecase.chat.IsGeolocationEnabledUseCase
+import mega.privacy.android.domain.usecase.chat.LeaveChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorCallInChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatConnectionStateUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatPendingChangesUseCase
+import mega.privacy.android.domain.usecase.chat.MonitorLeaveChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorLeavingChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorParticipatingInACallInOtherChatsUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorUserChatStatusByHandleUseCase
@@ -109,23 +118,26 @@ import mega.privacy.android.domain.usecase.contact.GetParticipantFirstNameUseCas
 import mega.privacy.android.domain.usecase.contact.GetParticipantFullNameUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserOnlineStatusByHandleUseCase
 import mega.privacy.android.domain.usecase.contact.GetUserUseCase
-import mega.privacy.android.domain.usecase.contact.InviteContactUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorAllContactParticipantsInChatUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorHasAnyContactUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorUserLastGreenUpdatesUseCase
 import mega.privacy.android.domain.usecase.contact.RequestUserLastGreenUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.file.CreateNewImageUriUseCase
 import mega.privacy.android.domain.usecase.file.DeleteFileUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
+import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.IsChatStatusConnectedForCallUseCase
 import mega.privacy.android.domain.usecase.meeting.SendStatisticsMeetingsUseCase
+import mega.privacy.android.domain.usecase.meeting.SetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.StartCallUseCase
 import mega.privacy.android.domain.usecase.meeting.StartChatCallNoRingingUseCase
 import mega.privacy.android.domain.usecase.meeting.StartMeetingInWaitingRoomChatUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorUpdatePushNotificationSettingsUseCase
+import mega.privacy.mobile.analytics.event.ChatConversationUnmuteMenuToolbarEvent
 import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.Collections
@@ -152,6 +164,9 @@ const val EXTRA_LINK = "LINK"
  * @property monitorChatRoomUpdates
  * @property monitorUpdatePushNotificationSettingsUseCase
  * @property monitorUserChatStatusByHandleUseCase
+ * @property getFeatureFlagValueUseCase
+ * @property setUsersCallLimitRemindersUseCase
+ * @property getUsersCallLimitRemindersUseCase
  * @property state UI state.
  *
  * @param savedStateHandle
@@ -184,6 +199,7 @@ class ChatViewModel @Inject constructor(
     private val unmuteChatNotificationUseCase: UnmuteChatNotificationUseCase,
     private val clearChatHistoryUseCase: ClearChatHistoryUseCase,
     private val archiveChatUseCase: ArchiveChatUseCase,
+    private val broadcastChatArchivedUseCase: BroadcastChatArchivedUseCase,
     private val endCallUseCase: EndCallUseCase,
     private val sendStatisticsMeetingsUseCase: SendStatisticsMeetingsUseCase,
     private val startCallUseCase: StartCallUseCase,
@@ -227,18 +243,22 @@ class ChatViewModel @Inject constructor(
     private val deleteMessagesUseCase: DeleteMessagesUseCase,
     private val editMessageUseCase: EditMessageUseCase,
     private val editLocationMessageUseCase: EditLocationMessageUseCase,
-    private val inviteContactUseCase: InviteContactUseCase,
-    private val inviteUserAsContactResultOptionMapper: InviteUserAsContactResultOptionMapper,
     private val getChatFromContactMessagesUseCase: GetChatFromContactMessagesUseCase,
     private val getCacheFileUseCase: GetCacheFileUseCase,
     private val recordAudioUseCase: RecordAudioUseCase,
     private val deleteFileUseCase: DeleteFileUseCase,
+    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
+    private val monitorLeaveChatUseCase: MonitorLeaveChatUseCase,
+    private val leaveChatUseCase: LeaveChatUseCase,
+    private val setUsersCallLimitRemindersUseCase: SetUsersCallLimitRemindersUseCase,
+    private val getUsersCallLimitRemindersUseCase: GetUsersCallLimitRemindersUseCase
 ) : ViewModel() {
     private val _state = MutableStateFlow(ChatUiState())
     val state = _state.asStateFlow()
 
     private val chatId: Long = savedStateHandle[Constants.CHAT_ID]
         ?: throw IllegalStateException("Chat screen must have a chat room id")
+
     private val chatLink: String
         get() = savedStateHandle.get<String>(EXTRA_LINK).orEmpty()
 
@@ -257,6 +277,8 @@ class ChatViewModel @Inject constructor(
     private var monitorConnectivityJob: Job? = null
 
     init {
+        checkFeatureFlag()
+        checkUsersCallLimitReminders()
         getMyUserHandle()
         checkGeolocation()
         monitorStorageStateEvent()
@@ -266,7 +288,20 @@ class ChatViewModel @Inject constructor(
         monitorNotificationMute()
         monitorJoiningChat()
         monitorLeavingChat()
+        monitorLeaveChat()
         monitorChatRoomPreference()
+    }
+
+    private fun checkFeatureFlag() {
+        viewModelScope.launch {
+            getFeatureFlagValueUseCase(AppFeatures.CallUnlimitedProPlan).let { flag ->
+                _state.update { state ->
+                    state.copy(
+                        isCallUnlimitedProPlanFeatureFlagEnabled = flag,
+                    )
+                }
+            }
+        }
     }
 
     private fun monitorChatRoomPreference() {
@@ -291,6 +326,15 @@ class ChatViewModel @Inject constructor(
                         _state.update { state -> state.copy(sendingText = preference.draftMessage) }
                     }
                 }
+        }
+    }
+
+    /**
+     * Enable or disable users call limit reminder
+     */
+    private fun setUsersCallLimitReminder(enabled: Boolean) = viewModelScope.launch {
+        runCatching {
+            setUsersCallLimitRemindersUseCase(if (enabled) UsersCallLimitReminders.Enabled else UsersCallLimitReminders.Disabled)
         }
     }
 
@@ -662,6 +706,26 @@ class ChatViewModel @Inject constructor(
             monitorCallInChatUseCase(chatId)
                 .catch { Timber.e(it) }
                 .collect {
+                    it?.apply {
+                        when (status) {
+                            ChatCallStatus.TerminatingUserParticipation, ChatCallStatus.GenericNotification ->
+                                if (termCode == ChatCallTermCodeType.CallUsersLimit
+                                    && _state.value.isCallUnlimitedProPlanFeatureFlagEnabled
+                                ) {
+                                    _state.update { state -> state.copy(callEndedDueToFreePlanLimits = true) }
+                                } else if (termCode == ChatCallTermCodeType.CallDurationLimit && _state.value.isCallUnlimitedProPlanFeatureFlagEnabled) {
+                                    if (it.isOwnClientCaller) {
+                                        _state.update { state ->
+                                            state.copy(
+                                                shouldUpgradeToProPlan = true
+                                            )
+                                        }
+                                    }
+                                }
+
+                            else -> {}
+                        }
+                    }
                     _state.update { state -> state.copy(callInThisChat = it) }
                 }
         }
@@ -703,7 +767,11 @@ class ChatViewModel @Inject constructor(
      */
     fun handleActionPress(action: ChatRoomMenuAction) {
         when (action) {
-            is ChatRoomMenuAction.Unmute -> unmutePushNotification()
+            is ChatRoomMenuAction.Unmute -> {
+                Analytics.tracker.trackEvent(ChatConversationUnmuteMenuToolbarEvent)
+                unmutePushNotification()
+            }
+
             else -> {}
         }
     }
@@ -836,7 +904,16 @@ class ChatViewModel @Inject constructor(
     fun archiveChat() {
         viewModelScope.launch {
             runCatching { archiveChatUseCase(chatId, true) }
-                .onFailure {
+                .onSuccess {
+                    broadcastChatArchivedUseCase(_state.value.title.orEmpty())
+                    _state.update { state ->
+                        state.copy(
+                            actionToManageEvent = triggered(
+                                ActionToManage.CloseChat
+                            )
+                        )
+                    }
+                }.onFailure {
                     Timber.e("Error archiving chat $it")
                     _state.update { state ->
                         state.copy(
@@ -858,6 +935,18 @@ class ChatViewModel @Inject constructor(
     fun unarchiveChat() {
         viewModelScope.launch {
             runCatching { archiveChatUseCase(chatId, false) }
+                .onSuccess {
+                    _state.update { state ->
+                        state.copy(
+                            infoToShowEvent = triggered(
+                                InfoToShow.StringWithParams(
+                                    stringId = R.string.success_unarchive_chat,
+                                    args = state.title?.let { title -> listOf(title) }.orEmpty()
+                                )
+                            )
+                        )
+                    }
+                }
                 .onFailure {
                     Timber.e("Error unarchiving chat $it")
                     _state.update { state ->
@@ -878,6 +967,7 @@ class ChatViewModel @Inject constructor(
      * Start a call.
      */
     fun startCall(video: Boolean) {
+        setUsersCallLimitReminder(enabled = true)
         viewModelScope.launch {
             runCatching { startCallUseCase(chatId, video) }
                 .onSuccess { call ->
@@ -915,6 +1005,7 @@ class ChatViewModel @Inject constructor(
      * Start or join a meeting.
      */
     fun onStartOrJoinMeeting(isStarted: Boolean) {
+        setUsersCallLimitReminder(enabled = true)
         val isWaitingRoom = state.value.isWaitingRoom
         if (isStarted) {
             val isHost = state.value.myPermission == ChatRoomPermission.Moderator
@@ -933,6 +1024,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun startWaitingRoomMeeting() {
+        setUsersCallLimitReminder(enabled = true)
         val isHost = state.value.myPermission == ChatRoomPermission.Moderator
         if (isHost) {
             viewModelScope.launch {
@@ -956,6 +1048,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun startMeeting() {
+        setUsersCallLimitReminder(enabled = true)
         viewModelScope.launch {
             runCatching {
                 val scheduledMeeting = requireNotNull(state.value.scheduledMeeting)
@@ -975,6 +1068,7 @@ class ChatViewModel @Inject constructor(
      * Answers a call.
      */
     fun onAnswerCall() {
+        setUsersCallLimitReminder(enabled = true)
         viewModelScope.launch {
             chatManagement.addJoiningCallChatId(chatId)
             runCatching {
@@ -1091,7 +1185,7 @@ class ChatViewModel @Inject constructor(
 
     private fun onAttachFiles(files: List<String>, isVoiceClip: Boolean) {
         viewModelScope.launch {
-            sendChatAttachmentsUseCase(chatId, files, isVoiceClip)
+            sendChatAttachmentsUseCase(chatId, files.associateWith { null }, isVoiceClip)
                 .catch { Timber.e(it) }
                 .collect {
                     if (it is MultiTransferEvent.TransferNotStarted<*>) {
@@ -1370,6 +1464,26 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * Check users call limit reminders
+     */
+    private fun checkUsersCallLimitReminders() {
+        viewModelScope.launch {
+            getUsersCallLimitRemindersUseCase().collectLatest { result ->
+                _state.update { it.copy(usersCallLimitReminders = result) }
+            }
+        }
+    }
+
+    /**
+     * Consume show free plan participants limit dialog event
+     *
+     */
+    fun consumeShowFreePlanParticipantsLimitDialogEvent() {
+        setUsersCallLimitReminder(enabled = false)
+        _state.update { state -> state.copy(callEndedDueToFreePlanLimits = false) }
+    }
+
+    /**
      * Consume download event
      *
      */
@@ -1378,7 +1492,7 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * On download chat node
+     * On download node for preview
      *
      * @param file [ChatFile]
      */
@@ -1396,6 +1510,17 @@ class ChatViewModel @Inject constructor(
     fun onDownloadForOfflineChatNode(file: ChatFile) {
         _state.update {
             it.copy(downloadEvent = triggered(TransferTriggerEvent.StartDownloadForOffline(file)))
+        }
+    }
+
+    /**
+     * On download node
+     *
+     * @param nodes
+     */
+    fun onDownloadNode(nodes: List<ChatFile>) {
+        _state.update {
+            it.copy(downloadEvent = triggered(TransferTriggerEvent.StartDownloadNode(nodes)))
         }
     }
 
@@ -1418,48 +1543,6 @@ class ChatViewModel @Inject constructor(
                 )
             }
         }
-    }
-
-    /**
-     * Invite contacts
-     *
-     * @param contactMessageList set of [ContactAttachmentMessage]
-     */
-    fun inviteContacts(contactMessageList: Set<ContactAttachmentMessage>) = viewModelScope.launch {
-        if (contactMessageList.size == 1) {
-            inviteSingleContact(contactMessageList.first())
-        } else if (contactMessageList.size > 1) {
-            inviteMultipleContacts(contactMessageList)
-        }
-    }
-
-    private suspend fun inviteMultipleContacts(messageList: Set<ContactAttachmentMessage>) {
-        runCatching {
-            TODO("not implemented")
-        }.onSuccess {
-
-        }.onFailure { Timber.e(it) }
-    }
-
-    private suspend fun inviteSingleContact(
-        message: ContactAttachmentMessage,
-    ) {
-        runCatching {
-            inviteContactUseCase(
-                email = message.contactEmail,
-                handle = message.contactHandle,
-                message = null
-            )
-        }.onSuccess {
-            val email = message.contactEmail
-            val infoToShow = InfoToShow.InviteUserAsContactResult(
-                inviteUserAsContactResultOptionMapper(
-                    inviteContactRequest = it,
-                    email = email
-                )
-            )
-            _state.update { state -> state.copy(infoToShowEvent = triggered(infoToShow)) }
-        }.onFailure { Timber.e(it) }
     }
 
     /**
@@ -1548,6 +1631,41 @@ class ChatViewModel @Inject constructor(
             } ?: run {
             Timber.e("Cache file for voice clip recording can't be created")
         }
+    }
+
+    private fun monitorLeaveChat() {
+        viewModelScope.launch {
+            monitorLeaveChatUseCase()
+                .collect { requestChatId ->
+                    if (chatId == requestChatId) {
+                        leaveChat()
+                    }
+                }
+        }
+    }
+
+    private fun leaveChat() {
+        viewModelScope.launch {
+            runCatching {
+                leaveChatUseCase(chatId)
+            }.onFailure { exception ->
+                if (exception is MegaException) {
+                    _state.update { state ->
+                        state.copy(
+                            infoToShowEvent = triggered(InfoToShow.SimpleString(exception.getErrorStringId()))
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Consume ShouldUpgradeToProPlan
+     *
+     */
+    fun onConsumeShouldUpgradeToProPlan() {
+        _state.update { state -> state.copy(shouldUpgradeToProPlan = false) }
     }
 
     companion object {

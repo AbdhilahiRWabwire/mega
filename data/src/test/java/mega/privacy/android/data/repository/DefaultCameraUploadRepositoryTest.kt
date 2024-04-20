@@ -12,9 +12,9 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.data.constant.CameraUploadsWorkerStatusConstant.PROGRESS
 import mega.privacy.android.data.constant.CameraUploadsWorkerStatusConstant.STATUS_INFO
-import mega.privacy.android.data.gateway.AndroidDeviceGateway
 import mega.privacy.android.data.gateway.AppEventGateway
 import mega.privacy.android.data.gateway.CameraUploadsMediaGateway
+import mega.privacy.android.data.gateway.DeviceGateway
 import mega.privacy.android.data.gateway.FileGateway
 import mega.privacy.android.data.gateway.MegaLocalRoomGateway
 import mega.privacy.android.data.gateway.MegaLocalStorageGateway
@@ -86,7 +86,7 @@ class DefaultCameraUploadRepositoryTest {
     private val appEventGateway = mock<AppEventGateway>()
     private val uploadOptionIntMapper = mock<UploadOptionIntMapper>()
     private val uploadOptionMapper = mock<UploadOptionMapper>()
-    private val deviceGateway = mock<AndroidDeviceGateway>()
+    private val deviceGateway = mock<DeviceGateway>()
     private val megaLocalRoomGateway = mock<MegaLocalRoomGateway>()
     private val videoQualityMapper: VideoQualityMapper = mock()
     private val videoQualityIntMapper: VideoQualityIntMapper = mock()
@@ -99,7 +99,6 @@ class DefaultCameraUploadRepositoryTest {
         underTest = DefaultCameraUploadRepository(
             localStorageGateway = localStorageGateway,
             megaApiGateway = megaApiGateway,
-            cacheGateway = mock(),
             cameraUploadsMediaGateway = cameraUploadsMediaGateway,
             workManagerGateway = workManagerGateway,
             heartbeatStatusIntMapper = heartbeatStatusIntMapper,
@@ -564,17 +563,6 @@ class DefaultCameraUploadRepositoryTest {
                 )
             }
 
-        @ParameterizedTest(name = "device charging: {0}")
-        @ValueSource(booleans = [true, false])
-        fun `test that charging state is correctly returned`(
-            isCharging: Boolean,
-        ) =
-            runTest {
-                whenever(deviceGateway.isCharging()).thenReturn(isCharging)
-                val actual = underTest.isCharging()
-                assertThat(actual).isEqualTo(isCharging)
-            }
-
         @Test
         fun `test that the video compression size limit is retrieved`() = runTest {
             val testSizeLimit = 300
@@ -620,7 +608,7 @@ class DefaultCameraUploadRepositoryTest {
         @Test
         fun `test that the worker is called to stop camera uploads heartbeat workers`() = runTest {
             underTest.stopCameraUploadsAndBackupHeartbeat()
-            verify(workManagerGateway).cancelCameraUploadAndHeartbeatWorkRequest()
+            verify(workManagerGateway).cancelCameraUploadsAndHeartbeatWorkRequest()
         }
 
         @Test

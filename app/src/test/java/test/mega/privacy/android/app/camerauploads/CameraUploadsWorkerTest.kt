@@ -15,6 +15,8 @@ import androidx.work.impl.utils.taskexecutor.WorkManagerTaskExecutor
 import androidx.work.workDataOf
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -61,38 +63,35 @@ import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeChanges
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeUpdate
+import mega.privacy.android.domain.entity.transfer.Transfer
 import mega.privacy.android.domain.entity.transfer.TransferEvent
 import mega.privacy.android.domain.exception.NotEnoughStorageException
 import mega.privacy.android.domain.exception.QuotaExceededMegaException
+import mega.privacy.android.domain.monitoring.CrashReporter
 import mega.privacy.android.domain.repository.FileSystemRepository
 import mega.privacy.android.domain.repository.TimeSystemRepository
-import mega.privacy.android.domain.usecase.CreateCameraUploadFolder
 import mega.privacy.android.domain.usecase.CreateCameraUploadTemporaryRootDirectoryUseCase
-import mega.privacy.android.domain.usecase.DisableMediaUploadSettings
-import mega.privacy.android.domain.usecase.IsChargingRequired
-import mega.privacy.android.domain.usecase.IsNotEnoughQuota
 import mega.privacy.android.domain.usecase.IsSecondaryFolderEnabled
 import mega.privacy.android.domain.usecase.IsWifiNotSatisfiedUseCase
-import mega.privacy.android.domain.usecase.MonitorBatteryInfo
-import mega.privacy.android.domain.usecase.SetPrimarySyncHandle
-import mega.privacy.android.domain.usecase.SetSecondarySyncHandle
+import mega.privacy.android.domain.usecase.account.IsStorageOverQuotaUseCase
 import mega.privacy.android.domain.usecase.backup.InitializeBackupsUseCase
 import mega.privacy.android.domain.usecase.camerauploads.AreCameraUploadsFoldersInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.camerauploads.BroadcastCameraUploadsSettingsActionUseCase
 import mega.privacy.android.domain.usecase.camerauploads.BroadcastStorageOverQuotaUseCase
+import mega.privacy.android.domain.usecase.camerauploads.CheckOrCreateCameraUploadsNodeUseCase
 import mega.privacy.android.domain.usecase.camerauploads.DeleteCameraUploadsTemporaryRootDirectoryUseCase
 import mega.privacy.android.domain.usecase.camerauploads.DisableCameraUploadsUseCase
+import mega.privacy.android.domain.usecase.camerauploads.DisableMediaUploadsSettingsUseCase
 import mega.privacy.android.domain.usecase.camerauploads.DoesCameraUploadsRecordExistsInTargetNodeUseCase
 import mega.privacy.android.domain.usecase.camerauploads.EstablishCameraUploadsSyncHandlesUseCase
 import mega.privacy.android.domain.usecase.camerauploads.ExtractGpsCoordinatesUseCase
-import mega.privacy.android.domain.usecase.camerauploads.GetDefaultNodeHandleUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetPendingCameraUploadsRecordsUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetPrimaryFolderPathUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetUploadFolderHandleUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetUploadVideoQualityUseCase
 import mega.privacy.android.domain.usecase.camerauploads.HandleLocalIpChangeUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsEnabledUseCase
-import mega.privacy.android.domain.usecase.camerauploads.IsChargingUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsChargingRequiredUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsPrimaryFolderPathValidUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsSecondaryFolderSetUseCase
 import mega.privacy.android.domain.usecase.camerauploads.MonitorStorageOverQuotaUseCase
@@ -101,20 +100,19 @@ import mega.privacy.android.domain.usecase.camerauploads.RenameCameraUploadsReco
 import mega.privacy.android.domain.usecase.camerauploads.SendBackupHeartBeatSyncUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetPrimaryFolderLocalPathUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetSecondaryFolderLocalPathUseCase
-import mega.privacy.android.domain.usecase.camerauploads.SetupPrimaryFolderUseCase
-import mega.privacy.android.domain.usecase.camerauploads.SetupSecondaryFolderUseCase
 import mega.privacy.android.domain.usecase.camerauploads.UpdateCameraUploadsBackupHeartbeatStatusUseCase
 import mega.privacy.android.domain.usecase.camerauploads.UpdateCameraUploadsBackupStatesUseCase
 import mega.privacy.android.domain.usecase.camerauploads.UploadCameraUploadsRecordsUseCase
+import mega.privacy.android.domain.usecase.environment.MonitorBatteryInfoUseCase
 import mega.privacy.android.domain.usecase.file.GetFileByPathUseCase
 import mega.privacy.android.domain.usecase.login.BackgroundFastLoginUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
-import mega.privacy.android.domain.usecase.node.IsNodeInRubbishOrDeletedUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.permisison.HasMediaPermissionUseCase
+import mega.privacy.android.domain.usecase.transfers.CancelTransferByTagUseCase
+import mega.privacy.android.domain.usecase.transfers.GetTransferByTagUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.MonitorPausedTransfersUseCase
-import mega.privacy.android.domain.usecase.transfers.uploads.CancelAllUploadTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.uploads.ResetTotalUploadsUseCase
 import mega.privacy.android.domain.usecase.workers.ScheduleCameraUploadUseCase
 import org.junit.Before
@@ -127,6 +125,7 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.io.File
@@ -149,7 +148,7 @@ class CameraUploadsWorkerTest {
     private lateinit var workExecutor: WorkManagerTaskExecutor
     private lateinit var workDatabase: WorkDatabase
 
-    private val isNotEnoughQuota: IsNotEnoughQuota = mock()
+    private val isStorageOverQuotaUseCase: IsStorageOverQuotaUseCase = mock()
     private val ioDispatcher = UnconfinedTestDispatcher()
     private val getPrimaryFolderPathUseCase: GetPrimaryFolderPathUseCase = mock()
     private val isPrimaryFolderPathValidUseCase: IsPrimaryFolderPathValidUseCase = mock()
@@ -159,26 +158,22 @@ class CameraUploadsWorkerTest {
     private val isWifiNotSatisfiedUseCase: IsWifiNotSatisfiedUseCase = mock()
     private val setPrimaryFolderLocalPathUseCase: SetPrimaryFolderLocalPathUseCase = mock()
     private val setSecondaryFolderLocalPathUseCase: SetSecondaryFolderLocalPathUseCase = mock()
-    private val isChargingRequired: IsChargingRequired = mock()
+    private val isChargingRequiredUseCase: IsChargingRequiredUseCase = mock()
     private val getUploadFolderHandleUseCase: GetUploadFolderHandleUseCase = mock()
-    private val setPrimarySyncHandle: SetPrimarySyncHandle = mock()
-    private val setSecondarySyncHandle: SetSecondarySyncHandle = mock()
-    private val getDefaultNodeHandleUseCase: GetDefaultNodeHandleUseCase = mock()
     private val monitorPausedTransfersUseCase: MonitorPausedTransfersUseCase = mock()
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase = mock()
-    private val monitorBatteryInfo: MonitorBatteryInfo = mock()
+    private val monitorBatteryInfoUseCase: MonitorBatteryInfoUseCase = mock()
     private val backgroundFastLoginUseCase: BackgroundFastLoginUseCase = mock()
-    private val isNodeInRubbishOrDeletedUseCase: IsNodeInRubbishOrDeletedUseCase = mock()
     private val monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase = mock()
     private val handleLocalIpChangeUseCase: HandleLocalIpChangeUseCase = mock()
-    private val cancelAllUploadTransfersUseCase: CancelAllUploadTransfersUseCase = mock()
-    private val createCameraUploadFolder: CreateCameraUploadFolder = mock()
-    private val setupPrimaryFolderUseCase: SetupPrimaryFolderUseCase = mock()
-    private val setupSecondaryFolderUseCase: SetupSecondaryFolderUseCase = mock()
+    private val cancelTransferByTagUseCase: CancelTransferByTagUseCase = mock()
+    private val getTransferByTagUseCase: GetTransferByTagUseCase = mock()
+    private val checkOrCreateCameraUploadsNodeUseCase: CheckOrCreateCameraUploadsNodeUseCase =
+        mock()
     private val establishCameraUploadsSyncHandlesUseCase: EstablishCameraUploadsSyncHandlesUseCase =
         mock()
     private val resetTotalUploadsUseCase: ResetTotalUploadsUseCase = mock()
-    private val disableMediaUploadSettings: DisableMediaUploadSettings = mock()
+    private val disableMediaUploadSettingsUseCase: DisableMediaUploadsSettingsUseCase = mock()
     private val createCameraUploadTemporaryRootDirectoryUseCase: CreateCameraUploadTemporaryRootDirectoryUseCase =
         mock()
     private val deleteCameraUploadsTemporaryRootDirectoryUseCase: DeleteCameraUploadsTemporaryRootDirectoryUseCase =
@@ -190,7 +185,6 @@ class CameraUploadsWorkerTest {
     private val sendBackupHeartBeatSyncUseCase: SendBackupHeartBeatSyncUseCase = mock()
     private val updateCameraUploadsBackupHeartbeatStatusUseCase: UpdateCameraUploadsBackupHeartbeatStatusUseCase =
         mock()
-    private val isChargingUseCase: IsChargingUseCase = mock()
     private val monitorStorageOverQuotaUseCase: MonitorStorageOverQuotaUseCase = mock()
     private val broadcastStorageOverQuotaUseCase: BroadcastStorageOverQuotaUseCase = mock()
     private val cameraUploadsNotificationManagerWrapper: CameraUploadsNotificationManagerWrapper =
@@ -217,6 +211,7 @@ class CameraUploadsWorkerTest {
     private val disableCameraUploadsUseCase: DisableCameraUploadsUseCase = mock()
     private val getFileByPathUseCase: GetFileByPathUseCase = mock()
     private val loginMutex: Mutex = mock()
+    private val crashReporter: CrashReporter = mock()
 
     private val foregroundInfo = ForegroundInfo(1, mock())
     private val primaryNodeHandle = 1111L
@@ -255,7 +250,7 @@ class CameraUploadsWorkerTest {
                         { _, _ -> }, workExecutor
                     )
                 ),
-                isNotEnoughQuota = isNotEnoughQuota,
+                isStorageOverQuotaUseCase = isStorageOverQuotaUseCase,
                 getPrimaryFolderPathUseCase = getPrimaryFolderPathUseCase,
                 isPrimaryFolderPathValidUseCase = isPrimaryFolderPathValidUseCase,
                 isSecondaryFolderSetUseCase = isSecondaryFolderSetUseCase,
@@ -264,33 +259,27 @@ class CameraUploadsWorkerTest {
                 isWifiNotSatisfiedUseCase = isWifiNotSatisfiedUseCase,
                 setPrimaryFolderLocalPathUseCase = setPrimaryFolderLocalPathUseCase,
                 setSecondaryFolderLocalPathUseCase = setSecondaryFolderLocalPathUseCase,
-                isChargingRequired = isChargingRequired,
+                isChargingRequiredUseCase = isChargingRequiredUseCase,
                 getUploadFolderHandleUseCase = getUploadFolderHandleUseCase,
-                setPrimarySyncHandle = setPrimarySyncHandle,
-                setSecondarySyncHandle = setSecondarySyncHandle,
-                getDefaultNodeHandleUseCase = getDefaultNodeHandleUseCase,
                 ioDispatcher = ioDispatcher,
                 monitorPausedTransfersUseCase = monitorPausedTransfersUseCase,
                 monitorConnectivityUseCase = monitorConnectivityUseCase,
-                monitorBatteryInfo = monitorBatteryInfo,
+                monitorBatteryInfoUseCase = monitorBatteryInfoUseCase,
                 backgroundFastLoginUseCase = backgroundFastLoginUseCase,
-                isNodeInRubbishOrDeletedUseCase = isNodeInRubbishOrDeletedUseCase,
                 monitorNodeUpdatesUseCase = monitorNodeUpdatesUseCase,
                 handleLocalIpChangeUseCase = handleLocalIpChangeUseCase,
-                cancelAllUploadTransfersUseCase = cancelAllUploadTransfersUseCase,
-                createCameraUploadFolder = createCameraUploadFolder,
-                setupPrimaryFolderUseCase = setupPrimaryFolderUseCase,
-                setupSecondaryFolderUseCase = setupSecondaryFolderUseCase,
+                cancelTransferByTagUseCase = cancelTransferByTagUseCase,
+                getTransferByTagUseCase = getTransferByTagUseCase,
+                checkOrCreateCameraUploadsNodeUseCase = checkOrCreateCameraUploadsNodeUseCase,
                 establishCameraUploadsSyncHandlesUseCase = establishCameraUploadsSyncHandlesUseCase,
                 resetTotalUploadsUseCase = resetTotalUploadsUseCase,
-                disableMediaUploadSettings = disableMediaUploadSettings,
+                disableMediaUploadSettingsUseCase = disableMediaUploadSettingsUseCase,
                 createCameraUploadTemporaryRootDirectoryUseCase = createCameraUploadTemporaryRootDirectoryUseCase,
                 deleteCameraUploadsTemporaryRootDirectoryUseCase = deleteCameraUploadsTemporaryRootDirectoryUseCase,
                 scheduleCameraUploadUseCase = scheduleCameraUploadUseCase,
                 updateCameraUploadsBackupStatesUseCase = updateCameraUploadsBackupStatesUseCase,
                 sendBackupHeartBeatSyncUseCase = sendBackupHeartBeatSyncUseCase,
                 updateCameraUploadsBackupHeartbeatStatusUseCase = updateCameraUploadsBackupHeartbeatStatusUseCase,
-                isChargingUseCase = isChargingUseCase,
                 monitorStorageOverQuotaUseCase = monitorStorageOverQuotaUseCase,
                 broadcastStorageOverQuotaUseCase = broadcastStorageOverQuotaUseCase,
                 hasMediaPermissionUseCase = hasMediaPermissionUseCase,
@@ -312,6 +301,7 @@ class CameraUploadsWorkerTest {
                 getUploadVideoQualityUseCase = getUploadVideoQualityUseCase,
                 disableCameraUploadsUseCase = disableCameraUploadsUseCase,
                 getFileByPathUseCase = getFileByPathUseCase,
+                crashReporter = crashReporter,
             )
         )
         setupDefaultCheckConditionMocks()
@@ -327,7 +317,7 @@ class CameraUploadsWorkerTest {
 
         // mock monitor events
         whenever(monitorConnectivityUseCase()).thenReturn(emptyFlow())
-        whenever(monitorBatteryInfo()).thenReturn(emptyFlow())
+        whenever(monitorBatteryInfoUseCase()).thenReturn(emptyFlow())
         whenever(monitorPausedTransfersUseCase()).thenReturn(emptyFlow())
         whenever(monitorStorageOverQuotaUseCase()).thenReturn(emptyFlow())
         whenever(monitorNodeUpdatesUseCase()).thenReturn(emptyFlow())
@@ -336,14 +326,13 @@ class CameraUploadsWorkerTest {
         // mock check preconditions
         whenever(hasMediaPermissionUseCase()).thenReturn(true)
         whenever(loginMutex.isLocked).thenReturn(false)
-        whenever(isNotEnoughQuota()).thenReturn(false)
+        whenever(isStorageOverQuotaUseCase()).thenReturn(false)
         whenever(isCameraUploadsEnabledUseCase()).thenReturn(true)
         whenever(isWifiNotSatisfiedUseCase()).thenReturn(false)
         whenever(getPrimaryFolderPathUseCase()).thenReturn(primaryLocalPath)
         whenever(isPrimaryFolderPathValidUseCase(primaryLocalPath)).thenReturn(true)
         whenever(getUploadFolderHandleUseCase(CameraUploadFolderType.Primary))
             .thenReturn(primaryNodeHandle)
-        whenever(isNodeInRubbishOrDeletedUseCase(primaryNodeHandle)).thenReturn(false)
         whenever(isSecondaryFolderEnabled()).thenReturn(false)
 
 
@@ -379,6 +368,13 @@ class CameraUploadsWorkerTest {
                 )
             ).thenReturn(list)
             whenever(extractGpsCoordinatesUseCase(list)).thenReturn(list)
+        }
+
+    @Test
+    fun `test that crashReporter is invoked when the worker starts doing work`() =
+        runTest {
+            underTest.doWork()
+            verify(crashReporter, times(2)).log(any())
         }
 
     @Test
@@ -973,8 +969,10 @@ class CameraUploadsWorkerTest {
             whenever(getPendingCameraUploadsRecordsUseCase()).thenReturn(list)
             whenever(getUploadVideoQualityUseCase()).thenReturn(VideoQuality.LOW)
             whenever(getFileByPathUseCase(videoRecord.filePath)).thenReturn(videoFile)
-            whenever(isChargingRequired(size)).thenReturn(true)
-            whenever(isChargingUseCase()).thenReturn(false)
+            whenever(isChargingRequiredUseCase(size)).thenReturn(true)
+            whenever(monitorBatteryInfoUseCase()).thenReturn(
+                flowOf(BatteryInfo(100, false))
+            )
 
             underTest.doWork()
 
@@ -1004,9 +1002,10 @@ class CameraUploadsWorkerTest {
             whenever(getPendingCameraUploadsRecordsUseCase()).thenReturn(expected)
             whenever(getUploadVideoQualityUseCase()).thenReturn(VideoQuality.LOW)
             whenever(getFileByPathUseCase(videoRecord.filePath)).thenReturn(videoFile)
-            whenever(isChargingRequired(size)).thenReturn(true)
-            whenever(isChargingUseCase()).thenReturn(true)
-
+            whenever(isChargingRequiredUseCase(size)).thenReturn(true)
+            whenever(monitorBatteryInfoUseCase()).thenReturn(
+                flowOf(BatteryInfo(100, true))
+            )
             underTest.doWork()
 
             verify(doesCameraUploadsRecordExistsInTargetNodeUseCase)
@@ -1113,7 +1112,7 @@ class CameraUploadsWorkerTest {
 
             underTest.doWork()
 
-            verify(disableMediaUploadSettings).invoke()
+            verify(disableMediaUploadSettingsUseCase).invoke()
             verify(setSecondaryFolderLocalPathUseCase).invoke("")
             verify(broadcastCameraUploadsSettingsActionUseCase).invoke(CameraUploadsSettingsAction.DisableMediaUploads)
             verify(underTest).setProgress(
@@ -1141,14 +1140,14 @@ class CameraUploadsWorkerTest {
     }
 
     @Test
-    fun `test that the worker returns failure when primary upload node does not exist and fails to be created`() =
+    fun `test that the worker returns failure when primary upload node is not retrieved and fails to be created`() =
         runTest {
-            whenever(getUploadFolderHandleUseCase(CameraUploadFolderType.Primary))
-                .thenReturn(-1L)
-            whenever(getDefaultNodeHandleUseCase(context.getString(R.string.section_photo_sync)))
-                .thenReturn(-1L)
-            whenever(createCameraUploadFolder(context.getString(R.string.section_photo_sync)))
-                .thenThrow(RuntimeException())
+            whenever(
+                checkOrCreateCameraUploadsNodeUseCase(
+                    context.getString(R.string.section_photo_sync),
+                    CameraUploadFolderType.Primary
+                )
+            ).thenThrow(RuntimeException())
 
             val result = underTest.doWork()
 
@@ -1163,64 +1162,18 @@ class CameraUploadsWorkerTest {
         }
 
     @Test
-    fun `test that the worker returns failure when secondary upload node does not exist and fails to be created`() =
+    fun `test that the worker returns failure when secondary upload node is not retrieved and fails to be created`() =
         runTest {
             whenever(isSecondaryFolderEnabled()).thenReturn(true)
             whenever(isSecondaryFolderSetUseCase()).thenReturn(true)
             whenever(getUploadFolderHandleUseCase(CameraUploadFolderType.Secondary))
                 .thenReturn(-1L)
-            whenever(getDefaultNodeHandleUseCase(context.getString(R.string.section_secondary_media_uploads)))
-                .thenReturn(-1L)
-            whenever(createCameraUploadFolder(context.getString(R.string.section_secondary_media_uploads)))
-                .thenThrow(RuntimeException())
-
-            val result = underTest.doWork()
-
-            verify(underTest).setProgress(
-                workDataOf(
-                    STATUS_INFO to FINISHED,
-                    FINISHED_REASON to CameraUploadsFinishedReason.ERROR_DURING_PROCESS.name
+            whenever(
+                checkOrCreateCameraUploadsNodeUseCase(
+                    context.getString(R.string.section_secondary_media_uploads),
+                    CameraUploadFolderType.Secondary
                 )
-            )
-            assertThat(result).isEqualTo(ListenableWorker.Result.failure())
-            verify(underTest, never()).setProgress(workDataOf(STATUS_INFO to CHECK_FILE_UPLOAD))
-        }
-
-    @Test
-    fun `test that the worker returns failure when primary upload node is in rubbish bin and fails to be created`() =
-        runTest {
-            whenever(getUploadFolderHandleUseCase(CameraUploadFolderType.Primary))
-                .thenReturn(1111L)
-            whenever(isNodeInRubbishOrDeletedUseCase(1111L)).thenReturn(true)
-            whenever(getDefaultNodeHandleUseCase(context.getString(R.string.section_photo_sync)))
-                .thenReturn(1111L)
-            whenever(createCameraUploadFolder(context.getString(R.string.section_photo_sync)))
-                .thenThrow(RuntimeException())
-
-            val result = underTest.doWork()
-
-            verify(underTest).setProgress(
-                workDataOf(
-                    STATUS_INFO to FINISHED,
-                    FINISHED_REASON to CameraUploadsFinishedReason.ERROR_DURING_PROCESS.name
-                )
-            )
-            assertThat(result).isEqualTo(ListenableWorker.Result.failure())
-            verify(underTest, never()).setProgress(workDataOf(STATUS_INFO to CHECK_FILE_UPLOAD))
-        }
-
-    @Test
-    fun `test that the worker returns failure when secondary upload node is in rubbish bin and fails to be created`() =
-        runTest {
-            whenever(isSecondaryFolderEnabled()).thenReturn(true)
-            whenever(isSecondaryFolderSetUseCase()).thenReturn(true)
-            whenever(getUploadFolderHandleUseCase(CameraUploadFolderType.Secondary))
-                .thenReturn(2222L)
-            whenever(isNodeInRubbishOrDeletedUseCase(2222L)).thenReturn(true)
-            whenever(getDefaultNodeHandleUseCase(context.getString(R.string.section_secondary_media_uploads)))
-                .thenReturn(2222L)
-            whenever(createCameraUploadFolder(context.getString(R.string.section_secondary_media_uploads)))
-                .thenThrow(RuntimeException())
+            ).thenThrow(RuntimeException())
 
             val result = underTest.doWork()
 
@@ -1273,7 +1226,7 @@ class CameraUploadsWorkerTest {
         underTest.doWork()
 
         verify(monitorConnectivityUseCase).invoke()
-        verify(monitorBatteryInfo).invoke()
+        verify(monitorBatteryInfoUseCase).invoke()
         verify(monitorStorageOverQuotaUseCase).invoke()
         verify(monitorNodeUpdatesUseCase).invoke()
     }
@@ -1333,7 +1286,7 @@ class CameraUploadsWorkerTest {
     @Test
     fun `test that worker returns failure when battery level too low and is not charging`() =
         runTest {
-            whenever(monitorBatteryInfo()).thenReturn(flowOf(BatteryInfo(10, false)))
+            whenever(monitorBatteryInfoUseCase()).thenReturn(flowOf(BatteryInfo(10, false)))
 
             val result = underTest.doWork()
 
@@ -1349,7 +1302,7 @@ class CameraUploadsWorkerTest {
     @Test
     fun `test that worker is rescheduled when battery level too low and is not charging`() =
         runTest {
-            whenever(monitorBatteryInfo()).thenReturn(flowOf(BatteryInfo(10, false)))
+            whenever(monitorBatteryInfoUseCase()).thenReturn(flowOf(BatteryInfo(10, false)))
 
             underTest.doWork()
 
@@ -1388,7 +1341,7 @@ class CameraUploadsWorkerTest {
 
     @Test
     fun `test that worker returns failure when quota is not enough`() = runTest {
-        whenever(isNotEnoughQuota.invoke()).thenReturn(true)
+        whenever(isStorageOverQuotaUseCase.invoke()).thenReturn(true)
 
         val result = underTest.doWork()
 
@@ -1404,7 +1357,7 @@ class CameraUploadsWorkerTest {
     @Test
     fun `test that worker is rescheduled when quota is not enough`() =
         runTest {
-            whenever(isNotEnoughQuota.invoke()).thenReturn(true)
+            whenever(isStorageOverQuotaUseCase.invoke()).thenReturn(true)
 
             underTest.doWork()
 
@@ -1458,12 +1411,49 @@ class CameraUploadsWorkerTest {
         }
 
     @Test
-    fun `test that all pending transfers are cancelled when the worker complete with failure`() =
+    fun `test that all transfers are cancelled when the worker complete with failure`() =
         runTest {
-            whenever(isPrimaryFolderPathValidUseCase(primaryLocalPath)).thenReturn(false)
-            val result = underTest.doWork()
-            verify(cancelAllUploadTransfersUseCase).invoke()
-            assertThat(result).isEqualTo(ListenableWorker.Result.failure())
+            val fakeFlow = MutableStateFlow(true)
+            val record = mock<CameraUploadsRecord> {
+                on { folderType }.thenReturn(CameraUploadFolderType.Primary)
+            }
+            val list = listOf(record)
+            val size = 2L // in MB
+            val file = mock<File> {
+                on { length() }.thenReturn(size * 1024 * 1024)
+            }
+            setupDefaultProcessingFilesConditionMocks(list)
+            whenever(fileSystemRepository.doesFileExist(record.filePath)).thenReturn(true)
+            whenever(getFileByPathUseCase(record.filePath)).thenReturn(file)
+
+            val uploadTag = 100
+            val transfer = mock<Transfer> {
+                on { tag }.thenReturn(uploadTag)
+                on { isFinished }.thenReturn(false)
+            }
+            val toUploadEvent = CameraUploadsTransferProgress.ToUpload(
+                record = record,
+                transferEvent = TransferEvent.TransferStartEvent(transfer = transfer),
+            )
+            val flow = channelFlow {
+                send(toUploadEvent)
+                fakeFlow.emit(false)
+            }
+            whenever(monitorConnectivityUseCase()).thenReturn(fakeFlow)
+            whenever(getTransferByTagUseCase(uploadTag)).thenReturn(transfer)
+            whenever(
+                uploadCameraUploadsRecordsUseCase(
+                    list,
+                    NodeId(primaryNodeHandle),
+                    NodeId(secondaryNodeHandle),
+                    tempPath
+                )
+            ).thenReturn(flow)
+
+            underTest.doWork()
+
+
+            verify(cancelTransferByTagUseCase).invoke(uploadTag)
         }
 
     @Test

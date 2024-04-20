@@ -2,10 +2,9 @@ package mega.privacy.android.domain.repository
 
 import kotlinx.coroutines.flow.Flow
 import mega.privacy.android.domain.entity.BackupState
-import mega.privacy.android.domain.entity.BatteryInfo
 import mega.privacy.android.domain.entity.CameraUploadsFolderDestinationUpdate
-import mega.privacy.android.domain.entity.MediaStoreFileType
 import mega.privacy.android.domain.entity.CameraUploadsRecordType
+import mega.privacy.android.domain.entity.MediaStoreFileType
 import mega.privacy.android.domain.entity.VideoQuality
 import mega.privacy.android.domain.entity.backup.Backup
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadFolderType
@@ -264,11 +263,6 @@ interface CameraUploadRepository {
     ): List<CameraUploadsMedia>
 
     /**
-     * clear all the contents of Internal cache directory
-     */
-    suspend fun clearCacheDirectory()
-
-    /**
      * Convert Base 64 string to handle
      */
     suspend fun convertBase64ToHandle(base64: String): Long
@@ -282,16 +276,6 @@ interface CameraUploadRepository {
      * [Pair.second] represents the Secondary Folder Sync Handle for the Media Uploads folder
      */
     suspend fun getCameraUploadsSyncHandles(): Pair<Long, Long>?
-
-    /**
-     * monitor battery info
-     */
-    fun monitorBatteryInfo(): Flow<BatteryInfo>
-
-    /**
-     * monitor charging stopped info
-     */
-    fun monitorChargingStoppedInfo(): Flow<Boolean>
 
     /**
      * Monitor camera upload folder icon updates
@@ -438,12 +422,6 @@ interface CameraUploadRepository {
         latitude: Double,
         longitude: Double,
     )
-
-    /**
-     * isCharging
-     * @return [Boolean] whether device is charging or not
-     */
-    suspend fun isCharging(): Boolean
 
     /**
      * Get backup folder Id

@@ -14,10 +14,9 @@ import kotlinx.coroutines.withContext
 import mega.privacy.android.data.R
 import mega.privacy.android.data.extensions.failWithError
 import mega.privacy.android.data.extensions.getRequestListener
-import mega.privacy.android.data.gateway.AndroidDeviceGateway
 import mega.privacy.android.data.gateway.AppEventGateway
-import mega.privacy.android.data.gateway.CacheGateway
 import mega.privacy.android.data.gateway.CameraUploadsMediaGateway
+import mega.privacy.android.data.gateway.DeviceGateway
 import mega.privacy.android.data.gateway.MegaLocalRoomGateway
 import mega.privacy.android.data.gateway.MegaLocalStorageGateway
 import mega.privacy.android.data.gateway.WorkManagerGateway
@@ -64,7 +63,6 @@ internal class DefaultCameraUploadRepository @Inject constructor(
     private val localStorageGateway: MegaLocalStorageGateway,
     private val megaApiGateway: MegaApiGateway,
     private val cameraUploadsMediaGateway: CameraUploadsMediaGateway,
-    private val cacheGateway: CacheGateway,
     private val heartbeatStatusIntMapper: HeartbeatStatusIntMapper,
     private val mediaStoreFileTypeUriMapper: MediaStoreFileTypeUriMapper,
     private val appEventGateway: AppEventGateway,
@@ -76,7 +74,7 @@ internal class DefaultCameraUploadRepository @Inject constructor(
     private val cameraUploadsHandlesMapper: CameraUploadsHandlesMapper,
     private val uploadOptionMapper: UploadOptionMapper,
     private val uploadOptionIntMapper: UploadOptionIntMapper,
-    private val deviceGateway: AndroidDeviceGateway,
+    private val deviceGateway: DeviceGateway,
     private val megaLocalRoomGateway: MegaLocalRoomGateway,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @ApplicationContext private val context: Context,
@@ -345,10 +343,6 @@ internal class DefaultCameraUploadRepository @Inject constructor(
         }
     }
 
-    override suspend fun clearCacheDirectory() = withContext(ioDispatcher) {
-        cacheGateway.clearCacheDirectory()
-    }
-
     override suspend fun convertBase64ToHandle(base64: String): Long = withContext(ioDispatcher) {
         megaApiGateway.base64ToHandle(base64)
     }
@@ -358,10 +352,6 @@ internal class DefaultCameraUploadRepository @Inject constructor(
 
     override suspend fun broadcastCameraUploadsFolderDestination(data: CameraUploadsFolderDestinationUpdate) =
         appEventGateway.broadcastCameraUploadsFolderDestination(data)
-
-    override fun monitorBatteryInfo() = deviceGateway.monitorBatteryInfo
-
-    override fun monitorChargingStoppedInfo() = deviceGateway.monitorChargingStoppedState
 
     override suspend fun renameNode(nodeHandle: Long, newName: String): Unit =
         withContext(ioDispatcher) {
@@ -391,7 +381,7 @@ internal class DefaultCameraUploadRepository @Inject constructor(
     }
 
     override suspend fun stopCameraUploadsAndBackupHeartbeat() = withContext(ioDispatcher) {
-        workManagerGateway.cancelCameraUploadAndHeartbeatWorkRequest()
+        workManagerGateway.cancelCameraUploadsAndHeartbeatWorkRequest()
     }
 
     override suspend fun listenToNewMedia(forceEnqueue: Boolean) = withContext(ioDispatcher) {
@@ -514,10 +504,6 @@ internal class DefaultCameraUploadRepository @Inject constructor(
                 }
             }
         }
-
-    override suspend fun isCharging() = deviceGateway.isCharging().also {
-        Timber.d("Is Device charging $it")
-    }
 
     override suspend fun getBackupFolderId(cameraUploadFolderType: CameraUploadFolderType): Long? =
         withContext(ioDispatcher) {

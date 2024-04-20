@@ -17,11 +17,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -37,11 +44,7 @@ import mega.privacy.android.core.ui.theme.extensions.body4
 import mega.privacy.android.core.ui.theme.extensions.conditional
 import mega.privacy.android.core.ui.theme.tokens.TextColor
 
-internal const val VOICE_CLIP_MESSAGE_VIEW_PLAY_BUTTON_TEST_TAG =
-    "chat_voice_clip_message_view:play_button"
-internal const val VOICE_CLIP_MESSAGE_VIEW_LOAD_PROGRESS_INDICATOR_TEST_TAG =
-    "chat_voice_clip_message_view:load_progress_indicator"
-
+internal const val INVALID_TIMESTAMP = "--:--"
 
 /**
  * Compose view for voice clip message
@@ -50,7 +53,7 @@ internal const val VOICE_CLIP_MESSAGE_VIEW_LOAD_PROGRESS_INDICATOR_TEST_TAG =
  * @param timestamp timestamp of the voice clip. Show total duration of the voice clip when pause;
  *                  show elapsed time when playing.
  * @param modifier modifier
- * @param isError whether message is in error status
+ * @param exists whether the voice clip exists
  * @param loadProgress loading progress of the message. null if already loaded. The value can be 0-1.
  * @param playProgress playing progress of the audio. null if not playing. The value can be 0-1.
  * @param isPlaying Whether voice clip is playing. Default is false.
@@ -59,20 +62,27 @@ internal const val VOICE_CLIP_MESSAGE_VIEW_LOAD_PROGRESS_INDICATOR_TEST_TAG =
 @Composable
 fun CoreVoiceClipMessageView(
     isMe: Boolean,
-    timestamp: String,
+    timestamp: String?,
+    interactionEnabled: Boolean,
     modifier: Modifier = Modifier,
-    isError: Boolean = false,
+    exists: Boolean = true,
     loadProgress: Float? = null,
     playProgress: Float? = null,
     isPlaying: Boolean = false,
     onPlayClicked: () -> Unit = {},
-    interactionEnabled: Boolean,
+    onSeek: (Float) -> Unit = {},
 ) {
     Box(
         modifier = modifier
             .size(width = 209.dp, height = 56.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(color = if (isMe) MegaTheme.colors.button.primary else MegaTheme.colors.background.surface2),
+            .background(
+                color = when {
+                    !exists -> MegaTheme.colors.button.disabled
+                    isMe -> MegaTheme.colors.icon.accent
+                    else -> MegaTheme.colors.background.surface2
+                }
+            ),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Row(
@@ -83,27 +93,34 @@ fun CoreVoiceClipMessageView(
         ) {
             PlayButton(
                 isMe = isMe,
-                enabled = !isError && loadProgress == null,
+                exists = exists,
                 isPlaying = isPlaying,
-                onPlayClicked = onPlayClicked,
+                onPlayClicked = {
+                    if (loadProgress != null)
+                        return@PlayButton
+
+                    onPlayClicked()
+                },
                 interactionEnabled = interactionEnabled,
             )
-            PlayProgress(
+            PlaySlider(
                 isMe = isMe,
-                progress = playProgress,
-                modifier = Modifier.padding(start = 8.dp)
+                progressByMediaPlayer = playProgress,
+                modifier = Modifier.padding(start = 8.dp),
+                exists = exists,
+                onValueChange = onSeek,
             )
-            TimestampText(isMe = isMe, timestamp = timestamp)
+            TimestampText(isMe = isMe, timestamp = timestamp, exists = exists)
         }
-        LoadOverlay(loadProgress = loadProgress, isError = isError)
-        LoadProgress(loadProgress = loadProgress, isError = isError)
+        LoadOverlay(loadProgress = loadProgress)
+        LoadProgress(loadProgress = loadProgress, exists = exists)
     }
 }
 
 @Composable
-private fun LoadProgress(loadProgress: Float?, isError: Boolean) {
+private fun LoadProgress(loadProgress: Float?, exists: Boolean) {
     loadProgress?.let {
-        if (!isError) {
+        if (exists) {
             MegaLinearProgressIndicator(
                 progress = it,
                 modifier = Modifier
@@ -117,38 +134,82 @@ private fun LoadProgress(loadProgress: Float?, isError: Boolean) {
 }
 
 /**
- * Show the play progress
+ * The slider user can view and control the progress of voice clip playback.
  *
  * @param isMe whether message is sent from me
- * @param progress loading progress of the audio. null if already loaded. The value can be 0-1.
+ * @param progressByMediaPlayer play progress of the audio. null if already loaded. The value can be 0-1.
+ * @param exists whether the voice clip exists
+ * @param onValueChange callback when the progress is changed
+ * @param onValueChangeFinished callback when the progress is changed finished,
+ *                  typically when drag or click is finished.
  */
 @Composable
-private fun PlayProgress(
+private fun PlaySlider(
     isMe: Boolean,
-    progress: Float?,
+    progressByMediaPlayer: Float?,
+    exists: Boolean,
     modifier: Modifier = Modifier,
+    onValueChange: (Float) -> Unit = { },
+    onValueChangeFinished: () -> Unit = { },
 ) {
     // @formatter:off
     val heightList = listOf(12, 12, 18, 14, 8, 12, 16, 20, 20, 24, 8, 32, 14, 14, 14,
         12, 12, 12, 12, 12, 12, 12, 12, 12, 12)
     // @formatter:on
 
+    var progressByUser by remember { mutableStateOf(progressByMediaPlayer) }
+    var isFingerDown by remember { mutableStateOf(false) }
+    val widthInDp = 99
+    val heightInDp = 40
+    val density = LocalDensity.current
+    val widthInPx = remember { with(density) { widthInDp.dp.toPx() }.toFloat() }
+
     Row(
-        modifier = modifier.size(width = 99.dp, height = 40.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = modifier
+            .size(width = widthInDp.dp, height = heightInDp.dp)
+            .testTag(VOICE_CLIP_MESSAGE_VIEW_SLIDER_TEST_TAG)
+            .pointerInput(null) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.type == PointerEventType.Press) {
+                            isFingerDown = true
+                        } else if (event.type == PointerEventType.Release) {
+                            isFingerDown = false
+                            onValueChangeFinished()
+                        }
+
+                        val x = event.changes.first().position.x.coerceIn(0f, widthInPx)
+                        val newProgress = x / widthInPx
+                        if (progressByUser != newProgress) {
+                            progressByUser = newProgress
+                            onValueChange(newProgress)
+                        }
+
+                        // If user is using the slider, consume the event to prevent parent to handle it.
+                        if (isFingerDown) {
+                            event.changes
+                                .first()
+                                .consume()
+                        }
+                    }
+                }
+            },
     ) {
-        val dividerPos = progress?.let { (it * heightList.size).toInt() } ?: 0
+        val progressToShow = if (isFingerDown) progressByUser else progressByMediaPlayer
+        val progressPosition = progressToShow?.let { (it * heightList.size).toInt() } ?: 0
         val color =
             if (isMe) MegaTheme.colors.icon.inverse else MegaTheme.colors.text.onColorDisabled
 
         heightList.forEachIndexed { index, height ->
-            val alpha = if (index < dividerPos) 1f else 0.5f
+            val alpha = if (index < progressPosition) 1f else 0.5f
             Box(
                 modifier = Modifier
                     .size(width = 2.dp, height = height.dp)
                     .background(
-                        color = color.copy(alpha = alpha),
+                        color = if (exists) color.copy(alpha = alpha) else Color.Transparent,
                         shape = RoundedCornerShape(8.dp)
                     )
             )
@@ -157,11 +218,17 @@ private fun PlayProgress(
 }
 
 @Composable
-private fun TimestampText(isMe: Boolean, timestamp: String) {
+private fun TimestampText(isMe: Boolean, timestamp: String?, exists: Boolean) {
     MegaText(
-        modifier = Modifier.padding(start = 8.dp),
-        text = timestamp,
-        textColor = if (isMe) TextColor.Inverse else TextColor.Secondary,
+        modifier = Modifier
+            .padding(start = 8.dp)
+            .testTag(VOICE_CLIP_MESSAGE_VIEW_TIMESTAMP_TEST_TAG),
+        text = timestamp ?: INVALID_TIMESTAMP,
+        textColor = when {
+            !exists -> TextColor.Disabled
+            isMe -> TextColor.Inverse
+            else -> TextColor.Secondary
+        },
         style = MaterialTheme.typography.body4,
     )
 }
@@ -170,23 +237,21 @@ private fun TimestampText(isMe: Boolean, timestamp: String) {
 private fun PlayButton(
     isMe: Boolean,
     isPlaying: Boolean,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    onPlayClicked: () -> Unit = {},
     interactionEnabled: Boolean,
+    modifier: Modifier = Modifier,
+    exists: Boolean = true,
+    onPlayClicked: () -> Unit = {},
 ) {
     Box(
         modifier = modifier
             .size(40.dp)
+            .clip(CircleShape)
             .background(
-                color = MegaTheme.colors.background.blur,
-                shape = CircleShape
+                color = if (exists) MegaTheme.colors.background.blur
+                else MegaTheme.colors.button.disabled,
             )
             .conditional(interactionEnabled) {
-                clickable(
-                    enabled = enabled,
-                    onClick = onPlayClicked
-                )
+                clickable(onClick = onPlayClicked)
             }
             .testTag(VOICE_CLIP_MESSAGE_VIEW_PLAY_BUTTON_TEST_TAG),
         contentAlignment = Alignment.Center,
@@ -196,7 +261,7 @@ private fun PlayButton(
         Icon(
             imageVector = ImageVector.vectorResource(iconId),
             contentDescription = "Play voice clip",
-            tint = if (isMe) MegaTheme.colors.icon.inverse else MegaTheme.colors.icon.onColor
+            tint = if (!exists || isMe) MegaTheme.colors.icon.inverse else MegaTheme.colors.icon.onColor
         )
     }
 }
@@ -207,8 +272,8 @@ private fun PlayButton(
  * @param loadProgress loading progress of the message. null if already loaded. The value can be 0-1.
  */
 @Composable
-private fun LoadOverlay(loadProgress: Float?, isError: Boolean) {
-    if (loadProgress != null || isError) {
+private fun LoadOverlay(loadProgress: Float?) {
+    loadProgress?.let {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -232,7 +297,7 @@ private fun Preview(
             loadProgress = parameter.loadProgress,
             playProgress = parameter.playProgress,
             isPlaying = parameter.isPlaying,
-            isError = parameter.hasError,
+            exists = parameter.exists,
             interactionEnabled = true,
         )
     }
@@ -244,7 +309,7 @@ private class VoiceClipMessageViewPreviewParameter(
     val loadProgress: Float? = null,
     val playProgress: Float? = null,
     val isPlaying: Boolean = true,
-    val hasError: Boolean = false,
+    val exists: Boolean = true,
 )
 
 private class Provider : PreviewParameterProvider<VoiceClipMessageViewPreviewParameter> {
@@ -262,9 +327,23 @@ private class Provider : PreviewParameterProvider<VoiceClipMessageViewPreviewPar
             VoiceClipMessageViewPreviewParameter(isMe = false, playProgress = .8f),
             VoiceClipMessageViewPreviewParameter(
                 timestamp = "--:--",
-                hasError = true,
+                exists = false,
+                isPlaying = false
+            ),
+            VoiceClipMessageViewPreviewParameter(
+                isMe = false,
+                timestamp = "--:--",
+                exists = false,
                 isPlaying = false
             ),
         )
 }
 
+internal const val VOICE_CLIP_MESSAGE_VIEW_PLAY_BUTTON_TEST_TAG =
+    "chat_voice_clip_message_view:play_button"
+internal const val VOICE_CLIP_MESSAGE_VIEW_LOAD_PROGRESS_INDICATOR_TEST_TAG =
+    "chat_voice_clip_message_view:load_progress_indicator"
+
+internal const val VOICE_CLIP_MESSAGE_VIEW_TIMESTAMP_TEST_TAG =
+    "chat_voice_clip_message_view:timestamp"
+internal const val VOICE_CLIP_MESSAGE_VIEW_SLIDER_TEST_TAG = "chat_voice_clip_message_view:slider"

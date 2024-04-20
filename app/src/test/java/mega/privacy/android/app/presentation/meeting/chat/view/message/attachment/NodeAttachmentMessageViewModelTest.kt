@@ -4,6 +4,7 @@ import android.content.Intent
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.copynode.CopyRequestResult
 import mega.privacy.android.app.presentation.copynode.mapper.CopyRequestMessageMapper
 import mega.privacy.android.app.presentation.mapper.file.FileSizeStringMapper
@@ -37,6 +38,7 @@ import mega.privacy.android.domain.usecase.chat.GetShareChatNodesUseCase
 import mega.privacy.android.domain.usecase.chat.message.GetCachedOriginalPathUseCase
 import mega.privacy.android.domain.usecase.chat.message.GetMessageIdsByTypeUseCase
 import mega.privacy.android.domain.usecase.favourites.IsAvailableOfflineUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.node.GetNodeContentUriUseCase
 import mega.privacy.android.domain.usecase.node.GetNodePreviewFileUseCase
 import mega.privacy.android.domain.usecase.node.ImportTypedNodesUseCase
@@ -79,6 +81,7 @@ class NodeAttachmentMessageViewModelTest {
     private val getShareChatNodesUseCase: GetShareChatNodesUseCase = mock()
     private val importTypedNodesUseCase = mock<ImportTypedNodesUseCase>()
     private val copyRequestMessageMapper = mock<CopyRequestMessageMapper>()
+    private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase>()
 
     @BeforeEach
     internal fun initTests() {
@@ -98,6 +101,7 @@ class NodeAttachmentMessageViewModelTest {
             getShareChatNodesUseCase = getShareChatNodesUseCase,
             importTypedNodesUseCase = importTypedNodesUseCase,
             copyRequestMessageMapper = copyRequestMessageMapper,
+            getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
         )
     }
 
@@ -137,7 +141,7 @@ class NodeAttachmentMessageViewModelTest {
         }
         whenever(getPreviewUseCase(fileNode)).thenReturn(previewFile)
         val msg = buildNodeAttachmentMessage(fileNode)
-        underTest.getOrPutUiStateFlow(msg).test {
+        underTest.updateAndGetUiStateFlow(msg).test {
             val actual = awaitItem().previewUri
             assertThat(actual).isEqualTo(expected)
         }
@@ -160,7 +164,7 @@ class NodeAttachmentMessageViewModelTest {
         whenever(fileSizeStringMapper(any())).thenReturn(expectedSize)
 
         val msg = buildNodeAttachmentMessage(fileNode)
-        underTest.getOrPutUiStateFlow(msg).test {
+        underTest.updateAndGetUiStateFlow(msg).test {
             val actual = awaitItem()
             assertThat(actual.fileName).isEqualTo(expectedName)
             assertThat(actual.fileSize).isEqualTo(expectedSize)
@@ -184,7 +188,7 @@ class NodeAttachmentMessageViewModelTest {
         whenever(getCachedOriginalPathUseCase(fileNode)).thenReturn(expected)
 
         val msg = buildNodeAttachmentMessage(fileNode)
-        underTest.getOrPutUiStateFlow(msg).test {
+        underTest.updateAndGetUiStateFlow(msg).test {
             val actual = awaitItem()
             assertThat(actual.previewUri).isEqualTo(expected)
         }
@@ -204,7 +208,7 @@ class NodeAttachmentMessageViewModelTest {
         whenever(fileSizeStringMapper(any())).thenReturn("1byte")
 
         val msg = buildNodeAttachmentMessage(fileNode)
-        underTest.getOrPutUiStateFlow(msg).test {
+        underTest.updateAndGetUiStateFlow(msg).test {
             val actual = awaitItem()
             assertThat(actual.previewUri).isNull()
         }
@@ -411,6 +415,12 @@ class NodeAttachmentMessageViewModelTest {
         assertThat(underTest.getCopyNodesResult(result)).isEqualTo(stringResult)
     }
 
+    @Test
+    fun `test useImagePreview invokes and returns correctly`() = runTest {
+        whenever(getFeatureFlagValueUseCase(AppFeatures.ImagePreview)).thenReturn(true)
+        assertThat(underTest.useImagePreview()).isTrue()
+    }
+
     private fun getFileAndVideoTypes(): List<FileTypeInfo> {
         val m = "mime/type"
         val e = "ext"
@@ -450,6 +460,8 @@ class NodeAttachmentMessageViewModelTest {
             reactions = emptyList(),
             status = ChatMessageStatus.UNKNOWN,
             content = null,
+            exists = true,
+            rowId = 1L,
         )
 }
 

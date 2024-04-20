@@ -17,7 +17,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -25,12 +24,17 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.usecase.GetThemeMode
+import mega.privacy.android.feature.devicecenter.navigation.deviceCenterInfoNavGraph
+import mega.privacy.android.feature.devicecenter.navigation.deviceCenterRoute
+import mega.privacy.android.feature.devicecenter.ui.model.DeviceCenterUINode
 import mega.privacy.android.feature.devicecenter.ui.model.DeviceMenuAction
 import mega.privacy.android.navigation.MegaNavigator
 import mega.privacy.android.shared.theme.MegaAppTheme
@@ -127,19 +131,6 @@ class DeviceCenterFragment : Fragment() {
                                 errorMessage = backupFolderUINode.status.localizedErrorMessage,
                             )
                         },
-                        onBackupFolderMenuClicked = { backupDeviceFolderUINode ->
-                            megaNavigator.openDeviceCenterFolderNodeOptions(
-                                activity = this@DeviceCenterFragment.activity
-                                    ?: return@DeviceCenterScreen,
-                                isBackupsFolder = true,
-                                nodeName = backupDeviceFolderUINode.name,
-                                nodeHandle = backupDeviceFolderUINode.rootHandle,
-                                nodeStatus = getString(backupDeviceFolderUINode.status.name),
-                                nodeStatusColorInt = backupDeviceFolderUINode.status.color?.toArgb(),
-                                nodeIcon = backupDeviceFolderUINode.icon.iconRes,
-                                nodeStatusIcon = backupDeviceFolderUINode.status.icon,
-                            )
-                        },
                         onNonBackupFolderClicked = { nonBackupDeviceFolderUINode ->
                             Analytics.tracker.trackEvent(
                                 DeviceCenterItemClickedEvent(
@@ -154,19 +145,7 @@ class DeviceCenterFragment : Fragment() {
                                 errorMessage = nonBackupDeviceFolderUINode.status.localizedErrorMessage,
                             )
                         },
-                        onNonBackupFolderMenuClicked = { nonBackupDeviceFolderUINode ->
-                            megaNavigator.openDeviceCenterFolderNodeOptions(
-                                activity = this@DeviceCenterFragment.activity
-                                    ?: return@DeviceCenterScreen,
-                                isBackupsFolder = false,
-                                nodeName = nonBackupDeviceFolderUINode.name,
-                                nodeHandle = nonBackupDeviceFolderUINode.rootHandle,
-                                nodeStatus = getString(nonBackupDeviceFolderUINode.status.name),
-                                nodeStatusColorInt = nonBackupDeviceFolderUINode.status.color?.toArgb(),
-                                nodeIcon = nonBackupDeviceFolderUINode.icon.iconRes,
-                                nodeStatusIcon = nonBackupDeviceFolderUINode.status.icon,
-                            )
-                        },
+                        onInfoOptionClicked = viewModel::onInfoClicked,
                         onCameraUploadsClicked = {
                             megaNavigator.openSettingsCameraUploads(requireActivity())
                         },
@@ -191,7 +170,9 @@ class DeviceCenterFragment : Fragment() {
                                 }
 
                                 is DeviceMenuAction.Info -> {
-                                    //TODO when the device info screen is ready
+                                    uiState.selectedDevice?.let { device ->
+                                        viewModel.onInfoClicked(selectedItem = device)
+                                    }
                                 }
 
                                 is DeviceMenuAction.CameraUploads -> {
@@ -206,6 +187,19 @@ class DeviceCenterFragment : Fragment() {
                                 .fillMaxSize()
                                 .background(MaterialTheme.colors.background)
                         )
+                    }
+                    if (uiState.infoSelectedItem != null) {
+                        val animatedNavController = rememberNavController()
+                        NavHost(
+                            navController = animatedNavController,
+                            startDestination = deviceCenterRoute,
+                        ) {
+                            deviceCenterInfoNavGraph(
+                                navController = animatedNavController,
+                                selectedItem = uiState.infoSelectedItem as DeviceCenterUINode,
+                                onBackPressHandled = viewModel::onInfoBackPressHandle
+                            )
+                        }
                     }
                 }
             }

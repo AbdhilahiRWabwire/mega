@@ -22,11 +22,14 @@ class VideoUIEntityMapper @Inject constructor(
         parentId = typedVideoNode.parentId,
         name = typedVideoNode.name,
         size = typedVideoNode.size,
+        fileTypeInfo = typedVideoNode.type,
         durationString = durationInSecondsTextMapper(typedVideoNode.duration),
-        durationInMinutes = typedVideoNode.duration.inWholeMinutes,
+        duration = typedVideoNode.duration,
         thumbnail = typedVideoNode.thumbnailPath?.let { File(it) },
         isFavourite = typedVideoNode.isFavourite,
         isSharedItems = typedVideoNode.exportedData != null,
-        nodeAvailableOffline = typedVideoNode.isAvailableOffline
+        nodeAvailableOffline = typedVideoNode.isAvailableOffline,
+        label = typedVideoNode.label,
+        elementID = typedVideoNode.elementID
     )
 }

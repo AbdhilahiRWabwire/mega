@@ -342,12 +342,14 @@ class DefaultNotificationsRepositoryTest {
 
     @Test
     fun `test that list of promo notifications is fetched`() = runTest {
+        val staticURL = "https://eu.static.mega.co.nz/psa/"
+        val testImageName = "vpn"
         val promoNotification = PromoNotification(
             promoID = 1L,
             title = "title",
             description = "description",
-            imageName = "imageName",
-            imageURL = "imageURL",
+            iconURL = "$staticURL$testImageName@2x.png",
+            imageURL = "$staticURL$testImageName@2x.png",
             startTimeStamp = 1L,
             endTimeStamp = 2L,
             actionName = "actionName",
@@ -365,8 +367,9 @@ class DefaultNotificationsRepositoryTest {
             on { id } doReturn 1L
             on { title } doReturn promoNotification.title
             on { description } doReturn promoNotification.description
-            on { imageName } doReturn promoNotification.imageName
-            on { imagePath } doReturn promoNotification.imageURL
+            on { iconName } doReturn testImageName
+            on { imageName } doReturn testImageName
+            on { imagePath } doReturn staticURL
             on { start } doReturn 1L
             on { end } doReturn 2L
             on { callToAction1 }.thenReturn(callToAction1Mock)
@@ -415,6 +418,42 @@ class DefaultNotificationsRepositoryTest {
             val result = underTest.getPromoNotifications()
             assertThat(result).isEmpty()
         }
+
+    @Test
+    fun `test that the last notification id is returned`() = runTest {
+        val expectedId = 123L
+        val megaApiJava = mock<MegaApiJava>()
+        val request = mock<MegaRequest> { on { number }.thenReturn(expectedId) }
+        val mock = mock<MegaError> { on { errorCode }.thenReturn(MegaError.API_OK) }
+
+        whenever(notificationsGateway.getLastReadNotificationId(any())).thenAnswer {
+            (it.arguments[0] as MegaRequestListenerInterface).onRequestFinish(
+                megaApiJava,
+                request,
+                mock
+            )
+        }
+        val result = underTest.getLastReadNotificationId()
+        assertThat(result).isEqualTo(expectedId)
+    }
+
+    @Test
+    fun `test that the last notification id is 0 when MegaError is API_ENOENT`() = runTest {
+        val expectedId = 0L
+        val megaApiJava = mock<MegaApiJava>()
+        val request = mock<MegaRequest> { on { number }.thenReturn(expectedId) }
+        val mock = mock<MegaError> { on { errorCode }.thenReturn(MegaError.API_ENOENT) }
+
+        whenever(notificationsGateway.getLastReadNotificationId(any())).thenAnswer {
+            (it.arguments[0] as MegaRequestListenerInterface).onRequestFinish(
+                megaApiJava,
+                request,
+                mock
+            )
+        }
+        val result = underTest.getLastReadNotificationId()
+        assertThat(result).isEqualTo(expectedId)
+    }
 
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     @Nested

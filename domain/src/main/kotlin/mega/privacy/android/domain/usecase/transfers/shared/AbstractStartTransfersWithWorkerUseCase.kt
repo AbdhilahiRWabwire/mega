@@ -25,8 +25,10 @@ abstract class AbstractStartTransfersWithWorkerUseCase(
     ) = emitAll(doTransfers()
         .filter {
             it !is MultiTransferEvent.SingleTransferEvent
+                    || (it.scanningFinished)
         }.transformWhile { event ->
-            val finished = event is MultiTransferEvent.ScanningFoldersFinished
+            val finished =
+                (event as? MultiTransferEvent.SingleTransferEvent)?.scanningFinished == true
             //emitting a FinishProcessingTransfers can cause a terminal event in the collector (firstOrNull for instance), so we need to start the worker before emitting it
             if (finished) {
                 startWorker()

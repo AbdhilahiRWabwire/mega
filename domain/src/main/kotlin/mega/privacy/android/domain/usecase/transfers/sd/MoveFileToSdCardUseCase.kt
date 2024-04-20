@@ -9,15 +9,15 @@ import javax.inject.Inject
  * Moves a file to a destination path in the sd card. User must have set downloads destination on sd for this to work
  */
 class MoveFileToSdCardUseCase @Inject constructor(
-    private val settingsRepository: SettingsRepository,
     private val fileSystemRepository: FileSystemRepository,
+    private val settingsRepository: SettingsRepository,
 ) {
     /**
      * invoke
      */
-    suspend operator fun invoke(file: File, destinationPath: String) {
-        settingsRepository.getDownloadToSdCardUri()?.let { sdCardUri ->
-            fileSystemRepository.moveFileToSd(file, destinationPath, sdCardUri)
-        }
+    suspend operator fun invoke(file: File, destinationUri: String, subFolders: List<String>) {
+        val destination = destinationUri.takeUnless { it.startsWith(File.separator) }
+            ?: settingsRepository.getDownloadToSdCardUri()
+        fileSystemRepository.moveFileToSd(file, destination ?: destinationUri, subFolders)
     }
 }

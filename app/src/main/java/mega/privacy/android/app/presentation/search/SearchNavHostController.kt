@@ -3,17 +3,17 @@ package mega.privacy.android.app.presentation.search
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import com.google.accompanist.navigation.material.BottomSheetNavigator
 import com.google.accompanist.navigation.material.ExperimentalMaterialNavigationApi
-import com.google.accompanist.navigation.material.ModalBottomSheetLayout
 import mega.privacy.android.app.presentation.node.NodeActionHandler
 import mega.privacy.android.app.presentation.node.NodeActionsViewModel
 import mega.privacy.android.app.presentation.search.model.SearchFilter
+import mega.privacy.android.core.ui.controls.sheets.MegaBottomSheetLayout
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.feature.sync.data.mapper.ListToStringWithDelimitersMapper
+import mega.privacy.android.feature.sync.ui.mapper.FileTypeIconMapper
 
 /**
  * Search nav host controller
@@ -44,13 +44,13 @@ internal fun SearchNavHostController(
     bottomSheetNavigator: BottomSheetNavigator,
     nodeActionsViewModel: NodeActionsViewModel,
     listToStringWithDelimitersMapper: ListToStringWithDelimitersMapper,
+    fileTypeIconMapper: FileTypeIconMapper,
     handleClick: (TypedNode?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ModalBottomSheetLayout(
+    MegaBottomSheetLayout(
         modifier = modifier.navigationBarsPadding(),
         bottomSheetNavigator = bottomSheetNavigator,
-        scrimColor = Color.Black.copy(alpha = 0.5f)
     ) {
         NavHost(
             modifier = modifier.navigationBarsPadding(),
@@ -67,7 +67,8 @@ internal fun SearchNavHostController(
                 onBackPressed = onBackPressed,
                 nodeActionsViewModel = nodeActionsViewModel,
                 handleClick = handleClick,
-                listToStringWithDelimitersMapper = listToStringWithDelimitersMapper
+                listToStringWithDelimitersMapper = listToStringWithDelimitersMapper,
+                fileTypeIconMapper = fileTypeIconMapper
             )
         }
     }

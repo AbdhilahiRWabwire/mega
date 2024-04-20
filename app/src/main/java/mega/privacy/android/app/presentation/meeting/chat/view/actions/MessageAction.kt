@@ -8,10 +8,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import mega.privacy.android.app.presentation.meeting.chat.model.messages.actions.MessageActionGroup
+import mega.privacy.android.core.ui.controls.lists.MenuActionListTile
 import mega.privacy.android.core.ui.model.MenuActionWithClick
 import mega.privacy.android.core.ui.model.MenuActionWithIcon
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
-import mega.privacy.android.legacy.core.ui.controls.lists.MenuActionListTile
 
 /**
  * Message action
@@ -19,11 +20,13 @@ import mega.privacy.android.legacy.core.ui.controls.lists.MenuActionListTile
  * @property text
  * @property icon
  * @property testTag
+ * @property group
  */
 abstract class MessageAction(
     @StringRes val text: Int,
     @DrawableRes val icon: Int,
     private val testTag: String,
+    val group: MessageActionGroup,
 ) {
 
     /**
@@ -37,12 +40,27 @@ abstract class MessageAction(
     val toolbarMenuItemTestTag = "chat_message_toolbar:$testTag"
 
     /**
+     * Applies to send error
+     */
+    protected open val appliesToSendError = false
+
+    /**
      * Applies to
      *
      * @param messages
-     * @return
+     * @return true if the action should be displayed for the selected set of messages
      */
-    abstract fun appliesTo(messages: Set<TypedMessage>): Boolean
+    fun appliesTo(messages: Set<TypedMessage>) =
+        (appliesToSendError || messages.none { it.isSendError() }) && shouldDisplayFor(messages)
+
+    /**
+     * Should display for
+     *
+     * @param messages
+     * @return true if the action should be displayed for the selected set of messages excluding
+     * checking for send errors
+     */
+    protected abstract fun shouldDisplayFor(messages: Set<TypedMessage>): Boolean
 
     /**
      * In column
@@ -57,6 +75,7 @@ abstract class MessageAction(
         setAction: ((@Composable () -> Unit)?) -> Unit,
     ): @Composable () -> Unit = bottomSheetItem(messages.first()) {
         setAction {
+            trackTriggerEvent(source = TriggerSource.BottomSheet)
             OnTrigger(messages = messages) {
                 setAction(null)
             }
@@ -76,6 +95,7 @@ abstract class MessageAction(
         setAction: ((@Composable () -> Unit)?) -> Unit,
     ): MenuActionWithClick? = toolbarItem(messages) {
         setAction {
+            trackTriggerEvent(source = TriggerSource.Toolbar)
             OnTrigger(messages = messages) {
                 setAction(null)
             }
@@ -111,14 +131,9 @@ abstract class MessageAction(
                 .testTag(bottomSheetItemTestTag)
                 .clickable { onClick() },
             isDestructive = isBottomSheetItemDestructive(),
-            addSeparator = showBottomSheetItemSeparator(message),
+            dividerType = null,
         )
     }
-
-    /**
-     * Show bottom sheet item separator.
-     */
-    protected open fun showBottomSheetItemSeparator(message: TypedMessage): Boolean = true
 
 
     /**
@@ -150,5 +165,27 @@ abstract class MessageAction(
     @Composable
     abstract fun OnTrigger(messages: Set<TypedMessage>, onHandled: () -> Unit)
 
+    /**
+     * Track [OnTrigger] - Analytics purposes
+     * Should be called before we call the [OnTrigger] method
+     *
+     * @param source [TriggerSource]
+     */
+    open fun trackTriggerEvent(source: TriggerSource) {}
 
+    /**
+     * An interface to differentiate the trigger source of a message action
+     */
+    sealed interface TriggerSource {
+
+        /**
+         * Indicates that bottom sheet is the trigger source of a message action
+         */
+        data object BottomSheet : TriggerSource
+
+        /**
+         * Indicates that toolbar is the trigger source of a message action
+         */
+        data object Toolbar : TriggerSource
+    }
 }

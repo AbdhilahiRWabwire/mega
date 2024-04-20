@@ -464,9 +464,13 @@ internal class DefaultTransfersRepository @Inject constructor(
         megaLocalRoomGateway.getAllCompletedTransfers(size)
             .flowOn(ioDispatcher)
 
-    override suspend fun addCompletedTransfer(transfer: Transfer, megaException: MegaException?) {
+    override suspend fun addCompletedTransfer(
+        transfer: Transfer,
+        megaException: MegaException?,
+        transferPath: String?,
+    ) {
         withContext(ioDispatcher) {
-            val completedTransfer = completedTransferMapper(transfer, megaException)
+            val completedTransfer = completedTransferMapper(transfer, megaException, transferPath)
             megaLocalRoomGateway.addCompletedTransfer(completedTransfer)
             appEventGateway.broadcastCompletedTransfer(completedTransfer)
         }
@@ -648,6 +652,10 @@ internal class DefaultTransfersRepository @Inject constructor(
 
     override suspend fun getAllSdTransfers(): List<SdTransfer> =
         megaLocalRoomGateway.getAllSdTransfers()
+
+    override suspend fun getSdTransferByTag(tag: Int): SdTransfer? = withContext(ioDispatcher) {
+        megaLocalRoomGateway.getSdTransferByTag(tag)
+    }
 
     override suspend fun deleteSdTransferByTag(tag: Int) {
         megaLocalRoomGateway.deleteSdTransferByTag(tag)

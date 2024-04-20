@@ -1,11 +1,14 @@
 package mega.privacy.android.app.presentation.imagepreview
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.core.os.bundleOf
@@ -28,6 +31,7 @@ import mega.privacy.android.app.components.saver.NodeSaver
 import mega.privacy.android.app.modalbottomsheet.nodelabel.NodeLabelBottomSheetDialogFragment
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.fileinfo.FileInfoActivity
+import mega.privacy.android.app.presentation.hidenode.HiddenNodesOnboardingActivity
 import mega.privacy.android.app.presentation.imagepreview.ImagePreviewViewModel.Companion.FETCHER_PARAMS
 import mega.privacy.android.app.presentation.imagepreview.ImagePreviewViewModel.Companion.IMAGE_NODE_FETCHER_SOURCE
 import mega.privacy.android.app.presentation.imagepreview.ImagePreviewViewModel.Companion.IMAGE_PREVIEW_IS_FOREIGN
@@ -38,6 +42,8 @@ import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewMenu
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewState
 import mega.privacy.android.app.presentation.imagepreview.slideshow.SlideshowActivity
 import mega.privacy.android.app.presentation.imagepreview.view.ImagePreviewScreen
+import mega.privacy.android.app.presentation.passcode.model.PasscodeCryptObjectFactory
+import mega.privacy.android.app.presentation.security.check.PasscodeContainer
 import mega.privacy.android.app.utils.AlertsAndWarnings
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.LinksUtil
@@ -45,7 +51,9 @@ import mega.privacy.android.app.utils.MegaNodeDialogUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.app.utils.MegaNodeUtil.onNodeTapped
 import mega.privacy.android.app.utils.permission.PermissionUtils
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.ThemeMode
+import mega.privacy.android.domain.entity.account.AccountDetail
 import mega.privacy.android.domain.entity.node.ImageNode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.GetThemeMode
@@ -59,17 +67,18 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class ImagePreviewActivity : BaseActivity() {
-
     @Inject
     lateinit var getThemeMode: GetThemeMode
 
     @Inject
-    lateinit var imagePreviewVideoLauncher: ImagePreviewVideoLauncher
+    lateinit var passcodeCryptObjectFactory: PasscodeCryptObjectFactory
+
     private val selectMoveFolderLauncher: ActivityResultLauncher<LongArray> =
         registerForActivityResult(
             SelectFolderToMoveActivityContract(),
             ::handleMoveFolderResult,
         )
+
     private val selectCopyFolderLauncher: ActivityResultLauncher<LongArray> =
         registerForActivityResult(
             SelectFolderToCopyActivityContract(),
@@ -80,6 +89,12 @@ class ImagePreviewActivity : BaseActivity() {
         registerForActivityResult(
             SelectFolderToImportActivityContract(),
             ::handleImportFolderResult
+        )
+
+    private val hiddenNodesOnboardingLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+            ::handleHiddenNodesOnboardingResult,
         )
 
     private val viewModel: ImagePreviewViewModel by viewModels()
@@ -99,6 +114,8 @@ class ImagePreviewActivity : BaseActivity() {
         intent.getBooleanExtra(IMAGE_PREVIEW_IS_FOREIGN, false)
     }
 
+    private var tempNodeId: NodeId? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (showScreenLabel) {
@@ -112,26 +129,34 @@ class ImagePreviewActivity : BaseActivity() {
         setContent {
             val themeMode by getThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.System)
             MegaAppTheme(isDark = themeMode.isDarkMode()) {
-                ImagePreviewScreen(
-                    onClickBack = ::finish,
-                    onClickVideoPlay = ::playVideo,
-                    onClickSlideshow = ::playSlideshow,
-                    onClickInfo = ::checkInfo,
-                    onClickFavourite = ::favouriteNode,
-                    onClickLabel = ::handleLabel,
-                    onClickOpenWith = ::handleOpenWith,
-                    onClickSaveToDevice = ::saveNodeToDevice,
-                    onClickImport = ::importNode,
-                    onSwitchAvailableOffline = ::setAvailableOffline,
-                    onClickGetLink = ::getNodeLink,
-                    onClickSendTo = ::sendNodeToChat,
-                    onClickShare = ::shareNode,
-                    onClickRename = ::renameNode,
-                    onClickMove = ::moveNode,
-                    onClickCopy = ::copyNode,
-                    onClickRestore = ::restoreNode,
-                    onClickRemove = ::removeNode,
-                    onClickMoveToRubbishBin = ::moveNodeToRubbishBin,
+                PasscodeContainer(
+                    passcodeCryptObjectFactory = passcodeCryptObjectFactory,
+                    content = {
+                        ImagePreviewScreen(
+                            onClickBack = ::finish,
+                            onClickVideoPlay = ::playVideo,
+                            onClickSlideshow = ::playSlideshow,
+                            onClickInfo = ::checkInfo,
+                            onClickFavourite = ::favouriteNode,
+                            onClickLabel = ::handleLabel,
+                            onClickOpenWith = ::handleOpenWith,
+                            onClickSaveToDevice = ::saveNodeToDevice,
+                            onClickImport = ::importNode,
+                            onSwitchAvailableOffline = ::setAvailableOffline,
+                            onClickGetLink = ::getNodeLink,
+                            onClickSendTo = ::sendNodeToChat,
+                            onClickShare = ::shareNode,
+                            onClickRename = ::renameNode,
+                            onClickHide = ::hideNode,
+                            onClickHideHelp = ::showHiddenNodesOnboarding,
+                            onClickUnhide = ::unhideNode,
+                            onClickMove = ::moveNode,
+                            onClickCopy = ::copyNode,
+                            onClickRestore = ::restoreNode,
+                            onClickRemove = ::removeNode,
+                            onClickMoveToRubbishBin = ::moveNodeToRubbishBin,
+                        )
+                    }
                 )
             }
         }
@@ -239,7 +264,7 @@ class ImagePreviewActivity : BaseActivity() {
     }
 
     private fun sendNodeToChat(imageNode: ImageNode) {
-        nodeAttacher.attachNode(imageNode.id.longValue)
+        nodeAttacher.attachNode(MegaNode.unserialize(imageNode.serializedData))
     }
 
     private fun getNodeLink(imageNode: ImageNode) {
@@ -253,6 +278,43 @@ class ImagePreviewActivity : BaseActivity() {
     private fun renameNode(imageNode: ImageNode) {
         val node = MegaNode.unserialize(imageNode.serializedData)
         MegaNodeDialogUtil.showRenameNodeDialog(this, node, this, null)
+    }
+
+    private fun hideNode(
+        imageNode: ImageNode,
+        accountDetail: AccountDetail?,
+        isHiddenNodesOnboarded: Boolean?,
+    ) {
+        val accountType = accountDetail?.levelDetail?.accountType
+
+        if (accountType == AccountType.FREE || accountType == AccountType.UNKNOWN) {
+            val intent = HiddenNodesOnboardingActivity.createScreen(
+                context = this,
+                isOnboarding = false,
+            )
+            hiddenNodesOnboardingLauncher.launch(intent)
+            overridePendingTransition(0, 0)
+        } else if (isHiddenNodesOnboarded == false) {
+            tempNodeId = imageNode.id
+            showHiddenNodesOnboarding()
+        } else {
+            viewModel.hideNode(nodeId = imageNode.id)
+        }
+    }
+
+    private fun showHiddenNodesOnboarding() {
+        viewModel.setHiddenNodesOnboarded()
+
+        val intent = HiddenNodesOnboardingActivity.createScreen(
+            context = this,
+            isOnboarding = true,
+        )
+        hiddenNodesOnboardingLauncher.launch(intent)
+        overridePendingTransition(0, 0)
+    }
+
+    private fun unhideNode(imageNode: ImageNode) {
+        viewModel.unhideNode(nodeId = imageNode.id)
     }
 
     private fun moveNode(imageNode: ImageNode) {
@@ -290,9 +352,9 @@ class ImagePreviewActivity : BaseActivity() {
 
     private fun playVideo(imageNode: ImageNode) {
         lifecycleScope.launch {
-            imagePreviewVideoLauncher.launchVideoScreen(
+            viewModel.playVideo(
+                this@ImagePreviewActivity,
                 imageNode = imageNode,
-                context = this@ImagePreviewActivity,
             )
         }
     }
@@ -351,6 +413,16 @@ class ImagePreviewActivity : BaseActivity() {
             downloadForPreview = true,
             downloadByOpenWith = true
         )
+    }
+
+    private fun handleHiddenNodesOnboardingResult(result: ActivityResult) {
+        if (result.resultCode != Activity.RESULT_OK) return
+        val nodeId = tempNodeId ?: return
+
+        viewModel.hideNode(nodeId)
+
+        val message = resources.getQuantityString(R.plurals.hidden_nodes_result_message, 1, 1)
+        viewModel.setResultMessage(message)
     }
 
     companion object {

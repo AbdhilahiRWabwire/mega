@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.contactinfo.view
 
+import mega.privacy.android.icon.pack.R as iconPackR
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.Divider
@@ -18,7 +19,7 @@ import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.CoroutineScope
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.contactinfo.model.ContactInfoState
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.core.ui.controls.lists.MenuActionListTile
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.core.ui.theme.extensions.grey_alpha_012_white_alpha_012
 import mega.privacy.android.domain.entity.ChatRoomPermission
@@ -28,7 +29,7 @@ import mega.privacy.android.domain.entity.contacts.ContactItem
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.android.domain.entity.user.UserVisibility
 import mega.privacy.android.legacy.core.ui.controls.controlssliders.MegaSwitch
-import mega.privacy.android.legacy.core.ui.controls.lists.MenuActionListTile
+import mega.privacy.android.shared.theme.MegaAppTheme
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -76,7 +77,7 @@ internal fun ContactInfoContent(
     }
     MenuActionListTile(
         text = stringResource(id = R.string.title_properties_chat_share_contact),
-        icon = painterResource(id = R.drawable.ic_share_contact),
+        icon = painterResource(id = iconPackR.drawable.ic_user_right_medium_regular_outline),
     )
     VerifyCredentialsView(isVerified = uiState.areCredentialsVerified)
     if (uiState.chatRoom != null) {
@@ -93,7 +94,7 @@ internal fun ContactInfoContent(
         text = stringResource(id = R.string.title_properties_remove_contact),
         icon = painterResource(id = R.drawable.ic_remove_contact),
         isDestructive = true,
-        addSeparator = false,
+        dividerType = null,
     )
 }
 

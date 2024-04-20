@@ -14,9 +14,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.app.namecollision.NameCollisionActivity
 import mega.privacy.android.app.namecollision.data.NameCollision
+import mega.privacy.android.app.presentation.meeting.chat.model.messages.actions.MessageActionGroup
 import mega.privacy.android.app.presentation.meeting.chat.view.message.attachment.NodeAttachmentMessageViewModel
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openFileExplorerActivity
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openNameCollisionActivity
@@ -24,6 +26,8 @@ import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.core.ui.controls.layouts.LocalSnackBarHostState
 import mega.privacy.android.domain.entity.chat.messages.NodeAttachmentMessage
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
+import mega.privacy.mobile.analytics.event.ChatConversationAddToCloudDriveActionMenuEvent
+import mega.privacy.mobile.analytics.event.ChatConversationAddToCloudDriveActionMenuItemEvent
 
 internal class ImportMessageAction(
     private val launchFolderPicker: (Context, ActivityResultLauncher<Intent>) -> Unit = ::openFileExplorerActivity,
@@ -32,9 +36,10 @@ internal class ImportMessageAction(
     text = R.string.general_import,
     icon = R.drawable.ic_cloud_upload_medium_regular_outline,
     testTag = "import_node",
+    group = MessageActionGroup.Transfer,
 ) {
-    override fun appliesTo(messages: Set<TypedMessage>) = messages.isNotEmpty()
-            && messages.all { it is NodeAttachmentMessage }
+    override fun shouldDisplayFor(messages: Set<TypedMessage>) = messages.isNotEmpty()
+            && messages.all { it is NodeAttachmentMessage && it.exists }
 
     @Composable
     override fun OnTrigger(messages: Set<TypedMessage>, onHandled: () -> Unit) {
@@ -124,6 +129,18 @@ internal class ImportMessageAction(
             LaunchedEffect(Unit) {
                 collisionsResult?.let { snackbarHostState?.showSnackbar(it) }
                 onHandled()
+            }
+        }
+    }
+
+    override fun trackTriggerEvent(source: TriggerSource) {
+        when (source) {
+            TriggerSource.BottomSheet -> {
+                Analytics.tracker.trackEvent(ChatConversationAddToCloudDriveActionMenuItemEvent)
+            }
+
+            TriggerSource.Toolbar -> {
+                Analytics.tracker.trackEvent(ChatConversationAddToCloudDriveActionMenuEvent)
             }
         }
     }

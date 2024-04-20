@@ -17,13 +17,13 @@ fun PendingVoiceClipMessageView(
     modifier: Modifier = Modifier,
     viewModel: PendingAttachmentMessageViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.getOrPutUiStateFlow(message).collectAsStateWithLifecycle()
+    val uiState by viewModel.updateAndGetUiStateFlow(message).collectAsStateWithLifecycle()
 
     CoreVoiceClipMessageView(
         isMe = message.isMine,
         timestamp = uiState.duration ?: "",
         modifier = modifier,
-        isError = uiState.isError,
+        exists = true,
         loadProgress = uiState.loadProgress?.floatValue,
         interactionEnabled = false,
     )

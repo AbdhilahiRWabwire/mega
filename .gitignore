@@ -19,6 +19,7 @@
 .idea/androidTestResultsUserPreferences.xml
 .idea/deploymentTargetDropDown.xml
 .idea/shelf/*
+.idea/copilot/
 
 # Sensitive or high-churn files:
 .idea/dataSources.ids
@@ -56,4 +57,4 @@ captures
 *.DS_Store
 wget-log
 
-credential.properties
+credentials.properties

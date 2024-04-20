@@ -55,6 +55,8 @@ import mega.privacy.android.domain.exception.ChatNotInitializedException
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.account.ConfirmCancelAccountException
 import mega.privacy.android.domain.exception.account.ConfirmChangeEmailException
+import mega.privacy.android.domain.exception.account.QueryCancelLinkException
+import mega.privacy.android.domain.exception.account.QueryChangeEmailLinkException
 import mega.privacy.android.domain.repository.AccountRepository
 import nz.mega.sdk.MegaAchievementsDetails
 import nz.mega.sdk.MegaApiJava
@@ -1654,6 +1656,204 @@ class DefaultAccountRepositoryTest {
 
                 // Then
                 assertThat(expectMostRecentItem()).isEqualTo(Unit)
+            }
+        }
+
+    @Test
+    fun `test that monitorLastRegisteredEmail is invoked when monitorLastRegisteredEmail called`() =
+        runTest {
+            whenever(accountPreferencesGateway.monitorLastRegisteredEmail()).thenReturn(
+                flowOf("email")
+            )
+            underTest.getLastRegisteredEmail()
+            verify(accountPreferencesGateway).monitorLastRegisteredEmail()
+        }
+
+    @Test
+    fun `test that setLastRegisteredEmail is invoked when saveLastRegisteredEmail called`() =
+        runTest {
+            underTest.saveLastRegisteredEmail("email")
+            verify(accountPreferencesGateway).setLastRegisteredEmail("email")
+        }
+
+    @Test
+    fun `test that clearLastRegisteredEmail is invoked when clearLastRegisteredEmail called`() =
+        runTest {
+            underTest.clearLastRegisteredEmail()
+            verify(accountPreferencesGateway).clearLastRegisteredEmail()
+        }
+
+    @Test
+    fun `test that query cancel link returns the queried link when the sdk is successful`() =
+        runTest {
+            val expectedLink = "expected/link"
+            val megaError = mock<MegaError> {
+                on { errorCode }.thenReturn(MegaError.API_OK)
+            }
+            val megaRequest = mock<MegaRequest> {
+                on { link }.thenReturn(expectedLink)
+            }
+            whenever(
+                megaApiGateway.queryCancelLink(
+                    link = any(),
+                    listener = any(),
+                )
+            ).thenAnswer {
+                ((it.arguments[1]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    api = mock(),
+                    request = megaRequest,
+                    error = megaError,
+                )
+            }
+
+            val actualLink = underTest.queryCancelLink("link/to/query")
+            assertThat(actualLink).isEqualTo(expectedLink)
+        }
+
+    @Test
+    fun `test that query cancel link throws an unrelated account cancellation link mega exception`() =
+        runTest {
+            val megaError = mock<MegaError> {
+                on { errorCode }.thenReturn(MegaError.API_EACCESS)
+            }
+            whenever(
+                megaApiGateway.queryCancelLink(
+                    link = any(),
+                    listener = any(),
+                )
+            ).thenAnswer {
+                ((it.arguments[1]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    api = mock(),
+                    request = mock(),
+                    error = megaError,
+                )
+            }
+
+            assertThrows<QueryCancelLinkException.UnrelatedAccountCancellationLink> {
+                underTest.queryCancelLink("link/to/query")
+            }
+        }
+
+    @Test
+    fun `test that query cancel link throws an expired account cancellation link mega exception`() =
+        runTest {
+            val megaError = mock<MegaError> {
+                on { errorCode }.thenReturn(MegaError.API_EEXPIRED)
+            }
+            whenever(
+                megaApiGateway.queryCancelLink(
+                    link = any(),
+                    listener = any(),
+                )
+            ).thenAnswer {
+                ((it.arguments[1]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    api = mock(),
+                    request = mock(),
+                    error = megaError,
+                )
+            }
+
+            assertThrows<QueryCancelLinkException.ExpiredAccountCancellationLink> {
+                underTest.queryCancelLink("link/to/query")
+            }
+        }
+
+    @Test
+    fun `test that query cancel link throws an unknown mega exception when the sdk returns a different error`() =
+        runTest {
+            val megaError = mock<MegaError> {
+                on { errorCode }.thenReturn(MegaError.API_ENOENT)
+            }
+            whenever(
+                megaApiGateway.queryCancelLink(
+                    link = any(),
+                    listener = any(),
+                )
+            ).thenAnswer {
+                ((it.arguments[1]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    api = mock(),
+                    request = mock(),
+                    error = megaError,
+                )
+            }
+
+            assertThrows<QueryCancelLinkException.Unknown> {
+                underTest.queryCancelLink("link/to/query")
+            }
+        }
+
+    @Test
+    fun `test that query change email link returns the queried link when the sdk is successful`() =
+        runTest {
+            val expectedLink = "expected/email/link"
+            val megaError = mock<MegaError> {
+                on { errorCode }.thenReturn(MegaError.API_OK)
+            }
+            val megaRequest = mock<MegaRequest> {
+                on { link }.thenReturn(expectedLink)
+            }
+            whenever(
+                megaApiGateway.queryChangeEmailLink(
+                    link = any(),
+                    listener = any(),
+                )
+            ).thenAnswer {
+                ((it.arguments[1]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    api = mock(),
+                    request = megaRequest,
+                    error = megaError,
+                )
+            }
+
+            val actualLink = underTest.queryChangeEmailLink("email/link/to/query")
+            assertThat(actualLink).isEqualTo(expectedLink)
+        }
+
+    @Test
+    fun `test that query change email link throws a link not generated mega exception`() =
+        runTest {
+            val megaError = mock<MegaError> {
+                on { errorCode }.thenReturn(MegaError.API_EACCESS)
+            }
+            whenever(
+                megaApiGateway.queryChangeEmailLink(
+                    link = any(),
+                    listener = any(),
+                )
+            ).thenAnswer {
+                ((it.arguments[1]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    api = mock(),
+                    request = mock(),
+                    error = megaError,
+                )
+            }
+
+            assertThrows<QueryChangeEmailLinkException.LinkNotGenerated> {
+                underTest.queryChangeEmailLink("email/link/to/query")
+            }
+        }
+
+    @Test
+    fun `test that query change email link throws an unknown mega exception when the sdk returns a different error`() =
+        runTest {
+            val megaError = mock<MegaError> {
+                on { errorCode }.thenReturn(MegaError.API_ENOENT)
+            }
+            whenever(
+                megaApiGateway.queryChangeEmailLink(
+                    link = any(),
+                    listener = any(),
+                )
+            ).thenAnswer {
+                ((it.arguments[1]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    api = mock(),
+                    request = mock(),
+                    error = megaError,
+                )
+            }
+
+            assertThrows<QueryChangeEmailLinkException.Unknown> {
+                underTest.queryChangeEmailLink("email/link/to/query")
             }
         }
 }

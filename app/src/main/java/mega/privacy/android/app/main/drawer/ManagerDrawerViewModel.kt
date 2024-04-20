@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.domain.usecase.GetBackupsNode
-import mega.privacy.android.app.featuretoggle.ABTestFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.extensions.getState
 import mega.privacy.android.domain.entity.Feature
@@ -26,6 +25,7 @@ import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCas
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
+import mega.privacy.android.domain.usecase.notifications.GetEnabledNotificationsUseCase
 import mega.privacy.android.domain.usecase.verification.MonitorVerificationStatus
 import timber.log.Timber
 import javax.inject.Inject
@@ -43,6 +43,7 @@ internal class ManagerDrawerViewModel @Inject constructor(
     private val rootNodeExistsUseCase: RootNodeExistsUseCase,
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
+    private val getEnabledNotificationsUseCase: GetEnabledNotificationsUseCase,
     monitorMyAccountUpdateUseCase: MonitorMyAccountUpdateUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ManagerDrawerUiState())
@@ -74,6 +75,7 @@ internal class ManagerDrawerViewModel @Inject constructor(
         observerVerificationStatus()
         observerConnectivityEvent()
         loadFeatureFlags()
+        shouldShowPromoTag()
     }
 
     private fun loadFeatureFlags() {
@@ -177,7 +179,19 @@ internal class ManagerDrawerViewModel @Inject constructor(
     private suspend fun getEnabledFeatures(): Set<Feature> {
         return setOfNotNull(
             AppFeatures.AndroidSync.takeIf { getFeatureFlagValueUseCase(it) },
-            ABTestFeatures.dmca.takeIf { getFeatureFlagValueUseCase(it) },
         )
+    }
+
+    private fun shouldShowPromoTag() {
+        viewModelScope.launch {
+            runCatching {
+                val promoNotificationCount =
+                    if (getFeatureFlagValueUseCase(AppFeatures.PromoNotifications))
+                        getEnabledNotificationsUseCase().size
+                    else
+                        0
+                _state.update { it.copy(showPromoTag = promoNotificationCount > 0) }
+            }
+        }
     }
 }

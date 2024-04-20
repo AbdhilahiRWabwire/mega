@@ -194,6 +194,7 @@ internal class MegaChatApiFacade @Inject constructor(
             }
         }
 
+        chatApi.closeChatRoom(chatId, listener)
         val opened = chatApi.openChatRoom(chatId, listener)
         Timber.d("Open chat room $chatId: $opened")
 
@@ -833,4 +834,36 @@ internal class MegaChatApiFacade @Inject constructor(
         latitude: Float,
         img: String,
     ): MegaChatMessage? = chatApi.editGeolocation(chatId, msgId, longitude, latitude, img)
+
+    override fun setLimitsInCall(
+        chatId: Long,
+        callDur: Long?,
+        numUsers: Long?,
+        numClients: Long?,
+        numClientsPerUser: Long?,
+        divider: Long?,
+        listener: MegaChatRequestListenerInterface?,
+    ) {
+        chatApi.setLimitsInCall(
+            chatId,
+            callDur,
+            numUsers,
+            numClients,
+            numClientsPerUser,
+            divider,
+            listener
+        )
+    }
+
+    override suspend fun removeFailedMessage(chatId: Long, rowId: Long) {
+        chatApi.removeUnsentMessage(chatId, rowId)
+    }
+
+    override fun setChatRetentionTime(
+        chatId: Long,
+        period: Long,
+        listener: MegaChatRequestListenerInterface,
+    ) {
+        chatApi.setChatRetentionTime(chatId, period, listener)
+    }
 }

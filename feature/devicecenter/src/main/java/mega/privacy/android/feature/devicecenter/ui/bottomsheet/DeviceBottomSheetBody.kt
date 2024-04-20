@@ -3,7 +3,6 @@ package mega.privacy.android.feature.devicecenter.ui.bottomsheet
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -11,9 +10,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
-import kotlinx.coroutines.CoroutineScope
-import mega.privacy.android.core.ui.controls.dividers.DividerSpacing
+import mega.privacy.android.core.ui.controls.dividers.DividerType
 import mega.privacy.android.core.ui.controls.dividers.MegaDivider
+import mega.privacy.android.core.ui.controls.status.getStatusIconColor
+import mega.privacy.android.core.ui.controls.status.getStatusTextColor
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.core.ui.theme.extensions.textColorSecondary
 import mega.privacy.android.feature.devicecenter.R
@@ -40,22 +40,20 @@ internal const val BOTTOM_SHEET_HEADER =
  * A [Composable] Bottom Sheet shown when clicking a Device's Context Menu Icon, showing all
  * available Options
  *
- * @param coroutineScope The [CoroutineScope] used to hide the Bottom Sheet
- * @param modalSheetState The Bottom Sheet State
  * @param device The selected [DeviceUINode]
  * @param isCameraUploadsEnabled true if Camera Uploads is Enabled, and false if otherwise
  * @param onCameraUploadsClicked Lambda that is executed when the "Camera uploads" Tile is selected
  * @param onRenameDeviceClicked Lambda that is executed when the "Rename" Tile is selected
  * @param onInfoClicked Lambda that is executed when the "Info" Tile is selected
+ * @param onBottomSheetDismissed Lambda that is executed when the bottom sheet is dismissed
  */
-@OptIn(ExperimentalMaterialApi::class)
 @Composable
 internal fun DeviceBottomSheetBody(
     device: DeviceUINode,
     isCameraUploadsEnabled: Boolean,
     onCameraUploadsClicked: () -> Unit,
     onRenameDeviceClicked: (DeviceUINode) -> Unit,
-    onInfoClicked: () -> Unit,
+    onInfoClicked: (DeviceUINode) -> Unit,
     onBottomSheetDismissed: () -> Unit,
 ) {
     Column(Modifier.testTag(BOTTOM_SHEET_CONTAINER)) {
@@ -65,11 +63,11 @@ internal fun DeviceBottomSheetBody(
             body = getStatusText(device.status),
             nodeIcon = device.icon.iconRes,
             bodyIcon = device.status.icon,
-            bodyColor = getStatusColor(device.status),
-            bodyIconColor = getStatusColor(device.status),
+            bodyColor = device.status.color.getStatusTextColor(),
+            bodyIconColor = device.status.color.getStatusIconColor(),
             nodeIconColor = getNodeIconColor(device.icon),
         )
-        MegaDivider(dividerSpacing = DividerSpacing.StartSmall)
+        MegaDivider(dividerType = DividerType.SmallStartPadding)
         // Display the Options depending on the Device type
         when (device) {
             is OwnDeviceUINode -> {
@@ -85,7 +83,7 @@ internal fun DeviceBottomSheetBody(
                     },
                     onInfoClicked = {
                         onBottomSheetDismissed()
-                        onInfoClicked.invoke()
+                        onInfoClicked(device)
                     },
                 )
             }
@@ -98,7 +96,7 @@ internal fun DeviceBottomSheetBody(
                     },
                     onInfoClicked = {
                         onBottomSheetDismissed()
-                        onInfoClicked.invoke()
+                        onInfoClicked(device)
                     },
                 )
             }
@@ -133,16 +131,6 @@ private fun getStatusText(uiNodeStatus: DeviceCenterUINodeStatus) =
     }
 
 /**
- * Retrieves the Status Color to be applied in the Status Text and Icon of [DeviceBottomSheetBody]
- *
- * @param uiNodeStatus The [DeviceCenterUINodeStatus]
- * @return The corresponding Status Color
- */
-@Composable
-private fun getStatusColor(uiNodeStatus: DeviceCenterUINodeStatus) =
-    uiNodeStatus.color ?: MaterialTheme.colors.textColorSecondary
-
-/**
  * Retrieves the Color to be applied in the Node Icon of [DeviceBottomSheetBody]
  *
  * @param uiNodeIcon The [DeviceCenterUINodeIcon]
@@ -159,7 +147,6 @@ private fun getNodeIconColor(uiNodeIcon: DeviceCenterUINodeIcon) =
 /**
  * A Preview Composable that displays the Device Bottom Sheet with its Options
  */
-@OptIn(ExperimentalMaterialApi::class)
 @CombinedThemePreviews
 @Composable
 private fun DeviceBottomSheetBodyPreview(

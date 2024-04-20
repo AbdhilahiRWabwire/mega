@@ -1,12 +1,14 @@
 package mega.privacy.android.domain.entity.chat.messages.normal
 
 import kotlinx.serialization.Polymorphic
-import mega.privacy.android.domain.entity.chat.messages.TypedMessage
+import mega.privacy.android.domain.entity.chat.messages.UserMessage
 
 /**
  * Call message
  *
- * @property content Message content
+ * @property isEdited Whether the message is edited
  */
 @Polymorphic
-interface NormalMessage : TypedMessage
+interface NormalMessage : UserMessage {
+    val isEdited: Boolean
+}

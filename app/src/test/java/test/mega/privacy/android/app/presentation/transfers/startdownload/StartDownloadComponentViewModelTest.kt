@@ -21,18 +21,16 @@ import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.transfer.MultiTransferEvent
 import mega.privacy.android.domain.entity.transfer.TransferType
-import mega.privacy.android.domain.usecase.BroadcastOfflineFileAvailabilityUseCase
 import mega.privacy.android.domain.usecase.SetStorageDownloadAskAlwaysUseCase
 import mega.privacy.android.domain.usecase.SetStorageDownloadLocationUseCase
-import mega.privacy.android.domain.usecase.file.GetExternalPathByContentUriUseCase
 import mega.privacy.android.domain.usecase.file.TotalFileSizeOfNodesUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.node.GetFilePreviewDownloadPathUseCase
 import mega.privacy.android.domain.usecase.offline.GetOfflinePathForNodeUseCase
-import mega.privacy.android.domain.usecase.offline.SaveOfflineNodeInformationUseCase
 import mega.privacy.android.domain.usecase.setting.IsAskBeforeLargeDownloadsSettingUseCase
 import mega.privacy.android.domain.usecase.setting.SetAskBeforeLargeDownloadsSettingUseCase
 import mega.privacy.android.domain.usecase.transfers.active.ClearActiveTransfersIfFinishedUseCase
+import mega.privacy.android.domain.usecase.transfers.active.MonitorActiveTransferFinishedUseCase
 import mega.privacy.android.domain.usecase.transfers.active.MonitorOngoingActiveTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.downloads.GetCurrentDownloadSpeedUseCase
 import mega.privacy.android.domain.usecase.transfers.downloads.GetOrCreateStorageDownloadLocationUseCase
@@ -65,9 +63,6 @@ class StartDownloadComponentViewModelTest {
 
     private val getOfflinePathForNodeUseCase: GetOfflinePathForNodeUseCase = mock()
     private val startDownloadsWithWorkerUseCase: StartDownloadsWithWorkerUseCase = mock()
-    private val saveOfflineNodeInformationUseCase: SaveOfflineNodeInformationUseCase = mock()
-    private val broadcastOfflineFileAvailabilityUseCase: BroadcastOfflineFileAvailabilityUseCase =
-        mock()
     private val isConnectedToInternetUseCase: IsConnectedToInternetUseCase = mock()
     private val clearActiveTransfersIfFinishedUseCase =
         mock<ClearActiveTransfersIfFinishedUseCase>()
@@ -88,7 +83,7 @@ class StartDownloadComponentViewModelTest {
         mock<SaveDoNotPromptToSaveDestinationUseCase>()
     private val setStorageDownloadAskAlwaysUseCase = mock<SetStorageDownloadAskAlwaysUseCase>()
     private val setStorageDownloadLocationUseCase = mock<SetStorageDownloadLocationUseCase>()
-    private val getExternalPathByContentUriUseCase = mock<GetExternalPathByContentUriUseCase>()
+    private val monitorActiveTransferFinishedUseCase = mock<MonitorActiveTransferFinishedUseCase>()
 
 
     private val node: TypedFileNode = mock()
@@ -103,8 +98,6 @@ class StartDownloadComponentViewModelTest {
             getOrCreateStorageDownloadLocationUseCase,
             getFilePreviewDownloadPathUseCase,
             startDownloadsWithWorkerUseCase,
-            saveOfflineNodeInformationUseCase,
-            broadcastOfflineFileAvailabilityUseCase,
             clearActiveTransfersIfFinishedUseCase,
             isConnectedToInternetUseCase,
             totalFileSizeOfNodesUseCase,
@@ -118,9 +111,8 @@ class StartDownloadComponentViewModelTest {
             saveDoNotPromptToSaveDestinationUseCase,
             setStorageDownloadAskAlwaysUseCase,
             setStorageDownloadLocationUseCase,
-            getExternalPathByContentUriUseCase,
+            monitorActiveTransferFinishedUseCase,
         )
-
     }
 
     @BeforeEach
@@ -129,8 +121,6 @@ class StartDownloadComponentViewModelTest {
             getOrCreateStorageDownloadLocationUseCase,
             startDownloadsWithWorkerUseCase,
             getOfflinePathForNodeUseCase,
-            saveOfflineNodeInformationUseCase,
-            broadcastOfflineFileAvailabilityUseCase,
             isConnectedToInternetUseCase,
             node,
             parentNode,
@@ -146,13 +136,13 @@ class StartDownloadComponentViewModelTest {
             saveDoNotPromptToSaveDestinationUseCase,
             setStorageDownloadAskAlwaysUseCase,
             setStorageDownloadLocationUseCase,
-            getExternalPathByContentUriUseCase,
         )
         initialStub()
     }
 
     private fun initialStub() {
         whenever(monitorOngoingActiveTransfersUseCase(any())).thenReturn(emptyFlow())
+        whenever(monitorActiveTransferFinishedUseCase(any())).thenReturn(emptyFlow())
     }
 
     @ParameterizedTest
@@ -230,7 +220,9 @@ class StartDownloadComponentViewModelTest {
             commonStub()
             stubStartDownload(flow {
                 delay(500)
-                emit(mock<MultiTransferEvent.ScanningFoldersFinished>())
+                emit(mock<MultiTransferEvent.SingleTransferEvent> {
+                    on { scanningFinished } doReturn true
+                })
             })
             underTest.startDownload(TransferTriggerEvent.StartDownloadNode(nodes))
             Truth.assertThat(underTest.uiState.value.jobInProgressState)
@@ -313,28 +305,6 @@ class StartDownloadComponentViewModelTest {
         }
 
     @Test
-    fun `test that the download starts with destination from getExternalPathByContentUriUseCase when startDownloadWithDestination is invoked`() =
-        runTest {
-            commonStub()
-            val uriString = "content:/destination/"
-            val destinationUri = mock<Uri> {
-                on { toString() } doReturn uriString
-            }
-            val startDownloadNode = TransferTriggerEvent.StartDownloadNode(nodes)
-            val destination = "file:/destination/"
-            whenever(getExternalPathByContentUriUseCase(uriString)).thenReturn(destination)
-            whenever(shouldPromptToSaveDestinationUseCase()).thenReturn(false)
-
-            underTest.startDownloadWithDestination(startDownloadNode, destinationUri)
-
-            verify(startDownloadsWithWorkerUseCase).invoke(
-                nodes,
-                destination,
-                startDownloadNode.isHighPriority
-            )
-        }
-
-    @Test
     fun `test that promptSaveDestination state is updated when startDownloadWithDestination is invoked and shouldPromptToSaveDestinationUseCase is true`() =
         runTest {
             commonStub()
@@ -343,8 +313,6 @@ class StartDownloadComponentViewModelTest {
                 on { toString() } doReturn uriString
             }
             val startDownloadNode = TransferTriggerEvent.StartDownloadNode(nodes)
-            val destination = "file:/destination"
-            whenever(getExternalPathByContentUriUseCase(uriString)).thenReturn(destination)
             whenever(shouldPromptToSaveDestinationUseCase()).thenReturn(true)
 
             underTest.startDownloadWithDestination(startDownloadNode, destinationUri)
@@ -352,7 +320,7 @@ class StartDownloadComponentViewModelTest {
             Truth.assertThat(underTest.uiState.value.promptSaveDestination)
                 .isInstanceOf(StateEventWithContentTriggered::class.java)
             Truth.assertThat((underTest.uiState.value.promptSaveDestination as StateEventWithContentTriggered).content)
-                .isEqualTo(destination)
+                .isEqualTo(uriString)
 
         }
 
@@ -380,7 +348,9 @@ class StartDownloadComponentViewModelTest {
 
     private fun provideDownloadNodeParameters() = listOf(
         Arguments.of(
-            mock<MultiTransferEvent.ScanningFoldersFinished>(),
+            mock<MultiTransferEvent.SingleTransferEvent> {
+                on { scanningFinished } doReturn true
+            },
             StartDownloadTransferEvent.FinishProcessing(null, 1, 0, 0),
         ),
         Arguments.of(
@@ -413,7 +383,12 @@ class StartDownloadComponentViewModelTest {
         whenever(isConnectedToInternetUseCase()).thenReturn(true)
         whenever(totalFileSizeOfNodesUseCase(any())).thenReturn(1)
         whenever(shouldAskDownloadDestinationUseCase()).thenReturn(false)
-        stubStartDownload(flowOf(mock<MultiTransferEvent.ScanningFoldersFinished>()))
+        stubStartDownload(
+            flowOf(
+                mock<MultiTransferEvent.SingleTransferEvent> {
+                    on { scanningFinished } doReturn true
+                })
+        )
     }
 
     private fun stubStartDownload(flow: Flow<MultiTransferEvent>) {

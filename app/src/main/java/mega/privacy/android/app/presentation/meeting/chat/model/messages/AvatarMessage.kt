@@ -1,5 +1,7 @@
 package mega.privacy.android.app.presentation.meeting.chat.model.messages
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
@@ -7,11 +9,13 @@ import androidx.compose.ui.Modifier
 import mega.privacy.android.app.presentation.meeting.chat.view.ChatAvatar
 import mega.privacy.android.core.ui.controls.chat.ChatMessageContainer
 import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
+import mega.privacy.android.core.ui.theme.extensions.conditional
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 
 /**
  * Avatar message
  */
+@OptIn(ExperimentalFoundationApi::class)
 abstract class AvatarMessage : UiChatMessage {
 
     /**
@@ -19,12 +23,12 @@ abstract class AvatarMessage : UiChatMessage {
      */
     @Composable
     abstract fun ContentComposable(
-        onLongClick: (TypedMessage) -> Unit,
         interactionEnabled: Boolean,
+        initialiseModifier: (onClick: () -> Unit) -> Modifier,
     )
 
     abstract override val message: TypedMessage
-    
+
     /**
      * Avatar composable
      */
@@ -55,10 +59,9 @@ abstract class AvatarMessage : UiChatMessage {
         onReactionLongClick: (String, List<UIReaction>) -> Unit,
         onForwardClicked: (TypedMessage) -> Unit,
         onSelectedChanged: (Boolean) -> Unit,
-        onSendErrorClicked: (TypedMessage) -> Unit,
+        onNotSentClick: (TypedMessage) -> Unit,
     ) {
         ChatMessageContainer(
-            modifier = Modifier.fillMaxWidth(),
             isMine = displayAsMine,
             showForwardIcon = shouldDisplayForwardIcon,
             reactions = reactions,
@@ -66,19 +69,59 @@ abstract class AvatarMessage : UiChatMessage {
             onReactionClick = { onReactionClicked(id, it, reactions) },
             onReactionLongClick = { onReactionLongClick(it, reactions) },
             onForwardClicked = { onForwardClicked(message) },
+            modifier = Modifier.fillMaxWidth(),
+            isSelectMode = state.isInSelectMode,
+            isSelected = state.isChecked,
+            onSelectionChanged = onSelectedChanged,
             avatarOrIcon = { avatarModifier ->
                 MessageAvatar(
                     lastUpdatedCache = state.lastUpdatedCache,
                     avatarModifier,
                 )
             },
-            content = { interactionEnabled ->
-                ContentComposable(onLongClick, interactionEnabled)
-            },
-            isSelectMode = state.isInSelectMode,
-            isSelected = state.isChecked,
-            onSelectionChanged = onSelectedChanged,
-            onSendErrorClick = { onSendErrorClicked(message) }
+            isSendError = message.isSendError()
+        ) { interactionEnabled ->
+            ContentComposable(interactionEnabled) {
+                Modifier.contentInteraction(
+                    onNotSentClick = onNotSentClick,
+                    onClick = it,
+                    onLongClick = onLongClick,
+                    interactionEnabled = interactionEnabled
+                )
+            }
+        }
+    }
+
+    private fun Modifier.contentInteraction(
+        onNotSentClick: (TypedMessage) -> Unit,
+        onClick: () -> Unit,
+        onLongClick: (TypedMessage) -> Unit,
+        interactionEnabled: Boolean,
+    ) = if (message.isNotSent()) {
+        forNotSent(
+            onNotSentClick = { onNotSentClick(message) }
+        )
+    } else {
+        setClickHandlers(
+            onClick = onClick,
+            onLongClick = { onLongClick(message) },
+            interactionEnabled = interactionEnabled,
+        )
+    }
+
+    private fun Modifier.forNotSent(onNotSentClick: () -> Unit) = this.combinedClickable(
+        onClick = onNotSentClick,
+        onLongClick = onNotSentClick,
+    )
+
+    private fun Modifier.setClickHandlers(
+        onClick: () -> Unit,
+        onLongClick: () -> Unit,
+        interactionEnabled: Boolean,
+    ) = this.conditional(interactionEnabled) {
+        combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick
         )
     }
 

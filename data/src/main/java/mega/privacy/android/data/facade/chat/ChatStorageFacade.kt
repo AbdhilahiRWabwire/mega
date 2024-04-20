@@ -2,7 +2,7 @@ package mega.privacy.android.data.facade.chat
 
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
-import mega.privacy.android.data.database.chat.InMemoryChatDatabase
+import mega.privacy.android.data.database.chat.ChatDatabase
 import mega.privacy.android.data.database.dao.ChatMessageMetaDao
 import mega.privacy.android.data.database.dao.ChatNodeDao
 import mega.privacy.android.data.database.entity.chat.ChatGeolocationEntity
@@ -14,6 +14,11 @@ import mega.privacy.android.data.database.entity.chat.RichPreviewEntity
 import mega.privacy.android.data.database.entity.chat.TypedMessageEntity
 import mega.privacy.android.data.gateway.chat.ChatStorageGateway
 import mega.privacy.android.domain.entity.chat.ChatMessageType
+import mega.privacy.android.domain.entity.chat.PendingMessageState
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageRequest
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateAndNodeHandleRequest
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateRequest
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageTransferTagRequest
 import javax.inject.Inject
 
 /**
@@ -24,7 +29,7 @@ import javax.inject.Inject
  * @property database In memory chat database
  */
 internal class ChatStorageFacade @Inject constructor(
-    private val database: InMemoryChatDatabase,
+    private val database: ChatDatabase,
 ) : ChatStorageGateway {
 
     /**
@@ -111,8 +116,17 @@ internal class ChatStorageFacade @Inject constructor(
         pendingMessageEntity: PendingMessageEntity,
     ) = database.pendingMessageDao().insert(pendingMessageEntity)
 
-    override suspend fun updatePendingMessage(pendingMessage: PendingMessageEntity) {
-        database.pendingMessageDao().update(pendingMessage)
+    override suspend fun updatePendingMessage(updatePendingMessageRequest: UpdatePendingMessageRequest) {
+        when (updatePendingMessageRequest) {
+            is UpdatePendingMessageStateRequest ->
+                database.pendingMessageDao().update(updatePendingMessageRequest)
+
+            is UpdatePendingMessageStateAndNodeHandleRequest ->
+                database.pendingMessageDao().update(updatePendingMessageRequest)
+
+            is UpdatePendingMessageTransferTagRequest ->
+                database.pendingMessageDao().update(updatePendingMessageRequest)
+        }
     }
 
     override suspend fun deletePendingMessage(pendingMessageId: Long) {
@@ -124,6 +138,9 @@ internal class ChatStorageFacade @Inject constructor(
 
     override suspend fun getPendingMessage(pendingMessageId: Long): PendingMessageEntity? =
         database.pendingMessageDao().get(pendingMessageId)
+
+    override suspend fun getPendingMessagesByState(state: PendingMessageState): List<PendingMessageEntity> =
+        database.pendingMessageDao().getByState(state)
 
     override suspend fun getMessageIdsByType(chatId: Long, type: ChatMessageType): List<Long> =
         database.typedMessageDao().getMessageIdsByType(chatId, type)
@@ -163,5 +180,20 @@ internal class ChatStorageFacade @Inject constructor(
         metaDao.deleteGeolocationsByMessageId(messagesToDelete)
         chatNodeDao.removeMessageNodeRelationship(messagesToDelete)
         chatNodeDao.deleteOrphanedNodes()
+    }
+
+    override suspend fun clearChatPendingMessages(chatId: Long) {
+        database.pendingMessageDao().deleteAllForChat(chatId)
+    }
+
+    override suspend fun updateExistsInMessage(chatId: Long, msgId: Long, exists: Boolean) {
+        database.typedMessageDao().updateExists(chatId, msgId, exists)
+    }
+
+    override suspend fun getExistsInMessage(chatId: Long, msgId: Long) =
+        database.typedMessageDao().getExists(chatId, msgId)
+
+    override suspend fun clearAllData() {
+        database.clearAllTables()
     }
 }

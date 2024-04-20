@@ -13,8 +13,7 @@ import mega.privacy.android.domain.repository.TransferRepository
 import mega.privacy.android.domain.usecase.canceltoken.CancelCancelTokenUseCase
 import mega.privacy.android.domain.usecase.canceltoken.InvalidateCancelTokenUseCase
 import mega.privacy.android.domain.usecase.transfers.MonitorTransferEventsUseCase
-import mega.privacy.android.domain.usecase.transfers.active.AddOrUpdateActiveTransferUseCase
-import mega.privacy.android.domain.usecase.transfers.sd.HandleSDCardEventUseCase
+import mega.privacy.android.domain.usecase.transfers.active.HandleTransferEventUseCase
 import mega.privacy.android.domain.usecase.transfers.shared.AbstractTransferNodesUseCase
 import javax.inject.Inject
 
@@ -24,16 +23,14 @@ import javax.inject.Inject
 class DownloadNodesUseCase @Inject constructor(
     cancelCancelTokenUseCase: CancelCancelTokenUseCase,
     invalidateCancelTokenUseCase: InvalidateCancelTokenUseCase,
-    addOrUpdateActiveTransferUseCase: AddOrUpdateActiveTransferUseCase,
-    handleSDCardEventUseCase: HandleSDCardEventUseCase,
+    handleTransferEventUseCase: HandleTransferEventUseCase,
     monitorTransferEventsUseCase: MonitorTransferEventsUseCase,
     private val transferRepository: TransferRepository,
     private val fileSystemRepository: FileSystemRepository,
 ) : AbstractTransferNodesUseCase<TypedNode, NodeId>(
     cancelCancelTokenUseCase,
     invalidateCancelTokenUseCase,
-    addOrUpdateActiveTransferUseCase,
-    handleSDCardEventUseCase,
+    handleTransferEventUseCase,
     monitorTransferEventsUseCase,
 ) {
     /**

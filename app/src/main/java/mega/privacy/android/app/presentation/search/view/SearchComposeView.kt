@@ -20,10 +20,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import kotlinx.coroutines.CoroutineScope
@@ -42,6 +46,7 @@ import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.NodeSourceType
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
+import mega.privacy.android.feature.sync.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyViewForSearch
 
 /**
@@ -55,7 +60,9 @@ import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyViewForSearch
  * @param onChangeViewTypeClick change view type click listener
  * @param onLinkClicked link click listener for item
  * @param onDisputeTakeDownClicked dispute take-down click listener
+ * @param onFilterClicked a filter has been clicked
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SearchComposeView(
     state: SearchActivityState,
@@ -71,24 +78,42 @@ fun SearchComposeView(
     updateFilter: (SearchFilter) -> Unit,
     trackAnalytics: (SearchFilter) -> Unit,
     updateSearchQuery: (String) -> Unit,
+    onFilterClicked: (String) -> Unit,
     onBackPressed: () -> Unit,
     navHostController: NavHostController,
     nodeActionHandler: NodeActionHandler,
     clearSelection: () -> Unit,
+    fileTypeIconMapper: FileTypeIconMapper,
     modifier: Modifier = Modifier,
 ) {
+    var resetScroll by rememberSaveable {
+        mutableStateOf(false)
+    }
+
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
     val scaffoldState = rememberScaffoldState()
     val snackBarHostState = remember { SnackbarHostState() }
+    var topBarPadding by remember { mutableStateOf(0.dp) }
+
+    LaunchedEffect(key1 = resetScroll) {
+        listState.scrollToItem(0)
+        gridState.scrollToItem(0)
+    }
 
     var searchQuery by rememberSaveable {
         mutableStateOf(state.searchQuery)
     }
 
-    searchQuery.useDebounce(onChange = {
-        updateSearchQuery(it)
-    })
+    searchQuery.useDebounce(
+        onChange = {
+            updateSearchQuery(it)
+            resetScroll = !resetScroll
+        },
+    )
+
+    topBarPadding =
+        if (state.navigationLevel.isNotEmpty() && state.nodeSourceType != NodeSourceType.CLOUD_DRIVE && state.nodeSourceType != NodeSourceType.HOME) 8.dp else 0.dp
 
     state.errorMessageId?.let {
         val errorMessage = stringResource(id = it)
@@ -104,7 +129,7 @@ fun SearchComposeView(
         }
     }
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.semantics { testTagsAsResourceId = true },
         topBar = {
             SearchToolBar(
                 searchQuery = searchQuery,
@@ -117,7 +142,8 @@ fun SearchComposeView(
                 navHostController = navHostController,
                 nodeActionHandler = nodeActionHandler,
                 clearSelection = clearSelection,
-                nodeSourceType = state.nodeSourceType
+                nodeSourceType = state.nodeSourceType,
+                navigationLevel = state.navigationLevel
             )
         },
         snackbarHost = {
@@ -126,16 +152,15 @@ fun SearchComposeView(
             }
         }
     ) { padding ->
-        Column {
+        Column(modifier = Modifier.padding(top = topBarPadding)) {
             if (state.nodeSourceType == NodeSourceType.CLOUD_DRIVE || state.nodeSourceType == NodeSourceType.HOME) {
-                SearchFilterChipsView(
-                    filters = state.filters,
-                    selectedFilter = state.selectedFilter,
-                    updateFilter = {
-                        trackAnalytics(it)
-                        updateFilter(it)
-                    }
-                )
+                FilterChipsView(state, onFilterClicked = {
+                    resetScroll = !resetScroll
+                    onFilterClicked(it)
+                }, updateFilter = {
+                    resetScroll = !resetScroll
+                    updateFilter(it)
+                }, trackAnalytics)
             }
             if (state.isSearching) {
                 LoadingStateView(
@@ -157,7 +182,8 @@ fun SearchComposeView(
                         onDisputeTakeDownClicked = onDisputeTakeDownClicked,
                         listState = listState,
                         gridState = gridState,
-                        modifier = Modifier.padding(padding)
+                        modifier = Modifier.padding(padding),
+                        fileTypeIconMapper = fileTypeIconMapper
                     )
                 } else {
                     LegacyMegaEmptyViewForSearch(
@@ -177,11 +203,11 @@ fun SearchComposeView(
 private fun <T> T.useDebounce(
     delayMillis: Long = 300L,
     coroutineScope: CoroutineScope = rememberCoroutineScope(),
-    onChange: (T) -> Unit
+    onChange: (T) -> Unit,
 ): T {
     val state by rememberUpdatedState(this)
 
-    DisposableEffect(state){
+    DisposableEffect(state) {
         val job = coroutineScope.launch {
             delay(delayMillis)
             onChange(state)
@@ -210,6 +236,7 @@ private fun PreviewSearchComposeView() {
         updateFilter = {},
         trackAnalytics = {},
         updateSearchQuery = {},
+        onFilterClicked = {},
         onBackPressed = {},
         navHostController = NavHostController(LocalContext.current),
         modifier = Modifier,
@@ -217,6 +244,24 @@ private fun PreviewSearchComposeView() {
             LocalContext.current as SearchActivity,
             hiltViewModel()
         ),
-        clearSelection = {}
+        clearSelection = {},
+        fileTypeIconMapper = FileTypeIconMapper()
     )
 }
+
+/**
+ * Test tag for type
+ */
+internal const val TYPE_DROPDOWN_CHIP_TEST_TAG = "search_compose_view:dropdown_chip_type"
+
+/**
+ * Test tag for date modified
+ */
+internal const val DATE_MODIFIED_DROPDOWN_CHIP_TEST_TAG =
+    "search_compose_view:dropdown_chip_date_modified"
+
+/**
+ * Test tag for date added
+ */
+internal const val DATE_ADDED_DROPDOWN_CHIP_TEST_TAG =
+    "search_compose_view:dropdown_chip_date_added"
