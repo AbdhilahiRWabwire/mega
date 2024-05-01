@@ -80,10 +80,10 @@ import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.extensions.isValid
 import mega.privacy.android.app.presentation.extensions.text
 import mega.privacy.android.app.presentation.meeting.WaitingRoomManagementViewModel
-import mega.privacy.android.app.presentation.meeting.view.DenyEntryToCallDialog
-import mega.privacy.android.app.presentation.meeting.view.UsersInWaitingRoomDialog
+import mega.privacy.android.app.presentation.meeting.view.dialog.DenyEntryToCallDialog
+import mega.privacy.android.app.presentation.meeting.view.dialog.UsersInWaitingRoomDialog
 import mega.privacy.android.app.presentation.movenode.mapper.MoveRequestMessageMapper
-import mega.privacy.android.app.presentation.transfers.startdownload.StartDownloadViewModel
+import mega.privacy.android.app.presentation.transfers.starttransfer.StartDownloadViewModel
 import mega.privacy.android.app.utils.AlertDialogUtil
 import mega.privacy.android.app.utils.AlertsAndWarnings.showForeignStorageOverQuotaWarningDialog
 import mega.privacy.android.app.utils.AlertsAndWarnings.showOverDiskQuotaPaywallWarning
@@ -553,35 +553,9 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
             setContent {
                 val themeMode by getThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.System)
                 val isDark = themeMode.isDarkMode()
-                val waitingRoomState by waitingRoomManagementViewModel.state.collectAsStateWithLifecycle()
                 MegaAppTheme(isDark = isDark) {
-                    UsersInWaitingRoomDialog(
-                        state = waitingRoomState,
-                        onAdmitClick = {
-                            waitingRoomManagementViewModel.admitUsersClick()
-                        },
-                        onDenyClick = {
-                            waitingRoomManagementViewModel.denyUsersClick()
-                        },
-                        onSeeWaitingRoomClick = {
-                            waitingRoomManagementViewModel.seeWaitingRoomClick()
-                        },
-                        onDismiss = {
-                            waitingRoomManagementViewModel.setShowParticipantsInWaitingRoomDialogConsumed()
-                        },
-                    )
-                    DenyEntryToCallDialog(
-                        state = waitingRoomState,
-                        onDenyEntryClick = {
-                            waitingRoomManagementViewModel.denyEntryClick()
-                        },
-                        onCancelDenyEntryClick = {
-                            waitingRoomManagementViewModel.cancelDenyEntryClick()
-                        },
-                        onDismiss = {
-                            waitingRoomManagementViewModel.setShowDenyParticipantDialogConsumed()
-                        },
-                    )
+                    UsersInWaitingRoomDialog()
+                    DenyEntryToCallDialog( )
                 }
             }
         }

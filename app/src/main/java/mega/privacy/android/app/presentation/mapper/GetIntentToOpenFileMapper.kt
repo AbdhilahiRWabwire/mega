@@ -9,7 +9,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import mega.privacy.android.app.MimeTypeList
 import mega.privacy.android.app.domain.usecase.GetNodeByHandle
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.imageviewer.ImageViewerActivity
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.presentation.folderlink.FolderLinkComposeActivity
@@ -35,6 +34,7 @@ import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_IS_FOLDER_LINK
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ORDER_GET_CHILDREN
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_PARENT_NODE_HANDLE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_PLACEHOLDER
+import mega.privacy.android.app.utils.Constants.LINKS_ADAPTER
 import mega.privacy.android.app.utils.Constants.OUTGOING_SHARES_ADAPTER
 import mega.privacy.android.app.utils.Constants.RUBBISH_BIN_ADAPTER
 import mega.privacy.android.app.utils.MegaNodeUtil
@@ -256,7 +256,7 @@ class GetIntentToOpenFileMapper @Inject constructor(
                     showScreenLabel = false,
                     params = mapOf(CloudDriveImageNodeFetcher.PARENT_ID to parentNodeHandle),
                 )
-            } else if (getFeatureFlagValueUseCase(AppFeatures.ImagePreview) && (viewType == INCOMING_SHARES_ADAPTER || viewType == OUTGOING_SHARES_ADAPTER)) {
+            } else if (viewType == INCOMING_SHARES_ADAPTER || viewType == OUTGOING_SHARES_ADAPTER) {
                 val parentNodeHandle = fileNode.parentId.longValue
                 ImagePreviewActivity.createIntent(
                     context = activity,
@@ -264,6 +264,17 @@ class GetIntentToOpenFileMapper @Inject constructor(
                     menuOptionsSource = ImagePreviewMenuSource.SHARED_ITEMS,
                     anchorImageNodeId = fileNode.id,
                     params = mapOf(SharedItemsImageNodeFetcher.PARENT_ID to parentNodeHandle),
+                    showScreenLabel = false,
+                )
+            } else if (viewType == LINKS_ADAPTER) {
+                val parentNodeHandle = fileNode.parentId.longValue
+                ImagePreviewActivity.createIntent(
+                    context = activity,
+                    imageSource = ImagePreviewFetcherSource.SHARED_ITEMS,
+                    menuOptionsSource = ImagePreviewMenuSource.LINKS,
+                    anchorImageNodeId = fileNode.id,
+                    params = mapOf(SharedItemsImageNodeFetcher.PARENT_ID to parentNodeHandle),
+                    showScreenLabel = false,
                 )
             } else if (viewType == RUBBISH_BIN_ADAPTER) {
                 ImagePreviewActivity.createIntent(

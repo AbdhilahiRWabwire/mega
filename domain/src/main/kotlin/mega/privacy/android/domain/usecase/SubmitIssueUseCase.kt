@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import mega.privacy.android.domain.entity.Progress
 import mega.privacy.android.domain.entity.SubmitIssueRequest
+import mega.privacy.android.domain.entity.UserAccount
 import mega.privacy.android.domain.repository.SupportRepository
 import mega.privacy.android.domain.usecase.logging.GetZippedLogsUseCase
 import javax.inject.Inject
@@ -26,6 +27,7 @@ class SubmitIssueUseCase @Inject constructor(
     private val createSupportTicketUseCase: CreateSupportTicketUseCase,
     private val formatSupportTicketUseCase: FormatSupportTicketUseCase,
     private val getZippedLogsUseCase: GetZippedLogsUseCase,
+    private val getAccountDetailsUseCase: GetAccountDetailsUseCase,
 ) {
     /**
      * Invoke
@@ -37,7 +39,9 @@ class SubmitIssueUseCase @Inject constructor(
         return flow {
             val logFileName = uploadLogs(request.includeLogs)
             if (currentCoroutineContext().isActive) {
-                val formattedTicket = createFormattedSupportTicket(request.description, logFileName)
+                val account = getAccountDetailsUseCase(false)
+                val formattedTicket =
+                    createFormattedSupportTicket(request.description, logFileName, account)
                 supportRepository.logTicket(formattedTicket)
             }
         }
@@ -46,7 +50,7 @@ class SubmitIssueUseCase @Inject constructor(
     private suspend fun FlowCollector<Progress>.uploadLogs(
         includeLogs: Boolean,
     ): String? {
-        val logs = if (shouldCompressLogs(includeLogs)) getZippedLogsUseCase() else null
+        val logs = if (shouldCompressLogs(includeLogs)) getZippedLogsOrNull() else null
         logs?.let {
             emitAll(
                 supportRepository.uploadFile(it)
@@ -56,14 +60,22 @@ class SubmitIssueUseCase @Inject constructor(
         return logs?.name
     }
 
+    private suspend fun SubmitIssueUseCase.getZippedLogsOrNull() =
+        runCatching { getZippedLogsUseCase() }.getOrNull()
+
     private suspend fun shouldCompressLogs(includeLogs: Boolean) =
         includeLogs && currentCoroutineContext().isActive
 
     private suspend fun createFormattedSupportTicket(
         description: String,
         logFileName: String?,
+        account: UserAccount,
     ) = formatSupportTicketUseCase(
-        createSupportTicketUseCase(description, logFileName)
+        createSupportTicketUseCase(
+            description = description,
+            logFileName = logFileName,
+            accountDetails = account
+        )
     )
 
 }

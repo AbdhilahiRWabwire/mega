@@ -397,6 +397,7 @@ class InMeetingViewModel @Inject constructor(
                 chatCall?.let { call ->
                     Timber.d("Call id ${call.callId} and chat id ${call.chatId} and call users limit ${call.callUsersLimit}")
                     Timber.d("Call limit ${call.callDurationLimit} Call Duration ${call.duration} and initial timestamp ${call.initialTimestamp}")
+                    Timber.d("Call user limit ${call.callUsersLimit} and users in call ${call.peerIdParticipants?.size}")
                     _state.update { it.copy(call = call) }
                     call.status?.let { status ->
                         checkSubtitleToolbar()
@@ -405,7 +406,6 @@ class InMeetingViewModel @Inject constructor(
                             _state.update { it.copy(previousState = status) }
                         }
                     }
-                    handleFreeCallEndWarning()
                 }
             }.onFailure { exception ->
                 Timber.e(exception)
@@ -442,6 +442,7 @@ class InMeetingViewModel @Inject constructor(
                 .filter { it.chatId == _state.value.currentChatId }
                 .collectLatest { call ->
                     _state.update { it.copy(call = call) }
+                    Timber.d("Call user limit ${call.callUsersLimit} and users in call ${call.peerIdParticipants?.size}")
                     checkSubtitleToolbar()
                     call.changes?.apply {
                         Timber.d("Changes in call $this")
@@ -454,6 +455,10 @@ class InMeetingViewModel @Inject constructor(
                                         previousState = status,
                                     )
                                 }
+                            }
+                            if (call.status == ChatCallStatus.InProgress) {
+                                Timber.d("Call in progress")
+                                handleFreeCallEndWarning()
                             }
                         } else if (contains(ChatCallChanges.CallWillEnd)) {
                             handleFreeCallEndWarning()
@@ -594,6 +599,12 @@ class InMeetingViewModel @Inject constructor(
         }
 
         _getParticipantsChanges.value = Pair(type, action)
+    }
+
+    fun onConsumeParticipantChanges(){
+        _getParticipantsChanges.update {
+            it.copy(second = null)
+        }
     }
 
     /**

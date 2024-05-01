@@ -7,6 +7,7 @@ import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.main.controllers.NodeController
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkDialogFragment
@@ -18,6 +19,7 @@ import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.app.utils.MenuUtils.toggleAllMenuItemsVisibility
 
 internal class AudioSectionActionModeCallback(
+    private val fragment: AudioSectionFragment,
     private val managerActivity: ManagerActivity,
     private val childFragmentManager: FragmentManager,
     private val audioSectionViewModel: AudioSectionViewModel,
@@ -42,6 +44,21 @@ internal class AudioSectionActionModeCallback(
                 totalNodes = audioSectionViewModel.state.value.allAudios.size
             )
             CloudStorageOptionControlUtil.applyControl(menu, control)
+        }
+
+        managerActivity.lifecycleScope.launch {
+            val isHiddenNodesEnabled = managerActivity.getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)
+            val hasNonSensitiveNode =
+                audioSectionViewModel.getSelectedNodes().any { !it.isMarkedSensitive }
+            val isPaid =
+            audioSectionViewModel.state.value.accountDetail?.levelDetail?.accountType?.isPaid
+                ?: false
+
+            menu?.findItem(R.id.cab_menu_hide)?.isVisible =
+                isHiddenNodesEnabled && (hasNonSensitiveNode || !isPaid)
+
+            menu?.findItem(R.id.cab_menu_unhide)?.isVisible =
+                isHiddenNodesEnabled && !hasNonSensitiveNode && isPaid
         }
         return true
     }
@@ -109,6 +126,13 @@ internal class AudioSectionActionModeCallback(
                         .show(childFragmentManager, RemoveAllSharingContactDialogFragment.TAG)
 
                 R.id.cab_menu_select_all -> audioSectionViewModel.selectAllNodes()
+
+                R.id.cab_menu_hide -> fragment.handleHideNodeClick()
+
+                R.id.cab_menu_unhide -> audioSectionViewModel.hideOrUnhideNodes(
+                    nodeIds = audioSectionViewModel.getSelectedNodes().map { it.id },
+                    hide = false,
+                )
 
                 R.id.cab_menu_copy ->
                     NodeController(managerActivity).chooseLocationToCopyNodes(selectedAudios)

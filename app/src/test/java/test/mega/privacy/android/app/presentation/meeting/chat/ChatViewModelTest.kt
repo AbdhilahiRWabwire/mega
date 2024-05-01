@@ -35,7 +35,7 @@ import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_LINK
 import mega.privacy.android.app.presentation.meeting.chat.model.ForwardMessagesToChatsResult
 import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
 import mega.privacy.android.app.presentation.meeting.chat.model.InviteContactToChatResult
-import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
+import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.app.utils.CacheFolderManager
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
@@ -62,8 +62,8 @@ import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.chat.messages.normal.NormalMessage
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
-import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
+import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.chat.ChatDefaultFile
@@ -110,7 +110,6 @@ import mega.privacy.android.domain.usecase.chat.link.MonitorJoiningChatUseCase
 import mega.privacy.android.domain.usecase.chat.message.AttachContactsUseCase
 import mega.privacy.android.domain.usecase.chat.message.AttachNodeUseCase
 import mega.privacy.android.domain.usecase.chat.message.GetChatFromContactMessagesUseCase
-import mega.privacy.android.domain.usecase.chat.message.SendChatAttachmentsUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendGiphyMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendLocationMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendTextMessageUseCase
@@ -133,6 +132,7 @@ import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCas
 import mega.privacy.android.domain.usecase.file.CreateNewImageUriUseCase
 import mega.privacy.android.domain.usecase.file.DeleteFileUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
+import mega.privacy.android.domain.usecase.meeting.BroadcastUpgradeDialogClosedUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
@@ -279,7 +279,6 @@ internal class ChatViewModelTest {
     private val monitorJoiningChatUseCase = mock<MonitorJoiningChatUseCase>()
     private val monitorLeavingChatUseCase = mock<MonitorLeavingChatUseCase>()
     private val sendLocationMessageUseCase = mock<SendLocationMessageUseCase>()
-    private val sendChatAttachmentsUseCase = mock<SendChatAttachmentsUseCase>()
     private val monitorChatPendingChangesUseCase = mock<MonitorChatPendingChangesUseCase> {
         on { invoke(any()) } doReturn emptyFlow()
     }
@@ -312,6 +311,7 @@ internal class ChatViewModelTest {
     }
     private val leaveChatUseCase = mock<LeaveChatUseCase>()
     private val broadcastChatArchivedUseCase = mock<BroadcastChatArchivedUseCase>()
+    private val broadcastUpgradeDialogClosedUseCase = mock<BroadcastUpgradeDialogClosedUseCase>()
 
 
     @BeforeEach
@@ -355,7 +355,6 @@ internal class ChatViewModelTest {
             closeChatPreviewUseCase,
             createNewImageUriUseCase,
             sendLocationMessageUseCase,
-            sendChatAttachmentsUseCase,
             addReactionUseCase,
             getChatMessageUseCase,
             deleteReactionUseCase,
@@ -379,7 +378,8 @@ internal class ChatViewModelTest {
             leaveChatUseCase,
             broadcastChatArchivedUseCase,
             setUsersCallLimitRemindersUseCase,
-            getUsersCallLimitRemindersUseCase
+            getUsersCallLimitRemindersUseCase,
+            broadcastUpgradeDialogClosedUseCase
         )
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         whenever(getUsersCallLimitRemindersUseCase()).thenReturn(flowOf(UsersCallLimitReminders.Enabled))
@@ -464,7 +464,6 @@ internal class ChatViewModelTest {
             monitorLeavingChatUseCase = monitorLeavingChatUseCase,
             applicationScope = CoroutineScope(testDispatcher),
             sendLocationMessageUseCase = sendLocationMessageUseCase,
-            sendChatAttachmentsUseCase = sendChatAttachmentsUseCase,
             monitorChatPendingChangesUseCase = monitorChatPendingChangesUseCase,
             addReactionUseCase = addReactionUseCase,
             getChatMessageUseCase = getChatMessageUseCase,
@@ -491,7 +490,8 @@ internal class ChatViewModelTest {
             monitorLeaveChatUseCase = monitorLeaveChatUseCase,
             broadcastChatArchivedUseCase = broadcastChatArchivedUseCase,
             setUsersCallLimitRemindersUseCase = setUsersCallLimitRemindersUseCase,
-            getUsersCallLimitRemindersUseCase = getUsersCallLimitRemindersUseCase
+            getUsersCallLimitRemindersUseCase = getUsersCallLimitRemindersUseCase,
+            broadcastUpgradeDialogClosedUseCase = broadcastUpgradeDialogClosedUseCase
         )
     }
 
@@ -2432,7 +2432,7 @@ internal class ChatViewModelTest {
     }
 
     @Test
-    fun `test that correct files are sent to SendChatAttachmentsUseCase when on attach files is invoked`() =
+    fun `test that correct state event is set when on attach files is invoked`() =
         runTest {
             initTestClass()
             val files = List(5) { index ->
@@ -2440,9 +2440,17 @@ internal class ChatViewModelTest {
                     on { toString() } doReturn "file$index"
                 }
             }
-            val expected = files.associate { it.toString() to null }
-            underTest.onAttachFiles(files)
-            verify(sendChatAttachmentsUseCase).invoke(chatId, expected, false)
+            underTest.state.test {
+                awaitItem() // Initial state doesn't matter
+                underTest.onAttachFiles(files)
+                val actual = awaitItem().downloadEvent
+                assertThat(actual).isInstanceOf(StateEventWithContentTriggered::class.java)
+                val content = (actual as StateEventWithContentTriggered).content
+                assertThat(content)
+                    .isInstanceOf(TransferTriggerEvent.StartChatUpload.Files::class.java)
+                assertThat((content as TransferTriggerEvent.StartChatUpload.Files).uris)
+                    .isEqualTo(files)
+            }
         }
 
     @Test
@@ -2990,6 +2998,17 @@ internal class ChatViewModelTest {
             }
         }
 
+    @Test
+    fun `test that when onConsumeShouldUpgradeToProPlan is invoked it updates the state`() =
+        runTest {
+            initTestClass()
+            underTest.onConsumeShouldUpgradeToProPlan()
+            underTest.state.test {
+                assertThat(awaitItem().shouldUpgradeToProPlan).isFalse()
+                verify(broadcastUpgradeDialogClosedUseCase).invoke()
+            }
+        }
+
     private fun provideChatCallStatusParameters(): Stream<Arguments> = Stream.of(
         Arguments.of(ChatCallStatus.TerminatingUserParticipation),
         Arguments.of(ChatCallStatus.GenericNotification),
@@ -3009,6 +3028,7 @@ internal class ChatViewModelTest {
             whenever(recordAudioUseCase(destination)) doReturn flow {
                 awaitCancellation()
             }
+            initTestClass()
         }
 
         @AfterEach
@@ -3032,11 +3052,20 @@ internal class ChatViewModelTest {
             }
 
         @Test
-        fun `test that recorded audio is sent when VoiceClipRecordEvent Finish event is received`() =
+        fun `test that correct state event is set when VoiceClipRecordEvent Finish event is received`() =
             runTest {
                 underTest.onVoiceClipRecordEvent(VoiceClipRecordEvent.Start)
-                underTest.onVoiceClipRecordEvent(VoiceClipRecordEvent.Finish)
-                verify(sendChatAttachmentsUseCase).invoke(chatId, mapOf(path to null), true)
+                underTest.state.test {
+                    awaitItem() // Initial state doesn't matter
+                    underTest.onVoiceClipRecordEvent(VoiceClipRecordEvent.Finish)
+                    val actual = awaitItem().downloadEvent
+                    assertThat(actual).isInstanceOf(StateEventWithContentTriggered::class.java)
+                    val content = (actual as StateEventWithContentTriggered).content
+                    assertThat(content)
+                        .isInstanceOf(TransferTriggerEvent.StartChatUpload.VoiceClip::class.java)
+                    assertThat((content as TransferTriggerEvent.StartChatUpload.VoiceClip).file)
+                        .isEqualTo(destination)
+                }
             }
     }
 

@@ -2,7 +2,6 @@ package mega.privacy.android.app.meeting.activity
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.MenuItem
@@ -43,10 +42,10 @@ import mega.privacy.android.app.presentation.extensions.changeStatusBarColor
 import mega.privacy.android.app.presentation.meeting.WaitingRoomManagementViewModel
 import mega.privacy.android.app.presentation.meeting.model.MeetingState
 import mega.privacy.android.app.presentation.meeting.model.WaitingRoomManagementState
-import mega.privacy.android.app.presentation.meeting.view.CallRecordingConsentDialog
-import mega.privacy.android.app.presentation.meeting.view.DenyEntryToCallDialog
 import mega.privacy.android.app.presentation.meeting.view.ParticipantsFullListView
-import mega.privacy.android.app.presentation.meeting.view.UsersInWaitingRoomDialog
+import mega.privacy.android.app.presentation.meeting.view.dialog.CallRecordingConsentDialog
+import mega.privacy.android.app.presentation.meeting.view.dialog.DenyEntryToCallDialog
+import mega.privacy.android.app.presentation.meeting.view.dialog.UsersInWaitingRoomDialog
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.REQUIRE_PASSCODE_INVALID
 import mega.privacy.android.app.utils.ScheduledMeetingDateUtil.getAppropriateStringForScheduledMeetingDate
@@ -95,7 +94,7 @@ class MeetingActivity : PasscodeActivity() {
 
 
         fun getIntentOngoingCall(context: Context, chatId: Long): Intent {
-           return Intent(context, MeetingActivity::class.java).apply {
+            return Intent(context, MeetingActivity::class.java).apply {
                 putExtra(MEETING_CHAT_ID, chatId)
                 action = MEETING_ACTION_IN
             }
@@ -210,35 +209,9 @@ class MeetingActivity : PasscodeActivity() {
             isVisible = true
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                val waitingRoomState by waitingRoomManagementViewModel.state.collectAsStateWithLifecycle()
                 MegaAppTheme(isDark = true) {
-                    UsersInWaitingRoomDialog(
-                        state = waitingRoomState,
-                        onAdmitClick = {
-                            waitingRoomManagementViewModel.admitUsersClick()
-                        },
-                        onDenyClick = {
-                            waitingRoomManagementViewModel.denyUsersClick()
-                        },
-                        onSeeWaitingRoomClick = {
-                            waitingRoomManagementViewModel.seeWaitingRoomClick()
-                        },
-                        onDismiss = {
-                            waitingRoomManagementViewModel.setShowParticipantsInWaitingRoomDialogConsumed()
-                        },
-                    )
-                    DenyEntryToCallDialog(
-                        state = waitingRoomState,
-                        onDenyEntryClick = {
-                            waitingRoomManagementViewModel.denyEntryClick()
-                        },
-                        onCancelDenyEntryClick = {
-                            waitingRoomManagementViewModel.cancelDenyEntryClick()
-                        },
-                        onDismiss = {
-                            waitingRoomManagementViewModel.setShowDenyParticipantDialogConsumed()
-                        },
-                    )
+                    UsersInWaitingRoomDialog()
+                    DenyEntryToCallDialog()
                 }
             }
         }
@@ -343,22 +316,7 @@ class MeetingActivity : PasscodeActivity() {
                 val state by meetingViewModel.state.collectAsStateWithLifecycle()
                 if (state.isSessionOnRecording && state.showRecordingConsentDialog && !state.isRecordingConsentAccepted) {
                     MegaAppTheme(isDark = true) {
-                        CallRecordingConsentDialog(
-                            onConfirm = {
-                                meetingViewModel.setIsRecordingConsentAccepted(value = true)
-                                meetingViewModel.setShowRecordingConsentDialogConsumed()
-                            },
-                            onDismiss = {
-                                meetingViewModel.setIsRecordingConsentAccepted(value = false)
-                                meetingViewModel.setShowRecordingConsentDialogConsumed()
-                                meetingViewModel.hangChatCall()
-                            },
-                            onLearnMore = {
-                                val viewIntent = Intent(Intent.ACTION_VIEW)
-                                viewIntent.data = Uri.parse("https://mega.io/privacy")
-                                startActivity(viewIntent)
-                            }
-                        )
+                        CallRecordingConsentDialog(meetingViewModel = meetingViewModel)
                     }
                 }
             }

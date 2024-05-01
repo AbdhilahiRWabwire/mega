@@ -1,7 +1,8 @@
-apply(from = "tools/util.gradle")
+import mega.privacy.android.build.shouldUsePrebuiltSdk
+import mega.privacy.android.build.isServerBuild
+
 plugins {
-    // change it following kotlin version, see here https://github.com/google/ksp/releases
-    id("com.google.devtools.ksp") version "1.9.22-1.0.17" apply false
+    alias(plugin.plugins.ksp) apply false
     id("org.jetbrains.kotlin.android") version "1.9.22" apply false
 }
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
@@ -73,7 +74,7 @@ tasks.register("clean", Delete::class) {
 
 // Define versions in a single place
 // App
-extra["appVersion"] = "12.0"
+extra["appVersion"] = "13.0"
 
 // Sdk and tools
 extra["compileSdkVersion"] = 34
@@ -82,21 +83,11 @@ extra["targetSdkVersion"] = 34
 extra["buildTools"] = "34.0.0"
 
 // Prebuilt MEGA SDK version
-extra["megaSdkVersion"] = "20240403.083758-rel"
+extra["megaSdkVersion"] = "20240417.031126-rel"
 
 //JDK and Java Version
 extra["jdk"] = "17"
 extra["javaVersion"] = JavaVersion.VERSION_17
-
-/**
- * Checks if it is CI Build
- */
-val isServerBuild: groovy.lang.Closure<Boolean> by ext
-
-/**
- * Checks whether to use Prebuilt Sdk
- */
-val shouldUsePrebuiltSdk: groovy.lang.Closure<Boolean> by ext
 
 /**
  * Checks whether to Suppress Warnings

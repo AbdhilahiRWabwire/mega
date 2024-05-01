@@ -10,8 +10,10 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import mega.privacy.android.app.presentation.recentactions.mapper.RecentActionBucketUiEntityMapper
 import mega.privacy.android.app.presentation.recentactions.model.RecentActionsUiState
 import mega.privacy.android.domain.entity.RecentActionBucket
+import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.recentactions.GetRecentActionsUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorHideRecentActivityUseCase
@@ -26,6 +28,8 @@ import javax.inject.Inject
 class RecentActionsComposeViewModel @Inject constructor(
     private val getRecentActionsUseCase: GetRecentActionsUseCase,
     private val setHideRecentActivityUseCase: SetHideRecentActivityUseCase,
+    private val recentActionBucketUiEntityMapper: RecentActionBucketUiEntityMapper,
+    monitorConnectivityUseCase: MonitorConnectivityUseCase,
     monitorHideRecentActivityUseCase: MonitorHideRecentActivityUseCase,
     monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase,
 ) : ViewModel() {
@@ -66,6 +70,12 @@ class RecentActionsComposeViewModel @Inject constructor(
                     setUiHideRecentActivity(it)
                 }
         }
+
+        viewModelScope.launch {
+            monitorConnectivityUseCase().collect {
+                _uiState.update { state -> state.copy(isConnected = it) }
+            }
+        }
     }
 
     /**
@@ -75,10 +85,13 @@ class RecentActionsComposeViewModel @Inject constructor(
         runCatching {
             getRecentActionsUseCase()
         }.onSuccess { list ->
+            val groupedRecentActions = list
+                .map { recentActionBucketUiEntityMapper(it) }
+                .groupBy { it.date }
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    groupedRecentActionItems = list.groupBy { it.timestamp },
+                    groupedRecentActionItems = groupedRecentActions,
                 )
             }
         }.onFailure {
@@ -89,10 +102,10 @@ class RecentActionsComposeViewModel @Inject constructor(
     /**
      * Set the selected recent actions bucket
      *
-     * @param item
+     * @param bucket
      */
-    fun selectBucket(item: RecentActionBucket) {
-        selectedBucket = item
+    fun selectBucket(bucket: RecentActionBucket) {
+        selectedBucket = bucket
     }
 
     /**
@@ -112,5 +125,9 @@ class RecentActionsComposeViewModel @Inject constructor(
     /**
      * Get all recent action buckets
      */
-    fun getAllRecentBuckets() = uiState.value.groupedRecentActionItems.values.flatten()
+    fun getAllRecentBuckets() = uiState.value
+        .groupedRecentActionItems
+        .values
+        .flatten()
+        .map { it.bucket }
 }

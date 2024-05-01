@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.settings.camerauploads
 
+import android.widget.Toast
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,11 +16,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.lifecycle.Lifecycle
@@ -38,8 +42,8 @@ import mega.privacy.android.app.presentation.settings.camerauploads.model.Settin
 import mega.privacy.android.app.presentation.settings.camerauploads.model.UploadConnectionType
 import mega.privacy.android.app.presentation.settings.camerauploads.model.UploadOptionUiItem
 import mega.privacy.android.app.presentation.settings.camerauploads.model.VideoQualityUiItem
-import mega.privacy.android.app.presentation.settings.camerauploads.navigation.pickers.openCameraUploadsFolderNodePicker
-import mega.privacy.android.app.presentation.settings.camerauploads.navigation.pickers.openCameraUploadsLocalFolderPicker
+import mega.privacy.android.app.presentation.settings.camerauploads.navigation.pickers.openFolderNodePicker
+import mega.privacy.android.app.presentation.settings.camerauploads.navigation.pickers.openLocalFolderPicker
 import mega.privacy.android.app.presentation.settings.camerauploads.permissions.CameraUploadsPermissionsHandler
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.CameraUploadsFolderNodeTile
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.CameraUploadsLocalFolderTile
@@ -48,6 +52,8 @@ import mega.privacy.android.app.presentation.settings.camerauploads.tiles.FileUp
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.HowToUploadTile
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.IncludeLocationTagsTile
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.KeepFileNamesTile
+import mega.privacy.android.app.presentation.settings.camerauploads.tiles.MediaUploadsFolderNodeTile
+import mega.privacy.android.app.presentation.settings.camerauploads.tiles.MediaUploadsLocalFolderTile
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.MediaUploadsTile
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.RequireChargingDuringVideoCompressionTile
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.VideoCompressionTile
@@ -76,6 +82,8 @@ import mega.privacy.android.shared.theme.MegaAppTheme
  * @param onKeepFileNamesStateChanged Lambda to execute when the Keep File Names state changes
  * @param onLocalPrimaryFolderSelected Lambda to execute when selecting the new Camera Uploads
  * Local Primary Folder
+ * @param onLocalSecondaryFolderSelected Lambda to execute when selecting the new Media Uploads
+ * Local Secondary Folder
  * @param onMediaPermissionsGranted Lambda to execute when the User has granted the Media Permissions
  * @param onMediaUploadsStateChanged Lambda to execute when the Media Uploads state changes
  * @param onNewVideoCompressionSizeLimitProvided Lambda to execute upon providing a new maximum
@@ -87,11 +95,14 @@ import mega.privacy.android.shared.theme.MegaAppTheme
  * in Camera Uploads
  * @param onRequestPermissionsStateChanged Lambda to execute whether a Camera Uploads permissions
  * request should be done (triggered) or not (consumed)
+ * @param onSecondaryFolderNodeSelected Lambda to execute when selecting the new Media Uploads
+ * Secondary Folder Node
  * @param onUploadOptionUiItemSelected Lambda to execute when the User selects a new
  * [UploadOptionUiItem] from the File Upload prompt
  * @param onVideoQualityUiItemSelected Lambda to execute when the User selects a new
  * [VideoQualityUiItem] from the Video Quality prompt
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun SettingsCameraUploadsView(
     uiState: SettingsCameraUploadsUiState,
@@ -103,12 +114,14 @@ internal fun SettingsCameraUploadsView(
     onIncludeLocationTagsStateChanged: (Boolean) -> Unit,
     onKeepFileNamesStateChanged: (Boolean) -> Unit,
     onLocalPrimaryFolderSelected: (String?) -> Unit,
+    onLocalSecondaryFolderSelected: (String?) -> Unit,
     onMediaPermissionsGranted: () -> Unit,
     onMediaUploadsStateChanged: (Boolean) -> Unit,
     onNewVideoCompressionSizeLimitProvided: (Int) -> Unit,
     onPrimaryFolderNodeSelected: (NodeId) -> Unit,
     onRegularBusinessAccountSubUserPromptAcknowledged: () -> Unit,
     onRequestPermissionsStateChanged: (StateEvent) -> Unit,
+    onSecondaryFolderNodeSelected: (NodeId) -> Unit,
     onUploadOptionUiItemSelected: (UploadOptionUiItem) -> Unit,
     onVideoQualityUiItemSelected: (VideoQualityUiItem) -> Unit,
 ) {
@@ -121,40 +134,36 @@ internal fun SettingsCameraUploadsView(
     var showVideoCompressionSizeInputPrompt by rememberSaveable { mutableStateOf(false) }
     var showVideoQualityPrompt by rememberSaveable { mutableStateOf(false) }
 
-    /**
-     * Flag that controls the start of Camera Uploads when the onPause() Lifecycle Event is triggered
-     * (e.g. User leaves the Screen)
-     *
-     * This is false when the User attempts to change the Camera / Media Uploads Folder, be it a
-     * Local Folder or Folder Node
-     */
-    var canStartCameraUploads by rememberSaveable {
-        mutableStateOf(true)
-    }
-
     val cameraUploadsLocalFolderLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
+        contract = ActivityResultContracts.StartActivityForResult(),
     ) {
         val primaryFolderLocalPath = it.data?.getStringExtra(FileStorageActivity.EXTRA_PATH)
         onLocalPrimaryFolderSelected.invoke(primaryFolderLocalPath)
     }
+    val mediaUploadsLocalFolderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) {
+        val secondaryFolderLocalPath = it.data?.getStringExtra(FileStorageActivity.EXTRA_PATH)
+        onLocalSecondaryFolderSelected.invoke(secondaryFolderLocalPath)
+    }
     val cameraUploadsFolderNodeLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
+        contract = ActivityResultContracts.StartActivityForResult(),
     ) {
         val primaryFolderNodeId = NodeId(it.data?.getLongExtra(SELECTED_MEGA_FOLDER, -1L) ?: -1L)
         onPrimaryFolderNodeSelected.invoke(primaryFolderNodeId)
     }
+    val mediaUploadsFolderNodeLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        val secondaryFolderNodeId = NodeId(it.data?.getLongExtra(SELECTED_MEGA_FOLDER, -1L) ?: -1L)
+        onSecondaryFolderNodeSelected.invoke(secondaryFolderNodeId)
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) {
-                // Check if Camera Uploads can be started
-                if (canStartCameraUploads) {
-                    onCameraUploadsProcessStarted.invoke()
-                }
-            } else if (event == Lifecycle.Event.ON_RESUME) {
-                // Re-enable the flag that starts the Camera Uploads process when leaving the screen
-                canStartCameraUploads = true
+            if (event == Lifecycle.Event.ON_DESTROY) {
+                // Only start the Camera Uploads process upon leaving Settings Camera Uploads
+                onCameraUploadsProcessStarted.invoke()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -162,6 +171,7 @@ internal fun SettingsCameraUploadsView(
     }
 
     MegaScaffold(
+        modifier = Modifier.semantics { testTagsAsResourceId = true },
         topBar = {
             MegaAppBar(
                 modifier = Modifier.testTag(SETTINGS_CAMERA_UPLOADS_TOOLBAR),
@@ -267,13 +277,19 @@ internal fun SettingsCameraUploadsView(
                     }
                     KeepFileNamesTile(
                         isChecked = uiState.shouldKeepUploadFileNames,
-                        onCheckedChange = onKeepFileNamesStateChanged,
+                        onCheckedChange = { shouldKeepFileNames ->
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.message_keep_device_name),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                            onKeepFileNamesStateChanged.invoke(shouldKeepFileNames)
+                        },
                     )
                     CameraUploadsLocalFolderTile(
                         primaryFolderPath = uiState.primaryFolderPath,
                         onItemClicked = {
-                            canStartCameraUploads = false
-                            openCameraUploadsLocalFolderPicker(
+                            openLocalFolderPicker(
                                 context = context,
                                 launcher = cameraUploadsLocalFolderLauncher,
                             )
@@ -283,8 +299,7 @@ internal fun SettingsCameraUploadsView(
                         primaryFolderName = uiState.primaryFolderName.takeIf { !it.isNullOrBlank() }
                             ?: stringResource(R.string.section_photo_sync),
                         onItemClicked = {
-                            canStartCameraUploads = false
-                            openCameraUploadsFolderNodePicker(
+                            openFolderNodePicker(
                                 context = context,
                                 launcher = cameraUploadsFolderNodeLauncher,
                             )
@@ -294,6 +309,28 @@ internal fun SettingsCameraUploadsView(
                         isMediaUploadsEnabled = uiState.isMediaUploadsEnabled,
                         onItemClicked = onMediaUploadsStateChanged,
                     )
+                    if (uiState.isMediaUploadsEnabled) {
+                        MediaUploadsLocalFolderTile(
+                            secondaryFolderPath = uiState.secondaryFolderPath.takeIf { it.isNotBlank() }
+                                ?: stringResource(R.string.settings_empty_folder),
+                            onItemClicked = {
+                                openLocalFolderPicker(
+                                    context = context,
+                                    launcher = mediaUploadsLocalFolderLauncher,
+                                )
+                            },
+                        )
+                        MediaUploadsFolderNodeTile(
+                            secondaryFolderName = uiState.secondaryFolderName.takeIf { !it.isNullOrBlank() }
+                                ?: stringResource(R.string.section_secondary_media_uploads),
+                            onItemClicked = {
+                                openFolderNodePicker(
+                                    context = context,
+                                    launcher = mediaUploadsFolderNodeLauncher,
+                                )
+                            },
+                        )
+                    }
                 }
             }
         },
@@ -313,7 +350,6 @@ private fun SettingsCameraUploadsViewPreview(
     MegaAppTheme(isDark = isSystemInDarkTheme()) {
         SettingsCameraUploadsView(
             uiState = uiState,
-            onRegularBusinessAccountSubUserPromptAcknowledged = {},
             onBusinessAccountPromptDismissed = {},
             onCameraUploadsProcessStarted = {},
             onCameraUploadsStateChanged = {},
@@ -322,11 +358,14 @@ private fun SettingsCameraUploadsViewPreview(
             onIncludeLocationTagsStateChanged = {},
             onKeepFileNamesStateChanged = {},
             onLocalPrimaryFolderSelected = {},
+            onLocalSecondaryFolderSelected = {},
             onMediaPermissionsGranted = {},
             onMediaUploadsStateChanged = {},
             onNewVideoCompressionSizeLimitProvided = {},
             onPrimaryFolderNodeSelected = {},
+            onRegularBusinessAccountSubUserPromptAcknowledged = {},
             onRequestPermissionsStateChanged = {},
+            onSecondaryFolderNodeSelected = {},
             onUploadOptionUiItemSelected = {},
             onVideoQualityUiItemSelected = {},
         )
@@ -345,6 +384,7 @@ private class SettingsCameraUploadsViewParameterProvider
                 isMediaUploadsEnabled = true,
                 primaryFolderName = "Camera Uploads",
                 primaryFolderPath = "primary/folder/path",
+                secondaryFolderName = "Media Uploads",
                 secondaryFolderPath = "secondary/folder/path",
                 shouldIncludeLocationTags = true,
                 shouldKeepUploadFileNames = true,

@@ -418,6 +418,10 @@ internal class MegaApiFacade @Inject constructor(
         megaApi.setNodeSensitive(node, sensitive, listener)
     }
 
+    override suspend fun isSensitiveInherited(node: MegaNode): Boolean {
+        return megaApi.isSensitiveInherited(node)
+    }
+
     override fun addLogger(logger: MegaLoggerInterface) = MegaApiAndroid.addLoggerObject(logger)
 
     override fun removeLogger(logger: MegaLoggerInterface) =
@@ -1210,13 +1214,17 @@ internal class MegaApiFacade @Inject constructor(
         filter: MegaSearchFilter,
         order: Int,
         megaCancelToken: MegaCancelToken,
-    ): List<MegaNode> {
-        return megaApi.search(
-            filter,
-            order,
-            megaCancelToken
-        )
-    }
+    ): List<MegaNode> = megaApi.search(
+        filter,
+        order,
+        megaCancelToken
+    )
+
+    override suspend fun getChildren(
+        filter: MegaSearchFilter,
+        order: Int,
+        megaCancelToken: MegaCancelToken
+    ): List<MegaNode> = megaApi.getChildren(filter, order, megaCancelToken, null)
 
     override fun openShareDialog(
         megaNode: MegaNode,
@@ -1565,4 +1573,13 @@ internal class MegaApiFacade @Inject constructor(
 
     override fun queryChangeEmailLink(link: String, listener: MegaRequestListenerInterface) =
         megaApi.queryChangeEmailLink(link, listener)
+
+    override fun resendSignupLink(
+        email: String,
+        name: String,
+        listener: MegaRequestListenerInterface,
+    ) = megaApi.resendSignupLink(email, name, listener)
+
+    override fun cancelCreateAccount(listener: MegaRequestListenerInterface) =
+        megaApi.cancelCreateAccount(listener)
 }

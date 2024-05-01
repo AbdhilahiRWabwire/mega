@@ -1,4 +1,11 @@
-apply(from = "tools/util.gradle")
+pluginManagement {
+    includeBuild("build-logic")
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
 
 dependencyResolutionManagement {
     versionCatalogs {
@@ -11,15 +18,6 @@ dependencyResolutionManagement {
     }
 }
 
-/**
- * Checks whether to use Prebuilt Sdk
- */
-val shouldUsePrebuiltSdk: groovy.lang.Closure<Boolean> by extra
-
-/**
- * Checks if it is CI Build
- */
-val isServerBuild: groovy.lang.Closure<Boolean> by extra
 
 if (!shouldUsePrebuiltSdk() || isServerBuild()) {
     include(":sdk")
@@ -63,3 +61,8 @@ buildCache {
         isEnabled = isServerBuild()
     }
 }
+
+fun shouldUsePrebuiltSdk(): Boolean =
+    System.getenv("USE_PREBUILT_SDK")?.let { it != "false" } ?: true
+
+fun isServerBuild(): Boolean = System.getenv("BUILD_NUMBER") != null

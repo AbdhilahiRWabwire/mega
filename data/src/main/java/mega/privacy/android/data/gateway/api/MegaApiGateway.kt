@@ -504,6 +504,15 @@ interface MegaApiGateway {
     )
 
     /**
+     * Ascertain if the node is marked as sensitive or a descendent of such
+     * <p>
+     * see MegaNode::isMarkedSensitive to see if the node is sensitive
+     *
+     * @param node node to inspect
+     */
+    suspend fun isSensitiveInherited(node: MegaNode): Boolean
+
+    /**
      * Add logger
      *
      * @param logger
@@ -2399,6 +2408,18 @@ interface MegaApiGateway {
     ): List<MegaNode>
 
     /**
+     * Get children of a node
+     * @param filter filter to apply [MegaSearchFilter]
+     * @param order [SortOrder]
+     * @param megaCancelToken [MegaCancelToken]
+     */
+    suspend fun getChildren(
+        filter: MegaSearchFilter,
+        order: Int,
+        megaCancelToken: MegaCancelToken,
+    ): List<MegaNode>
+
+    /**
      * Creates a new share key for the node if there is no share key already created.
      *
      * @param megaNode : [MegaNode] object which needs to be shared
@@ -3475,4 +3496,33 @@ interface MegaApiGateway {
      * @param listener MegaRequestListener to track this request
      */
     fun queryChangeEmailLink(link: String, listener: MegaRequestListenerInterface)
+
+    /**
+     * Sends the confirmation email for a new account
+     *
+     * This function is useful to send the confirmation link again or to send it to a different
+     * email address, in case the user mistyped the email at the registration form. It can only
+     * be used after a successful call to MegaApi::createAccount or MegaApi::resumeCreateAccount.
+     *
+     * The associated request type with this request is MegaRequest::TYPE_SEND_SIGNUP_LINK.
+     *
+     * @param email    Email for the account
+     * @param name     Full name of the user (firstname + lastname)
+     * @param listener MegaRequestListener to track this request
+     */
+    fun resendSignupLink(email: String, name: String, listener: MegaRequestListenerInterface)
+
+    /**
+     * Cancel a registration process
+     *
+     * If a signup link has been generated during registration process, call this function
+     * to invalidate it. The ephemeral session will not be invalidated, only the signup link.
+     *
+     * The associated request type with this request is MegaRequest::TYPE_CREATE_ACCOUNT.
+     * Valid data in the MegaRequest object received on callbacks:
+     * - MegaRequest::getParamType - Returns the value MegaApi::CANCEL_ACCOUNT
+     *
+     * @param listener MegaRequestListener to track this request
+     */
+    fun cancelCreateAccount(listener: MegaRequestListenerInterface)
 }

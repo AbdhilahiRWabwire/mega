@@ -393,14 +393,13 @@ class CameraUploadsWorker @AssistedInject constructor(
     ): Result =
         when (finishedReason) {
             CameraUploadsFinishedReason.COMPLETED -> {
-                Timber.d("Camera Uploads process ended successfully: Process completed")
                 resetTotalUploads()
                 sendTransfersUpToDateInfoToBackupCenter()
+                scheduleCameraUploads()
                 Result.success()
             }
 
             else -> {
-                Timber.d("Camera Uploads process aborted with restart mode: $restartMode")
                 cancelAllTransfers()
                 resetTotalUploads()
                 sendTransfersInterruptedInfoToBackupCenter()
@@ -424,6 +423,8 @@ class CameraUploadsWorker @AssistedInject constructor(
                     }
                 }
             }
+        }.also {
+            Timber.d("Camera Uploads process finished with $finishedReason with restart mode: $restartMode")
         }
 
     override suspend fun getForegroundInfo() =
@@ -1103,24 +1104,24 @@ class CameraUploadsWorker @AssistedInject constructor(
     }
 
     /**
-     * Perform some operations when the local Primary Folder is not valid:
+     * Perform the following operations when the local Primary Folder is invalid:
      * - Display an error notification
-     * - Reset the local folder path
-     * - Notify the app of a local folder path change
-     * - Disable the Camera Uploads if the local Primary Folder is not valid
+     * - Reset the Primary Folder local path
+     * - Notify the app that the Primary Folder local path has changed
+     * - Disable the Camera Uploads functionality
      */
     private suspend fun handleInvalidLocalPrimaryFolder() {
         sendFolderUnavailableStatus(CameraUploadFolderType.Primary)
         setPrimaryFolderLocalPathUseCase("")
-        broadcastCameraUploadsSettingsActionUseCase(CameraUploadsSettingsAction.RefreshSettings)
+        broadcastCameraUploadsSettingsActionUseCase(CameraUploadsSettingsAction.DisableCameraUploads)
     }
 
     /**
-     * Perform some operations when the local Secondary Folder is not valid:
+     * Perform the following operations when the local Secondary Folder is invalid:
      * - Display an error notification
-     * - Reset the local folder path
-     * - Notify the app of a local folder path change
-     * - Disable the Camera Uploads if the local Primary Folder is not valid
+     * - Reset the Secondary Folder local path
+     * - Notify the app that the Secondary Folder local path has changed
+     * - Disable the Media Uploads functionality
      */
     private suspend fun handleInvalidLocalSecondaryFolder() {
         sendFolderUnavailableStatus(CameraUploadFolderType.Secondary)

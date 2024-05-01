@@ -1,8 +1,6 @@
 package mega.privacy.android.app.presentation.search.model
 
 import androidx.annotation.StringRes
-import de.palm.composestateevents.StateEvent
-import de.palm.composestateevents.consumed
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.mapper.OptionsItemInfo
 import mega.privacy.android.app.presentation.node.view.ToolbarMenuItem
@@ -37,6 +35,7 @@ import mega.privacy.android.domain.entity.search.TypeFilterOption
  * @property nodeNameCollisionResult result of node name collision
  * @property moveRequestResult result of move request
  * @property navigationLevel list of parent handles
+ * @property resetScroll to reset scroll position
  */
 data class SearchActivityState(
     val dropdownChipsEnabled: Boolean? = null,
@@ -50,13 +49,14 @@ data class SearchActivityState(
     @StringRes val errorMessageId: Int? = null,
     val filters: List<SearchFilter> = emptyList(),
     val selectedFilter: SearchFilter? = null,
-    val typeSelectedFilterOption: TypeFilterOption? = null,
-    val dateModifiedSelectedFilterOption: DateFilterOption? = null,
-    val dateAddedSelectedFilterOption: DateFilterOption? = null,
+    val typeSelectedFilterOption: TypeFilterWithName? = null,
+    val dateModifiedSelectedFilterOption: DateFilterWithName? = null,
+    val dateAddedSelectedFilterOption: DateFilterWithName? = null,
     val emptyState: Pair<Int, String>? = null,
     val toolbarMenuItems: List<ToolbarMenuItem> = emptyList(),
     val nodeSourceType: NodeSourceType = NodeSourceType.OTHER,
     val nodeNameCollisionResult: NodeNameCollisionResult? = null,
     val moveRequestResult: Result<MoveRequestResult>? = null,
     val navigationLevel: List<Pair<Long, String>> = emptyList(),
+    val resetScroll: Boolean = false,
 )

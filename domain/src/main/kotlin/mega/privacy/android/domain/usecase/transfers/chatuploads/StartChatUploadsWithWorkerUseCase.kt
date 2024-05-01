@@ -2,8 +2,11 @@ package mega.privacy.android.domain.usecase.transfers.chatuploads
 
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onEach
+import mega.privacy.android.domain.entity.chat.PendingMessageState
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateRequest
 import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageTransferTagRequest
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.transfer.MultiTransferEvent
@@ -67,19 +70,23 @@ class StartChatUploadsWithWorkerUseCase @Inject constructor(
         )
         coroutineContext.ensureActive()
         val appData = TransferAppData.ChatUpload(pendingMessageId)
-        startTransfersAndWorker(
+        emitAll(startTransfersAndThenWorkerFlow(
             doTransfers = {
                 uploadFilesUseCase(
                     filesAndNames, chatFilesFolderId, appData, false
                 ).onEach { event ->
+                    val singleTransferEvent = (event as? MultiTransferEvent.SingleTransferEvent)
                     //update transfer tag on Start event
-                    ((event as? MultiTransferEvent.SingleTransferEvent)?.transferEvent as? TransferEvent.TransferStartEvent)?.transfer?.tag?.let { transferTag ->
+                    (singleTransferEvent?.transferEvent as? TransferEvent.TransferStartEvent)?.transfer?.tag?.let { transferTag ->
                         updatePendingMessageUseCase(
-                            UpdatePendingMessageTransferTagRequest(pendingMessageId, transferTag)
+                            UpdatePendingMessageTransferTagRequest(
+                                pendingMessageId,
+                                transferTag
+                            )
                         )
                     }
                     //attach it if it's already uploaded
-                    (event as? MultiTransferEvent.SingleTransferEvent)
+                    singleTransferEvent
                         ?.alreadyTransferredIds
                         ?.singleOrNull()
                         ?.takeIf { it.longValue != -1L }
@@ -89,6 +96,15 @@ class StartChatUploadsWithWorkerUseCase @Inject constructor(
                                 alreadyTransferredNodeId
                             )
                         }
+                    //mark as error if it's a temporary error (typically an over quota error)
+                    if (singleTransferEvent?.transferEvent is TransferEvent.TransferTemporaryErrorEvent) {
+                        updatePendingMessageUseCase(
+                            UpdatePendingMessageStateRequest(
+                                pendingMessageId,
+                                PendingMessageState.ERROR_UPLOADING
+                            )
+                        )
+                    }
                 }
             },
             startWorker = {
@@ -96,6 +112,6 @@ class StartChatUploadsWithWorkerUseCase @Inject constructor(
                 //ensure worker has started and is listening to global events so we can finish uploadFilesUseCase
                 isChatUploadsWorkerStartedUseCase()
             }
-        )
+        ))
     }
 }

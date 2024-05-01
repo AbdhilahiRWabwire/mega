@@ -8,12 +8,20 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.meeting.managechathistory.ManageChatHistoryViewModel
+import mega.privacy.android.app.presentation.meeting.managechathistory.model.ChatHistoryRetentionOption
+import mega.privacy.android.app.presentation.meeting.managechathistory.model.DisplayValueUiState
+import mega.privacy.android.app.presentation.meeting.managechathistory.model.TimePickerItemUiState
+import mega.privacy.android.app.presentation.meeting.managechathistory.navigation.manageChatHistoryChatIdArg
+import mega.privacy.android.app.presentation.meeting.managechathistory.navigation.manageChatHistoryEmailIdArg
 import mega.privacy.android.app.presentation.snackbar.MegaSnackbarDuration
 import mega.privacy.android.app.presentation.snackbar.SnackBarHandler
+import mega.privacy.android.app.utils.Constants.DISABLED_RETENTION_TIME
+import mega.privacy.android.app.utils.Constants.SECONDS_IN_DAY
+import mega.privacy.android.app.utils.Constants.SECONDS_IN_HOUR
+import mega.privacy.android.app.utils.Constants.SECONDS_IN_MONTH_30
+import mega.privacy.android.app.utils.Constants.SECONDS_IN_WEEK
+import mega.privacy.android.app.utils.Constants.SECONDS_IN_YEAR
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
-import mega.privacy.android.domain.entity.ChatRoomPermission
-import mega.privacy.android.domain.entity.chat.ChatRoom
-import mega.privacy.android.domain.entity.chat.ChatRoomChange
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.chat.ClearChatHistoryUseCase
 import mega.privacy.android.domain.usecase.chat.GetChatRoomByUserUseCase
@@ -28,16 +36,20 @@ import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.NullSource
 import org.junit.jupiter.params.provider.ValueSource
+import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.doThrow
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.mockito.kotlin.wheneverBlocking
+import test.mega.privacy.android.app.presentation.meeting.model.newChatRoom
 import java.util.stream.Stream
 
 @ExtendWith(CoroutineMainDispatcherExtension::class)
@@ -63,6 +75,10 @@ class ManageChatHistoryViewModelTest {
     @BeforeEach
     fun setUp() {
         savedStateHandle = SavedStateHandle(mapOf("CHAT_ROOM_ID_KEY" to null))
+        initializeViewModel()
+    }
+
+    private fun initializeViewModel() {
         underTest = ManageChatHistoryViewModel(
             monitorChatRetentionTimeUpdateUseCase = monitorChatRetentionTimeUpdateUseCase,
             clearChatHistoryUseCase = clearChatHistoryUseCase,
@@ -89,33 +105,22 @@ class ManageChatHistoryViewModelTest {
     fun `test that retention time in state is updated when retention time update is received`() =
         runTest {
             val retentionTime = 100L
-            whenever(monitorChatRetentionTimeUpdateUseCase(chatRoomId)) doReturn flowOf(
-                retentionTime
+            setRetentionTime(
+                retentionTime = retentionTime,
+                chatRoomId = chatRoomId,
+                email = email
             )
-            val chatRoom = newChatRoom()
-            whenever(getChatRoomUseCase(chatRoomId)) doReturn chatRoom
-
-            underTest.initializeChatRoom(chatId = chatRoomId, email = email)
 
             underTest.uiState.test {
-                assertThat(awaitItem().retentionTimeUpdate).isEqualTo(retentionTime)
+                val item = expectMostRecentItem()
+                assertThat(item.retentionTime).isEqualTo(retentionTime)
+                assertThat(
+                    item.selectedHistoryRetentionTimeOption
+                ).isEqualTo(
+                    ChatHistoryRetentionOption.Custom
+                )
             }
         }
-
-    @Test
-    fun `test that retention time in state is updated as null when update is consumed`() = runTest {
-        val retentionTime = 100L
-        whenever(monitorChatRetentionTimeUpdateUseCase(chatRoomId)) doReturn flowOf(retentionTime)
-        val chatRoom = newChatRoom()
-        whenever(getChatRoomUseCase(chatRoomId)) doReturn chatRoom
-
-        underTest.initializeChatRoom(chatId = chatRoomId, email = email)
-        underTest.onRetentionTimeUpdateConsumed()
-
-        underTest.uiState.test {
-            assertThat(awaitItem().retentionTimeUpdate).isNull()
-        }
-    }
 
     @Test
     fun `test that the chat's history is cleared with the correct chat room ID`() = runTest {
@@ -168,12 +173,12 @@ class ManageChatHistoryViewModelTest {
         }
 
     @Test
-    fun `test that chat's retention time use case is invoked with the correct parameters`() =
+    fun `test that chat's retention time updated with the correct parameters`() =
         runTest {
             val period = 321L
-            underTest.setChatRetentionTime(chatId = chatRoomId, period = period)
+            underTest.setChatRetentionTime(period = period)
 
-            verify(setChatRetentionTimeUseCase).invoke(chatRoomId, period)
+            verify(setChatRetentionTimeUseCase).invoke(any(), eq(period))
         }
 
     @ParameterizedTest
@@ -183,15 +188,11 @@ class ManageChatHistoryViewModelTest {
         runTest {
             val newChatRoomId = chatRoomId ?: MEGACHAT_INVALID_HANDLE
             val retentionTime = 100L
-            whenever(monitorChatRetentionTimeUpdateUseCase(newChatRoomId)) doReturn flowOf(
-                retentionTime
-            )
-            val chatRoom = newChatRoom()
-            whenever(getChatRoomUseCase(newChatRoomId)) doReturn chatRoom
+            setRetentionTime(chatRoomId = newChatRoomId, retentionTime = retentionTime)
 
-            underTest.initializeChatRoom(chatId = chatRoomId, email = null)
-
-            assertThat(underTest.chatRoomId).isEqualTo(newChatRoomId)
+            val actual =
+                savedStateHandle.get<Long>(manageChatHistoryChatIdArg) ?: MEGACHAT_INVALID_HANDLE
+            assertThat(actual).isEqualTo(newChatRoomId)
         }
 
     @Test
@@ -201,13 +202,13 @@ class ManageChatHistoryViewModelTest {
             whenever(monitorChatRetentionTimeUpdateUseCase(chatRoomId)) doReturn flowOf(
                 retentionTime
             )
-            val chatRoom = newChatRoom()
+            val chatRoom = newChatRoom(withChatId = chatRoomId)
             whenever(getChatRoomUseCase(chatRoomId)) doReturn chatRoom
 
-            underTest.initializeChatRoom(chatId = chatRoomId, email = null)
+            reinitializeViewModelWithProperty(chatRoomId = chatRoomId)
 
-            underTest.chatRoomUiState.test {
-                assertThat(expectMostRecentItem()).isEqualTo(chatRoom)
+            underTest.uiState.test {
+                assertThat(expectMostRecentItem().chatRoom).isEqualTo(chatRoom)
             }
         }
 
@@ -223,7 +224,7 @@ class ManageChatHistoryViewModelTest {
                 whenever(getContactHandleUseCase(it)) doReturn contactHandle
             }
 
-            underTest.initializeChatRoom(chatId = null, email = email)
+            reinitializeViewModelWithProperty(email = email)
 
             underTest.uiState.test {
                 assertThat(expectMostRecentItem().shouldNavigateUp).isTrue()
@@ -245,20 +246,20 @@ class ManageChatHistoryViewModelTest {
             )
             val contactHandle = 321L
             whenever(getContactHandleUseCase(email)) doReturn contactHandle
-            val chatRoom = newChatRoom()
+            val chatRoom = newChatRoom(withChatId = chatRoomId)
             whenever(getChatRoomByUserUseCase(contactHandle)) doReturn chatRoom
 
-            underTest.initializeChatRoom(chatId = null, email = email)
+            reinitializeViewModelWithProperty(email = email)
 
-            underTest.chatRoomUiState.test {
-                assertThat(expectMostRecentItem()).isEqualTo(chatRoom)
+            underTest.uiState.test {
+                assertThat(expectMostRecentItem().chatRoom).isEqualTo(chatRoom)
             }
         }
 
     @Test
     fun `test that the navigate up UI state is reset after navigating up`() =
         runTest {
-            underTest.initializeChatRoom(chatId = null, email = null)
+            reinitializeViewModelWithProperty()
             underTest.onNavigatedUp()
 
             underTest.uiState.test {
@@ -266,57 +267,380 @@ class ManageChatHistoryViewModelTest {
             }
         }
 
-    private fun newChatRoom(
-        withChatId: Long = chatRoomId,
-        withOwnPrivilege: ChatRoomPermission = ChatRoomPermission.Standard,
-        withNumPreviewers: Long = 0L,
-        withPeerPrivilegesByHandles: Map<Long, ChatRoomPermission> = mapOf(),
-        withPeerCount: Long = 0L,
-        withPeerHandlesList: List<Long> = listOf(),
-        withPeerPrivilegesList: List<ChatRoomPermission> = listOf(),
-        withIsGroup: Boolean = false,
-        withIsPublic: Boolean = false,
-        withIsPreview: Boolean = false,
-        withAuthorizationToken: String? = null,
-        withTitle: String = "",
-        withHasCustomTitle: Boolean = false,
-        withUnreadCount: Int = 0,
-        withUserTyping: Long = 0L,
-        withUserHandle: Long = 0L,
-        withIsActive: Boolean = false,
-        withIsArchived: Boolean = false,
-        withRetentionTime: Long = 0L,
-        withCreationTime: Long = 0L,
-        withIsMeeting: Boolean = false,
-        withIsWaitingRoom: Boolean = false,
-        withIsOpenInvite: Boolean = false,
-        withIsSpeakRequest: Boolean = false,
-        withChanges: List<ChatRoomChange>? = null,
-    ) = ChatRoom(
-        chatId = withChatId,
-        ownPrivilege = withOwnPrivilege,
-        numPreviewers = withNumPreviewers,
-        peerPrivilegesByHandles = withPeerPrivilegesByHandles,
-        peerCount = withPeerCount,
-        peerHandlesList = withPeerHandlesList,
-        peerPrivilegesList = withPeerPrivilegesList,
-        isGroup = withIsGroup,
-        isPublic = withIsPublic,
-        isPreview = withIsPreview,
-        authorizationToken = withAuthorizationToken,
-        title = withTitle,
-        hasCustomTitle = withHasCustomTitle,
-        unreadCount = withUnreadCount,
-        userTyping = withUserTyping,
-        userHandle = withUserHandle,
-        isActive = withIsActive,
-        isArchived = withIsArchived,
-        retentionTime = withRetentionTime,
-        creationTime = withCreationTime,
-        isMeeting = withIsMeeting,
-        isWaitingRoom = withIsWaitingRoom,
-        isOpenInvite = withIsOpenInvite,
-        isSpeakRequest = withIsSpeakRequest,
-        changes = withChanges
+    @Test
+    fun `test that the retention time UI state is updated after successfully retrieving the chat room`() =
+        runTest {
+            val retentionTime = 100L
+            setRetentionTime(retentionTime)
+
+            initializeViewModel()
+
+            underTest.uiState.test {
+                assertThat(expectMostRecentItem().retentionTime).isEqualTo(retentionTime)
+            }
+        }
+
+    @ParameterizedTest
+    @MethodSource("provideRetentionTimePeriod")
+    fun `test that the selected chat history retention time should be set with the correct option`(
+        period: Long,
+        expectedOption: ChatHistoryRetentionOption,
+    ) = runTest {
+        savedStateHandle = SavedStateHandle(mapOf("CHAT_ROOM_ID_KEY" to chatRoomId))
+        initializeViewModel()
+        underTest.setChatRetentionTime(period)
+
+        underTest.uiState.test {
+            assertThat(
+                expectMostRecentItem().selectedHistoryRetentionTimeOption
+            ).isEqualTo(
+                expectedOption
+            )
+        }
+    }
+
+    private fun provideRetentionTimePeriod() = Stream.of(
+        Arguments.of(
+            DISABLED_RETENTION_TIME,
+            ChatHistoryRetentionOption.Disabled
+        ),
+        Arguments.of(
+            SECONDS_IN_DAY,
+            ChatHistoryRetentionOption.OneDay
+        ),
+        Arguments.of(
+            SECONDS_IN_WEEK,
+            ChatHistoryRetentionOption.OneWeek
+        ),
+        Arguments.of(
+            SECONDS_IN_MONTH_30,
+            ChatHistoryRetentionOption.OneMonth
+        ),
+        Arguments.of(
+            100L,
+            ChatHistoryRetentionOption.Custom
+        )
     )
+
+    @ParameterizedTest
+    @MethodSource("provideTimePickerItems")
+    fun `test that the custom time picker is displayed with correct items when the confirmed option is set to custom`(
+        retentionTime: Long,
+        expectedOrdinalPickerUiState: TimePickerItemUiState,
+        expectedPeriodPickerUiState: TimePickerItemUiState,
+    ) = runTest {
+        setRetentionTime(retentionTime)
+
+        underTest.onNewRetentionTimeOptionConfirmed(ChatHistoryRetentionOption.Custom)
+
+        underTest.uiState.test {
+            val item = expectMostRecentItem()
+            assertThat(item.shouldShowCustomTimePicker).isTrue()
+            assertThat(item.ordinalTimePickerItem).isEqualTo(expectedOrdinalPickerUiState)
+            assertThat(item.periodTimePickerItem).isEqualTo(expectedPeriodPickerUiState)
+        }
+    }
+
+    private fun provideTimePickerItems() = Stream.of(
+        Arguments.of(
+            DISABLED_RETENTION_TIME,
+            TimePickerItemUiState(
+                minimumValue = 1,
+                maximumValue = 24,
+                currentValue = 1
+            ),
+            TimePickerItemUiState(
+                minimumWidth = 4,
+                minimumValue = 0,
+                maximumValue = 4,
+                currentValue = 0,
+                displayValues = getDisplayValues(1)
+            )
+        ),
+        Arguments.of(
+            SECONDS_IN_YEAR,
+            TimePickerItemUiState(
+                minimumValue = 1,
+                maximumValue = 1,
+                currentValue = 1
+            ),
+            TimePickerItemUiState(
+                minimumWidth = 4,
+                minimumValue = 0,
+                maximumValue = 4,
+                currentValue = 4,
+                displayValues = getDisplayValues(1)
+            )
+        ),
+        Arguments.of(
+            SECONDS_IN_MONTH_30 * 12,
+            TimePickerItemUiState(
+                minimumValue = 1,
+                maximumValue = 12,
+                currentValue = 12
+            ),
+            TimePickerItemUiState(
+                minimumWidth = 4,
+                minimumValue = 0,
+                maximumValue = 4,
+                currentValue = 3,
+                displayValues = getDisplayValues(12)
+            )
+        ),
+        Arguments.of(
+            SECONDS_IN_WEEK * 4,
+            TimePickerItemUiState(
+                minimumValue = 1,
+                maximumValue = 4,
+                currentValue = 4
+            ),
+            TimePickerItemUiState(
+                minimumWidth = 4,
+                minimumValue = 0,
+                maximumValue = 4,
+                currentValue = 2,
+                displayValues = getDisplayValues(4)
+            )
+        ),
+        Arguments.of(
+            SECONDS_IN_DAY * 31,
+            TimePickerItemUiState(
+                minimumValue = 1,
+                maximumValue = 31,
+                currentValue = 31
+            ),
+            TimePickerItemUiState(
+                minimumWidth = 4,
+                minimumValue = 0,
+                maximumValue = 4,
+                currentValue = 1,
+                displayValues = getDisplayValues(31)
+            )
+        ),
+        Arguments.of(
+            SECONDS_IN_HOUR * 23,
+            TimePickerItemUiState(
+                minimumValue = 1,
+                maximumValue = 24,
+                currentValue = 23
+            ),
+            TimePickerItemUiState(
+                minimumWidth = 4,
+                minimumValue = 0,
+                maximumValue = 4,
+                currentValue = 0,
+                displayValues = getDisplayValues(23)
+            )
+        ),
+        Arguments.of(
+            100L,
+            TimePickerItemUiState(
+                minimumValue = 1,
+                maximumValue = 24,
+                currentValue = 1
+            ),
+            TimePickerItemUiState(
+                minimumWidth = 4,
+                minimumValue = 0,
+                maximumValue = 4,
+                currentValue = 0,
+                displayValues = getDisplayValues(1)
+            )
+        )
+    )
+
+    private fun getDisplayValues(value: Int) = listOf(
+        DisplayValueUiState.PluralString(
+            id = R.plurals.retention_time_picker_hours,
+            quantity = value
+        ),
+        DisplayValueUiState.PluralString(
+            id = R.plurals.retention_time_picker_days,
+            quantity = value
+        ),
+        DisplayValueUiState.PluralString(
+            id = R.plurals.retention_time_picker_weeks,
+            quantity = value
+        ),
+        DisplayValueUiState.PluralString(
+            id = R.plurals.retention_time_picker_months,
+            quantity = value
+        ),
+        DisplayValueUiState.SingularString(
+            id = R.string.retention_time_picker_year
+        )
+    )
+
+    @ParameterizedTest
+    @MethodSource("provideConfirmedRetentionTimeOption")
+    fun `test that the retention time is updated with the correct period when the confirmed option is not custom`(
+        option: ChatHistoryRetentionOption,
+        expectedPeriod: Long,
+    ) = runTest {
+        underTest.onNewRetentionTimeOptionConfirmed(option)
+
+        verify(setChatRetentionTimeUseCase).invoke(any(), eq(expectedPeriod))
+    }
+
+    private fun provideConfirmedRetentionTimeOption() = Stream.of(
+        Arguments.of(
+            ChatHistoryRetentionOption.Disabled,
+            DISABLED_RETENTION_TIME
+        ),
+        Arguments.of(
+            ChatHistoryRetentionOption.OneDay,
+            SECONDS_IN_DAY.toLong()
+        ),
+        Arguments.of(
+            ChatHistoryRetentionOption.OneWeek,
+            SECONDS_IN_WEEK.toLong()
+        ),
+        Arguments.of(
+            ChatHistoryRetentionOption.OneMonth,
+            SECONDS_IN_MONTH_30.toLong()
+        )
+    )
+
+    @Test
+    fun `test that the custom picker is not displayed after being set`() = runTest {
+        underTest.hideCustomTimePicker()
+
+        underTest.uiState.test {
+            assertThat(expectMostRecentItem().shouldShowCustomTimePicker).isFalse()
+        }
+    }
+
+    @Test
+    fun `test that the history retention confirmation is displayed`() = runTest {
+        underTest.showHistoryRetentionConfirmation()
+
+        underTest.uiState.test {
+            assertThat(expectMostRecentItem().shouldShowHistoryRetentionConfirmation).isTrue()
+        }
+    }
+
+    @Test
+    fun `test that the history retention confirmation is not displayed when dismissed`() = runTest {
+        underTest.showHistoryRetentionConfirmation()
+        underTest.dismissHistoryRetentionConfirmation()
+
+        underTest.uiState.test {
+            assertThat(expectMostRecentItem().shouldShowHistoryRetentionConfirmation).isFalse()
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(ChatHistoryRetentionOption::class)
+    fun `test that the correct string resource id is set when updating the history retention time confirmation`(
+        option: ChatHistoryRetentionOption,
+    ) = runTest {
+        underTest.updateHistoryRetentionTimeConfirmation(option)
+
+        underTest.uiState.test {
+            val expected = if (option == ChatHistoryRetentionOption.Custom) {
+                R.string.general_next
+            } else {
+                R.string.general_ok
+            }
+            assertThat(expectMostRecentItem().confirmButtonStringId).isEqualTo(expected)
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("provideRetentionTimeAndOptionWithExpectedValue")
+    fun `test that the correct enablement value for the confirm button is set when updating the history retention time confirmation`(
+        retentionTime: Long,
+        option: ChatHistoryRetentionOption,
+        expected: Boolean,
+    ) = runTest {
+        setRetentionTime(retentionTime)
+
+        underTest.updateHistoryRetentionTimeConfirmation(option)
+
+        underTest.uiState.test {
+            assertThat(expectMostRecentItem().isConfirmButtonEnable).isEqualTo(expected)
+        }
+    }
+
+    private fun provideRetentionTimeAndOptionWithExpectedValue() = Stream.of(
+        Arguments.of(
+            DISABLED_RETENTION_TIME,
+            ChatHistoryRetentionOption.Disabled,
+            false
+        ),
+        Arguments.of(
+            DISABLED_RETENTION_TIME,
+            ChatHistoryRetentionOption.OneMonth,
+            true
+        ),
+        Arguments.of(
+            SECONDS_IN_DAY,
+            ChatHistoryRetentionOption.Disabled,
+            true
+        )
+    )
+
+    @ParameterizedTest
+    @ValueSource(longs = [100L, DISABLED_RETENTION_TIME])
+    fun `test that the correct string resource id is set when showing the history retention time confirmation`(
+        retentionTime: Long,
+    ) = runTest {
+        setRetentionTime(retentionTime)
+
+        underTest.showHistoryRetentionConfirmation()
+
+        underTest.uiState.test {
+            val expected = if (retentionTime == 100L) {
+                R.string.general_next
+            } else {
+                R.string.general_ok
+            }
+            assertThat(expectMostRecentItem().confirmButtonStringId).isEqualTo(expected)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = [DISABLED_RETENTION_TIME, SECONDS_IN_DAY.toLong()])
+    fun `test that the correct enablement value for the confirm button is set when showing the history retention time confirmation`(
+        retentionTime: Long,
+    ) = runTest {
+        setRetentionTime(retentionTime)
+
+        underTest.showHistoryRetentionConfirmation()
+
+        underTest.uiState.test {
+            assertThat(
+                expectMostRecentItem().isConfirmButtonEnable
+            ).isEqualTo(
+                retentionTime != DISABLED_RETENTION_TIME
+            )
+        }
+    }
+
+    private suspend fun setRetentionTime(
+        retentionTime: Long,
+        chatRoomId: Long = this.chatRoomId,
+        email: String? = null,
+    ) {
+        whenever(monitorChatRetentionTimeUpdateUseCase(chatRoomId)) doReturn flowOf(
+            retentionTime
+        )
+        val chatRoom = newChatRoom(withChatId = chatRoomId, withRetentionTime = retentionTime)
+        whenever(getChatRoomUseCase(chatRoomId)) doReturn chatRoom
+
+        reinitializeViewModelWithProperty(chatRoomId = chatRoomId, email = email)
+    }
+
+    private fun reinitializeViewModelWithProperty(
+        chatRoomId: Long? = null,
+        email: String? = null,
+    ) {
+        savedStateHandle = SavedStateHandle(
+            mapOf(
+                manageChatHistoryChatIdArg to chatRoomId,
+                manageChatHistoryEmailIdArg to email
+            )
+        )
+        initializeViewModel()
+    }
 }

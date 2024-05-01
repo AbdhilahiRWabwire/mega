@@ -1,43 +1,28 @@
 import groovy.lang.Closure
+import mega.privacy.android.build.preBuiltSdkDependency
+import mega.privacy.android.build.shouldApplyDefaultConfiguration
 
 plugins {
-    id("com.android.library")
+    alias(convention.plugins.mega.android.library)
+    alias(convention.plugins.mega.android.room)
     id("kotlin-android")
     id("kotlin-kapt")
     id("de.mannodermaus.android-junit5")
-    id("com.google.devtools.ksp")
+
     kotlin("plugin.serialization") version "1.9.21"
 }
 
 apply(plugin = "jacoco")
 apply(from = "${project.rootDir}/tools/jacoco.gradle")
-apply(from = "${project.rootDir}/tools/util.gradle")
-apply(from = "${project.rootDir}/tools/sdk.gradle")
 
 android {
-    val compileSdkVersion: Int by rootProject.extra
-    compileSdk = compileSdkVersion
-    val buildTools: String by rootProject.extra
-    buildToolsVersion = buildTools
 
     defaultConfig {
-        val minSdkVersion: Int by rootProject.extra
-        minSdk = minSdkVersion
-
-        val targetSdkVersion: Int by rootProject.extra
-        targetSdk = targetSdkVersion
 
         val appVersion: String by rootProject.extra
         resValue("string", "app_version", "\"${appVersion}\"")
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
-    }
-
-    compileOptions {
-        val javaVersion: JavaVersion by rootProject.extra
-        sourceCompatibility = javaVersion
-        targetCompatibility = javaVersion
     }
 
     kotlin {
@@ -72,10 +57,6 @@ android {
         }
     }
 
-    ksp {
-        arg("room.schemaLocation", "$projectDir/schemas")
-        arg("room.generateKotlin", "true")
-    }
     sourceSets {
         // Adds exported schema location as test app assets.
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
@@ -94,6 +75,7 @@ android.testVariants.all {
 
 dependencies {
     implementation(project(":domain"))
+    preBuiltSdkDependency(rootProject.extra)
 
     implementation(lib.coroutines.core)
     implementation(lib.kotlin.serialisation)
@@ -105,17 +87,13 @@ dependencies {
     implementation(androidx.preferences)
     implementation(androidx.lifecycle.process)
     implementation(androidx.work.ktx)
-    implementation(androidx.room)
     implementation(androidx.hilt.work)
     implementation(google.hilt.android)
     implementation(androidx.concurrent.futures)
     implementation(androidx.paging)
-    implementation(androidx.room.paging)
     implementation(androidx.documentfile)
-    ksp(androidx.room.compiler)
 
-    val shouldApplyDefaultConfiguration: Closure<Boolean> by rootProject.extra
-    if (shouldApplyDefaultConfiguration()) {
+    if (shouldApplyDefaultConfiguration(project)) {
         apply(plugin = "dagger.hilt.android.plugin")
 
         kapt(google.hilt.android.compiler)
@@ -148,5 +126,4 @@ dependencies {
     androidTestImplementation(lib.bundles.unit.test)
     androidTestImplementation(testlib.junit.test.ktx)
     androidTestImplementation(testlib.runner)
-    androidTestImplementation(testlib.room.test)
 }

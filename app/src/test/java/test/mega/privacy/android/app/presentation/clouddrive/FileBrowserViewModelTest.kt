@@ -2,6 +2,7 @@ package test.mega.privacy.android.app.presentation.clouddrive
 
 import android.view.MenuItem
 import app.cash.turbine.test
+import com.google.common.truth.Truth
 import com.google.common.truth.Truth.assertThat
 import de.palm.composestateevents.StateEventWithContentConsumed
 import de.palm.composestateevents.StateEventWithContentTriggered
@@ -22,10 +23,11 @@ import mega.privacy.android.app.presentation.mapper.HandleOptionClickMapper
 import mega.privacy.android.app.presentation.mapper.OptionsItemInfo
 import mega.privacy.android.app.presentation.settings.model.MediaDiscoveryViewSettings
 import mega.privacy.android.app.presentation.time.mapper.DurationInSecondsTextMapper
-import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
+import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.data.mapper.FileDurationMapper
 import mega.privacy.android.domain.entity.SortOrder
+import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeChanges
 import mega.privacy.android.domain.entity.node.NodeId
@@ -443,6 +445,45 @@ class FileBrowserViewModelTest {
         }
 
     @Test
+    fun `test that download event is updated when on available offline option click is invoked`() =
+        runTest {
+            val triggered = TransferTriggerEvent.StartDownloadForOffline(node = mock())
+            underTest.onDownloadFileTriggered(triggered)
+            underTest.state.test {
+                val state = awaitItem()
+                assertThat(state.downloadEvent).isInstanceOf(StateEventWithContentTriggered::class.java)
+                assertThat((state.downloadEvent as StateEventWithContentTriggered).content)
+                    .isInstanceOf(TransferTriggerEvent.StartDownloadForOffline::class.java)
+            }
+        }
+
+    @Test
+    fun `test that download event is updated when on download option click is invoked`() =
+        runTest {
+            val triggered = TransferTriggerEvent.StartDownloadNode(nodes = listOf(mock()))
+            underTest.onDownloadFileTriggered(triggered)
+            underTest.state.test {
+                val state = awaitItem()
+                assertThat(state.downloadEvent).isInstanceOf(StateEventWithContentTriggered::class.java)
+                assertThat((state.downloadEvent as StateEventWithContentTriggered).content)
+                    .isInstanceOf(TransferTriggerEvent.StartDownloadNode::class.java)
+            }
+        }
+
+    @Test
+    fun `test that download event is updated when on download for preview option click is invoked`() =
+        runTest {
+            val triggered = TransferTriggerEvent.StartDownloadForPreview(node = mock())
+            underTest.onDownloadFileTriggered(triggered)
+            underTest.state.test {
+                val state = awaitItem()
+                assertThat(state.downloadEvent).isInstanceOf(StateEventWithContentTriggered::class.java)
+                assertThat((state.downloadEvent as StateEventWithContentTriggered).content)
+                    .isInstanceOf(TransferTriggerEvent.StartDownloadForPreview::class.java)
+            }
+        }
+
+    @Test
     fun `test that download event is cleared when the download event is consumed`() =
         runTest {
             //first set to triggered
@@ -462,6 +503,15 @@ class FileBrowserViewModelTest {
         whenever(handleOptionClickMapper(eq(menuItem), any())).thenReturn(optionsItemInfo)
         whenever(getFeatureFlagValueUseCase(AppFeatures.DownloadWorker)).thenReturn(true)
         underTest.onOptionItemClicked(menuItem)
+    }
+
+    @Test
+    fun `test that when folder is selected it calls update handle`() = runTest {
+        val handle = 123456L
+        underTest.onFolderItemClicked(handle)
+        underTest.state.test {
+            assertThat(awaitItem().isLoading).isFalse()
+        }
     }
 
     private suspend fun stubCommon() {

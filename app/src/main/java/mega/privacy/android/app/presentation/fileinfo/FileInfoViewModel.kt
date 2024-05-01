@@ -27,8 +27,8 @@ import mega.privacy.android.app.presentation.fileinfo.model.FileInfoOneOffViewEv
 import mega.privacy.android.app.presentation.fileinfo.model.FileInfoViewState
 import mega.privacy.android.app.presentation.fileinfo.model.getNodeIcon
 import mega.privacy.android.app.presentation.fileinfo.model.mapper.NodeActionMapper
-import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
-import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent.StartDownloadForOffline
+import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
+import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent.StartDownloadForOffline
 import mega.privacy.android.app.usecase.exception.MegaNodeException
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.wrapper.FileUtilWrapper
@@ -82,6 +82,7 @@ import mega.privacy.android.domain.usecase.shares.GetNodeOutSharesUseCase
 import mega.privacy.android.domain.usecase.shares.SetOutgoingPermissions
 import mega.privacy.android.domain.usecase.shares.StopSharingNode
 import mega.privacy.android.domain.usecase.thumbnailpreview.GetPreviewUseCase
+import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
 import java.io.File
@@ -132,6 +133,7 @@ class FileInfoViewModel @Inject constructor(
     private val monitorOfflineFileAvailabilityUseCase: MonitorOfflineFileAvailabilityUseCase,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val getContactVerificationWarningUseCase: GetContactVerificationWarningUseCase,
+    private val fileTypeIconMapper: FileTypeIconMapper
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FileInfoViewState())
@@ -727,7 +729,11 @@ class FileInfoViewModel @Inject constructor(
             uiState.copyWithTypedNode(
                 typedNode = typedNode,
             ).copy(
-                iconResource = getNodeIcon(typedNode, _uiState.value.origin.fromShares),
+                iconResource = getNodeIcon(
+                    typedNode = typedNode,
+                    originShares = _uiState.value.origin.fromShares,
+                    fileTypeIconMapper = fileTypeIconMapper
+                ),
                 isNodeInBackups = isNodeInBackupsUseCase(typedNode.id.longValue),
                 isNodeInRubbish = isNodeInRubbish,
                 jobInProgressState = null,
@@ -765,7 +771,11 @@ class FileInfoViewModel @Inject constructor(
             it.copyWithTypedNode(
                 typedNode = typedNode
             ).copy(
-                iconResource = getNodeIcon(typedNode, _uiState.value.origin.fromShares),
+                iconResource = getNodeIcon(
+                    typedNode = typedNode,
+                    originShares = _uiState.value.origin.fromShares,
+                    fileTypeIconMapper = fileTypeIconMapper
+                ),
             )
         }
     }

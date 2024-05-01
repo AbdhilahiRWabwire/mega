@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.videosection.view.videoselected
 
+import mega.privacy.android.shared.resources.R as sharedR
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.scaleIn
@@ -48,7 +49,7 @@ import mega.privacy.android.core.ui.utils.sync
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
-import mega.privacy.android.feature.sync.ui.mapper.FileTypeIconMapper
+import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
 import mega.privacy.android.shared.theme.MegaAppTheme
 
@@ -89,7 +90,8 @@ internal fun VideoSelectedView(
         scaffoldState = rememberScaffoldState(),
         topBar = {
             VideoSelectedTopBar(
-                title = uiState.topBarTitle ?: "Choose files",
+                title = uiState.topBarTitle
+                    ?: stringResource(id = sharedR.string.video_section_video_selected_top_bar_title),
                 searchState = uiState.searchState,
                 query = uiState.query,
                 isEmpty = uiState.nodesList.isEmpty(),
@@ -170,7 +172,8 @@ internal fun VideoSelectedView(
                         onChangeViewTypeClick = onChangeViewTypeClick,
                         showSortOrder = showSortOrder,
                         showChangeViewType = showChangeViewType,
-                        listState = currentListState.lazyListState
+                        listState = currentListState.lazyListState,
+                        fileTypeIconMapper = fileTypeIconMapper
                     )
                 } else {
                     val newList =

@@ -8,7 +8,7 @@ import de.palm.composestateevents.consumed
 import mega.privacy.android.app.myAccount.StorageStatusDialogState
 import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.presentation.data.NodeUIItem
-import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
+import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
@@ -71,7 +71,7 @@ data class FolderLinkState(
     val finishActivity: Boolean = false,
     val openFile: StateEventWithContent<Intent> = consumed(),
     val downloadNodes: StateEventWithContent<List<MegaNode>> = consumed(),
-    val downloadEvent: StateEventWithContent<TransferTriggerEvent> = consumed(),
+    val downloadEvent: StateEventWithContent<TransferTriggerEvent.DownloadTriggerEvent> = consumed(),
     val importNode: NodeUIItem<TypedNode>? = null,
     val selectImportLocation: StateEvent = consumed,
     val snackbarMessageContent: StateEventWithContent<String> = consumed(),

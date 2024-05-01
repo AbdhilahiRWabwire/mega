@@ -1,5 +1,6 @@
 package mega.privacy.android.data.database.entity.chat
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Ignore
@@ -45,6 +46,8 @@ data class ChatNodeEntity(
     override val label: Int,
     override val isFavourite: Boolean,
     override val isMarkedSensitive: Boolean,
+    @ColumnInfo(name = "isSensitiveInherited", defaultValue = "0")
+    override val isSensitiveInherited: Boolean,
     @Embedded override val exportedData: ExportedData?,
     override val isTakenDown: Boolean,
     override val isIncomingShare: Boolean,
@@ -73,6 +76,7 @@ data class ChatNodeEntity(
         label: Int,
         isFavourite: Boolean,
         isMarkedSensitive: Boolean,
+        isSensitiveInherited: Boolean,
         exportedData: ExportedData?,
         isTakenDown: Boolean,
         isIncomingShare: Boolean,
@@ -101,6 +105,7 @@ data class ChatNodeEntity(
         label = label,
         isFavourite = isFavourite,
         isMarkedSensitive = isMarkedSensitive,
+        isSensitiveInherited = isSensitiveInherited,
         exportedData = exportedData,
         isTakenDown = isTakenDown,
         isIncomingShare = isIncomingShare,

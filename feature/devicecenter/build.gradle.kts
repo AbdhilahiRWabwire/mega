@@ -1,43 +1,21 @@
-import groovy.lang.Closure
+import mega.privacy.android.build.preBuiltSdkDependency
+import mega.privacy.android.build.shouldApplyDefaultConfiguration
 
 plugins {
-    id("com.android.library")
+    alias(convention.plugins.mega.android.library)
     id("kotlin-android")
     id("kotlin-kapt")
     id("de.mannodermaus.android-junit5")
 }
 
-apply(from = "${project.rootDir}/tools/util.gradle")
-apply(from = "${project.rootDir}/tools/sdk.gradle")
 
 android {
-    val compileSdkVersion: Int by rootProject.extra
-    compileSdk = compileSdkVersion
-    val buildTools: String by rootProject.extra
-    buildToolsVersion = buildTools
-
     buildFeatures {
         compose = true
     }
 
     composeOptions {
         kotlinCompilerExtensionVersion = androidx.versions.compose.compiler.get()
-    }
-
-    defaultConfig {
-        val minSdkVersion: Int by rootProject.extra
-        minSdk = minSdkVersion
-
-        val targetSdkVersion: Int by rootProject.extra
-        targetSdk = targetSdkVersion
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    compileOptions {
-        val javaVersion: JavaVersion by rootProject.extra
-        sourceCompatibility = javaVersion
-        targetCompatibility = javaVersion
     }
 
     testOptions {
@@ -72,6 +50,8 @@ tasks.withType<Test> {
 }
 
 dependencies {
+    preBuiltSdkDependency(rootProject.extra)
+
     implementation(project(":core:formatter"))
     lintChecks(project(":lint"))
 
@@ -99,8 +79,7 @@ dependencies {
     implementation(androidx.lifecycle.service)
     implementation(google.hilt.android)
 
-    val shouldApplyDefaultConfiguration: Closure<Boolean> by rootProject.extra
-    if (shouldApplyDefaultConfiguration()) {
+    if (shouldApplyDefaultConfiguration(project)) {
         apply(plugin = "dagger.hilt.android.plugin")
 
         kapt(google.hilt.android.compiler)

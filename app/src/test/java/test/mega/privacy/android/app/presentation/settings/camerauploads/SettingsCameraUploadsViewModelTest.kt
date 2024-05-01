@@ -5,8 +5,12 @@ import com.google.common.truth.Truth.assertThat
 import de.palm.composestateevents.StateEvent
 import de.palm.composestateevents.consumed
 import de.palm.composestateevents.triggered
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.settings.camerauploads.SettingsCameraUploadsViewModel
@@ -23,6 +27,7 @@ import mega.privacy.android.domain.entity.VideoQuality
 import mega.privacy.android.domain.entity.account.EnableCameraUploadsStatus
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadFolderType
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRestartMode
+import mega.privacy.android.domain.entity.camerauploads.CameraUploadsSettingsAction
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.settings.camerauploads.UploadOption
@@ -35,6 +40,7 @@ import mega.privacy.android.domain.usecase.camerauploads.DeleteCameraUploadsTemp
 import mega.privacy.android.domain.usecase.camerauploads.DisableMediaUploadsSettingsUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetPrimaryFolderNodeUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetPrimaryFolderPathUseCase
+import mega.privacy.android.domain.usecase.camerauploads.GetSecondaryFolderNodeUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetSecondaryFolderPathUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetUploadOptionUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetUploadVideoQualityUseCase
@@ -44,9 +50,11 @@ import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsEnabledU
 import mega.privacy.android.domain.usecase.camerauploads.IsChargingRequiredForVideoCompressionUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsPrimaryFolderNodeValidUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsPrimaryFolderPathValidUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsSecondaryFolderNodeValidUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsSecondaryFolderPathValidUseCase
 import mega.privacy.android.domain.usecase.camerauploads.ListenToNewMediaUseCase
 import mega.privacy.android.domain.usecase.camerauploads.MonitorCameraUploadsFolderDestinationUseCase
+import mega.privacy.android.domain.usecase.camerauploads.MonitorCameraUploadsSettingsActionsUseCase
 import mega.privacy.android.domain.usecase.camerauploads.PreparePrimaryFolderPathUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetCameraUploadsByWifiUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetChargingRequiredForVideoCompressionUseCase
@@ -61,6 +69,7 @@ import mega.privacy.android.domain.usecase.camerauploads.SetupCameraUploadsSetti
 import mega.privacy.android.domain.usecase.camerauploads.SetupDefaultSecondaryFolderUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetupMediaUploadsSettingUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetupPrimaryFolderUseCase
+import mega.privacy.android.domain.usecase.camerauploads.SetupSecondaryFolderUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.workers.StartCameraUploadUseCase
 import mega.privacy.android.domain.usecase.workers.StopCameraUploadsUseCase
@@ -77,9 +86,9 @@ import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.Mockito
 import org.mockito.kotlin.any
+import org.mockito.kotlin.atLeast
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
-import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.util.stream.Stream
@@ -88,6 +97,7 @@ import java.util.stream.Stream
  * Test class for [SettingsCameraUploadsViewModel]
  */
 @ExtendWith(CoroutineMainDispatcherExtension::class)
+@OptIn(ExperimentalCoroutinesApi::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 internal class SettingsCameraUploadsViewModelTest {
 
@@ -103,6 +113,7 @@ internal class SettingsCameraUploadsViewModelTest {
     private val disableMediaUploadsSettingsUseCase = mock<DisableMediaUploadsSettingsUseCase>()
     private val getPrimaryFolderNodeUseCase = mock<GetPrimaryFolderNodeUseCase>()
     private val getPrimaryFolderPathUseCase = mock<GetPrimaryFolderPathUseCase>()
+    private val getSecondaryFolderNodeUseCase = mock<GetSecondaryFolderNodeUseCase>()
     private val getSecondaryFolderPathUseCase = mock<GetSecondaryFolderPathUseCase>()
     private val getUploadOptionUseCase = mock<GetUploadOptionUseCase>()
     private val getUploadVideoQualityUseCase = mock<GetUploadVideoQualityUseCase>()
@@ -115,10 +126,13 @@ internal class SettingsCameraUploadsViewModelTest {
     private val isPrimaryFolderNodeValidUseCase = mock<IsPrimaryFolderNodeValidUseCase>()
     private val isPrimaryFolderPathValidUseCase = mock<IsPrimaryFolderPathValidUseCase>()
     private val isSecondaryFolderEnabled = mock<IsSecondaryFolderEnabled>()
+    private val isSecondaryFolderNodeValidUseCase = mock<IsSecondaryFolderNodeValidUseCase>()
     private val isSecondaryFolderPathValidUseCase = mock<IsSecondaryFolderPathValidUseCase>()
     private val listenToNewMediaUseCase = mock<ListenToNewMediaUseCase>()
     private val monitorCameraUploadsFolderDestinationUseCase =
         mock<MonitorCameraUploadsFolderDestinationUseCase>()
+    private val monitorCameraUploadsSettingsActionsUseCase =
+        mock<MonitorCameraUploadsSettingsActionsUseCase>()
     private val preparePrimaryFolderPathUseCase = mock<PreparePrimaryFolderPathUseCase>()
     private val setCameraUploadsByWifiUseCase = mock<SetCameraUploadsByWifiUseCase>()
     private val setChargingRequiredForVideoCompressionUseCase =
@@ -134,11 +148,16 @@ internal class SettingsCameraUploadsViewModelTest {
     private val setupDefaultSecondaryFolderUseCase = mock<SetupDefaultSecondaryFolderUseCase>()
     private val setupMediaUploadsSettingUseCase = mock<SetupMediaUploadsSettingUseCase>()
     private val setupPrimaryFolderUseCase = mock<SetupPrimaryFolderUseCase>()
+    private val setupSecondaryFolderUseCase = mock<SetupSecondaryFolderUseCase>()
     private val snackBarHandler = mock<SnackBarHandler>()
     private val startCameraUploadUseCase = mock<StartCameraUploadUseCase>()
     private val stopCameraUploadsUseCase = mock<StopCameraUploadsUseCase>()
     private val uploadOptionUiItemMapper = Mockito.spy(UploadOptionUiItemMapper())
     private val videoQualityUiItemMapper = Mockito.spy(VideoQualityUiItemMapper())
+
+    private val fakeMonitorCameraUploadsSettingsActionsFlow =
+        MutableSharedFlow<CameraUploadsSettingsAction>()
+    private val applicationScope = TestScope(UnconfinedTestDispatcher())
 
     @BeforeEach
     fun resetMocks() {
@@ -151,6 +170,7 @@ internal class SettingsCameraUploadsViewModelTest {
             disableMediaUploadsSettingsUseCase,
             getPrimaryFolderNodeUseCase,
             getPrimaryFolderPathUseCase,
+            getSecondaryFolderNodeUseCase,
             getSecondaryFolderPathUseCase,
             getUploadOptionUseCase,
             getUploadVideoQualityUseCase,
@@ -162,9 +182,11 @@ internal class SettingsCameraUploadsViewModelTest {
             isPrimaryFolderNodeValidUseCase,
             isPrimaryFolderPathValidUseCase,
             isSecondaryFolderEnabled,
+            isSecondaryFolderNodeValidUseCase,
             isSecondaryFolderPathValidUseCase,
             listenToNewMediaUseCase,
             monitorCameraUploadsFolderDestinationUseCase,
+            monitorCameraUploadsSettingsActionsUseCase,
             preparePrimaryFolderPathUseCase,
             setCameraUploadsByWifiUseCase,
             setChargingRequiredForVideoCompressionUseCase,
@@ -179,6 +201,7 @@ internal class SettingsCameraUploadsViewModelTest {
             setupDefaultSecondaryFolderUseCase,
             setupMediaUploadsSettingUseCase,
             setupPrimaryFolderUseCase,
+            setupSecondaryFolderUseCase,
             snackBarHandler,
             startCameraUploadUseCase,
             stopCameraUploadsUseCase,
@@ -205,10 +228,15 @@ internal class SettingsCameraUploadsViewModelTest {
             on { id }.thenReturn(NodeId(123456L))
             on { name }.thenReturn("Camera Uploads")
         }
+        val mediaUploadsFolderNode = mock<TypedFolderNode> {
+            on { id }.thenReturn(NodeId(789012L))
+            on { name }.thenReturn("Media Uploads")
+        }
         whenever(areLocationTagsEnabledUseCase()).thenReturn(shouldIncludeLocationTags)
         whenever(areUploadFileNamesKeptUseCase()).thenReturn(shouldKeepUploadFileNames)
         whenever(getPrimaryFolderNodeUseCase()).thenReturn(cameraUploadsFolderNode)
         whenever(getPrimaryFolderPathUseCase()).thenReturn(primaryFolderPath)
+        whenever(getSecondaryFolderNodeUseCase()).thenReturn(mediaUploadsFolderNode)
         whenever(getSecondaryFolderPathUseCase()).thenReturn(secondaryFolderPath)
         whenever(getUploadOptionUseCase()).thenReturn(uploadOption)
         whenever(getUploadVideoQualityUseCase()).thenReturn(videoQuality)
@@ -221,8 +249,12 @@ internal class SettingsCameraUploadsViewModelTest {
             requireChargingDuringVideoCompression
         )
         whenever(isSecondaryFolderEnabled()).thenReturn(isMediaUploadsEnabled)
+        whenever(monitorCameraUploadsSettingsActionsUseCase()).thenReturn(
+            fakeMonitorCameraUploadsSettingsActionsFlow
+        )
 
         underTest = SettingsCameraUploadsViewModel(
+            applicationScope = applicationScope,
             areLocationTagsEnabledUseCase = areLocationTagsEnabledUseCase,
             areUploadFileNamesKeptUseCase = areUploadFileNamesKeptUseCase,
             checkEnableCameraUploadsStatusUseCase = checkEnableCameraUploadsStatusUseCase,
@@ -231,6 +263,7 @@ internal class SettingsCameraUploadsViewModelTest {
             disableMediaUploadsSettingsUseCase = disableMediaUploadsSettingsUseCase,
             getPrimaryFolderNodeUseCase = getPrimaryFolderNodeUseCase,
             getPrimaryFolderPathUseCase = getPrimaryFolderPathUseCase,
+            getSecondaryFolderNodeUseCase = getSecondaryFolderNodeUseCase,
             getSecondaryFolderPathUseCase = getSecondaryFolderPathUseCase,
             getUploadOptionUseCase = getUploadOptionUseCase,
             getUploadVideoQualityUseCase = getUploadVideoQualityUseCase,
@@ -242,14 +275,17 @@ internal class SettingsCameraUploadsViewModelTest {
             isPrimaryFolderNodeValidUseCase = isPrimaryFolderNodeValidUseCase,
             isPrimaryFolderPathValidUseCase = isPrimaryFolderPathValidUseCase,
             isSecondaryFolderEnabled = isSecondaryFolderEnabled,
+            isSecondaryFolderNodeValidUseCase = isSecondaryFolderNodeValidUseCase,
             isSecondaryFolderPathValidUseCase = isSecondaryFolderPathValidUseCase,
             listenToNewMediaUseCase = listenToNewMediaUseCase,
             monitorCameraUploadsFolderDestinationUseCase = monitorCameraUploadsFolderDestinationUseCase,
+            monitorCameraUploadsSettingsActionsUseCase = monitorCameraUploadsSettingsActionsUseCase,
             preparePrimaryFolderPathUseCase = preparePrimaryFolderPathUseCase,
             setCameraUploadsByWifiUseCase = setCameraUploadsByWifiUseCase,
             setChargingRequiredForVideoCompressionUseCase = setChargingRequiredForVideoCompressionUseCase,
             setLocationTagsEnabledUseCase = setLocationTagsEnabledUseCase,
             setPrimaryFolderPathUseCase = setPrimaryFolderPathUseCase,
+            setupSecondaryFolderUseCase = setupSecondaryFolderUseCase,
             setSecondaryFolderLocalPathUseCase = setSecondaryFolderLocalPathUseCase,
             setUploadFileNamesKeptUseCase = setUploadFileNamesKeptUseCase,
             setUploadOptionUseCase = setUploadOptionUseCase,
@@ -282,7 +318,7 @@ internal class SettingsCameraUploadsViewModelTest {
                 initializeUnderTest()
                 whenever(isConnectedToInternetUseCase()).thenReturn(false)
 
-                underTest.onCameraUploadsStateChanged(newState = false)
+                underTest.onCameraUploadsStateChanged(enabled = false)
 
                 verify(snackBarHandler).postSnackbarMessage(
                     resId = R.string.general_error,
@@ -296,7 +332,7 @@ internal class SettingsCameraUploadsViewModelTest {
                 initializeUnderTest()
                 whenever(isConnectedToInternetUseCase()).thenThrow(RuntimeException())
 
-                assertDoesNotThrow { underTest.onCameraUploadsStateChanged(newState = false) }
+                assertDoesNotThrow { underTest.onCameraUploadsStateChanged(enabled = false) }
                 verify(snackBarHandler).postSnackbarMessage(
                     resId = R.string.general_error,
                     snackbarDuration = MegaSnackbarDuration.Long,
@@ -308,12 +344,8 @@ internal class SettingsCameraUploadsViewModelTest {
             initializeUnderTest()
             whenever(isConnectedToInternetUseCase()).thenReturn(true)
 
-            underTest.onCameraUploadsStateChanged(newState = false)
+            underTest.onCameraUploadsStateChanged(enabled = false)
 
-            // The Use Case is called two times: one during ViewModel initialization and another
-            // when the ViewModel function is called
-            verify(isCameraUploadsEnabledUseCase, times(2)).invoke()
-            verify(stopCameraUploadsUseCase).invoke(CameraUploadsRestartMode.StopAndDisable)
             underTest.uiState.test {
                 val state = awaitItem()
                 assertThat(state.isCameraUploadsEnabled).isFalse()
@@ -322,12 +354,23 @@ internal class SettingsCameraUploadsViewModelTest {
         }
 
         @Test
+        fun `test that disabling camera uploads stops and disables the ongoing camera uploads process`() =
+            runTest {
+                whenever(isConnectedToInternetUseCase()).thenReturn(true)
+                initializeUnderTest()
+
+                underTest.onCameraUploadsStateChanged(enabled = false)
+
+                verify(stopCameraUploadsUseCase).invoke(CameraUploadsRestartMode.StopAndDisable)
+            }
+
+        @Test
         fun `test that an error snackbar is shown when the user enables camera uploads and is not connected to the internet`() =
             runTest {
                 initializeUnderTest(isCameraUploadsEnabled = false)
                 whenever(isConnectedToInternetUseCase()).thenReturn(false)
 
-                underTest.onCameraUploadsStateChanged(newState = true)
+                underTest.onCameraUploadsStateChanged(enabled = true)
 
                 verify(snackBarHandler).postSnackbarMessage(
                     resId = R.string.general_error,
@@ -341,7 +384,7 @@ internal class SettingsCameraUploadsViewModelTest {
                 initializeUnderTest(isCameraUploadsEnabled = false)
                 whenever(isConnectedToInternetUseCase()).thenThrow(RuntimeException())
 
-                assertDoesNotThrow { underTest.onCameraUploadsStateChanged(newState = true) }
+                assertDoesNotThrow { underTest.onCameraUploadsStateChanged(enabled = true) }
                 verify(snackBarHandler).postSnackbarMessage(
                     resId = R.string.general_error,
                     snackbarDuration = MegaSnackbarDuration.Long,
@@ -354,12 +397,48 @@ internal class SettingsCameraUploadsViewModelTest {
                 initializeUnderTest(isCameraUploadsEnabled = false)
                 whenever(isConnectedToInternetUseCase()).thenReturn(true)
 
-                underTest.onCameraUploadsStateChanged(newState = true)
+                underTest.onCameraUploadsStateChanged(enabled = true)
 
                 underTest.uiState.test {
                     val state = awaitItem()
                     assertThat(state.requestPermissions).isEqualTo(triggered)
                 }
+            }
+
+        @ParameterizedTest(name = "is camera uploads enabled: {0}")
+        @ValueSource(booleans = [true, false])
+        fun `test that camera uploads is disabled when it receives a monitor update to disable the feature`(
+            isCameraUploadsEnabled: Boolean,
+        ) =
+            runTest {
+                whenever(isConnectedToInternetUseCase()).thenReturn(true)
+                initializeUnderTest(isCameraUploadsEnabled = isCameraUploadsEnabled)
+
+                // Trigger an update to disable Camera Uploads
+                fakeMonitorCameraUploadsSettingsActionsFlow.emit(CameraUploadsSettingsAction.DisableCameraUploads)
+
+                underTest.uiState.test {
+                    val state = awaitItem()
+                    assertThat(state.isCameraUploadsEnabled).isFalse()
+                    assertThat(state.isMediaUploadsEnabled).isFalse()
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
+
+        @Test
+        fun `test that disabling camera uploads through a monitor update stops and disables the ongoing camera uploads process`() =
+            runTest {
+                whenever(isConnectedToInternetUseCase()).thenReturn(true)
+                // Camera Uploads is initially enabled
+                initializeUnderTest()
+
+                // Trigger an update to disable Camera Uploads
+                fakeMonitorCameraUploadsSettingsActionsFlow.emit(CameraUploadsSettingsAction.DisableCameraUploads)
+
+                verify(
+                    stopCameraUploadsUseCase,
+                    atLeast(1)
+                ).invoke(CameraUploadsRestartMode.StopAndDisable)
             }
 
         @ParameterizedTest(name = "new request permissions state event: {0}")
@@ -1128,5 +1207,227 @@ internal class SettingsCameraUploadsViewModelTest {
 
             verify(stopCameraUploadsUseCase).invoke(CameraUploadsRestartMode.Stop)
         }
+
+        @ParameterizedTest(name = "is media uploads enabled: {0}")
+        @ValueSource(booleans = [true, false])
+        fun `test that media uploads is disabled when it receives a monitor update to disable the feature`(
+            isMediaUploadsEnabled: Boolean,
+        ) = runTest {
+            whenever(isConnectedToInternetUseCase()).thenReturn(true)
+            initializeUnderTest(isMediaUploadsEnabled = isMediaUploadsEnabled)
+
+            // Trigger an update to disable Media Uploads
+            fakeMonitorCameraUploadsSettingsActionsFlow.emit(CameraUploadsSettingsAction.DisableMediaUploads)
+
+            verify(disableMediaUploadsSettingsUseCase, atLeast(1)).invoke()
+            underTest.uiState.test {
+                assertThat(awaitItem().isMediaUploadsEnabled).isFalse()
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        @Test
+        fun `test that disabling media uploads through a monitor update stops the ongoing camera uploads process`() =
+            runTest {
+                whenever(isConnectedToInternetUseCase()).thenReturn(true)
+                initializeUnderTest()
+
+                // Trigger an update to disable Media Uploads
+                fakeMonitorCameraUploadsSettingsActionsFlow.emit(CameraUploadsSettingsAction.DisableMediaUploads)
+
+                verify(stopCameraUploadsUseCase, atLeast(1)).invoke(CameraUploadsRestartMode.Stop)
+            }
+    }
+
+    /**
+     * The Test Group that verifies behaviors when changing the Media Uploads Local Secondary Folder
+     */
+    @Nested
+    @DisplayName("Media Uploads - Local Folder Selection")
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    internal inner class MediaUploadsLocalFolderSelectionTestGroup {
+        @Test
+        fun `test that an error snackbar is shown when changing the local secondary folder throws an exception`() =
+            runTest {
+                initializeUnderTest()
+                whenever(isSecondaryFolderPathValidUseCase(any())).thenThrow(RuntimeException())
+
+                assertDoesNotThrow { underTest.onLocalSecondaryFolderSelected("new/secondary/folder/path") }
+                verify(snackBarHandler).postSnackbarMessage(
+                    resId = R.string.general_error,
+                    snackbarDuration = MegaSnackbarDuration.Long,
+                )
+            }
+
+        @Test
+        fun `test that an error snackbar is shown when the new local secondary folder is invalid`() =
+            runTest {
+                initializeUnderTest()
+                whenever(isSecondaryFolderPathValidUseCase(any())).thenReturn(false)
+
+                underTest.onLocalSecondaryFolderSelected("new/secondary/folder/path")
+                snackBarHandler.postSnackbarMessage(
+                    resId = R.string.error_invalid_folder_selected,
+                    snackbarDuration = MegaSnackbarDuration.Long,
+                )
+            }
+
+        @Test
+        fun `test that an error snackbar is shown when the new local secondary folder is null`() =
+            runTest {
+                initializeUnderTest()
+
+                underTest.onLocalSecondaryFolderSelected(null)
+
+                snackBarHandler.postSnackbarMessage(
+                    resId = R.string.error_invalid_folder_selected,
+                    snackbarDuration = MegaSnackbarDuration.Long,
+                )
+            }
+
+        @Test
+        fun `test that the new local secondary folder is set`() = runTest {
+            initializeUnderTest()
+            whenever(isSecondaryFolderPathValidUseCase(any())).thenReturn(true)
+            val expectedLocalSecondaryFolder = "new/secondary/folder/path"
+
+            underTest.onLocalSecondaryFolderSelected(expectedLocalSecondaryFolder)
+
+            verify(setSecondaryFolderLocalPathUseCase).invoke(expectedLocalSecondaryFolder)
+            underTest.uiState.test {
+                assertThat(awaitItem().secondaryFolderPath).isEqualTo(expectedLocalSecondaryFolder)
+            }
+        }
+
+        @Test
+        fun `test that setting the new local secondary folder also clears the secondary folder records`() =
+            runTest {
+                initializeUnderTest()
+                whenever(isSecondaryFolderPathValidUseCase(any())).thenReturn(true)
+
+                underTest.onLocalSecondaryFolderSelected("new/secondary/folder/path")
+
+                verify(clearCameraUploadsRecordUseCase).invoke(listOf(CameraUploadFolderType.Secondary))
+            }
+
+        @Test
+        fun `test that setting the new local secondary folder also stops the ongoing camera uploads process`() =
+            runTest {
+                initializeUnderTest()
+                whenever(isSecondaryFolderPathValidUseCase(any())).thenReturn(true)
+
+                underTest.onLocalSecondaryFolderSelected("new/secondary/folder/path")
+
+                verify(stopCameraUploadsUseCase).invoke(CameraUploadsRestartMode.Stop)
+            }
+    }
+
+    /**
+     * The Test Group that verifies behaviors when changing the Media Uploads Secondary Folder Node
+     */
+    @Nested
+    @DisplayName("Media Uploads - Folder Node Selection")
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    internal inner class MediaUploadsFolderNodeSelectionTestGroup {
+        @Test
+        fun `test that an error snackbar is shown when changing the secondary folder node throws an exception`() =
+            runTest {
+                whenever(isSecondaryFolderNodeValidUseCase(any())).thenThrow(RuntimeException())
+                initializeUnderTest()
+
+                assertDoesNotThrow { underTest.onSecondaryFolderNodeSelected(NodeId(789012L)) }
+
+                verify(snackBarHandler).postSnackbarMessage(
+                    resId = R.string.general_error,
+                    snackbarDuration = MegaSnackbarDuration.Long,
+                )
+            }
+
+        @Test
+        fun `test that an error snackbar is shown when the new secondary folder node is invalid`() =
+            runTest {
+                whenever(isSecondaryFolderNodeValidUseCase(any())).thenReturn(false)
+                initializeUnderTest()
+
+                underTest.onSecondaryFolderNodeSelected(NodeId(789012L))
+
+                verify(snackBarHandler).postSnackbarMessage(
+                    resId = R.string.error_invalid_folder_selected,
+                    snackbarDuration = MegaSnackbarDuration.Long,
+                )
+            }
+
+        @Test
+        fun `test that the new secondary folder node is set`() = runTest {
+            val secondaryFolderNodeId = NodeId(789012L)
+            whenever(isSecondaryFolderNodeValidUseCase(any())).thenReturn(true)
+            initializeUnderTest()
+
+            underTest.onSecondaryFolderNodeSelected(secondaryFolderNodeId)
+
+            verify(setupSecondaryFolderUseCase).invoke(secondaryFolderNodeId.longValue)
+        }
+
+        @Test
+        fun `test that setting the new secondary folder node also stops the ongoing camera uploads process`() =
+            runTest {
+                whenever(isSecondaryFolderNodeValidUseCase(any())).thenReturn(true)
+                initializeUnderTest()
+
+                underTest.onSecondaryFolderNodeSelected(NodeId(789012L))
+
+                verify(stopCameraUploadsUseCase).invoke(CameraUploadsRestartMode.Stop)
+            }
+
+        @Test
+        fun `test that the exception is caught when setting the secondary folder name`() = runTest {
+            val folderNodeId = NodeId(789012L)
+            val folderDestinationUpdate = CameraUploadsFolderDestinationUpdate(
+                nodeHandle = folderNodeId.longValue,
+                cameraUploadFolderType = CameraUploadFolderType.Secondary,
+            )
+            whenever(isSecondaryFolderNodeValidUseCase(any())).thenReturn(true)
+            whenever(getSecondaryFolderNodeUseCase(any())).thenThrow(RuntimeException())
+            whenever(monitorCameraUploadsFolderDestinationUseCase()).thenReturn(
+                flow {
+                    emit(folderDestinationUpdate)
+                    awaitCancellation()
+                }
+            )
+            initializeUnderTest()
+
+            assertDoesNotThrow { underTest.onSecondaryFolderNodeSelected(folderNodeId) }
+        }
+
+        @Test
+        fun `test that the secondary folder name is set`() =
+            runTest {
+                val folderName = "Media Uploads"
+                val folderNodeId = NodeId(789012L)
+                val mediaUploadsNode = mock<TypedFolderNode> {
+                    on { id }.thenReturn(folderNodeId)
+                    on { name }.thenReturn(folderName)
+                }
+                val folderDestinationUpdate = CameraUploadsFolderDestinationUpdate(
+                    nodeHandle = folderNodeId.longValue,
+                    cameraUploadFolderType = CameraUploadFolderType.Secondary,
+                )
+
+                whenever(isSecondaryFolderNodeValidUseCase(any())).thenReturn(true)
+                whenever(getSecondaryFolderNodeUseCase(any())).thenReturn(mediaUploadsNode)
+                whenever(monitorCameraUploadsFolderDestinationUseCase()).thenReturn(
+                    flow {
+                        emit(folderDestinationUpdate)
+                        awaitCancellation()
+                    }
+                )
+                initializeUnderTest()
+
+                underTest.onSecondaryFolderNodeSelected(folderNodeId)
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().secondaryFolderName).isEqualTo(folderName)
+                }
+            }
     }
 }

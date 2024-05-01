@@ -5,6 +5,7 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
@@ -12,11 +13,12 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.presentation.recentactions.RecentActionsComposeViewModel
+import mega.privacy.android.app.presentation.recentactions.mapper.RecentActionBucketUiEntityMapper
+import mega.privacy.android.app.presentation.recentactions.model.RecentActionBucketUiEntity
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.RecentActionBucket
-import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeUpdate
-import mega.privacy.android.domain.entity.node.TypedFileNode
+import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.recentactions.GetRecentActionsUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorHideRecentActivityUseCase
@@ -38,41 +40,14 @@ class RecentActionsComposeViewModelTest {
     private val getRecentActionsUseCase = mock<GetRecentActionsUseCase>()
     private val setHideRecentActivityUseCase = mock<SetHideRecentActivityUseCase>()
     private val monitorHideRecentActivityUseCase = mock<MonitorHideRecentActivityUseCase>()
+    private val monitorConnectivityUseCase = mock<MonitorConnectivityUseCase>()
     private val monitorNodeUpdatesFakeFlow = MutableSharedFlow<NodeUpdate>()
     private val monitorNodeUpdatesUseCase = mock<MonitorNodeUpdatesUseCase>()
+    private val recentActionBucketUiEntityMapper = mock<RecentActionBucketUiEntityMapper>()
 
-    private val node: TypedFileNode = mock {
-        on { id }.thenReturn(NodeId(123))
-        on { isNodeKeyDecrypted }.thenReturn(false)
-    }
-
-    private val megaRecentActionBucket = mock<RecentActionBucket> {
-        on { this.nodes }.thenReturn(listOf(node))
-        on { this.parentNodeId }.thenReturn(NodeId(321))
-        on { this.isMedia }.thenReturn(false)
-        on { this.timestamp }.thenReturn(1711960000)
-        on { this.userEmail }.thenReturn("aaa@aaa.com")
-        on { this.isUpdate }.thenReturn(false)
-        on { this.isKeyVerified }.thenReturn(true)
-    }
-
-    private val megaRecentActionBucket2 = mock<RecentActionBucket> {
-        on { this.nodes }.thenReturn(listOf(node))
-        on { this.parentNodeId }.thenReturn(NodeId(111))
-        on { this.isMedia }.thenReturn(false)
-        on { this.timestamp }.thenReturn(1711961075)
-        on { this.userEmail }.thenReturn("aaa@aaa.com")
-        on { this.isUpdate }.thenReturn(false)
-    }
-
-    private val megaRecentActionBucket3 = mock<RecentActionBucket> {
-        on { this.nodes }.thenReturn(listOf(node))
-        on { this.parentNodeId }.thenReturn(NodeId(111))
-        on { this.isMedia }.thenReturn(false)
-        on { this.timestamp }.thenReturn(1711961075)
-        on { this.userEmail }.thenReturn("aaa@aaa.com")
-        on { this.isUpdate }.thenReturn(false)
-    }
+    private val megaRecentActionBucket = mock<RecentActionBucket>()
+    private val megaRecentActionBucket2 = mock<RecentActionBucket>()
+    private val megaRecentActionBucket3 = mock<RecentActionBucket>()
 
     @BeforeEach
     fun resetMocks() {
@@ -81,6 +56,8 @@ class RecentActionsComposeViewModelTest {
             setHideRecentActivityUseCase,
             monitorHideRecentActivityUseCase,
             monitorNodeUpdatesUseCase,
+            recentActionBucketUiEntityMapper,
+            monitorConnectivityUseCase
         )
         runBlocking {
             stubCommon()
@@ -90,6 +67,8 @@ class RecentActionsComposeViewModelTest {
             setHideRecentActivityUseCase = setHideRecentActivityUseCase,
             monitorHideRecentActivityUseCase = monitorHideRecentActivityUseCase,
             monitorNodeUpdatesUseCase = monitorNodeUpdatesUseCase,
+            recentActionBucketUiEntityMapper = recentActionBucketUiEntityMapper,
+            monitorConnectivityUseCase = monitorConnectivityUseCase
         )
     }
 
@@ -100,13 +79,37 @@ class RecentActionsComposeViewModelTest {
             emit(false)
         })
         whenever(monitorNodeUpdatesUseCase()).thenReturn(monitorNodeUpdatesFakeFlow)
+        whenever(monitorConnectivityUseCase()).thenReturn(emptyFlow())
+
+        val recentActionBucketUiEntity1 = mock<RecentActionBucketUiEntity> {
+            on { this.date }.thenReturn("Today")
+            on { this.bucket }.thenReturn(megaRecentActionBucket)
+        }
+        val recentActionBucketUiEntity2 = mock<RecentActionBucketUiEntity> {
+            on { this.date }.thenReturn("Today")
+            on { this.bucket }.thenReturn(megaRecentActionBucket2)
+        }
+        val recentActionBucketUiEntity3 = mock<RecentActionBucketUiEntity> {
+            on { this.date }.thenReturn("14 March 2024")
+            on { this.bucket }.thenReturn(megaRecentActionBucket3)
+        }
+        whenever(recentActionBucketUiEntityMapper(megaRecentActionBucket)).thenReturn(
+            recentActionBucketUiEntity1
+        )
+        whenever(recentActionBucketUiEntityMapper(megaRecentActionBucket2)).thenReturn(
+            recentActionBucketUiEntity2
+        )
+        whenever(recentActionBucketUiEntityMapper(megaRecentActionBucket3)).thenReturn(
+            recentActionBucketUiEntity3
+        )
     }
 
     @Test
     fun `test that initial state is returned`() = runTest {
         underTest.uiState.test {
             val initial = awaitItem()
-            assertThat(initial.hideRecentActivity).isEqualTo(false)
+            assertThat(initial.hideRecentActivity).isFalse()
+            assertThat(initial.isConnected).isFalse()
         }
     }
 
@@ -152,8 +155,8 @@ class RecentActionsComposeViewModelTest {
                     val result = awaitItem()
                     assertThat(result.totalSize()).isEqualTo(3)
                     assertThat(result.size).isEqualTo(2)
-                    assertThat(result.keys.first()).isEqualTo(1711960000)
-                    assertThat(result.keys.last()).isEqualTo(1711961075)
+                    assertThat(result.keys.first()).isEqualTo("Today")
+                    assertThat(result.keys.last()).isEqualTo("14 March 2024")
                 }
         }
 
@@ -202,5 +205,5 @@ class RecentActionsComposeViewModelTest {
         val extension = CoroutineMainDispatcherExtension(StandardTestDispatcher())
     }
 
-    private fun Map<Long, List<Any>>.totalSize() = values.sumOf { it.size }
+    private fun Map<String, List<Any>>.totalSize() = values.sumOf { it.size }
 }

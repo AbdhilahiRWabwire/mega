@@ -20,10 +20,14 @@ abstract class AvatarMessage : UiChatMessage {
 
     /**
      * Content composable
+     *
+     * @param onLongClick Already established in the Modifier, but required by some type of messages
+     * with text in bubbles and others which has interactions with their content.
      */
     @Composable
     abstract fun ContentComposable(
         interactionEnabled: Boolean,
+        onLongClick: () -> Unit,
         initialiseModifier: (onClick: () -> Unit) -> Modifier,
     )
 
@@ -81,14 +85,22 @@ abstract class AvatarMessage : UiChatMessage {
             },
             isSendError = message.isSendError()
         ) { interactionEnabled ->
-            ContentComposable(interactionEnabled) {
-                Modifier.contentInteraction(
-                    onNotSentClick = onNotSentClick,
-                    onClick = it,
-                    onLongClick = onLongClick,
-                    interactionEnabled = interactionEnabled
-                )
-            }
+            ContentComposable(
+                interactionEnabled = interactionEnabled,
+                onLongClick = {
+                    if (interactionEnabled) {
+                        onLongClick(message)
+                    }
+                },
+                initialiseModifier = {
+                    Modifier.contentInteraction(
+                        onNotSentClick = onNotSentClick,
+                        onClick = it,
+                        onLongClick = onLongClick,
+                        interactionEnabled = interactionEnabled
+                    )
+                }
+            )
         }
     }
 

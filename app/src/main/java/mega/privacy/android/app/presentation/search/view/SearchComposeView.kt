@@ -41,12 +41,12 @@ import mega.privacy.android.app.presentation.search.model.SearchActivityState
 import mega.privacy.android.app.presentation.search.model.SearchFilter
 import mega.privacy.android.app.presentation.view.NodesView
 import mega.privacy.android.core.ui.controls.snackbars.MegaSnackbar
+import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.NodeSourceType
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
-import mega.privacy.android.feature.sync.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyViewForSearch
 
 /**
@@ -86,18 +86,16 @@ fun SearchComposeView(
     fileTypeIconMapper: FileTypeIconMapper,
     modifier: Modifier = Modifier,
 ) {
-    var resetScroll by rememberSaveable {
-        mutableStateOf(false)
-    }
-
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
     val scaffoldState = rememberScaffoldState()
     val snackBarHostState = remember { SnackbarHostState() }
     var topBarPadding by remember { mutableStateOf(0.dp) }
 
-    LaunchedEffect(key1 = resetScroll) {
+    LaunchedEffect(key1 = state.resetScroll) {
         listState.scrollToItem(0)
+    }
+    LaunchedEffect(key1 = state.resetScroll) {
         gridState.scrollToItem(0)
     }
 
@@ -108,12 +106,10 @@ fun SearchComposeView(
     searchQuery.useDebounce(
         onChange = {
             updateSearchQuery(it)
-            resetScroll = !resetScroll
         },
     )
 
-    topBarPadding =
-        if (state.navigationLevel.isNotEmpty() && state.nodeSourceType != NodeSourceType.CLOUD_DRIVE && state.nodeSourceType != NodeSourceType.HOME) 8.dp else 0.dp
+    topBarPadding = if (state.navigationLevel.isNotEmpty()) 8.dp else 0.dp
 
     state.errorMessageId?.let {
         val errorMessage = stringResource(id = it)
@@ -153,14 +149,13 @@ fun SearchComposeView(
         }
     ) { padding ->
         Column(modifier = Modifier.padding(top = topBarPadding)) {
-            if (state.nodeSourceType == NodeSourceType.CLOUD_DRIVE || state.nodeSourceType == NodeSourceType.HOME) {
-                FilterChipsView(state, onFilterClicked = {
-                    resetScroll = !resetScroll
-                    onFilterClicked(it)
-                }, updateFilter = {
-                    resetScroll = !resetScroll
-                    updateFilter(it)
-                }, trackAnalytics)
+            if ((state.nodeSourceType == NodeSourceType.CLOUD_DRIVE || state.nodeSourceType == NodeSourceType.HOME) && state.navigationLevel.isEmpty()) {
+                FilterChipsView(
+                    state = state,
+                    onFilterClicked = onFilterClicked,
+                    updateFilter = updateFilter,
+                    trackAnalytics = trackAnalytics
+                )
             }
             if (state.isSearching) {
                 LoadingStateView(
@@ -245,7 +240,7 @@ private fun PreviewSearchComposeView() {
             hiltViewModel()
         ),
         clearSelection = {},
-        fileTypeIconMapper = FileTypeIconMapper()
+        fileTypeIconMapper = FileTypeIconMapper(),
     )
 }
 

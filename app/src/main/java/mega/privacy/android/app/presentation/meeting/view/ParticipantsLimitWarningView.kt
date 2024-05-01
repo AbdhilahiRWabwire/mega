@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.core.content.withStyledAttributes
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.core.R
@@ -25,6 +26,8 @@ import mega.privacy.android.core.ui.controls.text.MegaSpannedClickableText
 import mega.privacy.android.core.ui.model.MegaSpanStyle
 import mega.privacy.android.core.ui.model.MegaSpanStyleWithAnnotation
 import mega.privacy.android.core.ui.model.SpanIndicator
+import mega.privacy.android.core.ui.preview.BooleanProvider
+import mega.privacy.android.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.core.ui.theme.tokens.TextColor
 import mega.privacy.android.shared.theme.MegaAppTheme
 
@@ -52,7 +55,9 @@ class ParticipantsLimitWarningView : AbstractComposeView {
     @Composable
     override fun Content() {
         MegaAppTheme(isDark = isSystemInDarkTheme()) {
-            ParticipantsLimitWarningComposeView(isModerator)
+            ParticipantsLimitWarningComposeView(
+                isModerator = isModerator,
+            )
         }
     }
 }
@@ -65,49 +70,52 @@ fun ParticipantsLimitWarningComposeView(
     isModerator: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    var isWarningDismissed by rememberSaveable {
+        mutableStateOf(false)
+    }
+
     if (isModerator) {
-        val context = LocalContext.current
-        WarningBanner(
-            modifier = modifier.testTag(TEST_TAG_PARTICIPANTS_LIMIT_WARNING_MODERATOR_VIEW),
-            textComponent = {
-                MegaSpannedClickableText(
-                    value = stringResource(id = mega.privacy.android.app.R.string.meetings_free_call_organiser_number_of_participants_warning),
-                    styles = hashMapOf(
-                        SpanIndicator('A') to MegaSpanStyleWithAnnotation(
-                            MegaSpanStyle(
-                                SpanStyle(textDecoration = TextDecoration.None),
-                            ), ""
+        if (isWarningDismissed.not()) {
+            val context = LocalContext.current
+            WarningBanner(
+                modifier = modifier.testTag(TEST_TAG_PARTICIPANTS_LIMIT_WARNING_MODERATOR_VIEW),
+                textComponent = {
+                    MegaSpannedClickableText(
+                        value = stringResource(id = mega.privacy.android.app.R.string.meetings_free_call_organiser_number_of_participants_warning),
+                        styles = hashMapOf(
+                            SpanIndicator('A') to MegaSpanStyleWithAnnotation(
+                                MegaSpanStyle(
+                                    SpanStyle(textDecoration = TextDecoration.None),
+                                ), ""
+                            ),
+                            SpanIndicator('B') to MegaSpanStyleWithAnnotation(
+                                MegaSpanStyle(
+                                    SpanStyle(textDecoration = TextDecoration.Underline),
+                                ), "upgrade"
+                            ),
                         ),
-                        SpanIndicator('B') to MegaSpanStyleWithAnnotation(
-                            MegaSpanStyle(
-                                SpanStyle(textDecoration = TextDecoration.Underline),
-                            ), "upgrade"
-                        ),
-                    ),
-                    onAnnotationClick = { annotation ->
-                        if (annotation == "upgrade") {
-                            context.startActivity(
-                                Intent(
-                                    context,
-                                    UpgradeAccountActivity::class.java
+                        onAnnotationClick = { annotation ->
+                            if (annotation == "upgrade") {
+                                context.startActivity(
+                                    Intent(
+                                        context,
+                                        UpgradeAccountActivity::class.java
+                                    )
                                 )
-                            )
-                        }
-                    },
-                    baseStyle = MaterialTheme.typography.caption,
-                    color = TextColor.Primary
-                )
-            },
-            onCloseClick = null
-        )
-    } else {
-        var isWarningDismissed by rememberSaveable {
-            mutableStateOf(false)
+                            }
+                        },
+                        baseStyle = MaterialTheme.typography.caption,
+                        color = TextColor.Primary
+                    )
+                },
+                onCloseClick = { isWarningDismissed = true }
+            )
         }
+    } else {
         if (isWarningDismissed.not()) {
             WarningBanner(
                 modifier = modifier.testTag(TEST_TAG_PARTICIPANTS_LIMIT_WARNING_VIEW),
-                textString = stringResource(id = mega.privacy.android.app.R.string.meetings_free_call_non_organiser_number_of_participants_warning),
+                textString = stringResource(id = mega.privacy.android.app.R.string.meetings_free_call_organiser_number_of_participants_warning),
                 onCloseClick = { isWarningDismissed = true }
             )
         }
@@ -117,3 +125,15 @@ fun ParticipantsLimitWarningComposeView(
 internal const val TEST_TAG_PARTICIPANTS_LIMIT_WARNING_MODERATOR_VIEW =
     "participants_limit_warning_moderator_view"
 internal const val TEST_TAG_PARTICIPANTS_LIMIT_WARNING_VIEW = "participants_limit_warning_view"
+
+@CombinedThemePreviews
+@Composable
+private fun ParticipantsLimitWarningComposeViewPreview(
+    @PreviewParameter(BooleanProvider::class) isModerator: Boolean,
+) {
+    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+        ParticipantsLimitWarningComposeView(
+            isModerator = isModerator,
+        )
+    }
+}

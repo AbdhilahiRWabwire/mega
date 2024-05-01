@@ -49,7 +49,6 @@ import mega.privacy.android.app.components.session.SessionContainer
 import mega.privacy.android.app.components.transferWidget.TransfersWidgetView
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.globalmanagement.TransfersManagement
-import mega.privacy.android.app.imageviewer.ImageViewerActivity
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.mediaplayer.AudioPlayerActivity
 import mega.privacy.android.app.mediaplayer.VideoPlayerActivity
@@ -60,8 +59,10 @@ import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.filelink.view.animationScale
 import mega.privacy.android.app.presentation.filelink.view.animationSpecs
 import mega.privacy.android.app.presentation.imagepreview.ImagePreviewActivity
+import mega.privacy.android.app.presentation.imagepreview.fetcher.BackupsImageNodeFetcher
 import mega.privacy.android.app.presentation.imagepreview.fetcher.CloudDriveImageNodeFetcher
 import mega.privacy.android.app.presentation.imagepreview.fetcher.RubbishBinImageNodeFetcher
+import mega.privacy.android.app.presentation.imagepreview.fetcher.SharedItemsImageNodeFetcher
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewFetcherSource
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewMenuSource
 import mega.privacy.android.app.presentation.manager.model.TransfersTab
@@ -80,12 +81,13 @@ import mega.privacy.android.app.presentation.search.view.MiniAudioPlayerView
 import mega.privacy.android.app.presentation.snackbar.MegaSnackbarDuration
 import mega.privacy.android.app.presentation.snackbar.MegaSnackbarShower
 import mega.privacy.android.app.presentation.transfers.TransfersManagementViewModel
-import mega.privacy.android.app.presentation.transfers.startdownload.view.StartDownloadComponent
+import mega.privacy.android.app.presentation.transfers.starttransfer.view.StartTransferComponent
 import mega.privacy.android.app.textEditor.TextEditorActivity
 import mega.privacy.android.app.textEditor.TextEditorViewModel
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.zippreview.ui.ZipBrowserActivity
 import mega.privacy.android.core.ui.controls.layouts.MegaScaffold
+import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.domain.entity.AudioFileTypeInfo
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.VideoFileTypeInfo
@@ -100,7 +102,6 @@ import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.search.SearchCategory
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.feature.sync.data.mapper.ListToStringWithDelimitersMapper
-import mega.privacy.android.feature.sync.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.mobile.analytics.event.SearchAudioFilterPressedEvent
 import mega.privacy.mobile.analytics.event.SearchDocsFilterPressedEvent
@@ -355,7 +356,7 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
                         )
                     },
                 )
-                StartDownloadComponent(
+                StartTransferComponent(
                     event = nodeActionState.downloadEvent,
                     onConsumeEvent = nodeActionsViewModel::markDownloadEventConsumed,
                     snackBarHostState = snackbarHostState,
@@ -409,7 +410,6 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
 
                 is FileNodeContent.ImageForNode -> {
                     openImageViewerActivity(
-                        isImagePreview = content.isImagePreview,
                         currentFileNode = currentFileNode
                     )
                 }
@@ -539,39 +539,63 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
         startActivity(pdfIntent)
     }
 
-    private fun openImageViewerActivity(
-        isImagePreview: Boolean,
-        currentFileNode: TypedFileNode,
-    ) {
+    private fun openImageViewerActivity(currentFileNode: TypedFileNode) {
         val nodeSourceType = viewModel.state.value.nodeSourceType
-        val intent = if (isImagePreview &&
-            (nodeSourceType == NodeSourceType.CLOUD_DRIVE || nodeSourceType == NodeSourceType.HOME)
-        ) {
-            ImagePreviewActivity.createIntent(
-                context = this,
-                imageSource = ImagePreviewFetcherSource.CLOUD_DRIVE,
-                menuOptionsSource = ImagePreviewMenuSource.CLOUD_DRIVE,
-                anchorImageNodeId = currentFileNode.id,
-                params = mapOf(CloudDriveImageNodeFetcher.PARENT_ID to currentFileNode.parentId.longValue),
-            )
-        } else if (isImagePreview && nodeSourceType == NodeSourceType.RUBBISH_BIN) {
-            ImagePreviewActivity.createIntent(
-                context = this,
-                imageSource = ImagePreviewFetcherSource.RUBBISH_BIN,
-                menuOptionsSource = ImagePreviewMenuSource.RUBBISH_BIN,
-                anchorImageNodeId = currentFileNode.id,
-                params = mapOf(RubbishBinImageNodeFetcher.PARENT_ID to currentFileNode.parentId.longValue),
-            )
-        } else {
-            ImageViewerActivity.getIntentForParentNode(
-                this,
-                currentFileNode.parentId.longValue,
-                viewModel.state.value.sortOrder,
-                currentFileNode.id.longValue
-            )
+        val currentFileNodeParentId = currentFileNode.parentId.longValue
+
+        val (imageSource, menuOptionsSource, paramKey) = when (nodeSourceType) {
+            NodeSourceType.CLOUD_DRIVE, NodeSourceType.HOME ->
+                Triple(
+                    ImagePreviewFetcherSource.CLOUD_DRIVE,
+                    ImagePreviewMenuSource.CLOUD_DRIVE,
+                    CloudDriveImageNodeFetcher.PARENT_ID
+                )
+
+            NodeSourceType.RUBBISH_BIN ->
+                Triple(
+                    ImagePreviewFetcherSource.RUBBISH_BIN,
+                    ImagePreviewMenuSource.RUBBISH_BIN,
+                    RubbishBinImageNodeFetcher.PARENT_ID
+                )
+
+            NodeSourceType.INCOMING_SHARES, NodeSourceType.OUTGOING_SHARES ->
+                Triple(
+                    ImagePreviewFetcherSource.SHARED_ITEMS,
+                    ImagePreviewMenuSource.SHARED_ITEMS,
+                    SharedItemsImageNodeFetcher.PARENT_ID
+                )
+
+            NodeSourceType.LINKS ->
+                Triple(
+                    ImagePreviewFetcherSource.SHARED_ITEMS,
+                    ImagePreviewMenuSource.LINKS,
+                    SharedItemsImageNodeFetcher.PARENT_ID
+                )
+
+            NodeSourceType.BACKUPS ->
+                Triple(
+                    ImagePreviewFetcherSource.BACKUPS,
+                    ImagePreviewMenuSource.BACKUPS,
+                    BackupsImageNodeFetcher.PARENT_ID
+                )
+
+            else -> {
+                Timber.e("Unsupported node source type")
+                return
+            }
         }
+
+        val intent = ImagePreviewActivity.createIntent(
+            context = this,
+            imageSource = imageSource,
+            menuOptionsSource = menuOptionsSource,
+            anchorImageNodeId = currentFileNode.id,
+            params = mapOf(paramKey to currentFileNodeParentId),
+            showScreenLabel = false
+        )
         startActivity(intent)
     }
+
 
     private fun openVideoOrAudioFile(
         fileNode: TypedFileNode,

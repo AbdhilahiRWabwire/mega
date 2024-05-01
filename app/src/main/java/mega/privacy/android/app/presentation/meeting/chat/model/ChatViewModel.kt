@@ -36,7 +36,7 @@ import mega.privacy.android.app.presentation.meeting.chat.mapper.ForwardMessages
 import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteParticipantResultMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.ParticipantNameMapper
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.INVALID_LOCATION_MESSAGE_ID
-import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
+import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.app.utils.CacheFolderManager
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.core.ui.controls.chat.VoiceClipRecordEvent
@@ -60,7 +60,6 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.chat.ChatFile
 import mega.privacy.android.domain.entity.statistics.EndCallForAll
-import mega.privacy.android.domain.entity.transfer.MultiTransferEvent
 import mega.privacy.android.domain.entity.user.UserId
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.chat.CreateChatException
@@ -103,7 +102,6 @@ import mega.privacy.android.domain.usecase.chat.link.MonitorJoiningChatUseCase
 import mega.privacy.android.domain.usecase.chat.message.AttachContactsUseCase
 import mega.privacy.android.domain.usecase.chat.message.AttachNodeUseCase
 import mega.privacy.android.domain.usecase.chat.message.GetChatFromContactMessagesUseCase
-import mega.privacy.android.domain.usecase.chat.message.SendChatAttachmentsUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendGiphyMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendLocationMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.SendTextMessageUseCase
@@ -126,6 +124,7 @@ import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCas
 import mega.privacy.android.domain.usecase.file.CreateNewImageUriUseCase
 import mega.privacy.android.domain.usecase.file.DeleteFileUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
+import mega.privacy.android.domain.usecase.meeting.BroadcastUpgradeDialogClosedUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
@@ -139,6 +138,7 @@ import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorUpdatePushNotificationSettingsUseCase
 import mega.privacy.mobile.analytics.event.ChatConversationUnmuteMenuToolbarEvent
 import timber.log.Timber
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Collections
 import java.util.Date
@@ -225,7 +225,6 @@ class ChatViewModel @Inject constructor(
     private val monitorJoiningChatUseCase: MonitorJoiningChatUseCase,
     private val monitorLeavingChatUseCase: MonitorLeavingChatUseCase,
     private val sendLocationMessageUseCase: SendLocationMessageUseCase,
-    private val sendChatAttachmentsUseCase: SendChatAttachmentsUseCase,
     private val monitorChatPendingChangesUseCase: MonitorChatPendingChangesUseCase,
     private val addReactionUseCase: AddReactionUseCase,
     private val getChatMessageUseCase: GetChatMessageUseCase,
@@ -251,7 +250,8 @@ class ChatViewModel @Inject constructor(
     private val monitorLeaveChatUseCase: MonitorLeaveChatUseCase,
     private val leaveChatUseCase: LeaveChatUseCase,
     private val setUsersCallLimitRemindersUseCase: SetUsersCallLimitRemindersUseCase,
-    private val getUsersCallLimitRemindersUseCase: GetUsersCallLimitRemindersUseCase
+    private val getUsersCallLimitRemindersUseCase: GetUsersCallLimitRemindersUseCase,
+    private val broadcastUpgradeDialogClosedUseCase: BroadcastUpgradeDialogClosedUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ChatUiState())
     val state = _state.asStateFlow()
@@ -709,7 +709,7 @@ class ChatViewModel @Inject constructor(
                     it?.apply {
                         when (status) {
                             ChatCallStatus.TerminatingUserParticipation, ChatCallStatus.GenericNotification ->
-                                if (termCode == ChatCallTermCodeType.CallUsersLimit
+                                if ((termCode == ChatCallTermCodeType.CallUsersLimit || termCode == ChatCallTermCodeType.TooManyParticipants)
                                     && _state.value.isCallUnlimitedProPlanFeatureFlagEnabled
                                 ) {
                                     _state.update { state -> state.copy(callEndedDueToFreePlanLimits = true) }
@@ -1180,18 +1180,26 @@ class ChatViewModel @Inject constructor(
     /**
      * Attaches files.
      */
-    fun onAttachFiles(files: List<Uri>) =
-        onAttachFiles(files.map { it.toString() }, false)
+    fun onAttachFiles(files: List<Uri>) {
+        _state.update {
+            it.copy(
+                downloadEvent = triggered(
+                    TransferTriggerEvent.StartChatUpload.Files(chatId, files)
+                )
+            )
+        }
+    }
 
-    private fun onAttachFiles(files: List<String>, isVoiceClip: Boolean) {
-        viewModelScope.launch {
-            sendChatAttachmentsUseCase(chatId, files.associateWith { null }, isVoiceClip)
-                .catch { Timber.e(it) }
-                .collect {
-                    if (it is MultiTransferEvent.TransferNotStarted<*>) {
-                        Timber.e(it.exception, "${it.item} not attached")
-                    }
-                }
+    /**
+     * Attaches voice clip.
+     */
+    private fun onAttachVoiceClip(file: File) {
+        _state.update {
+            it.copy(
+                downloadEvent = triggered(
+                    TransferTriggerEvent.StartChatUpload.VoiceClip(chatId, file)
+                )
+            )
         }
     }
 
@@ -1618,7 +1626,7 @@ class ChatViewModel @Inject constructor(
                 }
                 recordAudioJob?.invokeOnCompletion {
                     if (it == StopAndSendVoiceClip) {
-                        onAttachFiles(listOf(voiceClipFile.toString()), true)
+                        onAttachVoiceClip(voiceClipFile)
                     } else {
                         viewModelScope.launch {
                             deleteFileUseCase(voiceClipFile.toString())
@@ -1666,6 +1674,11 @@ class ChatViewModel @Inject constructor(
      */
     fun onConsumeShouldUpgradeToProPlan() {
         _state.update { state -> state.copy(shouldUpgradeToProPlan = false) }
+        viewModelScope.launch {
+            runCatching {
+                broadcastUpgradeDialogClosedUseCase()
+            }
+        }
     }
 
     companion object {

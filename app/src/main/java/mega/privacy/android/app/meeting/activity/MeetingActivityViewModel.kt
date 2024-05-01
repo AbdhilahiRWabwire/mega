@@ -357,19 +357,20 @@ class MeetingActivityViewModel @Inject constructor(
             getChatAndCall()
         }
 
+        getCurrentSubscriptionPlan()
         viewModelScope.launch {
-            getCurrentSubscriptionPlanUseCase()?.let { currentSubscriptionPlan ->
-                _state.update { it.copy(subscriptionPlan = currentSubscriptionPlan) }
-            }
-        }
-        viewModelScope.launch {
-            getFeatureFlagValueUseCase(AppFeatures.CallUnlimitedProPlan).let { flag ->
-                _state.update { state ->
-                    state.copy(
-                        isCallUnlimitedProPlanFeatureFlagEnabled = flag,
-                    )
+            runCatching {
+                getFeatureFlagValueUseCase(AppFeatures.CallUnlimitedProPlan).let { flag ->
+                    _state.update { state ->
+                        state.copy(
+                            isCallUnlimitedProPlanFeatureFlagEnabled = flag,
+                        )
+                    }
                 }
+            }.onFailure {
+                Timber.e(it)
             }
+
         }
 
         LiveEventBus.get(EVENT_AUDIO_OUTPUT_CHANGE, AppRTCAudioManager.AudioDevice::class.java)
@@ -421,6 +422,21 @@ class MeetingActivityViewModel @Inject constructor(
                     UserChanges.Firstname, UserChanges.Lastname -> getMyFullName()
                     else -> Unit
                 }
+            }
+        }
+    }
+
+    private fun getCurrentSubscriptionPlan() {
+        viewModelScope.launch {
+            runCatching {
+                val subscriptionPlan = getCurrentSubscriptionPlanUseCase()
+                subscriptionPlan?.let {
+                    _state.update {
+                        it.copy(subscriptionPlan = subscriptionPlan)
+                    }
+                }
+            }.onFailure {
+                Timber.e(it)
             }
         }
     }
@@ -532,6 +548,12 @@ class MeetingActivityViewModel @Inject constructor(
                 getChatCallUseCase(_state.value.chatId)
             }.onSuccess { call ->
                 call?.let {
+                    _state.update { state ->
+                        state.copy(
+                            currentCall = it
+                        )
+                    }
+
                     when (call.status) {
                         ChatCallStatus.UserNoPresent -> {
                             if (_state.value.action == MeetingActivity.MEETING_ACTION_IN) {
@@ -542,7 +564,6 @@ class MeetingActivityViewModel @Inject constructor(
                         ChatCallStatus.TerminatingUserParticipation,
                         ChatCallStatus.Destroyed,
                         -> finishMeetingActivity()
-
 
                         else -> {
                             checkIfPresenting(it)
@@ -786,6 +807,12 @@ class MeetingActivityViewModel @Inject constructor(
             monitorChatCallUpdatesUseCase()
                 .filter { it.chatId == _state.value.chatId }
                 .collectLatest { call ->
+                    _state.update { state ->
+                        state.copy(
+                            currentCall = call
+                        )
+                    }
+
                     checkIfPresenting(call)
                     call.changes?.apply {
                         if (contains(ChatCallChanges.Status)) {
@@ -984,7 +1011,7 @@ class MeetingActivityViewModel @Inject constructor(
      * @param chatId chat ID
      */
     fun updateChatRoomId(chatId: Long) {
-        if (_state.value.chatId != chatId) {
+        if (_state.value.chatId != chatId && chatId != -1L) {
             _state.update {
                 it.copy(
                     chatId = chatId
@@ -1656,7 +1683,6 @@ class MeetingActivityViewModel @Inject constructor(
                             chatParticipantList = list
                         )
                     }
-
                     checkParticipantLists()
                 }
         }.onFailure { exception ->
@@ -1707,6 +1733,7 @@ class MeetingActivityViewModel @Inject constructor(
                 usersInCall = participants
             )
         }
+
         checkParticipantLists()
         if (!_state.value.isSessionOnRecording) {
             checkIfCallIsBeingRecorded()
@@ -1728,9 +1755,12 @@ class MeetingActivityViewModel @Inject constructor(
                 participantAdded = true
                 chatParticipantsInWaitingRoom.add(chatParticipant)
             }
+
             state.value.usersInCall.find { it.peerId == chatParticipant.handle }
                 ?.let { participant ->
+
                     participantAdded = true
+
                     chatParticipantsInCall.add(chatParticipantMapper(participant, chatParticipant))
                 }
 
@@ -1746,6 +1776,7 @@ class MeetingActivityViewModel @Inject constructor(
                             ringIndividualInACall(chatParticipant.handle)
                             chatNewInvitedParticipants.remove(participant)
                         }
+
                     chatParticipantsNotInCall.add(chatParticipant)
                 }
             }

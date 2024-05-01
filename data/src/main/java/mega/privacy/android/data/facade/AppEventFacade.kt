@@ -29,8 +29,8 @@ internal class AppEventFacade @Inject constructor(
 
     private val cameraUploadsFolderDestinationUpdate =
         MutableSharedFlow<CameraUploadsFolderDestinationUpdate>()
-    private val _transferOverQuota = MutableSharedFlow<Boolean>()
-    private val _storageOverQuota = MutableSharedFlow<Boolean>()
+    private val _transferOverQuota = MutableStateFlow(false)
+    private val _storageOverQuota = MutableStateFlow(false)
     private val _fileAvailableOffline = MutableSharedFlow<Long>()
     private val _cookieSettings = MutableSharedFlow<Set<CookieType>>()
     private val logout = MutableSharedFlow<Boolean>()
@@ -55,6 +55,7 @@ internal class AppEventFacade @Inject constructor(
     private val _monitorCompletedTransfer = MutableSharedFlow<CompletedTransfer>()
     private val _monitorRefreshSession = MutableSharedFlow<Unit>()
     private val _monitorBackupInfoType = MutableSharedFlow<BackupInfoType>()
+    private val _monitorUpgradeDialogShown = MutableSharedFlow<Unit>()
 
     private val _monitorCameraUploadsSettingsActions =
         MutableSharedFlow<CameraUploadsSettingsAction>()
@@ -96,8 +97,8 @@ internal class AppEventFacade @Inject constructor(
 
     override fun monitorStorageOverQuota(): Flow<Boolean> = _storageOverQuota.asSharedFlow()
 
-    override suspend fun broadcastStorageOverQuota() {
-        _storageOverQuota.emit(true)
+    override suspend fun broadcastStorageOverQuota(isCurrentOverQuota: Boolean) {
+        _storageOverQuota.emit(isCurrentOverQuota)
     }
 
     override fun monitorLogout(): Flow<Boolean> = logout.asSharedFlow()
@@ -230,6 +231,16 @@ internal class AppEventFacade @Inject constructor(
     override fun monitorUpdateUserData(): Flow<Unit> {
         return updateUserData
     }
+
+    override fun monitorUpgradeDialogClosed(): Flow<Unit> {
+        return _monitorUpgradeDialogShown.asSharedFlow()
+    }
+
+    override suspend fun broadcastUpgradeDialogClosed() {
+        _monitorUpgradeDialogShown.emit(Unit)
+    }
+
+
 }
 
 private fun <T> Flow<T>.toSharedFlow(

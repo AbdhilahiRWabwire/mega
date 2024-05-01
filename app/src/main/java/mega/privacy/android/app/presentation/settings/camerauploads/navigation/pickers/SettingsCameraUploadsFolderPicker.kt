@@ -6,15 +6,16 @@ import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.result.ActivityResult
 import mega.privacy.android.app.main.FileExplorerActivity
 import mega.privacy.android.app.main.FileStorageActivity
+import mega.privacy.android.app.main.FileStorageActivity.PickFolderType
 
 /**
- * Selects a new Camera Uploads Local Primary Folder by starting [FileStorageActivity] and
- * retrieving the new Local Folder path afterwards
+ * Selects a new Local Folder by starting an [Intent] to [FileStorageActivity] and retrieving the
+ * new Local Folder path afterwards
  *
  * @param context The [Context] to create a [FileStorageActivity] [Intent]
  * @param launcher The Launcher to start [FileStorageActivity]
  */
-internal fun openCameraUploadsLocalFolderPicker(
+internal fun openLocalFolderPicker(
     context: Context,
     launcher: ManagedActivityResultLauncher<Intent, ActivityResult>,
 ) {
@@ -22,20 +23,20 @@ internal fun openCameraUploadsLocalFolderPicker(
         it.action = FileStorageActivity.Mode.PICK_FOLDER.action
         it.putExtra(
             FileStorageActivity.PICK_FOLDER_TYPE,
-            FileStorageActivity.PickFolderType.CU_FOLDER.folderType
+            PickFolderType.CAMERA_UPLOADS_FOLDER.folderType,
         )
         launcher.launch(it)
     }
 }
 
 /**
- * Selects a new Camera Uploads Folder Node by starting [FileExplorerActivity] and retrieving the
+ * Selects a new Folder Node by starting an [Intent] to [FileExplorerActivity] and retrieving the
  * new Folder Node handle afterwards
  *
  * @param context The [Context] to create a [FileExplorerActivity] [Intent]
  * @param launcher The Launcher to start [FileExplorerActivity]
  */
-internal fun openCameraUploadsFolderNodePicker(
+internal fun openFolderNodePicker(
     context: Context,
     launcher: ManagedActivityResultLauncher<Intent, ActivityResult>,
 ) {

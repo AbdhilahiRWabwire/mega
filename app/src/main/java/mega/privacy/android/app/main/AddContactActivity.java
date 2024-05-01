@@ -178,6 +178,7 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
 
     // Determine if open this page from meeting
     private boolean isFromMeeting;
+
     private int multipleSelectIntent;
     private long nodeHandle = -1;
     private long[] nodeHandles;
@@ -1541,6 +1542,7 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
             return;
         }
         viewModel = new ViewModelProvider(this).get(AddContactViewModel.class);
+
         if (getIntent() != null) {
             contactType = getIntent().getIntExtra(INTENT_EXTRA_KEY_CONTACT_TYPE, CONTACT_TYPE_MEGA);
             emailsContactsSelected = getIntent().getStringArrayListExtra(INTENT_EXTRA_KEY_CONTACTS_SELECTED);
@@ -1573,6 +1575,7 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
                 }
             }
         }
+        viewModel.setChatId(chatId);
 
         Display display = getWindowManager().getDefaultDisplay();
         outMetrics = new DisplayMetrics();
@@ -2376,7 +2379,7 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
                 if (chat != null) {
                     long participantsCount = chat.getPeerCount();
                     boolean isModerator = chat.getOwnPrivilege() == MegaChatRoom.PRIV_MODERATOR;
-                    showParticipantsLimitWarning(participantsCount, isModerator);
+                    participantsLimitWarningView.setModerator(isModerator);
                     for (int i = 0; i < contactsMEGA.size(); i++) {
                         if (contactsMEGA.get(i).getVisibility() == MegaUser.VISIBILITY_VISIBLE) {
 
@@ -2472,11 +2475,6 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
                 }
             }
         }
-    }
-
-    private void showParticipantsLimitWarning(long participantsCount, boolean isModerator) {
-        participantsLimitWarningView.setModerator(isModerator);
-        viewModel.shouldShowParticipantsLimitWarning(participantsCount >= maxParticipants);
     }
 
     @SuppressLint("InlinedApi")
@@ -3548,7 +3546,7 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
             }
             adapterShare.updateContactVerification(addContactState.isContactVerificationWarningEnabled());
             isContactVerificationOn = addContactState.isContactVerificationWarningEnabled();
-            participantsLimitWarningView.setVisibility(addContactState.getShouldShowParticipantsLimitWarning() ? View.VISIBLE : View.GONE);
+            participantsLimitWarningView.setVisibility(addContactState.getShowUserLimitWarningDialog() ? View.VISIBLE : View.GONE);
             return Unit.INSTANCE;
         });
     }

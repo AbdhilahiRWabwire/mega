@@ -1,4 +1,27 @@
 import groovy.lang.Closure
+import mega.privacy.android.build.buildTypeMatches
+import mega.privacy.android.build.getAppGitHash
+import mega.privacy.android.build.getChatGitHash
+import mega.privacy.android.build.getKarmaPluginPort
+import mega.privacy.android.build.getNocturnTimeout
+import mega.privacy.android.build.getSdkGitHash
+import mega.privacy.android.build.isCiBuild
+import mega.privacy.android.build.isServerBuild
+import mega.privacy.android.build.nativeLibsDir
+import mega.privacy.android.build.preBuiltSdkDependency
+import mega.privacy.android.build.readReleaseNotes
+import mega.privacy.android.build.readTesterGroupList
+import mega.privacy.android.build.readTesters
+import mega.privacy.android.build.readVersionCode
+import mega.privacy.android.build.readVersionNameChannel
+import mega.privacy.android.build.readVersionNameTag
+import mega.privacy.android.build.shouldActivateGreeter
+import mega.privacy.android.build.shouldActivateNocturn
+import mega.privacy.android.build.shouldActivateTestLite
+import mega.privacy.android.build.shouldApplyDefaultConfiguration
+import mega.privacy.android.build.shouldCombineLintReports
+import mega.privacy.android.build.shouldUsePrebuiltSdk
+
 
 plugins {
     id("com.android.application")
@@ -14,9 +37,6 @@ plugins {
     id("com.google.firebase.firebase-perf")
     id("androidx.baselineprofile")
 }
-
-apply(from = "${project.rootDir}/tools/util.gradle")
-apply(from = "${project.rootDir}/tools/sdk.gradle")
 
 configurations {
     jacocoAnt
@@ -61,13 +81,10 @@ android {
             versionNameSuffix = "(9999_debug)"
         } else {
             println("Create NORMAL build using dynamic versionCode")
-            val readVersionCode: Closure<Int> by extra
             versionCode = readVersionCode()
-            val readVersionNameChannel: Closure<String> by extra
-            val readVersionNameTag: Closure<String> by extra
-            val getAppGitHash: Closure<String> by extra
             versionNameSuffix =
-                "${readVersionNameChannel()}(${readVersionCode()}${readVersionNameTag()})(${getAppGitHash()})"
+                "${readVersionNameChannel()}(${readVersionCode()}${readVersionNameTag()})(" +
+                        "${getAppGitHash(project)})"
         }
 
         multiDexEnabled = true
@@ -77,26 +94,21 @@ android {
 
         buildConfigField("String", "USER_AGENT", "\"MEGAAndroid/${versionName}_${versionCode}\"")
 
-        val shouldActivateGreeter: Closure<Boolean> by extra
-        buildConfigField("boolean", "ACTIVATE_GREETER", "${shouldActivateGreeter()}")
+        buildConfigField("boolean", "ACTIVATE_GREETER", "${shouldActivateGreeter(project)}")
 
-        val shouldActivateNocturn: Closure<Boolean> by extra
-        buildConfigField("boolean", "ACTIVATE_NOCTURN", "${shouldActivateNocturn()}")
+        buildConfigField("boolean", "ACTIVATE_NOCTURN", "${shouldActivateNocturn(project)}")
 
-        val getNocturnTimeout: Closure<Long> by extra
-        buildConfigField("long", "NOCTURN_TIMEOUT", "${getNocturnTimeout()}")
+        buildConfigField("long", "NOCTURN_TIMEOUT", "${getNocturnTimeout(project)}")
 
-        val getKarmaPluginPort: Closure<Int> by extra
-        buildConfigField("int", "KARMA_PLUGIN_PORT", "${getKarmaPluginPort()}")
+        buildConfigField("int", "KARMA_PLUGIN_PORT", "${getKarmaPluginPort(project)}")
 
         resValue("string", "app_version", "\"${versionName}${versionNameSuffix}\"")
 
         val megaSdkVersion: String by rootProject.extra
-        val getSdkGitHash: Closure<String> by extra
-        resValue("string", "sdk_version", "\"${getSdkGitHash(megaSdkVersion)}\"")
 
-        val getChatGitHash: Closure<String> by extra
-        resValue("string", "karere_version", "\"${getChatGitHash(megaSdkVersion)}\"")
+        resValue("string", "sdk_version", "\"${getSdkGitHash(megaSdkVersion, project)}\"")
+
+        resValue("string", "karere_version", "\"${getChatGitHash(megaSdkVersion, project)}\"")
 
         testInstrumentationRunner = "test.mega.privacy.android.app.HiltTestRunner"
 
@@ -126,9 +138,8 @@ android {
                 // Enable processing and uploading of native symbols to Crashlytics servers.
                 // This flag must be enabled to see properly-symbolicated native
                 // stack traces in the Crashlytics dashboard.
-                val nativeLibsDir: Closure<String> by extra
                 "nativeSymbolUploadEnabled"(true)
-                "unstrippedNativeLibsDir"(nativeLibsDir())
+                "unstrippedNativeLibsDir"(nativeLibsDir(project))
             }
         }
     }
@@ -179,10 +190,6 @@ android {
         jniLibs.pickFirsts.add("lib/x86_64/libmodft2.so")
         jniLibs.pickFirsts.add("lib/x86_64/libmodpng.so")
     }
-
-    val readReleaseNotes: Closure<String> by extra
-    val readTesterGroupList: Closure<String> by extra
-    val readTesters: Closure<String> by extra
 
     buildTypes {
         debug {
@@ -255,7 +262,6 @@ android {
     }
     lint {
         checkReleaseBuilds = false
-        val shouldCombineLintReports: Closure<Boolean> by extra
         if (shouldCombineLintReports()) {
             checkDependencies = true
             htmlReport = true
@@ -305,6 +311,7 @@ dependencies {
     implementation(project(":feature:sync"))
     implementation(project(":feature:devicecenter"))
     implementation(project(":shared:resources"))
+    preBuiltSdkDependency(rootProject.extra)
 
     //Test Modules
     testImplementation(project(":core-test"))
@@ -396,8 +403,7 @@ dependencies {
     implementation(androidx.hilt.work)
     implementation(androidx.hilt.navigation)
 
-    val shouldApplyDefaultConfiguration: Closure<Boolean> by rootProject.extra
-    if (shouldApplyDefaultConfiguration()) {
+    if (shouldApplyDefaultConfiguration(project)) {
         apply(plugin = "dagger.hilt.android.plugin")
 
         kapt(google.hilt.android.compiler)
@@ -441,7 +447,6 @@ dependencies {
     debugImplementation(lib.nocturn)
     debugImplementation(lib.xray)
 
-    val shouldUsePrebuiltSdk: Closure<Boolean> by rootProject.extra
     if (!shouldUsePrebuiltSdk()) {
         implementation(files("../sdk/src/main/jni/megachat/webrtc/libwebrtc.jar"))
     }
@@ -464,7 +469,6 @@ dependencies {
     }
     testImplementation(google.hilt.android.test)
     testImplementation(androidx.work.test)
-    testImplementation(testlib.room.test)
     testImplementation(testlib.compose.junit)
     testImplementation(androidx.navigation.testing)
 
@@ -631,8 +635,7 @@ tasks.register("createUnitTestCoverageReport") {
  */
 tasks.register("printAppGitHash") {
     doLast {
-        val getAppGitHash: Closure<String> by ext
-        println(getAppGitHash())
+        println(getAppGitHash(project))
     }
 }
 
@@ -663,7 +666,6 @@ tasks.register("printPrebuildSdkVersion") {
  */
 tasks.register("printAppVersionNameChannel") {
     doLast {
-        val readVersionNameChannel: Closure<String> by ext
         println(readVersionNameChannel())
     }
 }
@@ -672,9 +674,6 @@ tasks.register("printAppVersionNameChannel") {
  * Decide whether to use static version code
  */
 fun useStaticVersion(): Boolean {
-    val isCiBuild: Closure<Boolean> by extra
-    val isServerBuild: Closure<Boolean> by extra
-    val buildTypeMatches: Closure<Boolean> by extra
     val taskNames = gradle.startParameter.taskNames
     return buildTypeMatches("debug", taskNames) ||
             buildTypeMatches("lint", taskNames) ||
@@ -687,7 +686,6 @@ fun useStaticVersion(): Boolean {
  * Apply unit test lite mode if constraints met
  */
 fun applyTestLiteForTasks() {
-    val shouldActivateTestLite: Closure<Boolean> by extra
     val excludedTasks = listOf<(Task) -> Boolean>(
         { it.name.startsWith("injectCrashlytics") },
         { it.name.startsWith("kapt") && it.name.endsWith("TestKotlin") },

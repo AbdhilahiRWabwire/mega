@@ -1094,7 +1094,7 @@ class CameraUploadsWorkerTest {
             )
             assertThat(result).isEqualTo(ListenableWorker.Result.failure())
             verify(setPrimaryFolderLocalPathUseCase).invoke("")
-            verify(broadcastCameraUploadsSettingsActionUseCase).invoke(CameraUploadsSettingsAction.RefreshSettings)
+            verify(broadcastCameraUploadsSettingsActionUseCase).invoke(CameraUploadsSettingsAction.DisableCameraUploads)
             verify(underTest).setProgress(
                 workDataOf(
                     STATUS_INFO to FOLDER_UNAVAILABLE,
@@ -1392,6 +1392,14 @@ class CameraUploadsWorkerTest {
             underTest.doWork()
 
             verify(disableCameraUploadsUseCase).invoke()
+        }
+
+    @Test
+    fun `test that the CU is scheduled when the worker complete with success`() =
+        runTest {
+            val result = underTest.doWork()
+            verify(scheduleCameraUploadUseCase).invoke()
+            assertThat(result).isEqualTo(ListenableWorker.Result.success())
         }
 
     @Test

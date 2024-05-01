@@ -17,13 +17,9 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.OnOffFab
@@ -35,10 +31,8 @@ import mega.privacy.android.app.meeting.activity.MeetingActivityViewModel
 import mega.privacy.android.app.meeting.adapter.Participant
 import mega.privacy.android.app.meeting.listeners.BottomFloatingPanelListener
 import mega.privacy.android.app.presentation.meeting.WaitingRoomManagementViewModel
-import mega.privacy.android.app.presentation.meeting.model.MeetingState.Companion.FREE_PLAN_PARTICIPANTS_LIMIT
 import mega.privacy.android.app.presentation.meeting.view.ParticipantsBottomPanelView
 import mega.privacy.android.app.utils.Util
-import mega.privacy.android.domain.entity.meeting.ParticipantsSection
 import mega.privacy.android.shared.theme.MegaAppTheme
 import timber.log.Timber
 
@@ -447,76 +441,19 @@ class BottomFloatingPanelViewHolder(
 
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                val meetingState by meetingViewModel.state.collectAsStateWithLifecycle()
-                val inMeetingState by inMeetingViewModel.state.collectAsStateWithLifecycle()
-                val shouldShowParticipantsLimitWarning by remember {
-                    derivedStateOf {
-                        meetingState.isCallUnlimitedProPlanFeatureFlagEnabled &&
-                                meetingState.hasFreePlan() && meetingState.chatParticipantsInCall.size >= (inMeetingState.call?.callUsersLimit
-                            ?: FREE_PLAN_PARTICIPANTS_LIMIT)
-                    }
-                }
                 MegaAppTheme(isDark = isSystemInDarkTheme()) {
                     ParticipantsBottomPanelView(
-                        state = meetingState,
-                        shouldShowParticipantsLimitWarning = shouldShowParticipantsLimitWarning,
-                        onWaitingRoomClick = {
-                            meetingViewModel.updateParticipantsSection(
-                                ParticipantsSection.WaitingRoomSection
-                            )
-                        },
-                        onInCallClick = {
-                            meetingViewModel.updateParticipantsSection(
-                                ParticipantsSection.InCallSection
-                            )
-                        },
-                        onNotInCallClick = {
-                            meetingViewModel.updateParticipantsSection(
-                                ParticipantsSection.NotInCallSection
-                            )
-                        },
-                        onAdmitAllClick = { waitingRoomManagementViewModel.admitUsersClick() },
-                        onSeeAllClick = {
-                            meetingViewModel.onSnackbarMessageConsumed()
-                            meetingViewModel.onSeeAllClick()
-                            if (meetingViewModel.state.value.participantsSection == ParticipantsSection.WaitingRoomSection) {
-                                waitingRoomManagementViewModel.setShowParticipantsInWaitingRoomDialogConsumed()
-                            }
-                        },
+                        viewModel = meetingViewModel,
+                        waitingRoomManagementViewModel = waitingRoomManagementViewModel,
                         onInviteParticipantsClick = { listener.onInviteParticipants() },
-                        onShareMeetingLinkClick = {
-                            meetingViewModel.queryMeetingLink(
-                                shouldShareMeetingLink = true
-                            )
-                        },
-                        onAllowAddParticipantsClick = {
-                            meetingViewModel.allowAddParticipantsClick()
-                        },
-                        onAdmitParticipantClicked = {
-                            waitingRoomManagementViewModel.admitUsersClick(
-                                it
-                            )
-                        },
                         onParticipantMoreOptionsClicked = { chatParticipant ->
                             meetingViewModel.state.value.usersInCall.find { it.peerId == chatParticipant.handle }
                                 ?.let {
                                     listener.onParticipantOption(it)
                                 }
                         },
-                        onDenyParticipantClicked = {
-                            waitingRoomManagementViewModel.denyUsersClick(
-                                it
-                            )
-                        },
-                        onRingParticipantClicked = { chatParticipant ->
-                            meetingViewModel.ringParticipant(chatParticipant.handle)
-                        },
-                        onMuteAllParticipantsClick = {
-                            meetingViewModel.muteAllParticipants()
-                        },
-                        onRingAllParticipantsClicked = {
-                            meetingViewModel.ringAllAbsentsParticipants()
-                        })
+
+                        )
                 }
             }
         }

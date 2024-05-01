@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.components.ChatManagement
-import mega.privacy.android.app.featuretoggle.ABTestFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.main.dialog.shares.RemoveShareResultMapper
@@ -32,7 +31,6 @@ import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.app.utils.livedata.SingleLiveEvent
-import mega.privacy.android.domain.entity.Feature
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRestartMode
 import mega.privacy.android.domain.entity.chat.ChatCall
@@ -85,6 +83,7 @@ import mega.privacy.android.domain.usecase.meeting.MonitorCallEndedUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorCallRecordingConsentEventUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
+import mega.privacy.android.domain.usecase.meeting.MonitorUpgradeDialogClosedUseCase
 import mega.privacy.android.domain.usecase.meeting.SetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.StartMeetingInWaitingRoomChatUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
@@ -98,6 +97,7 @@ import mega.privacy.android.domain.usecase.node.MoveNodesToRubbishUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodesUseCase
 import mega.privacy.android.domain.usecase.node.RemoveShareUseCase
 import mega.privacy.android.domain.usecase.node.RestoreNodesUseCase
+import mega.privacy.android.domain.usecase.notifications.BroadcastHomeBadgeCountUseCase
 import mega.privacy.android.domain.usecase.notifications.GetNumUnreadPromoNotificationsUseCase
 import mega.privacy.android.domain.usecase.photos.mediadiscovery.SendStatisticsMediaDiscoveryUseCase
 import mega.privacy.android.domain.usecase.psa.DismissPsaUseCase
@@ -246,6 +246,8 @@ class ManagerViewModel @Inject constructor(
     private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase,
     private val setUsersCallLimitRemindersUseCase: SetUsersCallLimitRemindersUseCase,
     private val getUsersCallLimitRemindersUseCase: GetUsersCallLimitRemindersUseCase,
+    private val broadcastHomeBadgeCountUseCase: BroadcastHomeBadgeCountUseCase,
+    private val monitorUpgradeDialogClosedUseCase: MonitorUpgradeDialogClosedUseCase,
 ) : ViewModel() {
 
     /**
@@ -338,13 +340,11 @@ class ManagerViewModel @Inject constructor(
                 isFirstLogin,
                 flowOf(getUnverifiedIncomingShares(order) + getUnverifiedOutgoingShares(order))
                     .map { it.size },
-                flowOf(getEnabledFeatures()),
-            ) { firstLogin: Boolean, pendingShares: Int, features: Set<Feature> ->
+            ) { firstLogin: Boolean, pendingShares: Int ->
                 { state: ManagerState ->
                     state.copy(
                         isFirstLogin = firstLogin,
                         pendingActionsCount = state.pendingActionsCount + pendingShares,
-                        enabledFlags = features
                     )
                 }
             }.collectLatest {
@@ -519,6 +519,14 @@ class ManagerViewModel @Inject constructor(
                     startCameraUploads()
                 }
         }
+
+        viewModelScope.launch {
+            monitorUpgradeDialogClosedUseCase().catch {
+                Timber.e(it)
+            }.collect {
+                _state.update { it.copy(shouldUpgradeToProPlan = false) }
+            }
+        }
     }
 
     /**
@@ -527,12 +535,6 @@ class ManagerViewModel @Inject constructor(
      * @return the [ManagerState]
      */
     fun state() = _state.value
-
-    private suspend fun getEnabledFeatures(): Set<Feature> {
-        return setOfNotNull(
-            ABTestFeatures.dmca.takeIf { getFeatureFlagValueUseCase(it) },
-        )
-    }
 
     /**
      * Cache up-to-date incoming contact requests in view model
@@ -613,6 +615,8 @@ class ManagerViewModel @Inject constructor(
                     getNumUnreadUserAlertsUseCase() + promoNotificationCount
                 _numUnreadUserAlerts.update { Pair(type, totalCount) }
                 legacyNumUnreadUserAlerts.value = Pair(type, totalCount)
+                val incomingContactRequests = incomingContactRequests.value.size
+                broadcastHomeBadgeCountUseCase(totalCount + incomingContactRequests)
             }.onFailure {
                 Timber.e("Failed to get the number of unread user alerts or promo notifications with error: $it")
             }

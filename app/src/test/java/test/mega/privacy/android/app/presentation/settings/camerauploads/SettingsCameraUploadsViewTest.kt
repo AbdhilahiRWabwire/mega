@@ -24,6 +24,8 @@ import mega.privacy.android.app.presentation.settings.camerauploads.tiles.FILE_U
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.HOW_TO_UPLOAD_TILE
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.INCLUDE_LOCATION_TAGS_TILE
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.KEEP_FILE_NAMES_TILE
+import mega.privacy.android.app.presentation.settings.camerauploads.tiles.MEDIA_UPLOADS_FOLDER_NODE_TILE
+import mega.privacy.android.app.presentation.settings.camerauploads.tiles.MEDIA_UPLOADS_LOCAL_FOLDER_TILE
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.MEDIA_UPLOADS_TILE
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.REQUIRE_CHARGING_DURING_VIDEO_COMPRESSION_TILE
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.VIDEO_COMPRESSION_TILE
@@ -274,10 +276,61 @@ internal class SettingsCameraUploadsViewTest {
         }
     }
 
+    @Test
+    fun `test that the following tiles are always shown when media uploads is enabled`() {
+        initializeComposeContent(
+            isCameraUploadsEnabled = true,
+            isMediaUploadsEnabled = true,
+        )
+
+        listOf(
+            MEDIA_UPLOADS_LOCAL_FOLDER_TILE,
+            MEDIA_UPLOADS_FOLDER_NODE_TILE,
+        ).forEach { tag ->
+            composeTestRule.onNodeWithTag(tag).apply {
+                performScrollTo()
+                assertIsDisplayed()
+            }
+        }
+    }
+
+    @Test
+    fun `test that the media uploads folder node tile shows a default name when the secondary folder name is empty`() {
+        initializeComposeContent(
+            isCameraUploadsEnabled = true,
+            isMediaUploadsEnabled = true,
+            secondaryFolderName = "",
+        )
+
+        composeTestRule.onNodeWithTag(MEDIA_UPLOADS_FOLDER_NODE_TILE).apply {
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(fromId(R.string.section_secondary_media_uploads))
+        }
+    }
+
+    @Test
+    fun `test that the media uploads folder node tile shows a default name when the secondary folder name is null`() {
+        initializeComposeContent(
+            isCameraUploadsEnabled = true,
+            isMediaUploadsEnabled = true,
+            secondaryFolderName = null,
+        )
+
+        composeTestRule.onNodeWithTag(MEDIA_UPLOADS_FOLDER_NODE_TILE).apply {
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(fromId(R.string.section_secondary_media_uploads))
+        }
+    }
+
     private fun initializeComposeContent(
         isCameraUploadsEnabled: Boolean = false,
+        isMediaUploadsEnabled: Boolean = false,
         primaryFolderName: String? = "Primary Folder Name",
         requireChargingDuringVideoCompression: Boolean = true,
+        secondaryFolderName: String? = "Secondary Folder Name",
+        secondaryFolderPath: String = "secondary/folder/path",
         uploadOptionUiItem: UploadOptionUiItem = UploadOptionUiItem.PhotosOnly,
         videoQualityUiItem: VideoQualityUiItem = VideoQualityUiItem.Original,
     ) {
@@ -285,8 +338,11 @@ internal class SettingsCameraUploadsViewTest {
             SettingsCameraUploadsView(
                 uiState = SettingsCameraUploadsUiState(
                     isCameraUploadsEnabled = isCameraUploadsEnabled,
+                    isMediaUploadsEnabled = isMediaUploadsEnabled,
                     primaryFolderName = primaryFolderName,
                     requireChargingDuringVideoCompression = requireChargingDuringVideoCompression,
+                    secondaryFolderName = secondaryFolderName,
+                    secondaryFolderPath = secondaryFolderPath,
                     uploadOptionUiItem = uploadOptionUiItem,
                     videoQualityUiItem = videoQualityUiItem,
                 ),
@@ -298,12 +354,14 @@ internal class SettingsCameraUploadsViewTest {
                 onIncludeLocationTagsStateChanged = {},
                 onKeepFileNamesStateChanged = {},
                 onLocalPrimaryFolderSelected = {},
+                onLocalSecondaryFolderSelected = {},
                 onMediaPermissionsGranted = {},
                 onMediaUploadsStateChanged = {},
                 onNewVideoCompressionSizeLimitProvided = {},
                 onPrimaryFolderNodeSelected = {},
                 onRegularBusinessAccountSubUserPromptAcknowledged = {},
                 onRequestPermissionsStateChanged = {},
+                onSecondaryFolderNodeSelected = {},
                 onUploadOptionUiItemSelected = {},
                 onVideoQualityUiItemSelected = {},
             )

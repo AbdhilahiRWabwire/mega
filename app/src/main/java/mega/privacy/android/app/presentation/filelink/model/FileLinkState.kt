@@ -5,7 +5,7 @@ import de.palm.composestateevents.StateEvent
 import de.palm.composestateevents.StateEventWithContent
 import de.palm.composestateevents.consumed
 import mega.privacy.android.app.namecollision.data.NameCollision
-import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
+import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.exception.PublicNodeException
@@ -54,7 +54,7 @@ data class FileLinkState(
     val jobInProgressState: FileLinkJobInProgressState? = FileLinkJobInProgressState.InitialLoading,
     val openFile: StateEventWithContent<Intent> = consumed(),
     val downloadFile: StateEventWithContent<MegaNode> = consumed(),
-    val downloadEvent: StateEventWithContent<TransferTriggerEvent> = consumed(),
+    val downloadEvent: StateEventWithContent<TransferTriggerEvent.DownloadTriggerEvent> = consumed(),
     val errorMessage: StateEventWithContent<Int> = consumed(),
     val overQuotaError: StateEventWithContent<StorageState> = consumed(),
     val foreignNodeError: StateEvent = consumed,

@@ -1,32 +1,17 @@
-import groovy.lang.Closure
+import mega.privacy.android.build.preBuiltSdkDependency
+import mega.privacy.android.build.shouldApplyDefaultConfiguration
 
 plugins {
-    id("com.android.library")
+    alias(convention.plugins.mega.android.library)
+    alias(convention.plugins.mega.android.room)
+    alias(convention.plugins.mega.android.test)
     id("kotlin-android")
     id("kotlin-kapt")
     id("de.mannodermaus.android-junit5")
-    id("com.google.devtools.ksp")
 }
-
-apply(from = "${project.rootDir}/tools/util.gradle")
-apply(from = "${project.rootDir}/tools/sdk.gradle")
 
 android {
     namespace = "mega.privacy.android.feature.sync"
-
-    val compileSdkVersion: Int by rootProject.extra
-    compileSdk = compileSdkVersion
-    val buildTools: String by rootProject.extra
-    buildToolsVersion = buildTools
-
-    defaultConfig {
-        val minSdkVersion: Int by rootProject.extra
-        minSdk = minSdkVersion
-        val targetSdkVersion: Int by rootProject.extra
-        targetSdk = targetSdkVersion
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
 
     buildFeatures {
         compose = true
@@ -34,12 +19,6 @@ android {
 
     composeOptions {
         kotlinCompilerExtensionVersion = androidx.versions.compose.compiler.get()
-    }
-
-    compileOptions {
-        val javaVersion: JavaVersion by rootProject.extra
-        sourceCompatibility = javaVersion
-        targetCompatibility = javaVersion
     }
 
     kotlinOptions {
@@ -70,14 +49,11 @@ android {
     }
 }
 
-tasks.withType<Test> {
-    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).takeIf { it > 0 } ?: 1
-}
-
 dependencies {
     testImplementation(project(":core-test"))
     testImplementation(project(":core-ui-test"))
     lintChecks(project(":lint"))
+    preBuiltSdkDependency(rootProject.extra)
 
     implementation(project(":domain"))
     implementation(project(":data"))
@@ -99,8 +75,7 @@ dependencies {
     implementation(androidx.datastore.preferences)
     implementation(androidx.hilt.navigation)
 
-    val shouldApplyDefaultConfiguration: Closure<Boolean> by rootProject.extra
-    if (shouldApplyDefaultConfiguration()) {
+    if (shouldApplyDefaultConfiguration(project)) {
         apply(plugin = "dagger.hilt.android.plugin")
 
         kapt(google.hilt.android.compiler)
@@ -109,8 +84,6 @@ dependencies {
 
     implementation(androidx.appcompat)
     implementation(androidx.fragment)
-    implementation(androidx.room)
-    ksp(androidx.room.compiler)
     implementation(google.material)
     implementation(google.accompanist.permissions)
     implementation(androidx.lifecycle.viewmodel)
@@ -120,20 +93,4 @@ dependencies {
     implementation(platform(androidx.compose.bom))
     implementation(androidx.bundles.compose.bom)
     implementation(lib.compose.state.events)
-
-    testImplementation(testlib.junit)
-    testImplementation(testlib.junit.test.ktx)
-    testImplementation(testlib.espresso)
-    testImplementation(testlib.compose.junit)
-    testImplementation(testlib.bundles.ui.test)
-    testImplementation(testlib.bundles.unit.test)
-    testImplementation(testlib.arch.core.test)
-    testImplementation(testlib.test.core.ktx)
-    testImplementation(testlib.mockito)
-    testImplementation(testlib.mockito.kotlin)
-    testImplementation(testlib.mockito.android)
-
-    testRuntimeOnly(testlib.junit.jupiter.engine)
-    testImplementation(platform(testlib.junit5.bom))
-    testImplementation(testlib.bundles.junit5.api)
 }

@@ -1,7 +1,6 @@
 package mega.privacy.android.feature.sync.ui.views
 
 import mega.privacy.android.icon.pack.R as iconPackR
-import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -24,7 +23,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -32,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import mega.privacy.android.core.R as coreR
 import mega.privacy.android.icon.pack.R as IconPackR
+import mega.privacy.android.core.ui.controls.buttons.MegaButtonWithIconAndText
 import mega.privacy.android.feature.sync.R
 import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
@@ -53,6 +52,7 @@ internal fun SyncCard(
     pauseRunClicked: () -> Unit,
     removeFolderClicked: () -> Unit,
     issuesInfoClicked: () -> Unit,
+    isLowBatteryLevel: Boolean,
     modifier: Modifier = Modifier,
 ) {
 
@@ -93,6 +93,7 @@ internal fun SyncCard(
             pauseRunClicked,
             removeFolderClicked,
             issuesInfoClicked,
+            isLowBatteryLevel = isLowBatteryLevel,
         )
     }
 }
@@ -241,6 +242,7 @@ private fun SyncCardFooter(
     pauseRunClicked: () -> Unit,
     removeFolderClicked: () -> Unit,
     issuesInfoClicked: () -> Unit,
+    isLowBatteryLevel: Boolean,
 ) {
     Box(Modifier.fillMaxWidth()) {
         Row(
@@ -249,15 +251,16 @@ private fun SyncCardFooter(
                 .padding(end = 16.dp, top = 16.dp, bottom = 16.dp)
         ) {
             if (isError) {
-                IconButtonWithText(
+                MegaButtonWithIconAndText(
                     modifier = Modifier.padding(end = 8.dp),
                     onClick = issuesInfoClicked,
                     icon = coreR.drawable.ic_info,
-                    color = MaterialTheme.colors.error,
+                    iconColor = MaterialTheme.colors.error,
+                    textColor = MaterialTheme.colors.error,
                     text = stringResource(id = R.string.sync_card_sync_issues_info)
                 )
             }
-            IconButtonWithText(
+            MegaButtonWithIconAndText(
                 modifier = Modifier
                     .padding(end = 8.dp)
                     .defaultMinSize(minWidth = 48.dp, minHeight = 36.dp),
@@ -271,41 +274,15 @@ private fun SyncCardFooter(
                     stringResource(id = R.string.sync_card_pause_sync)
                 } else {
                     stringResource(id = R.string.sync_card_run_sync)
-                }
+                },
+                enabled = !isLowBatteryLevel
             )
-            IconButtonWithText(
+            MegaButtonWithIconAndText(
                 onClick = removeFolderClicked,
                 icon = coreR.drawable.ic_minus_circle,
                 text = stringResource(id = R.string.sync_card_remove_sync)
             )
         }
-    }
-}
-
-@Composable
-private fun IconButtonWithText(
-    modifier: Modifier = Modifier,
-    @DrawableRes icon: Int,
-    text: String,
-    color: Color = MaterialTheme.colors.textColorPrimary,
-    onClick: () -> Unit,
-) {
-    Column(modifier.clickable { onClick() }) {
-        Image(
-            painter = painterResource(icon),
-            contentDescription = null,
-            modifier = Modifier
-                .padding(bottom = 8.dp)
-                .height(16.dp)
-                .width(16.dp)
-                .align(Alignment.CenterHorizontally),
-            colorFilter = ColorFilter.tint(color)
-        )
-        Text(
-            text = text,
-            Modifier.align(Alignment.CenterHorizontally),
-            style = MaterialTheme.typography.caption.copy(color = color),
-        )
     }
 }
 
@@ -324,7 +301,8 @@ private fun SyncCardExpandedPreview() {
             expanded = true,
             expandClicked = {},
             removeFolderClicked = {},
-            issuesInfoClicked = {}
+            issuesInfoClicked = {},
+            isLowBatteryLevel = false
         )
     }
 }
@@ -344,17 +322,8 @@ private fun SyncCardCollapsedPreview() {
             expanded = false,
             expandClicked = {},
             removeFolderClicked = {},
-            issuesInfoClicked = {}
-        )
-    }
-}
-
-@CombinedThemePreviews
-@Composable
-private fun IconButtonPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
-        IconButtonWithText(
-            onClick = {}, icon = coreR.drawable.ic_info, text = "Info"
+            issuesInfoClicked = {},
+            isLowBatteryLevel = false
         )
     }
 }

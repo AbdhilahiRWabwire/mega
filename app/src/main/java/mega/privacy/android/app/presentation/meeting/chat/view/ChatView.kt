@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -62,6 +63,8 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
+import mega.privacy.android.app.camera.CameraArg
+import mega.privacy.android.app.camera.InAppCameraLauncher
 import mega.privacy.android.app.extensions.navigateToAppSettings
 import mega.privacy.android.app.main.AddContactActivity
 import mega.privacy.android.app.main.InviteContactActivity
@@ -103,9 +106,9 @@ import mega.privacy.android.app.presentation.meeting.chat.view.sheet.MessageNotS
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.MessageOptionsBottomSheet
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.ReactionsInfoBottomSheet
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.UpgradeProPlanBottomSheet
-import mega.privacy.android.app.presentation.meeting.view.FreePlanLimitParticipantsDialog
+import mega.privacy.android.app.presentation.meeting.view.dialog.FreePlanLimitParticipantsDialog
 import mega.privacy.android.app.presentation.qrcode.findActivity
-import mega.privacy.android.app.presentation.transfers.startdownload.view.StartDownloadComponent
+import mega.privacy.android.app.presentation.transfers.starttransfer.view.StartTransferComponent
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.permission.PermissionUtils
@@ -281,6 +284,7 @@ internal fun ChatView(
     onConsumeShouldUpgradeToProPlan: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val coroutineScope = rememberCoroutineScope()
     val scaffoldState = rememberScaffoldState()
     var showParticipatingInACallDialog by rememberSaveable { mutableStateOf(false) }
@@ -400,6 +404,20 @@ internal fun ChatView(
             fileModalSheetState.hide()
         }
     }
+    BackHandler(enabled = messageOptionsModalSheetState.isVisible) {
+        coroutineScope.launch {
+            messageNotSentBottomSheetState.hide()
+        }
+    }
+    BackHandler(enabled = messageNotSentBottomSheetState.isVisible) {
+        coroutineScope.launch {
+            messageNotSentBottomSheetState.hide()
+        }
+    }
+    BackHandler(enabled = reactionInfoBottomSheetState.isVisible) {
+        coroutineScope.launch { reactionInfoBottomSheetState.hide() }
+    }
+
     BackHandler(enabled = WindowInsets.isImeVisible) {
         keyboardController?.hide()
     }
@@ -445,6 +463,28 @@ internal fun ChatView(
 
             selectedMessages = emptySet()
         }
+    val takePictureLauncher =
+        rememberLauncherForActivityResult(
+            contract = InAppCameraLauncher()
+        ) { uri ->
+            uri?.let {
+                onAttachFiles(listOf(it))
+            }
+        }
+    val capturePhotoOrVideoPermissionsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissionsResult ->
+        if (permissionsResult[Manifest.permission.CAMERA] == true) {
+            takePictureLauncher.launch(CameraArg(uiState.title.orEmpty()))
+        } else {
+            showPermissionNotAllowedSnackbar(
+                context,
+                coroutineScope,
+                scaffoldState.snackbarHostState,
+                R.string.chat_attach_pick_from_camera_deny_permission
+            )
+        }
+    }
     var pendingAction: (@Composable () -> Unit)? by remember {
         mutableStateOf(null)
     }
@@ -475,17 +515,6 @@ internal fun ChatView(
                     ?.let { contactList ->
                         onAttachContacts(contactList.toList())
                     }
-            }
-        var takePictureUri by remember { mutableStateOf(Uri.EMPTY) }
-
-        val takePictureLauncher =
-            rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.TakePicture()
-            ) { resultOk ->
-                if (resultOk) {
-                    onAttachFiles(listOf(takePictureUri))
-                }
-                takePictureUri = Uri.EMPTY
             }
 
         val isFileModalShown by derivedStateOf {
@@ -539,7 +568,7 @@ internal fun ChatView(
                         ChatAttachFileBottomSheet(
                             onAttachFiles = onAttachFiles,
                             onAttachNodes = onAttachNodes,
-                            sheetState = fileModalSheetState,
+                            hideSheet = { coroutineScope.launch { fileModalSheetState.hide() } },
                         )
                     }
 
@@ -571,7 +600,6 @@ internal fun ChatView(
                                     action.group
                                 )
                             },
-                            sheetState = messageOptionsModalSheetState,
                         )
                     }
 
@@ -590,7 +618,6 @@ internal fun ChatView(
                                     setAction = { pendingAction = it }
                                 )
                             },
-                            sheetState = messageNotSentBottomSheetState,
                         )
                     }
 
@@ -598,7 +625,6 @@ internal fun ChatView(
                         ReactionsInfoBottomSheet(
                             selectedReaction = selectedReaction,
                             reactions = reactionList,
-                            sheetState = reactionInfoBottomSheetState,
                             getDetailsInReactionList = getUserInfoIntoReactionList,
                             onUserClick = { userHandle ->
                                 coroutineScope.launch {
@@ -646,14 +672,15 @@ internal fun ChatView(
                             onSendGiphyMessage = onSendGiphyMessage,
                             onTakePicture = {
                                 coroutineScope.launch {
-                                    createNewImage()?.let {
-                                        takePictureUri = it
-                                        takePictureLauncher.launch(it)
-                                    }
                                     toolbarModalSheetState.hide()
                                 }
+                                capturePhotoOrVideoPermissionsLauncher.launch(
+                                    arrayOf(
+                                        PermissionUtils.getCameraPermission(),
+                                        PermissionUtils.getRecordAudioPermission()
+                                    )
+                                )
                             },
-                            sheetState = toolbarModalSheetState,
                             onCameraPermissionDenied = {
                                 showPermissionNotAllowedSnackbar(
                                     context,
@@ -662,16 +689,16 @@ internal fun ChatView(
                                     R.string.chat_attach_pick_from_camera_deny_permission
                                 )
                             },
-                            onAttachFiles = onAttachFiles
+                            onAttachFiles = onAttachFiles,
+                            hideSheet = { coroutineScope.launch { toolbarModalSheetState.hide() } },
+                            isVisible = toolbarModalSheetState.isVisible,
                         )
                     }
 
                     isUpgradeToProPlanShown -> {
-                        UpgradeProPlanBottomSheet {
-                            coroutineScope.launch {
-                                upgradeToProPlanBottomSheetState.hide()
-                            }
-                        }
+                        UpgradeProPlanBottomSheet(
+                            onUpgrade = { coroutineScope.launch { upgradeToProPlanBottomSheetState.hide() } },
+                        )
                     }
                 }
             },
@@ -754,6 +781,7 @@ internal fun ChatView(
                 bottomBar = {
                     if (haveWritePermission) {
                         val onAttachmentClick: () -> Unit = {
+                            focusManager.clearFocus()
                             coroutineScope.launch {
                                 Analytics.tracker.trackEvent(
                                     ChatConversationAddAttachmentButtonPressedEvent
@@ -836,6 +864,7 @@ internal fun ChatView(
                             val onMessageLongClick: (TypedMessage) -> Unit = { message ->
                                 selectedMessages = setOf(message)
                                 // Use message for showing correct available options
+                                focusManager.clearFocus()
                                 coroutineScope.launch {
                                     Analytics.tracker.trackEvent(ChatMessageLongPressedEvent)
                                     messageOptionsModalSheetState.show()
@@ -1072,7 +1101,7 @@ internal fun ChatView(
             }
         }
 
-        StartDownloadComponent(
+        StartTransferComponent(
             event = uiState.downloadEvent,
             onConsumeEvent = consumeDownloadEvent,
             snackBarHostState = scaffoldState.snackbarHostState,

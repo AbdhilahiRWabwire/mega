@@ -19,4 +19,8 @@
     <string name="general_allow"/>
     <string name="chat_microphone_permissions_denied_for_voice_clip"/>
     <string name="context_send"/>
+    <string name="camera_photo_button">Photo</string>
+    <string name="video_button">Video</string>
+    <string name="edited_message_text">(edited)</string>
+    <string name="chat_click_link_in_message_intent_not_available">You may not have any apps installed which can open this website</string>
 </resources>

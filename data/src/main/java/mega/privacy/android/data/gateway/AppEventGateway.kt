@@ -78,7 +78,7 @@ internal interface AppEventGateway {
      * Broadcast storage over quota
      *
      */
-    suspend fun broadcastStorageOverQuota()
+    suspend fun broadcastStorageOverQuota(isCurrentOverQuota: Boolean)
 
     /**
      * Monitors logout.
@@ -374,4 +374,16 @@ internal interface AppEventGateway {
     suspend fun broadcastUpdateUserData()
 
     fun monitorUpdateUserData(): Flow<Unit>
+
+    /**
+     * monitor upgrade dialog closed due to time limit
+     *
+     */
+    fun monitorUpgradeDialogClosed(): Flow<Unit>
+
+    /**
+     * broadcast upgrade dialog is closed
+     *
+     */
+    suspend fun broadcastUpgradeDialogClosed()
 }

@@ -16,11 +16,27 @@ enum class AppFeatures(override val description: String, private val defaultValu
     Feature {
 
     /**
+     * Enables new audio queue
+     */
+    NewAudioQueue(
+        "Enable new audio queue",
+        false,
+    ),
+
+    /**
+     * Enables recent actions compose tab
+     */
+    RecentActionsCompose(
+        "Enables new Recent Actions Compose tab (requires app restart)",
+        true,
+    ),
+
+    /**
      * Enables the report issue button on the login screen
      */
     LoginReportIssueButton(
         "Enables the report issue button on the login screen feature",
-        false,
+        true,
     ),
 
     /**
@@ -45,7 +61,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
     SettingsCameraUploadsCompose(
         "Enables the Settings Camera Uploads in Jetpack Compose. This requires an app " +
                 "restart for the changes to take effect.",
-        false,
+        true,
     ),
 
 
@@ -199,7 +215,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
     /**
      * Search implementation with dropdown chips
      */
-    DropdownChips("Search implementation with dropdown chips and bottom sheet", false),
+    DropdownChips("Search implementation with dropdown chips and bottom sheet", true),
 
     /**
      * To enable showing promo notifications in Notifications screen
@@ -216,14 +232,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
      * Call unlimited for pro users
      */
     CallUnlimitedProPlan("Call to stay unlimited when host with pro plan leaves", false),
-
-    /**
-     * Enable new design Variant A for ChooseAccount screen
-     */
-    ChooseAccountScreenVariantA(
-        "Enable new design (Variant A) for ChooseAccount screen (Onboarding Upselling dialog)",
-        false
-    ),
 
     /**
      * To show strings for new features (meetings and VPN), strings should be hidden until the features are released

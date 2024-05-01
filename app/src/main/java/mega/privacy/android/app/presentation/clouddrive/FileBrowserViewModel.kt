@@ -26,7 +26,7 @@ import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.mapper.HandleOptionClickMapper
 import mega.privacy.android.app.presentation.settings.model.MediaDiscoveryViewSettings
 import mega.privacy.android.app.presentation.time.mapper.DurationInSecondsTextMapper
-import mega.privacy.android.app.presentation.transfers.startdownload.model.TransferTriggerEvent
+import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.data.mapper.FileDurationMapper
 import mega.privacy.android.domain.entity.ImageFileTypeInfo
 import mega.privacy.android.domain.entity.SvgFileTypeInfo
@@ -230,7 +230,10 @@ class FileBrowserViewModel @Inject constructor(
                 }
             } else {
                 _state.update {
-                    it.copy(fileBrowserHandle = handle)
+                    it.copy(
+                        fileBrowserHandle = handle,
+                        updateToolbarTitleEvent = triggered
+                    )
                 }
             }
             refreshNodesState()
@@ -495,7 +498,7 @@ class FileBrowserViewModel @Inject constructor(
      *
      * @param folderHandle The Folder Handle
      */
-    private fun onFolderItemClicked(folderHandle: Long) {
+    fun onFolderItemClicked(folderHandle: Long) {
         viewModelScope.launch {
             _state.update {
                 it.copy(
@@ -610,18 +613,6 @@ class FileBrowserViewModel @Inject constructor(
             _state.value.nodesList.indexOfFirst { it.node.id.longValue == nodeUIItem.id.longValue }
         if (_state.value.isInSelection) {
             updateNodeInSelectionState(nodeUIItem = nodeUIItem, index = index)
-        } else {
-            if (nodeUIItem.node is FileNode) {
-                _state.update {
-                    it.copy(
-                        itemIndex = index,
-                        currentFileNode = nodeUIItem.node
-                    )
-                }
-
-            } else {
-                onFolderItemClicked(nodeUIItem.id.longValue)
-            }
         }
     }
 
@@ -737,23 +728,22 @@ class FileBrowserViewModel @Inject constructor(
     }
 
     /**
-     * When item is clicked on activity
-     */
-    fun onItemPerformedClicked() {
-        _state.update {
-            it.copy(
-                currentFileNode = null,
-                itemIndex = -1,
-            )
-        }
-    }
-
-    /**
      * Consume download event
      */
     fun consumeDownloadEvent() {
         _state.update {
             it.copy(downloadEvent = consumed())
+        }
+    }
+
+    /**
+     * Download file triggered
+     */
+    fun onDownloadFileTriggered(triggerEvent: TransferTriggerEvent) {
+        _state.update {
+            it.copy(
+                downloadEvent = triggered(triggerEvent)
+            )
         }
     }
 

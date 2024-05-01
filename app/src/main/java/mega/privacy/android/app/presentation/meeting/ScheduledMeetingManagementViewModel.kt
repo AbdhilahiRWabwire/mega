@@ -22,7 +22,7 @@ import mega.privacy.android.app.presentation.extensions.getDayAndMonth
 import mega.privacy.android.app.presentation.extensions.getEndZoneDateTime
 import mega.privacy.android.app.presentation.extensions.getStartZoneDateTime
 import mega.privacy.android.app.presentation.mapper.GetStringFromStringResMapper
-import mega.privacy.android.app.presentation.meeting.model.ScheduledMeetingManagementState
+import mega.privacy.android.app.presentation.meeting.model.ScheduledMeetingManagementUiState
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.data.gateway.api.MegaChatApiGateway
 import mega.privacy.android.domain.entity.ChatRoomLastMessage
@@ -40,6 +40,7 @@ import mega.privacy.android.domain.usecase.RemoveChatLink
 import mega.privacy.android.domain.usecase.account.GetCurrentSubscriptionPlanUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.chat.ArchiveChatUseCase
+import mega.privacy.android.domain.usecase.chat.message.MonitorChatRoomMessagesUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.meeting.BroadcastScheduledMeetingCanceledUseCase
 import mega.privacy.android.domain.usecase.meeting.CancelScheduledMeetingOccurrenceUseCase
@@ -82,7 +83,7 @@ import javax.inject.Inject
  * @property getChatCallUseCase                         [GetChatCallUseCase]
  * @property getCurrentSubscriptionPlanUseCase          [GetCurrentSubscriptionPlanUseCase]
  * @property monitorAccountDetailUseCase                [MonitorAccountDetailUseCase]
- * @property state                                      Current view state as [ScheduledMeetingManagementState]setWaitingRoom
+ * @property state                                      Current view state as [ScheduledMeetingManagementUiState]setWaitingRoom
  */
 @HiltViewModel
 class ScheduledMeetingManagementViewModel @Inject constructor(
@@ -110,8 +111,8 @@ class ScheduledMeetingManagementViewModel @Inject constructor(
     private val getCurrentSubscriptionPlanUseCase: GetCurrentSubscriptionPlanUseCase,
     private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(ScheduledMeetingManagementState())
-    val state: StateFlow<ScheduledMeetingManagementState> = _state
+    private val _state = MutableStateFlow(ScheduledMeetingManagementUiState())
+    val state: StateFlow<ScheduledMeetingManagementUiState> = _state
 
     private var isChatHistoryEmptyJob: Job? = null
 
@@ -158,6 +159,7 @@ class ScheduledMeetingManagementViewModel @Inject constructor(
      * @return          True if the chat history is empty (only management messages) or false otherwise.
      */
     fun checkIfIsChatHistoryEmpty(chatId: Long) = viewModelScope.launch {
+        monitorLoadedMessages(chatId)
         loadMessagesUseCase(chatId)
     }
 
