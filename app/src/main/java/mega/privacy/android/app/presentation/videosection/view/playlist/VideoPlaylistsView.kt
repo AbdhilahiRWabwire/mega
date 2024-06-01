@@ -51,6 +51,7 @@ import mega.privacy.android.core.ui.theme.black
 import mega.privacy.android.core.ui.theme.extensions.white_black
 import mega.privacy.android.core.ui.theme.white
 import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
 import mega.privacy.android.legacy.core.ui.controls.lists.HeaderViewItem
 import mega.privacy.android.shared.theme.MegaAppTheme
@@ -118,7 +119,9 @@ internal fun VideoPlaylistsView(
                     deletedVideoPlaylistTitles.size
                 )
             }
-            snackBarHostState.showSnackbar(deletedMessage)
+            coroutineScope.launch {
+                snackBarHostState.showSnackbar(deletedMessage)
+            }
             onDeletedMessageShown()
         }
     }
@@ -285,7 +288,9 @@ internal fun VideoPlaylistsView(
                                 icon = R.drawable.ic_playlist_item_empty,
                                 title = videoPlaylistItem.title,
                                 numberOfVideos = videoPlaylistItem.numberOfVideos,
-                                thumbnailList = videoPlaylistItem.thumbnailList,
+                                thumbnailList = videoPlaylistItem.thumbnailList?.map { id ->
+                                    ThumbnailRequest(id)
+                                },
                                 totalDuration = videoPlaylistItem.totalDuration,
                                 isSelected = videoPlaylistItem.isSelected,
                                 onClick = { onClick(videoPlaylistItem, it) },

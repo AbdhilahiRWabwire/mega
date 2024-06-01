@@ -26,6 +26,6 @@ enum class DataFeatures(
 
     companion object : FeatureFlagValueProvider {
         override suspend fun isEnabled(feature: Feature) =
-            values().firstOrNull { it == feature }?.defaultValue
+            entries.firstOrNull { it == feature }?.defaultValue
     }
 }

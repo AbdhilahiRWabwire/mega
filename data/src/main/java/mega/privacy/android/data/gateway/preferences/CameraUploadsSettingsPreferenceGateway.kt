@@ -1,5 +1,7 @@
 package mega.privacy.android.data.gateway.preferences
 
+import kotlinx.coroutines.flow.Flow
+
 /**
  * CameraUploads Settings Preference Gateway
  *
@@ -179,4 +181,28 @@ interface CameraUploadsSettingsPreferenceGateway {
      * Clear preferences
      */
     suspend fun clearPreferences()
+
+    /**
+     * Observes the User's Setting in the DataStore, as to whether or not the Device must be charged
+     * for the active Camera Uploads to start uploading content
+     *
+     * @return A Boolean [Flow] that observes the User's Setting. The [Flow] may emit null if the
+     * Setting cannot be found
+     */
+    fun monitorIsChargingRequiredToUploadContent(): Flow<Boolean?>
+
+    /**
+     * Checks whether or not the Device must be charged for Camera Uploads to start uploading content
+     *
+     * @return true if the Device must be charged. It can be null if the state could not be retrieved
+     * from the DataStore
+     */
+    suspend fun isChargingRequiredToUploadContent(): Boolean?
+
+    /**
+     * Sets whether or not the Device must be charged for Camera Uploads to start uploading content
+     *
+     * @param chargingRequired the new Device charging state
+     */
+    suspend fun setChargingRequiredToUploadContent(chargingRequired: Boolean)
 }

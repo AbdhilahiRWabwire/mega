@@ -9,37 +9,32 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.palm.composestateevents.consumed
 import de.palm.composestateevents.triggered
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
-import io.reactivex.rxjava3.core.Completable
-import io.reactivex.rxjava3.kotlin.addTo
-import io.reactivex.rxjava3.kotlin.subscribeBy
-import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mega.privacy.android.app.R
 import mega.privacy.android.app.UploadService
-import mega.privacy.android.app.arch.BaseRxViewModel
 import mega.privacy.android.app.components.saver.NodeSaver
 import mega.privacy.android.app.domain.usecase.CheckNameCollision
-import mega.privacy.android.app.domain.usecase.GetNodeByHandle
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.listeners.ExportListener
 import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.namecollision.data.NameCollisionType
 import mega.privacy.android.app.namecollision.usecase.CheckNameCollisionUseCase
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
-import mega.privacy.android.app.usecase.LegacyCopyNodeUseCase
 import mega.privacy.android.app.usecase.exception.MegaNodeException
 import mega.privacy.android.app.utils.AlertsAndWarnings.showConfirmRemoveLinkDialog
 import mega.privacy.android.app.utils.CacheFolderManager
@@ -78,10 +73,13 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.ViewerNode
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
+import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
+import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.filelink.GetPublicNodeFromSerializedDataUseCase
 import mega.privacy.android.domain.usecase.folderlink.GetPublicChildNodeFromIdUseCase
+import mega.privacy.android.domain.usecase.node.CopyChatNodeUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodeUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodeUseCase
 import mega.privacy.android.domain.usecase.node.chat.GetChatFileUseCase
@@ -131,17 +129,18 @@ class TextEditorViewModel @Inject constructor(
     private val checkNameCollisionUseCase: CheckNameCollisionUseCase,
     private val moveNodeUseCase: MoveNodeUseCase,
     private val copyNodeUseCase: CopyNodeUseCase,
-    private val getNodeByHandle: GetNodeByHandle,
-    private val legacyCopyNodeUseCase: LegacyCopyNodeUseCase,
     private val downloadBackgroundFile: DownloadBackgroundFile,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val getNodeByIdUseCase: GetNodeByIdUseCase,
     private val getChatFileUseCase: GetChatFileUseCase,
+    private val copyChatNodeUseCase: CopyChatNodeUseCase,
     private val getPublicChildNodeFromIdUseCase: GetPublicChildNodeFromIdUseCase,
     private val getPublicNodeFromSerializedDataUseCase: GetPublicNodeFromSerializedDataUseCase,
     private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase,
-) : BaseRxViewModel() {
+    private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
+    private val isHiddenNodesOnboardedUseCase: IsHiddenNodesOnboardedUseCase,
+) : ViewModel() {
 
     companion object {
         const val MODE = "MODE"
@@ -174,6 +173,11 @@ class TextEditorViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(TextEditorViewState())
 
     val uiState = _uiState.asStateFlow()
+
+    init {
+        monitorAccountDetail()
+        monitorIsHiddenNodesOnboarded()
+    }
 
     fun onTextFileEditorDataUpdate(): LiveData<TextEditorData> = textEditorData
 
@@ -238,11 +242,11 @@ class TextEditorViewModel @Inject constructor(
 
     fun isViewMode(): Boolean = mode.value == VIEW_MODE
 
-    private fun isEditMode(): Boolean = mode.value == EDIT_MODE
+    internal fun isEditMode(): Boolean = mode.value == EDIT_MODE
 
     fun isCreateMode(): Boolean = mode.value == CREATE_MODE
 
-    private fun setViewMode() {
+    internal fun setViewMode() {
         mode.value = VIEW_MODE
     }
 
@@ -703,58 +707,49 @@ class TextEditorViewModel @Inject constructor(
      * @param node              Node handle to copy.
      * @param newParentHandle   Parent handle in which the node will be copied.
      */
-    fun importNode(node: MegaNode, newParentHandle: Long) =
-        viewModelScope.launch {
-            val parentNode = getNodeByHandle(newParentHandle)
+    fun importNode(node: MegaNode, newParentHandle: Long) = viewModelScope.launch {
+        runCatching {
             checkNameCollisionUseCase.check(
                 node = node,
-                parentNode = parentNode,
+                parentHandle = newParentHandle,
                 type = NameCollisionType.COPY,
-            ).observeOn(AndroidSchedulers.mainThread())
-                .subscribeBy(
-                    onSuccess = { collisionResult -> collision.value = collisionResult },
-                    onError = { error ->
-                        when (error) {
-                            is MegaNodeException.ChildDoesNotExistsException -> {
-                                legacyCopyNodeUseCase.copy(
-                                    node = node,
-                                    parentHandle = newParentHandle
-                                ).subscribeAndComplete(
-                                    completeAction = {
-                                        snackBarMessage.value =
-                                            R.string.context_correctly_copied
-                                    },
-                                    errorAction = { copyError ->
-                                        throwable.value = copyError
-                                    })
-                            }
-
-                            else -> Timber.e(error)
-                        }
-                    }
-                )
-                .addTo(composite)
-        }
-
-
-    private fun Completable.subscribeAndComplete(
-        addToComposite: Boolean = false,
-        completeAction: (() -> Unit)? = null,
-        errorAction: ((Throwable) -> Unit)? = null,
-    ) {
-        subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy(
-                onComplete = {
-                    completeAction?.invoke()
-                },
-                onError = { error ->
-                    errorAction?.invoke(error)
-                    Timber.e(error)
+            )
+        }.onSuccess { collisionResult ->
+            collision.value = collisionResult
+        }.onFailure { throwable ->
+            when (throwable) {
+                is MegaNodeException.ChildDoesNotExistsException -> {
+                    copyChatNode(NodeId(newParentHandle))
                 }
-            ).also {
-                if (addToComposite) it.addTo(composite)
+
+                else -> Timber.e(throwable)
             }
+        }
+    }
+
+    /**
+     * Copies a chat node
+     *
+     * @param newParentNodeId Parent handle in which the node will be copied.
+     */
+    private fun copyChatNode(newParentNodeId: NodeId) {
+        viewModelScope.launch {
+            runCatching {
+                val viewerNode = textEditorData.value?.viewerNode
+                if (viewerNode !is ViewerNode.ChatNode) throw IllegalStateException("ViewerNode must be a ChatNode type")
+                copyChatNodeUseCase(
+                    chatId = viewerNode.chatId,
+                    messageId = viewerNode.messageId,
+                    newNodeParent = newParentNodeId,
+                )
+            }.onSuccess {
+                snackBarMessage.value =
+                    R.string.context_correctly_copied
+            }.onFailure {
+                Timber.e(it, "Error not copied")
+                throwable.value = it
+            }
+        }
     }
 
     /**
@@ -779,7 +774,7 @@ class TextEditorViewModel @Inject constructor(
                     snackBarMessage.value = R.string.context_correctly_copied
                 }.onFailure {
                     throwable.value = it
-                    Timber.e("Error not copied $it")
+                    Timber.e(it, "Error not copied")
                 }
             }
         }
@@ -807,7 +802,7 @@ class TextEditorViewModel @Inject constructor(
                         snackBarMessage.value = R.string.context_correctly_moved
                     }.onFailure {
                         throwable.value = it
-                        Timber.e("Not moved: $it")
+                        Timber.e(it, "Not moved")
                     }
                 }
             }
@@ -817,6 +812,31 @@ class TextEditorViewModel @Inject constructor(
     fun hideOrUnhideNode(nodeId: NodeId, hide: Boolean) {
         viewModelScope.launch {
             updateNodeSensitiveUseCase(nodeId = nodeId, isSensitive = hide)
+        }
+    }
+
+    private fun monitorAccountDetail() {
+        monitorAccountDetailUseCase()
+            .onEach { accountDetail ->
+                _uiState.update {
+                    it.copy(accountType = accountDetail.levelDetail?.accountType)
+                }
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun monitorIsHiddenNodesOnboarded() {
+        viewModelScope.launch {
+            val isHiddenNodesOnboarded = isHiddenNodesOnboardedUseCase()
+            _uiState.update {
+                it.copy(isHiddenNodesOnboarded = isHiddenNodesOnboarded)
+            }
+        }
+    }
+
+    fun setHiddenNodesOnboarded() {
+        _uiState.update {
+            it.copy(isHiddenNodesOnboarded = true)
         }
     }
 

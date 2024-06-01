@@ -11,9 +11,6 @@ import mega.privacy.android.app.di.manager.ManagerUseCases
 import mega.privacy.android.app.domain.usecase.AuthorizeNode
 import mega.privacy.android.app.domain.usecase.GetBackupsChildrenNodes
 import mega.privacy.android.app.domain.usecase.GetBackupsNode
-import mega.privacy.android.app.domain.usecase.GetIncomingSharesChildrenNode
-import mega.privacy.android.app.domain.usecase.GetOutgoingSharesChildrenNode
-import mega.privacy.android.app.domain.usecase.GetPublicLinks
 import mega.privacy.android.app.domain.usecase.GetRootFolder
 import mega.privacy.android.domain.usecase.GetNumUnreadUserAlertsUseCase
 import mega.privacy.android.domain.usecase.HasBackupsChildren
@@ -46,21 +43,6 @@ object TestManagerUseCases {
     @Provides
     fun provideGetBackupsChildrenNodes() = mock<GetBackupsChildrenNodes> {
         onBlocking { invoke() }.thenReturn(flowOf(any()))
-    }
-
-    @Provides
-    fun provideGetIncomingSharesNode() = mock<GetIncomingSharesChildrenNode> {
-        onBlocking { invoke(any()) }.thenReturn(emptyList())
-    }
-
-    @Provides
-    fun provideGetOutgoingSharesNode() = mock<GetOutgoingSharesChildrenNode> {
-        onBlocking { invoke(any()) }.thenReturn(emptyList())
-    }
-
-    @Provides
-    fun provideGetPublicLinks() = mock<GetPublicLinks> {
-        onBlocking { invoke(any()) }.thenReturn(emptyList())
     }
 
     @Provides

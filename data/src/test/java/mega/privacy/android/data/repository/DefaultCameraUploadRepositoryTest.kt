@@ -585,6 +585,60 @@ class DefaultCameraUploadRepositoryTest {
     }
 
     @Nested
+    @DisplayName("Charging Required When Uploading")
+    inner class ChargingRequiredWhenUploadingTest {
+
+        @Test
+        fun `test that the charging required when uploading content state is being monitored`() =
+            runTest {
+                val chargingRequiredFlow = flowOf(true)
+                whenever(cameraUploadsSettingsPreferenceGateway.monitorIsChargingRequiredToUploadContent()).thenReturn(
+                    chargingRequiredFlow
+                )
+
+                underTest.monitorIsChargingRequiredToUploadContent().test {
+                    assertThat(awaitItem()).isTrue()
+                    cancelAndIgnoreRemainingEvents()
+                }
+            }
+
+        @ParameterizedTest(name = "is charging required when uploading content: {0}")
+        @ValueSource(booleans = [true, false])
+        fun `test that the charging required when uploading content state is retrieved`(
+            chargingRequired: Boolean,
+        ) = runTest {
+            whenever(cameraUploadsSettingsPreferenceGateway.isChargingRequiredToUploadContent()).thenReturn(
+                chargingRequired
+            )
+
+            assertThat(underTest.isChargingRequiredToUploadContent()).isEqualTo(chargingRequired)
+        }
+
+        @Test
+        fun `test that the charging required when uploading content state is null if it cannot be retrieved`() =
+            runTest {
+                whenever(cameraUploadsSettingsPreferenceGateway.isChargingRequiredToUploadContent()).thenReturn(
+                    null
+                )
+
+                assertThat(underTest.isChargingRequiredToUploadContent()).isNull()
+
+            }
+
+        @ParameterizedTest(name = "new is charging required when uploading content state: {0}")
+        @ValueSource(booleans = [true, false])
+        fun `test that the new charging required when uploading content state is set`(
+            chargingRequired: Boolean,
+        ) = runTest {
+            underTest.setChargingRequiredToUploadContent(chargingRequired)
+
+            verify(cameraUploadsSettingsPreferenceGateway).setChargingRequiredToUploadContent(
+                chargingRequired
+            )
+        }
+    }
+
+    @Nested
     @DisplayName("Camera Uploads Operation")
     inner class CameraUploadsOperationTest {
         @Test

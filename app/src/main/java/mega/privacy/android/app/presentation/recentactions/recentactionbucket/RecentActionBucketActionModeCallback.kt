@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.recentactions.recentactionbucket
 
+import mega.privacy.android.shared.resources.R as sharedR
 import android.view.Menu
 import android.view.MenuItem
 import androidx.appcompat.view.ActionMode
@@ -12,6 +13,7 @@ import mega.privacy.android.app.main.controllers.NodeController
 import mega.privacy.android.app.main.dialog.rubbishbin.ConfirmMoveToRubbishBinDialogFragment
 import mega.privacy.android.app.utils.LinksUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
+import mega.privacy.android.domain.entity.node.NodeId
 import timber.log.Timber
 
 /**
@@ -50,10 +52,20 @@ class RecentActionBucketActionModeCallback constructor(
     override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean {
         Timber.d("ActionBarCallBack::onPrepareActionMode")
 
-        menu!!.findItem(R.id.cab_menu_select_all).isVisible =
-            (viewModel.getSelectedNodesCount() < viewModel.getNodesCount())
+        menu?.let {
+            it.findItem(R.id.cab_menu_select_all).isVisible =
+                (viewModel.getSelectedNodesCount() < viewModel.getNodesCount())
 
-        handleHiddenNodes(menu)
+            it.findItem(R.id.cab_menu_share_link)?.let { item ->
+                item.title = recentActionBucketFragment.context?.resources?.getQuantityString(
+                    sharedR.plurals.label_share_links,
+                    viewModel.getSelectedNodesCount()
+                )
+            }
+
+            handleHiddenNodes(it)
+        }
+
         return true
     }
 
@@ -80,7 +92,8 @@ class RecentActionBucketActionModeCallback constructor(
     override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
         Timber.d("ActionBarCallBack::onActionItemClicked")
         val selectedMegaNodes = viewModel.getSelectedMegaNodes()
-        val nodesHandles: ArrayList<Long> = ArrayList(selectedMegaNodes.map { it.handle })
+        val nodesHandles = selectedMegaNodes.map { it.handle }
+        val nodeIds = nodesHandles.map { NodeId(it) }
         when (item!!.itemId) {
             R.id.cab_menu_download -> {
                 managerActivity.saveNodesToDevice(
@@ -129,12 +142,12 @@ class RecentActionBucketActionModeCallback constructor(
             }
 
             R.id.cab_menu_hide -> {
-                recentActionBucketFragment.onHideClicked()
+                recentActionBucketFragment.onHideClicked(nodeIds = nodeIds)
                 viewModel.clearSelection()
             }
 
             R.id.cab_menu_unhide -> {
-                viewModel.hideOrUnhideNodes(false)
+                viewModel.hideOrUnhideNodes(nodeIds = nodeIds, false)
                 viewModel.clearSelection()
             }
 

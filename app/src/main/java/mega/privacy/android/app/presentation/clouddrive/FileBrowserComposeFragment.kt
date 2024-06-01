@@ -1,5 +1,7 @@
 package mega.privacy.android.app.presentation.clouddrive
 
+import mega.privacy.android.shared.resources.R as sharedR
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -10,6 +12,9 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
@@ -57,6 +62,7 @@ import mega.privacy.android.app.presentation.bottomsheet.NodeOptionsBottomSheetD
 import mega.privacy.android.app.presentation.clouddrive.ui.FileBrowserComposeView
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.extensions.isDarkMode
+import mega.privacy.android.app.presentation.hidenode.HiddenNodesOnboardingActivity
 import mega.privacy.android.app.presentation.mapper.GetOptionsForToolbarMapper
 import mega.privacy.android.app.presentation.mapper.OptionsItemInfo
 import mega.privacy.android.app.presentation.node.NodeActionsViewModel
@@ -68,6 +74,7 @@ import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.core.ui.controls.layouts.MegaScaffold
+import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.MoveRequestResult
@@ -76,7 +83,6 @@ import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.usecase.GetThemeMode
-import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.mobile.analytics.event.CloudDriveScreenEvent
 import timber.log.Timber
@@ -126,6 +132,8 @@ class FileBrowserComposeFragment : Fragment() {
     private val nodeActionsViewModel: NodeActionsViewModel by viewModels()
     private val fileBrowserViewModel: FileBrowserViewModel by activityViewModels()
     private val sortByHeaderViewModel: SortByHeaderViewModel by activityViewModels()
+
+    private var tempNodeIds: List<NodeId> = listOf()
 
     /**
      * onAttach
@@ -180,20 +188,18 @@ class FileBrowserComposeFragment : Fragment() {
                             uiState = uiState,
                             emptyState = getEmptyFolderDrawable(uiState.isFileBrowserEmpty),
                             onItemClick = {
-                                coroutineScope.launch {
-                                    if (uiState.selectedNodeHandles.isEmpty()) {
-                                        when (it.node) {
-                                            is TypedFileNode -> clickedFile = it.node
+                                if (uiState.selectedNodeHandles.isEmpty()) {
+                                    when (it.node) {
+                                        is TypedFileNode -> clickedFile = it.node
 
-                                            is TypedFolderNode -> {
-                                                fileBrowserViewModel.onFolderItemClicked(it.id.longValue)
-                                            }
-
-                                            else -> Timber.e("Unsupported click")
+                                        is TypedFolderNode -> {
+                                            fileBrowserViewModel.onFolderItemClicked(it.id.longValue)
                                         }
-                                    } else {
-                                        fileBrowserViewModel.onItemClicked(it)
+
+                                        else -> Timber.e("Unsupported click")
                                     }
+                                } else {
+                                    fileBrowserViewModel.onItemClicked(it)
                                 }
                             },
                             onLongClick = {
@@ -483,7 +489,7 @@ class FileBrowserComposeFragment : Fragment() {
                 fileBrowserViewModel.state.value.selectedNodeHandles.takeUnless { it.isEmpty() }
                     ?: return false
             menu.findItem(R.id.cab_menu_share_link).title =
-                resources.getQuantityString(R.plurals.get_links, selected.size)
+                resources.getQuantityString(sharedR.plurals.label_share_links, selected.size)
             lifecycleScope.launch {
                 val control = getOptionsForToolbarMapper(
                     selectedNodeHandleList = fileBrowserViewModel.state.value.selectedNodeHandles,
@@ -598,9 +604,8 @@ class FileBrowserComposeFragment : Fragment() {
                 }
 
                 OptionItems.HIDE_CLICKED -> {
-                    fileBrowserViewModel.hideOrUnhideNodes(
+                    handleHideNodeClick(
                         nodeIds = it.selectedMegaNode.map { node -> NodeId(node.handle) },
-                        hide = true
                     )
                     disableSelectMode()
                 }
@@ -662,5 +667,63 @@ class FileBrowserComposeFragment : Fragment() {
     private fun disableSelectMode() {
         fileBrowserViewModel.clearAllNodes()
         actionMode?.finish()
+    }
+
+    fun handleHideNodeClick(nodeIds: List<NodeId>) {
+        val (isPaid, isHiddenNodesOnboarded) = with(fileBrowserViewModel.state.value) {
+            (this.accountType?.isPaid ?: false) to this.isHiddenNodesOnboarded
+        }
+
+
+        if (!isPaid) {
+            val intent = HiddenNodesOnboardingActivity.createScreen(
+                context = requireContext(),
+                isOnboarding = false,
+            )
+            hiddenNodesOnboardingLauncher.launch(intent)
+            activity?.overridePendingTransition(0, 0)
+        } else if (isHiddenNodesOnboarded) {
+            fileBrowserViewModel.hideOrUnhideNodes(
+                nodeIds = nodeIds,
+                hide = true,
+            )
+        } else {
+            tempNodeIds = nodeIds
+            showHiddenNodesOnboarding()
+        }
+    }
+
+    private fun showHiddenNodesOnboarding() {
+        fileBrowserViewModel.setHiddenNodesOnboarded()
+
+        val intent = HiddenNodesOnboardingActivity.createScreen(
+            context = requireContext(),
+            isOnboarding = true,
+        )
+        hiddenNodesOnboardingLauncher.launch(intent)
+        activity?.overridePendingTransition(0, 0)
+    }
+
+    private val hiddenNodesOnboardingLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+            ::handleHiddenNodesOnboardingResult,
+        )
+
+    private fun handleHiddenNodesOnboardingResult(result: ActivityResult) {
+        if (result.resultCode != Activity.RESULT_OK) return
+
+        fileBrowserViewModel.hideOrUnhideNodes(
+            nodeIds = tempNodeIds,
+            hide = true,
+        )
+
+        val message =
+            resources.getQuantityString(
+                R.plurals.hidden_nodes_result_message,
+                tempNodeIds.size,
+                tempNodeIds.size,
+            )
+        Util.showSnackbar(requireActivity(), message)
     }
 }

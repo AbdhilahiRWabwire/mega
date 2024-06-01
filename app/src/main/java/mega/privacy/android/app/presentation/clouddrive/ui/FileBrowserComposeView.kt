@@ -2,8 +2,11 @@
 
 package mega.privacy.android.app.presentation.clouddrive.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,12 +28,12 @@ import mega.privacy.android.app.presentation.view.NODES_EMPTY_VIEW_VISIBLE
 import mega.privacy.android.app.presentation.view.NodesView
 import mega.privacy.android.app.presentation.view.OverQuotaView
 import mega.privacy.android.core.ui.controls.banners.WarningBanner
+import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.core.ui.utils.ListGridStateMap
 import mega.privacy.android.core.ui.utils.getState
 import mega.privacy.android.core.ui.utils.sync
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
-import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
 
 /**
@@ -79,7 +82,12 @@ fun FileBrowserComposeView(
         )
     }
 
-    Column(modifier = Modifier.semantics { testTagsAsResourceId = true }) {
+    Column(
+        modifier = Modifier
+            .semantics { testTagsAsResourceId = true }
+            .fillMaxSize()
+            .background(MaterialTheme.colors.background),
+    ) {
         uiState.errorMessage?.let { errorMessage ->
             WarningBanner(textString = stringResource(id = errorMessage), onCloseClick = null)
         }
@@ -111,8 +119,9 @@ fun FileBrowserComposeView(
                         onDisputeTakeDownClicked = onDisputeTakeDownClicked,
                         showMediaDiscoveryButton = uiState.showMediaDiscoveryIcon,
                         onEnterMediaDiscoveryClick = onEnterMediaDiscoveryClick,
-                        listContentPadding = PaddingValues(top = 18.dp),
-                        fileTypeIconMapper = fileTypeIconMapper
+                        listContentPadding = PaddingValues(top = 18.dp, bottom = 86.dp),
+                        fileTypeIconMapper = fileTypeIconMapper,
+                        inSelectionMode = uiState.isInSelection
                     )
                 }
             } else {

@@ -47,9 +47,6 @@ import mega.privacy.android.domain.entity.meeting.ParticipantsSection
  * @property chatIdToOpen                               Chat Id of the chat that should be opened.
  * @property callType                                   [CallType]
  * @property isParticipantSharingScreen                 True, if a participant is sharing the screen. False, if not.
- * @property isSessionOnRecording                       True if a host is recording or False otherwise.
- * @property showRecordingConsentDialog                 True if should show the recording consent dialog or False otherwise.
- * @property isRecordingConsentAccepted                 True if recording consent dialog has been already accepted or False otherwise.
  * @property startOrStopRecordingParticipantName        Name of the [Participant] who has started/stopped the recording.
  * @property isNecessaryToUpdateCall                    True, it is necessary to update call. False, it's not necessary.
  * @property isScheduledMeeting                         True, if it is a scheduled meeting. False, if not.
@@ -98,10 +95,6 @@ data class MeetingState(
     val chatIdToOpen: Long = -1L,
     val callType: CallType = CallType.OneToOne,
     val isParticipantSharingScreen: Boolean = false,
-    val isSessionOnRecording: Boolean = false,
-    val showRecordingConsentDialog: Boolean = false,
-    val isRecordingConsentAccepted: Boolean = false,
-    val startOrStopRecordingParticipantName: String? = null,
     val isNecessaryToUpdateCall: Boolean = false,
     val isScheduledMeeting: Boolean = false,
     val myFullName: String = "",
@@ -116,8 +109,9 @@ data class MeetingState(
     val isCallUnlimitedProPlanFeatureFlagEnabled: Boolean = false,
     val callEndedDueToFreePlanLimits: Boolean = false,
     val action: String? = null,
-    val currentCall: ChatCall? = null
+    val currentCall: ChatCall? = null,
 ) {
+
     /**
      * Check if waiting room is opened
      */
@@ -181,67 +175,38 @@ data class MeetingState(
                 (participantsSection == ParticipantsSection.WaitingRoomSection && chatParticipantsInWaitingRoom.isNotEmpty())
 
     /**
-     * Get the users limit
+     * Check if the section is right
      */
-    private val callUsersLimit
-        get() = currentCall?.callUsersLimit
+    fun isRightSection(): Boolean =
+        ((participantsSection == ParticipantsSection.WaitingRoomSection &&
+                shouldWaitingRoomListBeShown &&
+                chatParticipantsInWaitingRoom.isNotEmpty()) ||
+                (participantsSection == ParticipantsSection.InCallSection &&
+                        shouldInCallListBeShown &&
+                        chatParticipantsInCall.isNotEmpty()) ||
+                (participantsSection == ParticipantsSection.NotInCallSection &&
+                        shouldNotInCallListBeShown &&
+                        chatParticipantsNotInCall.isNotEmpty())
+                )
 
     /**
-     * Check if participants in the call is equal o more than the limit
+     * Check if see all should be shown
      */
-    fun isUsersLimitInCallReached(): Boolean {
-        callUsersLimit?.let { limit ->
-            return chatParticipantsInCall.size >= limit
-        }
-
-        return false
-    }
-
-    /**
-     * Check if participants in the call and in the WR is more than the limit
-     */
-    private fun isUsersLimitInCallAndInWRReached(): Boolean {
-        callUsersLimit?.let { limit ->
-            return (chatParticipantsInCall.size + chatParticipantsInWaitingRoom.size) >= limit
-        }
-
-        return false
-    }
-
-    /**
-     * Check if user limit warning dialog should be shown
-     */
-    val showUserLimitWarningDialog
-        get() = isCallUnlimitedProPlanFeatureFlagEnabled &&
-                hasHostPermission() &&
-                chatParticipantsInWaitingRoom.isNotEmpty() &&
-                participantsSection == ParticipantsSection.WaitingRoomSection &&
-                (isUsersLimitInCallReached() || isUsersLimitInCallAndInWRReached())
-
-
-    /**
-     * Check if admit all participants should be disabled
-     */
-    val isAdmitAllButtonDisabled
-        get() = isCallUnlimitedProPlanFeatureFlagEnabled &&
-                hasHostPermission() &&
-                chatParticipantsInWaitingRoom.isNotEmpty() &&
-                participantsSection == ParticipantsSection.WaitingRoomSection &&
-                (isUsersLimitInCallReached() || isUsersLimitInCallAndInWRReached())
-
-    /**
-     * Check if admit all participants should be disabled
-     */
-    val isAllowNonHostAddParticipantsButtonDisabled
-        get() = isCallUnlimitedProPlanFeatureFlagEnabled &&
-                hasHostPermission() &&
-                participantsSection == ParticipantsSection.InCallSection &&
-                isUsersLimitInCallReached()
+    val showSeeAllButton
+        get() = ((participantsSection == ParticipantsSection.WaitingRoomSection && shouldWaitingRoomSectionBeShown() && chatParticipantsInWaitingRoom.size > MAX_PARTICIPANTS_IN_BOTTOM_PANEL) ||
+                (participantsSection == ParticipantsSection.InCallSection && chatParticipantsInCall.size > MAX_PARTICIPANTS_IN_BOTTOM_PANEL) ||
+                (participantsSection == ParticipantsSection.NotInCallSection && chatParticipantsNotInCall.size > MAX_PARTICIPANTS_IN_BOTTOM_PANEL))
 
     companion object {
         /**
          * Free plan participants limit
          */
         const val FREE_PLAN_PARTICIPANTS_LIMIT = 100
+
+        /**
+         * Max participants in bottom panel
+         */
+        const val MAX_PARTICIPANTS_IN_BOTTOM_PANEL = 4
+
     }
 }

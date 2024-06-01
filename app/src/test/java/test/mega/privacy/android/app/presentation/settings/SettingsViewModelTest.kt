@@ -21,8 +21,6 @@ import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.preference.StartScreen
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.SettingNotFoundException
-import mega.privacy.android.domain.usecase.AreChatLogsEnabled
-import mega.privacy.android.domain.usecase.AreSdkLogsEnabled
 import mega.privacy.android.domain.usecase.GetAccountDetailsUseCase
 import mega.privacy.android.domain.usecase.IsChatLoggedIn
 import mega.privacy.android.domain.usecase.IsMultiFactorAuthAvailable
@@ -37,6 +35,8 @@ import mega.privacy.android.domain.usecase.account.IsMultiFactorAuthEnabledUseCa
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsEnabledUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.domain.usecase.logging.AreChatLogsEnabledUseCase
+import mega.privacy.android.domain.usecase.logging.AreSdkLogsEnabledUseCase
 import mega.privacy.android.domain.usecase.login.GetSessionTransferURLUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorHideRecentActivityUseCase
@@ -84,8 +84,8 @@ class SettingsViewModelTest {
     private val monitorConnectivityUseCase = mock<MonitorConnectivityUseCase>()
     private val monitorStartScreenPreference = mock<MonitorStartScreenPreference>()
     private val isMultiFactorAuthAvailable = mock<IsMultiFactorAuthAvailable>()
-    private val areSdkLogsEnabled = mock<AreSdkLogsEnabled>()
-    private val areChatLogsEnabled = mock<AreChatLogsEnabled>()
+    private val areSdkLogsEnabledUseCase = mock<AreSdkLogsEnabledUseCase>()
+    private val areChatLogsEnabledUseCase = mock<AreChatLogsEnabledUseCase>()
     private val isCameraUploadsEnabledUseCase = mock<IsCameraUploadsEnabledUseCase>()
     private val setSubFolderMediaDiscoveryEnabledUseCase =
         mock<SetSubFolderMediaDiscoveryEnabledUseCase>()
@@ -142,9 +142,9 @@ class SettingsViewModelTest {
 
         isMultiFactorAuthAvailable.stub { on { invoke() }.thenReturn(true) }
 
-        areSdkLogsEnabled.stub { on { invoke() }.thenReturn(emptyFlow()) }
+        areSdkLogsEnabledUseCase.stub { on { invoke() }.thenReturn(emptyFlow()) }
 
-        areChatLogsEnabled.stub { on { invoke() }.thenReturn(emptyFlow()) }
+        areChatLogsEnabledUseCase.stub { on { invoke() }.thenReturn(emptyFlow()) }
 
         isCameraUploadsEnabledUseCase.stub { onBlocking { invoke() }.thenReturn(false) }
 
@@ -163,8 +163,8 @@ class SettingsViewModelTest {
             getAccountDetailsUseCase = getAccountDetailsUseCase,
             canDeleteAccount = mock { on { invoke(TEST_USER_ACCOUNT) }.thenReturn(true) },
             refreshPasscodeLockPreference = refreshPasscodeLockPreference,
-            areSdkLogsEnabled = areSdkLogsEnabled,
-            areChatLogsEnabled = areChatLogsEnabled,
+            areSdkLogsEnabledUseCase = areSdkLogsEnabledUseCase,
+            areChatLogsEnabledUseCase = areChatLogsEnabledUseCase,
             isCameraUploadsEnabledUseCase = isCameraUploadsEnabledUseCase,
             rootNodeExistsUseCase = mock { on { runBlocking { invoke() } }.thenReturn(true) },
             isMultiFactorAuthAvailable = isMultiFactorAuthAvailable,
@@ -214,6 +214,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `test that the subsequent value auto accept is returned from the use case`() = runTest {
+        whenever(monitorPasscodeLockPreferenceUseCase()).thenReturn(emptyFlow())
         isMultiFactorAuthEnabledUseCase.stub {
             onBlocking { invoke() }.thenReturn(false)
             monitorAutoAcceptQRLinks.stub {
@@ -470,10 +471,6 @@ class SettingsViewModelTest {
     @Test
     internal fun `test that passcodeLock is set with values returned from monitorPasscodeLockPreferenceUseCase`() =
         runTest {
-            getFeatureFlagValueUseCase.stub {
-                onBlocking { invoke(AppFeatures.PasscodeBackend) }.thenReturn(true)
-            }
-
             monitorPasscodeLockPreferenceUseCase.stub {
                 on { invoke() }.thenReturn(
                     flow {

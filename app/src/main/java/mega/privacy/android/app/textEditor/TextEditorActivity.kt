@@ -1,8 +1,10 @@
 package mega.privacy.android.app.textEditor
 
+import mega.privacy.android.shared.resources.R as sharedR
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Bundle
@@ -15,9 +17,13 @@ import android.provider.Settings.System.getFloat
 import android.util.TypedValue.COMPLEX_UNIT_PX
 import android.view.Menu
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.ViewPropertyAnimator
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -42,6 +48,7 @@ import mega.privacy.android.app.interfaces.SnackbarShower
 import mega.privacy.android.app.interfaces.showSnackbar
 import mega.privacy.android.app.main.FileExplorerActivity
 import mega.privacy.android.app.main.controllers.ChatController
+import mega.privacy.android.app.presentation.hidenode.HiddenNodesOnboardingActivity
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.createStartTransferView
 import mega.privacy.android.app.textEditor.TextEditorViewModel.Companion.VIEW_MODE
 import mega.privacy.android.app.usecase.exception.MegaException
@@ -78,6 +85,7 @@ import mega.privacy.android.app.utils.MegaNodeUtil.selectFolderToCopy
 import mega.privacy.android.app.utils.MegaNodeUtil.selectFolderToMove
 import mega.privacy.android.app.utils.MenuUtils.toggleAllMenuItemsVisibility
 import mega.privacy.android.app.utils.RunOnUIThreadUtils
+import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.Util.isDarkMode
 import mega.privacy.android.app.utils.Util.isOnline
 import mega.privacy.android.app.utils.Util.showKeyboardDelayed
@@ -121,6 +129,7 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
     private var animator: ViewPropertyAnimator? = null
     private var countDownTimer: CountDownTimer? = null
     private var isHiddenNodesEnabled: Boolean = false
+    private var tempNodeId: NodeId? = null
 
     @Inject
     lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
@@ -146,6 +155,11 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
                 binding.contentEditText.hideKeyboard()
                 showDiscardChangesConfirmationDialog()
             } else {
+                if (viewModel.isEditMode()) {
+                    viewModel.setViewMode()
+                    return
+                }
+
                 if (viewModel.isCreateMode()) {
                     viewModel.saveFile(
                         this@TextEditorActivity,
@@ -295,26 +309,12 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
 
             R.id.action_rename -> renameNode()
             R.id.action_hide -> {
-                val node = viewModel.getNode()!!
-                viewModel.hideOrUnhideNode(
-                    nodeId = NodeId(node.handle),
-                    hide = true,
-                )
-
-                RunOnUIThreadUtils.runDelay(500L) {
-                    menu?.findItem(R.id.action_hide)?.apply {
-                        isVisible = false
-                    }
-                    menu?.findItem(R.id.action_unhide)?.apply {
-                        isVisible = true
-                    }
-                }
+                handleHideNodeClick(handle = viewModel.getNode()?.handle ?: 0)
             }
 
             R.id.action_unhide -> {
-                val node = viewModel.getNode()!!
                 viewModel.hideOrUnhideNode(
-                    nodeId = NodeId(node.handle),
+                    nodeId = NodeId(viewModel.getNode()?.handle ?: 0),
                     hide = false,
                 )
 
@@ -405,7 +405,7 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
         this.menu = menu
 
         menu.findItem(R.id.action_get_link)?.title =
-            resources.getQuantityString(R.plurals.get_links, 1)
+            resources.getQuantityString(sharedR.plurals.label_share_links, 1)
 
         refreshMenuOptionsVisibility()
 
@@ -584,6 +584,7 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
      *
      * @param savedInstanceState Saved state if available.
      */
+    @SuppressLint("ClickableViewAccessibility")
     private fun setUpView(savedInstanceState: Bundle?) {
         binding.contentEditText.apply {
             doAfterTextChanged { editable ->
@@ -652,6 +653,13 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
             checkScroll()
             hideUI()
             animatePaginationUI()
+        }
+
+        binding.fileEditorScrollView.setOnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_UP) {
+                animateUI()
+            }
+            false
         }
     }
 
@@ -898,7 +906,7 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
         if (isFinishing || animator != null) {
             return
         }
-
+        Timber.d("animateUI $currentUIState")
         if (currentUIState == STATE_SHOWN) {
             currentUIState = STATE_HIDDEN
             binding.editFab.hide()
@@ -1091,5 +1099,67 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
     private fun showFatalErrorWarningAndFinish() {
         showSnackbar(getString(R.string.error_temporary_unavaible))
         Handler(Looper.getMainLooper()).postDelayed({ finish() }, LONG_SNACKBAR_DURATION)
+    }
+
+    private fun handleHideNodeClick(handle: Long) {
+        val (isPaid, isHiddenNodesOnboarded) = with(viewModel.uiState.value) {
+            (this.accountType?.isPaid ?: false) to this.isHiddenNodesOnboarded
+        }
+
+        if (!isPaid) {
+            val intent = HiddenNodesOnboardingActivity.createScreen(
+                context = this,
+                isOnboarding = false,
+            )
+            hiddenNodesOnboardingLauncher.launch(intent)
+            this.overridePendingTransition(0, 0)
+        } else if (isHiddenNodesOnboarded) {
+            viewModel.hideOrUnhideNode(
+                nodeId = NodeId(handle),
+                hide = true,
+            )
+        } else {
+            tempNodeId = NodeId(longValue = handle)
+            showHiddenNodesOnboarding()
+        }
+    }
+
+    private fun showHiddenNodesOnboarding() {
+        viewModel.setHiddenNodesOnboarded()
+
+        val intent = HiddenNodesOnboardingActivity.createScreen(
+            context = this,
+            isOnboarding = true,
+        )
+        hiddenNodesOnboardingLauncher.launch(intent)
+        this.overridePendingTransition(0, 0)
+    }
+
+    private val hiddenNodesOnboardingLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+            ::handleHiddenNodesOnboardingResult,
+        )
+
+    private fun handleHiddenNodesOnboardingResult(result: ActivityResult) {
+        if (result.resultCode != Activity.RESULT_OK) return
+
+        viewModel.hideOrUnhideNode(
+            nodeId = NodeId(tempNodeId?.longValue ?: 0),
+            hide = true,
+        )
+
+        val message =
+            resources.getQuantityString(
+                R.plurals.hidden_nodes_result_message,
+                1,
+                1,
+            )
+        Util.showSnackbar(this, message)
+
+        RunOnUIThreadUtils.runDelay(500L) {
+            menu?.findItem(R.id.pdf_viewer_hide)?.isVisible = false
+            menu?.findItem(R.id.pdf_viewer_unhide)?.isVisible = true
+        }
     }
 }

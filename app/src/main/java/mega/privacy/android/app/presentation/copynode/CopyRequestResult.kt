@@ -1,5 +1,7 @@
 package mega.privacy.android.app.presentation.copynode
 
+import mega.privacy.android.domain.entity.node.MoveRequestResult
+
 /**
  * Data class containing all the info related to a copy request.
  *
@@ -30,3 +32,24 @@ data class CopyRequestResult(
      */
     val isAllRequestSuccess: Boolean = errorCount == 0
 }
+
+
+/**
+ * A temporary extension function to map a [MoveRequestResult] to a [CopyRequestResult]
+ * @return [CopyRequestResult]
+ */
+fun MoveRequestResult.toCopyRequestResult() = CopyRequestResult(count, errorCount)
+
+/**
+ * A temporary data class to represent the state of a copy request
+ *
+ * Should be removed when [mega.privacy.android.app.main.megachat.NodeAttachmentHistoryActivity]
+ * and [mega.privacy.android.app.main.megachat.ChatActivity] Java classes are converted to Kotlin
+ *
+ * @property result [CopyRequestResult] The result of the copy request
+ * @property error [CopyRequestResult] When copy request throws exception
+ */
+data class CopyRequestState(
+    val result: CopyRequestResult? = null,
+    val error: Throwable? = null,
+)

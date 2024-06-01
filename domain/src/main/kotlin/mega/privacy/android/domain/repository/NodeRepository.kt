@@ -432,6 +432,14 @@ interface NodeRepository {
     suspend fun getParentNode(nodeId: NodeId): UnTypedNode?
 
     /**
+     * Get the root parent node of a Node
+     *
+     * @param nodeId [NodeId]
+     * @return the root parent node of the node
+     */
+    suspend fun getRootParentNode(nodeId: NodeId): UnTypedNode?
+
+    /**
      * Get [UnTypedNode] by original fingerprint
      * @param originalFingerprint
      * @param parentNodeId NodeId
@@ -760,4 +768,13 @@ interface NodeRepository {
      * @param node the folder node to check
      */
     suspend fun isEmptyFolder(node: TypedNode): Boolean
+
+    /**
+     * Set description for a node
+     *
+     * to remove description of a node we need to pass null as description
+     * @param nodeHandle [NodeId]
+     * @param description [String]
+     */
+    suspend fun setNodeDescription(nodeHandle: NodeId, description: String?)
 }

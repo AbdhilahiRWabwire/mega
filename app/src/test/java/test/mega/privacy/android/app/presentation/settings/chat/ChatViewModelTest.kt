@@ -19,13 +19,13 @@ import mega.privacy.android.data.gateway.DeviceGateway
 import mega.privacy.android.domain.entity.chat.RichLinkConfig
 import mega.privacy.android.domain.entity.contacts.ContactLink
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
-import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.chat.BroadcastChatArchivedUseCase
 import mega.privacy.android.domain.usecase.chat.EndCallUseCase
 import mega.privacy.android.domain.usecase.chat.LeaveChatUseCase
 import mega.privacy.android.domain.usecase.chat.LoadPendingMessagesUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatArchivedUseCase
+import mega.privacy.android.domain.usecase.chat.MonitorChatRoomUpdatesUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorJoinedSuccessfullyUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorLeaveChatUseCase
 import mega.privacy.android.domain.usecase.chat.link.MonitorRichLinkPreviewConfigUseCase
@@ -34,12 +34,10 @@ import mega.privacy.android.domain.usecase.contact.GetContactLinkUseCase
 import mega.privacy.android.domain.usecase.contact.IsContactRequestSentUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.BroadcastCallRecordingConsentEventUseCase
 import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorCallEndedUseCase
-import mega.privacy.android.domain.usecase.meeting.MonitorCallRecordingConsentEventUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorScheduledMeetingUpdatesUseCase
@@ -97,7 +95,7 @@ class ChatViewModelTest {
     private val monitorLeaveChatUseCase = mock<MonitorLeaveChatUseCase>()
     private val monitorScheduledMeetingUpdatesUseCase =
         mock<MonitorScheduledMeetingUpdatesUseCase>()
-    private val monitorChatRoomUpdates = mock<MonitorChatRoomUpdates>()
+    private val monitorChatRoomUpdatesUseCase = mock<MonitorChatRoomUpdatesUseCase>()
     private val startMeetingInWaitingRoomChatUseCase = mock<StartMeetingInWaitingRoomChatUseCase>()
     private val leaveChatUseCase = mock<LeaveChatUseCase>()
     private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase>()
@@ -105,10 +103,6 @@ class ChatViewModelTest {
     private val monitorPausedTransfersUseCase = mock<MonitorPausedTransfersUseCase>()
     private val monitorChatSessionUpdatesUseCase = mock<MonitorChatSessionUpdatesUseCase>()
     private val hangChatCallUseCase = mock<HangChatCallUseCase>()
-    private val broadcastCallRecordingConsentEventUseCase =
-        mock<BroadcastCallRecordingConsentEventUseCase>()
-    private val monitorCallRecordingConsentEventUseCase =
-        mock<MonitorCallRecordingConsentEventUseCase>()
     private val monitorCallEndedUseCase = mock<MonitorCallEndedUseCase>()
     private val monitorRichLinkPreviewConfigUseCase = mock<MonitorRichLinkPreviewConfigUseCase> {
         on { invoke() } doReturn emptyFlow()
@@ -141,7 +135,6 @@ class ChatViewModelTest {
             leaveChatUseCase,
             getFeatureFlagValueUseCase,
             hangChatCallUseCase,
-            broadcastCallRecordingConsentEventUseCase,
             setRichLinkWarningCounterUseCase
         )
         wheneverBlocking { monitorPausedTransfersUseCase() }.thenReturn(emptyFlow())
@@ -150,10 +143,9 @@ class ChatViewModelTest {
         wheneverBlocking { monitorJoinedSuccessfullyUseCase() }.thenReturn(flowOf(true))
         wheneverBlocking { monitorLeaveChatUseCase() }.thenReturn(flowOf(1234L))
         wheneverBlocking { monitorScheduledMeetingUpdatesUseCase() }.thenReturn(flowOf())
-        wheneverBlocking { monitorChatRoomUpdates(any()) }.thenReturn(flowOf())
+        wheneverBlocking { monitorChatRoomUpdatesUseCase(any()) }.thenReturn(flowOf())
         wheneverBlocking { loadPendingMessagesUseCase(any()) }.thenReturn(flowOf())
         wheneverBlocking { monitorChatSessionUpdatesUseCase() }.thenReturn(emptyFlow())
-        wheneverBlocking { monitorCallRecordingConsentEventUseCase() }.thenReturn(emptyFlow())
         wheneverBlocking { monitorCallEndedUseCase() }.thenReturn(emptyFlow())
         wheneverBlocking { monitorRichLinkPreviewConfigUseCase() }.thenReturn(emptyFlow())
         initTestClass()
@@ -188,14 +180,12 @@ class ChatViewModelTest {
             getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             loadPendingMessagesUseCase = loadPendingMessagesUseCase,
             monitorScheduledMeetingUpdates = monitorScheduledMeetingUpdatesUseCase,
-            monitorChatRoomUpdates = monitorChatRoomUpdates,
+            monitorChatRoomUpdatesUseCase = monitorChatRoomUpdatesUseCase,
             startMeetingInWaitingRoomChatUseCase = startMeetingInWaitingRoomChatUseCase,
             isConnectedToInternetUseCase = isConnectedToInternetUseCase,
             monitorPausedTransfersUseCase = monitorPausedTransfersUseCase,
             monitorChatSessionUpdatesUseCase = monitorChatSessionUpdatesUseCase,
             hangChatCallUseCase = hangChatCallUseCase,
-            broadcastCallRecordingConsentEventUseCase = broadcastCallRecordingConsentEventUseCase,
-            monitorCallRecordingConsentEventUseCase = monitorCallRecordingConsentEventUseCase,
             monitorCallEndedUseCase = monitorCallEndedUseCase,
             monitorRichLinkPreviewConfigUseCase = monitorRichLinkPreviewConfigUseCase,
             setRichLinkWarningCounterUseCase = setRichLinkWarningCounterUseCase

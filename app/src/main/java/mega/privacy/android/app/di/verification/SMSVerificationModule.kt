@@ -10,15 +10,11 @@ import mega.privacy.android.app.presentation.verification.model.mapper.SMSVerifi
 import mega.privacy.android.app.presentation.verification.model.mapper.SmsVerificationTextErrorMapper
 import mega.privacy.android.app.presentation.verification.model.mapper.SmsVerificationTextErrorMapperImpl
 import mega.privacy.android.domain.repository.VerificationRepository
-import mega.privacy.android.domain.usecase.GetCountryCallingCodes
 import mega.privacy.android.domain.usecase.IsSMSVerificationShown
-import mega.privacy.android.domain.usecase.SetSMSVerificationShown
 import mega.privacy.android.domain.usecase.verification.DefaultMonitorVerificationStatus
 import mega.privacy.android.domain.usecase.verification.DefaultMonitorVerifiedPhoneNumber
 import mega.privacy.android.domain.usecase.verification.MonitorVerificationStatus
 import mega.privacy.android.domain.usecase.verification.MonitorVerifiedPhoneNumber
-import mega.privacy.android.domain.usecase.verification.ResetSMSVerifiedPhoneNumber
-import mega.privacy.android.domain.usecase.verification.SendSMSVerificationCode
 import mega.privacy.android.domain.usecase.verification.VerifyPhoneNumber
 
 /**
@@ -54,39 +50,11 @@ abstract class SMSVerificationModule {
 
     companion object {
         /**
-         * Provides the Use Case [SetSMSVerificationShown]
-         */
-        @Provides
-        fun provideSetSMSVerificationShown(repository: VerificationRepository): SetSMSVerificationShown =
-            SetSMSVerificationShown(repository::setSMSVerificationShown)
-
-        /**
          * Provides the Use Case [IsSMSVerificationShown]
          */
         @Provides
         fun provideIsSMSVerificationShown(repository: VerificationRepository): IsSMSVerificationShown =
             IsSMSVerificationShown(repository::isSMSVerificationShown)
-
-        /**
-         * Provides the Use Case [GetCountryCallingCodes]
-         */
-        @Provides
-        fun provideGetCountryCallingCodes(repository: VerificationRepository): GetCountryCallingCodes =
-            GetCountryCallingCodes(repository::getCountryCallingCodes)
-
-        /**
-         * Provides the Use Case [SendSMSVerificationCode]
-         */
-        @Provides
-        fun provideSendSMSVerificationCode(repository: VerificationRepository): SendSMSVerificationCode =
-            SendSMSVerificationCode(repository::sendSMSVerificationCode)
-
-        /**
-         * Provides the Use Case [ResetSMSVerifiedPhoneNumber]
-         */
-        @Provides
-        fun provideResetSMSVerifiedPhoneNumber(repository: VerificationRepository): ResetSMSVerifiedPhoneNumber =
-            ResetSMSVerifiedPhoneNumber(repository::resetSMSVerifiedPhoneNumber)
 
         /**
          * Provides the use case [VerifyPhoneNumber]

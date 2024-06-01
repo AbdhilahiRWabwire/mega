@@ -64,31 +64,13 @@ enum class AppFeatures(override val description: String, private val defaultValu
         true,
     ),
 
-
     /**
-     * Enables new incoming shares compose page
+     * Shows the "Upload only while charging" Option in the refactored Settings Camera Uploads screen
      */
-    IncomingSharesCompose(
-        "Enable new Incoming Shares Compose page (requires app restart)",
-        true
-    ),
-
-
-    /**
-     * Enables new outgoing shares compose page
-     */
-    OutgoingSharesCompose(
-        "Enable new Outgoing Shares Compose page (requires app restart)",
-        true
-    ),
-
-
-    /**
-     * Enables new links compose page
-     */
-    LinksCompose(
-        "Enable new Shared Links Compose page (requires app restart)",
-        true
+    SettingsCameraUploadsUploadWhileCharging(
+        description = "Shows the Upload only while charging Option in the refactored Settings Camera " +
+                "Uploads screen.",
+        defaultValue = false,
     ),
 
     /**
@@ -113,22 +95,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     PrefetchTimeline(
         "Enables prefetch timeline photos as soon initialization screen completed",
         false,
-    ),
-
-    /**
-     * Enables the new compose passcode backend implementation
-     */
-    PasscodeBackend(
-        "Enables the new compose passcode backend implementation",
-        true,
-    ),
-
-    /**
-     * Enables the new compose passcode implementation
-     */
-    Passcode(
-        "Enables the new compose passcode implementation",
-        true,
     ),
 
     /**
@@ -176,14 +142,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     PhotosCompose(
         "Enable compose-world photos feature (modularization)",
-        false
-    ),
-
-    /**
-     * Android Sync toggle
-     */
-    AndroidSync(
-        "Enable a synchronization between folders on local storage and folders on MEGA cloud",
         false
     ),
 
@@ -238,6 +196,30 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     ShowStringsForNewFeatures(
         "Show strings for new features (meetings and VPN)",
+        false
+    ),
+
+    /**
+     * To enable the new add and manage description feature to node
+     */
+    NodeWithDescription(
+        "Enable node with description",
+        false
+    ),
+
+    /**
+     * To enable the new cancel subscription feature
+     */
+    CancelSubscription(
+        "Enable cancel subscription feature",
+        false
+    ),
+
+    /**
+     * Enables new manage chat history compose page
+     */
+    NewManageChatHistoryActivity(
+        "Enable new manage chat history activity",
         false
     );
 

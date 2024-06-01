@@ -121,34 +121,6 @@ internal class LinksViewModelTest {
     }
 
     @Test
-    internal fun `test that calling onItemClicked with folder node returns the children`() =
-        runTest {
-            val publicLinkNodes = listOf<PublicLinkFolder>(mock())
-            val flow = flow {
-                emit(publicLinkNodes)
-                awaitCancellation()
-            }
-            val parentNode = mock<PublicLinkFolder> {
-                on { id }.thenReturn(NodeId(12))
-                on { children }.thenReturn(flow)
-            }
-
-            underTest.onItemClicked(
-                NodeUIItem(
-                    parentNode,
-                    isSelected = true,
-                    isInvisible = false
-                )
-            )
-
-            underTest.state.test {
-                val expected = awaitItem()
-                assertThat(expected.parentNode?.id).isEqualTo(NodeId(12))
-                assertThat(expected.nodesList).hasSize(1)
-            }
-        }
-
-    @Test
     fun `test that calling openFolderByHandle opens the folder`() = runTest {
         val childLinkNodes = listOf<PublicLinkFolder>(mock())
         val flow = flow {
@@ -173,27 +145,18 @@ internal class LinksViewModelTest {
     @Test
     internal fun `test that updates from the root are ignored while children are displayed`() =
         runTest {
-            val publicLinkNodes = listOf<PublicLinkFolder>(mock())
+            val childLinkNodes = listOf<PublicLinkFolder>(mock())
             val flow = flow {
-                emit(publicLinkNodes)
+                emit(childLinkNodes)
                 awaitCancellation()
             }
-            val parentNode = mock<PublicLinkFolder> {
+            val publicLinkNodes = listOf<PublicLinkFolder>(mock {
+                on { id }.thenReturn(NodeId(12))
                 on { children }.thenReturn(flow)
-            }
+            })
 
-            monitorLinksChannel.send(emptyList())
-            underTest.state.test {
-                assertThat(awaitItem().nodesList).isEmpty()
-            }
-
-            underTest.onItemClicked(
-                NodeUIItem(
-                    parentNode,
-                    isSelected = true,
-                    isInvisible = false
-                )
-            )
+            monitorLinksChannel.send(publicLinkNodes)
+            underTest.openFolderByHandle(12)
 
             underTest.state.test {
                 val expected = awaitItem()
@@ -206,30 +169,19 @@ internal class LinksViewModelTest {
     @Test
     internal fun `test that calling performBackNavigation returns the children of the parent folder`() =
         runTest {
-            val publicLinkNodes = listOf<PublicLinkFolder>(mock())
+            val childLinkNodes = listOf<PublicLinkFolder>(mock())
             val flow = flow {
-                emit(publicLinkNodes)
+                emit(childLinkNodes)
                 awaitCancellation()
             }
-            val parentNode = mock<PublicLinkFolder> {
-                on { parent }.thenReturn(null)
-                on { children }.thenReturn(flow)
+            val publicLinkNodes = listOf<PublicLinkFolder>(mock {
                 on { id }.thenReturn(NodeId(12))
-                on { node }.thenReturn(mock())
-            }
+                on { children }.thenReturn(flow)
+            })
 
-            val currentFolder = mock<PublicLinkFolder> {
-                on { parent }.thenReturn(parentNode)
-                on { children }.thenReturn(emptyFlow())
-            }
+            monitorLinksChannel.send(publicLinkNodes)
+            underTest.openFolderByHandle(12)
 
-            underTest.onItemClicked(
-                NodeUIItem(
-                    currentFolder,
-                    isSelected = true,
-                    isInvisible = false
-                )
-            )
             underTest.state.test {
                 assertThat(awaitItem()).isInstanceOf(LinksUiState::class.java)
             }
@@ -434,4 +386,42 @@ internal class LinksViewModelTest {
         underTest.onOptionItemClicked(menuItem)
     }
 
+    @Test
+    fun `test that download event is updated when on available offline option click is invoked`() =
+        runTest {
+            val triggered = TransferTriggerEvent.StartDownloadForOffline(node = mock())
+            underTest.onDownloadFileTriggered(triggered)
+            underTest.state.test {
+                val state = awaitItem()
+                assertThat(state.downloadEvent).isInstanceOf(StateEventWithContentTriggered::class.java)
+                assertThat((state.downloadEvent as StateEventWithContentTriggered).content)
+                    .isInstanceOf(TransferTriggerEvent.StartDownloadForOffline::class.java)
+            }
+        }
+
+    @Test
+    fun `test that download event is updated when on download option click is invoked`() =
+        runTest {
+            val triggered = TransferTriggerEvent.StartDownloadNode(nodes = listOf(mock()))
+            underTest.onDownloadFileTriggered(triggered)
+            underTest.state.test {
+                val state = awaitItem()
+                assertThat(state.downloadEvent).isInstanceOf(StateEventWithContentTriggered::class.java)
+                assertThat((state.downloadEvent as StateEventWithContentTriggered).content)
+                    .isInstanceOf(TransferTriggerEvent.StartDownloadNode::class.java)
+            }
+        }
+
+    @Test
+    fun `test that download event is updated when on download for preview option click is invoked`() =
+        runTest {
+            val triggered = TransferTriggerEvent.StartDownloadForPreview(node = mock())
+            underTest.onDownloadFileTriggered(triggered)
+            underTest.state.test {
+                val state = awaitItem()
+                assertThat(state.downloadEvent).isInstanceOf(StateEventWithContentTriggered::class.java)
+                assertThat((state.downloadEvent as StateEventWithContentTriggered).content)
+                    .isInstanceOf(TransferTriggerEvent.StartDownloadForPreview::class.java)
+            }
+        }
 }

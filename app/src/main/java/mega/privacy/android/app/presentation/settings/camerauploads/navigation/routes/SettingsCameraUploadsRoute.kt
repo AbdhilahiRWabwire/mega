@@ -23,6 +23,7 @@ internal fun SettingsCameraUploadsRoute(
         onCameraUploadsStateChanged = viewModel::onCameraUploadsStateChanged,
         onCameraUploadsProcessStarted = viewModel::onCameraUploadsProcessStarted,
         onChargingDuringVideoCompressionStateChanged = viewModel::onChargingDuringVideoCompressionStateChanged,
+        onChargingWhenUploadingContentStateChanged = viewModel::onChargingWhenUploadingContentStateChanged,
         onHowToUploadPromptOptionSelected = viewModel::onHowToUploadPromptOptionSelected,
         onIncludeLocationTagsStateChanged = viewModel::onIncludeLocationTagsStateChanged,
         onKeepFileNamesStateChanged = viewModel::onKeepFileNamesStateChanged,
@@ -35,6 +36,7 @@ internal fun SettingsCameraUploadsRoute(
         onRegularBusinessAccountSubUserPromptAcknowledged = viewModel::onRegularBusinessAccountSubUserPromptAcknowledged,
         onRequestPermissionsStateChanged = viewModel::onRequestPermissionsStateChanged,
         onSecondaryFolderNodeSelected = viewModel::onSecondaryFolderNodeSelected,
+        onSnackbarMessageConsumed = viewModel::onSnackbarMessageConsumed,
         onUploadOptionUiItemSelected = viewModel::onUploadOptionUiItemSelected,
         onVideoQualityUiItemSelected = viewModel::onVideoQualityUiItemSelected,
     )

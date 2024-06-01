@@ -36,6 +36,7 @@ plugins {
     id("com.google.firebase.crashlytics")
     id("com.google.firebase.firebase-perf")
     id("androidx.baselineprofile")
+    alias(convention.plugins.mega.android.test)
 }
 
 configurations {
@@ -241,12 +242,6 @@ android {
         freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
     }
 
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-        }
-    }
-
     flavorDimensions += "service"
     productFlavors {
         create("gms") {
@@ -288,10 +283,6 @@ project.extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
     }
 }
 
-tasks.withType<Test> {
-    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).takeIf { it > 0 } ?: 1
-}
-
 applyTestLiteForTasks()
 
 dependencies {
@@ -304,6 +295,7 @@ dependencies {
     implementation(project(":data"))
     implementation(project(":navigation"))
     implementation("androidx.profileinstaller:profileinstaller:1.3.1")
+    implementation(project(":shared:sync"))
     "baselineProfile"(project(":baselineprofile"))
     implementation(project(":liveeventbus-x"))
     implementation(project(":analytics"))
@@ -380,16 +372,17 @@ dependencies {
     implementation(google.accompanist.systemui)
 
     // Google GMS
-    "gmsImplementation"(lib.billing.client.ktx)
-    "gmsImplementation"(google.services.location)
-    "gmsImplementation"(google.services.maps)
-    "gmsImplementation"(google.maps.utils)
-    "gmsImplementation"(google.code.scanner)
-    "gmsImplementation"(google.install.referrer)
+    implementation(lib.billing.client.ktx)
+    implementation(google.services.location)
+    implementation(google.services.maps)
+    implementation(google.maps.utils)
+    implementation(google.code.scanner)
+    implementation(google.install.referrer)
 
     // Firebase
-    "gmsImplementation"(platform(google.firebase.bom))
-    "gmsImplementation"(google.bundles.firebase.bom)
+    implementation(platform(google.firebase.bom))
+    implementation(google.bundles.firebase.bom)
+    implementation(google.firebase.analytics)
 
     // Play Core
     implementation(google.play.core)

@@ -22,6 +22,7 @@ internal interface SyncGateway {
     /**
      * Creates a new folder pair between localPath and MEGA folder
      *
+     * @param name - name of the folder pair
      * @param localPath - local path on the device
      * @param remoteFolderId - MEGA folder handle
      * @return Boolean - indicates whether the folder was set up

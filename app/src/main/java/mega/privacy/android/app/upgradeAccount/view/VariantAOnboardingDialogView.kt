@@ -1,5 +1,6 @@
 package mega.privacy.android.app.upgradeAccount.view
 
+import mega.privacy.android.shared.resources.R as sharedR
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -21,45 +21,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
-import com.google.accompanist.placeholder.PlaceholderHighlight
-import com.google.accompanist.placeholder.fade
-import com.google.accompanist.placeholder.placeholder
 import mega.privacy.android.app.R
 import mega.privacy.android.app.upgradeAccount.model.ChooseAccountState
-import mega.privacy.android.app.upgradeAccount.model.LocalisedSubscription
-import mega.privacy.android.app.upgradeAccount.model.mapper.FormattedSizeMapper
-import mega.privacy.android.app.upgradeAccount.model.mapper.LocalisedPriceCurrencyCodeStringMapper
-import mega.privacy.android.app.upgradeAccount.model.mapper.LocalisedPriceStringMapper
+import mega.privacy.android.app.upgradeAccount.view.ChooseAccountPreviewProvider.Companion.subscriptionProLite
 import mega.privacy.android.app.upgradeAccount.view.components.ButtonsRow
 import mega.privacy.android.app.upgradeAccount.view.components.FeatureRow
 import mega.privacy.android.app.upgradeAccount.view.components.GetProPlanColumn
-import mega.privacy.android.core.ui.controls.text.MegaText
 import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.grey_020_grey_900
-import mega.privacy.android.core.ui.theme.extensions.subtitle1medium
-import mega.privacy.android.core.ui.theme.tokens.TextColor
-import mega.privacy.android.domain.entity.AccountType
-import mega.privacy.android.domain.entity.Currency
-import mega.privacy.android.domain.entity.account.CurrencyAmount
-import mega.privacy.android.shared.resources.R as sharedR
+import mega.privacy.android.shared.resources.R.string.dialog_onboarding_feature_storage_description
 import mega.privacy.android.shared.theme.MegaAppTheme
-
-internal const val IMAGE_TAG = "onboarding_screen_variant_a:image"
-internal const val PRO_PLAN_TITLE = "onboarding_screen_variant_a:pro_plan_title"
-internal const val PRO_PLAN_TEXT = "onboarding_screen_variant_a:pro_plan_description"
-internal const val FEATURE_TITLE = "onboarding_screen_variant_a:feature_title"
-internal const val STORAGE_DESCRIPTION_ROW = "onboarding_screen_variant_a:storage_description_row"
-internal const val FILE_SHARING_DESCRIPTION_ROW =
-    "onboarding_screen_variant_a:file_sharing_description_row"
-internal const val BACKUP_DESCRIPTION_ROW = "onboarding_screen_variant_a:backup_description_row"
-internal const val VPN_DESCRIPTION_ROW = "onboarding_screen_variant_a:vpn_description_row"
-internal const val CHAT_DESCRIPTION_ROW = "onboarding_screen_variant_a:chat_description_row"
-internal const val SKIP_BUTTON = "onboarding_screen_variant_a:skip_button"
-internal const val VIEW_PRO_PLAN_BUTTON = "onboarding_screen_variant_a:view_pro_plan_button"
 
 /**
  *  Compose UI for new Onboarding dialog (Choose account screen), this is Variant A
- *  User will see this account when the registration was finished and user signs in for the first time ever
+ *  User will see this screen when the registration was finished and user signs in for the first time ever
  */
 @Composable
 fun VariantAOnboardingDialogView(
@@ -70,8 +44,10 @@ fun VariantAOnboardingDialogView(
     val scrollState = rememberScrollState()
     val cheapestSubscriptionAvailable = state.cheapestSubscriptionAvailable
     val isLoading = cheapestSubscriptionAvailable == null
-    val formattedStorage = cheapestSubscriptionAvailable?.formatStorageSize()
-    val minimalStorageString = formattedStorage?.let { stringResource(id = it.unit, it.size) }
+    val formattedStorage = cheapestSubscriptionAvailable?.formatStorageSize(usePlaceholder = false)
+    val minimalStorageUnitString = formattedStorage?.let { stringResource(id = it.unit) } ?: ""
+    val minimalStorageSizeString = formattedStorage?.size ?: ""
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -98,30 +74,15 @@ fun VariantAOnboardingDialogView(
                 bodyTextStyle = MaterialTheme.typography.subtitle2
             )
             Spacer(modifier = Modifier.height(16.dp))
-            MegaText(
-                text = stringResource(id = R.string.dialog_onboarding_some_features_title),
-                textColor = TextColor.Primary,
-                style = MaterialTheme.typography.subtitle1medium,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .testTag(FEATURE_TITLE)
-                    .placeholder(
-                        color = MaterialTheme.colors.grey_020_grey_900,
-                        shape = RoundedCornerShape(4.dp),
-                        highlight = PlaceholderHighlight.fade(MaterialTheme.colors.surface),
-                        visible = isLoading,
-                    ),
-            )
-            Spacer(modifier = Modifier.height(16.dp))
             //Storage
             FeatureRow(
                 drawableID = painterResource(id = R.drawable.ic_storage_onboarding_dialog),
                 title = stringResource(id = R.string.dialog_onboarding_feature_title_storage),
-                description = if (minimalStorageString != null) stringResource(
-                    id = R.string.dialog_onboarding_feature_description_storage,
-                    minimalStorageString
-                )
-                else stringResource(id = R.string.dialog_onboarding_feature_description_storage),
+                description = stringResource(
+                    id = dialog_onboarding_feature_storage_description,
+                    minimalStorageSizeString,
+                    minimalStorageUnitString
+                ),
                 testTag = STORAGE_DESCRIPTION_ROW,
                 isLoading = isLoading,
             )
@@ -189,25 +150,16 @@ private class VariantAOnboardingDialogPreviewProvider :
                 cheapestSubscriptionAvailable = subscriptionProLite
             )
         )
-
-    companion object {
-        val localisedPriceStringMapper = LocalisedPriceStringMapper()
-        val localisedPriceCurrencyCodeStringMapper = LocalisedPriceCurrencyCodeStringMapper()
-        val formattedSizeMapper = FormattedSizeMapper()
-
-        val subscriptionProLite = LocalisedSubscription(
-            accountType = AccountType.PRO_LITE,
-            storage = 400,
-            monthlyTransfer = 1024,
-            yearlyTransfer = 12288,
-            monthlyAmount = CurrencyAmount(4.99F, Currency("EUR")),
-            yearlyAmount = CurrencyAmount(
-                49.99F,
-                Currency("EUR")
-            ),
-            localisedPrice = localisedPriceStringMapper,
-            localisedPriceCurrencyCode = localisedPriceCurrencyCodeStringMapper,
-            formattedSize = formattedSizeMapper,
-        )
-    }
 }
+
+internal const val IMAGE_TAG = "onboarding_screen_variant_a:image"
+internal const val PRO_PLAN_TITLE = "onboarding_screen:pro_plan_title"
+internal const val PRO_PLAN_TEXT = "onboarding_screen:pro_plan_description"
+internal const val STORAGE_DESCRIPTION_ROW = "onboarding_screen:storage_description_row"
+internal const val FILE_SHARING_DESCRIPTION_ROW =
+    "onboarding_screen:file_sharing_description_row"
+internal const val BACKUP_DESCRIPTION_ROW = "onboarding_screen:backup_description_row"
+internal const val VPN_DESCRIPTION_ROW = "onboarding_screen:vpn_description_row"
+internal const val CHAT_DESCRIPTION_ROW = "onboarding_screen:chat_description_row"
+internal const val SKIP_BUTTON = "onboarding_screen_variant_a:skip_button"
+internal const val VIEW_PRO_PLAN_BUTTON = "onboarding_screen_variant_a:view_pro_plan_button"

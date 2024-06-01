@@ -1,6 +1,7 @@
 package mega.privacy.android.app.presentation.bottomsheet
 
 import mega.privacy.android.icon.pack.R as RPack
+import mega.privacy.android.shared.resources.R as sharedR
 import android.app.Activity
 import android.content.DialogInterface
 import android.content.Intent
@@ -428,7 +429,10 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                 optionLabel.visibility = if (isTakenDown) View.GONE else View.VISIBLE
                 optionFavourite.visibility = if (isTakenDown) View.GONE else View.VISIBLE
                 optionHideLayout.visibility =
-                    if (isHiddenNodesEnabled && accountType != null && isHiddenNodesOnboarded != null) View.VISIBLE else View.GONE
+                    if (isHiddenNodesEnabled && accountType != null && isHiddenNodesOnboarded != null && state.isHidingActionAllowed)
+                        View.VISIBLE
+                    else
+                        View.GONE
                 optionHideProLabel.visibility =
                     if (accountType?.isPaid == false) View.VISIBLE else View.GONE
                 optionHideHelp.visibility =
@@ -486,7 +490,8 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                         optionLink.setText(R.string.edit_link_option)
                         optionRemoveLink.visibility = View.VISIBLE
                     } else {
-                        optionLink.text = resources.getQuantityString(R.plurals.get_links, 1)
+                        optionLink.text =
+                            resources.getQuantityString(sharedR.plurals.label_share_links, 1)
                         counterShares--
                         optionRemoveLink.visibility = View.GONE
                     }

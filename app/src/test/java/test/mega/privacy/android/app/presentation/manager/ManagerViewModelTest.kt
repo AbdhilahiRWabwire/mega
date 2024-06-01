@@ -87,8 +87,6 @@ import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.MonitorCallEndedUseCase
-import mega.privacy.android.domain.usecase.meeting.MonitorCallRecordingConsentEventUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorUpgradeDialogClosedUseCase
@@ -119,6 +117,7 @@ import mega.privacy.android.feature.sync.domain.entity.FolderPair
 import mega.privacy.android.feature.sync.domain.entity.RemoteFolder
 import mega.privacy.android.feature.sync.domain.entity.SyncStatus
 import mega.privacy.android.feature.sync.domain.usecase.sync.MonitorSyncStalledIssuesUseCase
+import mega.privacy.android.shared.sync.featuretoggle.SyncFeatures
 import nz.mega.sdk.MegaNode
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -134,7 +133,6 @@ import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.reset
-import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
@@ -304,13 +302,6 @@ class ManagerViewModelTest {
     private lateinit var monitorSyncsUseCaseFakeFlow: MutableSharedFlow<List<FolderPair>>
     private val monitorChatSessionUpdatesUseCase: MonitorChatSessionUpdatesUseCase = mock()
     private val hangChatCallUseCase: HangChatCallUseCase = mock()
-    private val monitorCallRecordingConsentEventUseCase: MonitorCallRecordingConsentEventUseCase =
-        mock {
-            onBlocking { invoke() }.thenReturn(emptyFlow())
-        }
-    private val monitorCallEndedUseCase: MonitorCallEndedUseCase = mock {
-        onBlocking { invoke() }.thenReturn(emptyFlow())
-    }
     private val fakeCallUpdatesFlow = MutableSharedFlow<ChatCall>()
 
     private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase = mock {
@@ -397,8 +388,6 @@ class ManagerViewModelTest {
             },
             monitorChatSessionUpdatesUseCase = monitorChatSessionUpdatesUseCase,
             hangChatCallUseCase = hangChatCallUseCase,
-            monitorCallRecordingConsentEventUseCase = monitorCallRecordingConsentEventUseCase,
-            monitorCallEndedUseCase = monitorCallEndedUseCase,
             monitorChatCallUpdatesUseCase = monitorChatCallUpdatesUseCase,
             getUsersCallLimitRemindersUseCase = getUsersCallLimitRemindersUseCase,
             setUsersCallLimitRemindersUseCase = setUsersCallLimitRemindersUseCase,
@@ -454,11 +443,9 @@ class ManagerViewModelTest {
             monitorUpgradeDialogClosedUseCase
         )
         wheneverBlocking { getCloudSortOrder() }.thenReturn(SortOrder.ORDER_DEFAULT_ASC)
-        whenever(getUsersCallLimitRemindersUseCase()).thenReturn(flowOf(UsersCallLimitReminders.Enabled))
+        whenever(getUsersCallLimitRemindersUseCase()).thenReturn(emptyFlow())
         wheneverBlocking { getFeatureFlagValueUseCase(any()) }.thenReturn(true)
         whenever(monitorUserUpdates()).thenReturn(emptyFlow())
-        whenever(monitorCallRecordingConsentEventUseCase()).thenReturn(emptyFlow())
-        whenever(monitorCallEndedUseCase()).thenReturn(emptyFlow())
         whenever(monitorChatArchivedUseCase()).thenReturn(flowOf("Chat Title"))
         whenever(monitorPushNotificationSettingsUpdate()).thenReturn(flowOf(true))
         wheneverBlocking { getPrimarySyncHandleUseCase() }.thenReturn(0L)
@@ -472,6 +459,24 @@ class ManagerViewModelTest {
         monitorMyAccountUpdateFakeFlow = MutableSharedFlow()
         initViewModel()
     }
+
+    @Test
+    fun `test that the option returned by getUsersCallLimitRemindersUseCase is set as enabled`() =
+        runTest {
+            whenever(getUsersCallLimitRemindersUseCase()).thenReturn(flowOf(UsersCallLimitReminders.Enabled))
+            underTest.state.map { it.usersCallLimitReminders }.distinctUntilChanged().test {
+                testScheduler.advanceUntilIdle()
+                assertThat(awaitItem()).isEqualTo(UsersCallLimitReminders.Enabled)
+            }
+        }
+
+    @Test
+    fun `test that setUsersCallLimitRemindersUseCase calls the set use case with the correct value`() =
+        runTest {
+            underTest.setUsersCallLimitReminder(false)
+            testScheduler.advanceUntilIdle()
+            verify(setUsersCallLimitRemindersUseCase).invoke(UsersCallLimitReminders.Disabled)
+        }
 
     @Test
     fun `test that the user root backups folder node id is set when an update is received`() =
@@ -1296,7 +1301,7 @@ class ManagerViewModelTest {
                 SyncStatus.SYNCING
             )
             testScheduler.advanceUntilIdle()
-            whenever(getFeatureFlagValueUseCase(AppFeatures.AndroidSync)).thenReturn(true)
+            whenever(getFeatureFlagValueUseCase(SyncFeatures.AndroidSync)).thenReturn(true)
             monitorSyncsUseCaseFakeFlow.emit(listOf(mockFolderPair))
             testScheduler.advanceUntilIdle()
             underTest
@@ -1309,7 +1314,7 @@ class ManagerViewModelTest {
     @Test
     fun `test that if Android Sync feature is on and syncs are empty Sync service is disabled`() =
         runTest {
-            whenever(getFeatureFlagValueUseCase(AppFeatures.AndroidSync)).thenReturn(true)
+            whenever(getFeatureFlagValueUseCase(SyncFeatures.AndroidSync)).thenReturn(true)
             monitorSyncsUseCaseFakeFlow.emit(listOf())
             testScheduler.advanceUntilIdle()
 
@@ -1323,7 +1328,7 @@ class ManagerViewModelTest {
     @Test
     fun `test that if Android Sync feature is off Sync service is disabled`() =
         runTest {
-            whenever(getFeatureFlagValueUseCase(AppFeatures.AndroidSync)).thenReturn(false)
+            whenever(getFeatureFlagValueUseCase(SyncFeatures.AndroidSync)).thenReturn(false)
             testScheduler.advanceUntilIdle()
 
             underTest

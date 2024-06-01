@@ -1,9 +1,11 @@
 package mega.privacy.android.app.presentation.view
 
 import android.content.res.Configuration
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +55,7 @@ fun <T : TypedNode> NodesView(
     onChangeViewTypeClick: () -> Unit,
     onLinkClicked: (String) -> Unit,
     onDisputeTakeDownClicked: (String) -> Unit,
+    fileTypeIconMapper: FileTypeIconMapper,
     modifier: Modifier = Modifier,
     listState: LazyListState = LazyListState(),
     gridState: LazyGridState = LazyGridState(),
@@ -63,16 +66,16 @@ fun <T : TypedNode> NodesView(
     showMediaDiscoveryButton: Boolean = false,
     showPublicLinkCreationTime: Boolean = false,
     isPublicNode: Boolean = false,
+    inSelectionMode: Boolean = false,
     onEnterMediaDiscoveryClick: () -> Unit = {},
     listContentPadding: PaddingValues = PaddingValues(0.dp),
-    fileTypeIconMapper: FileTypeIconMapper,
 ) {
     val takenDownDialog = remember { mutableStateOf(Pair(false, false)) }
     val orientation = LocalConfiguration.current.orientation
     val span = if (orientation == Configuration.ORIENTATION_PORTRAIT) spanCount else 4
     if (isListView) {
         NodeListView(
-            modifier = modifier,
+            modifier = modifier.background(MaterialTheme.colors.background),
             listContentPadding = listContentPadding,
             nodeUIItemList = nodeUIItems,
             onMenuClick = onMenuClick,
@@ -95,7 +98,8 @@ fun <T : TypedNode> NodesView(
             showMediaDiscoveryButton = showMediaDiscoveryButton,
             isPublicNode = isPublicNode,
             showPublicLinkCreationTime = showPublicLinkCreationTime,
-            fileTypeIconMapper = fileTypeIconMapper
+            fileTypeIconMapper = fileTypeIconMapper,
+            inSelectionMode = inSelectionMode
         )
     } else {
         val newList = rememberNodeListForGrid(nodeUIItems = nodeUIItems, spanCount = span)
@@ -122,7 +126,8 @@ fun <T : TypedNode> NodesView(
             gridState = gridState,
             showMediaDiscoveryButton = showMediaDiscoveryButton,
             isPublicNode = isPublicNode,
-            fileTypeIconMapper = fileTypeIconMapper
+            fileTypeIconMapper = fileTypeIconMapper,
+            inSelectionMode = inSelectionMode
         )
     }
     if (takenDownDialog.value.first) {
@@ -149,25 +154,24 @@ fun <T : TypedNode> NodesView(
 private fun <T : TypedNode> rememberNodeListForGrid(
     nodeUIItems: List<NodeUIItem<T>>,
     spanCount: Int,
-) =
-    remember(spanCount + nodeUIItems.hashCode()) {
-        val folderCount = nodeUIItems.count {
-            it.node is FolderNode
-        }
-        val placeholderCount =
-            (folderCount % spanCount).takeIf { it != 0 }?.let { spanCount - it } ?: 0
-        if (folderCount > 0 && placeholderCount > 0 && folderCount < nodeUIItems.size) {
-            val gridItemList = nodeUIItems.toMutableList()
-            repeat(placeholderCount) {
-                val node = nodeUIItems[folderCount - 1].copy(
-                    isInvisible = true,
-                )
-                gridItemList.add(folderCount, node)
-            }
-            return@remember gridItemList
-        }
-        nodeUIItems
+) = remember(spanCount + nodeUIItems.hashCode()) {
+    val folderCount = nodeUIItems.count {
+        it.node is FolderNode
     }
+    val placeholderCount =
+        (folderCount % spanCount).takeIf { it != 0 }?.let { spanCount - it } ?: 0
+    if (folderCount > 0 && placeholderCount > 0 && folderCount < nodeUIItems.size) {
+        val gridItemList = nodeUIItems.toMutableList()
+        repeat(placeholderCount) {
+            val node = nodeUIItems[folderCount - 1].copy(
+                isInvisible = true,
+            )
+            gridItemList.add(folderCount, node)
+        }
+        return@remember gridItemList
+    }
+    nodeUIItems
+}
 
 /**
  * Test tag for nodesView visibility

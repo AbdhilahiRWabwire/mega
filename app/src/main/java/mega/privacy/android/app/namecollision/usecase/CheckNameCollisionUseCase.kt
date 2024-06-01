@@ -84,24 +84,6 @@ class CheckNameCollisionUseCase @Inject constructor(
             type = type,
         )
 
-
-    /**
-     * Checks if a node with the same name exists on the provided parent node.
-     *
-     * @param node          [MegaNode] to check its name.
-     * @param parentNode    Parent [MegaNode] in which to look.
-     * @param type          [NameCollisionType]
-     * @return Single Long with the node handle with which there is a name collision.
-     */
-    fun check(
-        node: MegaNode?,
-        parentNode: MegaNode?,
-        type: NameCollisionType,
-    ): Single<NameCollision> =
-        rxSingle(ioDispatcher) {
-            checkNodeCollisionsWithType(node, parentNode, type)
-        }
-
     private suspend fun checkNodeCollisionsWithType(
         node: MegaNode?,
         parentNode: MegaNode?,
@@ -180,24 +162,6 @@ class CheckNameCollisionUseCase @Inject constructor(
         return withContext(ioDispatcher) { megaApiGateway.getChildNode(parent, name)?.handle }
             ?: throw MegaNodeException.ChildDoesNotExistsException()
     }
-
-    /**
-     * Checks a list of handles in order to know which names already exist on the parent nodes.
-     *
-     * @param nodes         List of node handles to check.
-     * @param parentHandle  Parent handle node in which to look.
-     * @return Single<Pair<List<NameCollision>, LongArray>> containing:
-     *  - First:    List of NameCollision with name collisions.
-     *  - Second:   Array of handles without name collision.
-     */
-    fun checkNodeList(
-        nodes: List<MegaNode>,
-        parentHandle: Long,
-        type: NameCollisionType,
-    ): Single<Pair<ArrayList<NameCollision>, List<MegaNode>>> =
-        rxSingle(ioDispatcher) {
-            checkNodeListAsync(nodes, parentHandle, type)
-        }
 
     /**
      * Check node list async

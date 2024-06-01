@@ -9,16 +9,19 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.palm.composestateevents.consumed
 import de.palm.composestateevents.triggered
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.mapLatest
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.saver.NodeSaver
 import mega.privacy.android.app.domain.usecase.CheckNameCollision
@@ -40,9 +43,13 @@ import mega.privacy.android.domain.entity.node.ImageNode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.node.chat.ChatImageFile
+import mega.privacy.android.domain.qualifier.DefaultDispatcher
+import mega.privacy.android.domain.usecase.GetParentNodeUseCase
 import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
+import mega.privacy.android.domain.usecase.camerauploads.GetPrimarySyncHandleUseCase
+import mega.privacy.android.domain.usecase.camerauploads.GetSecondarySyncHandleUseCase
 import mega.privacy.android.domain.usecase.favourites.AddFavouritesUseCase
 import mega.privacy.android.domain.usecase.favourites.IsAvailableOfflineUseCase
 import mega.privacy.android.domain.usecase.favourites.RemoveFavouritesUseCase
@@ -61,6 +68,8 @@ import mega.privacy.android.domain.usecase.node.MoveNodeUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodesToRubbishUseCase
 import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.offline.RemoveOfflineNodeUseCase
+import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
+import mega.privacy.android.domain.usecase.transfers.chatuploads.GetMyChatsFilesFolderIdUseCase
 import mega.privacy.android.domain.usecase.transfers.downloads.ResetTotalDownloadsUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
 import nz.mega.sdk.MegaNode
@@ -68,7 +77,6 @@ import timber.log.Timber
 import java.io.File
 import java.lang.ref.WeakReference
 import javax.inject.Inject
-
 @HiltViewModel
 class ImagePreviewViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
@@ -103,6 +111,12 @@ class ImagePreviewViewModel @Inject constructor(
     private val imagePreviewVideoLauncher: ImagePreviewVideoLauncher,
     private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
     private val isHiddenNodesOnboardedUseCase: IsHiddenNodesOnboardedUseCase,
+    private val monitorShowHiddenItemsUseCase: MonitorShowHiddenItemsUseCase,
+    private val getPrimarySyncHandleUseCase: GetPrimarySyncHandleUseCase,
+    private val getSecondarySyncHandleUseCase: GetSecondarySyncHandleUseCase,
+    private val getMyChatsFilesFolderIdUseCase: GetMyChatsFilesFolderIdUseCase,
+    private val getParentNodeUseCase: GetParentNodeUseCase,
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
     private val imagePreviewFetcherSource: ImagePreviewFetcherSource
         get() = savedStateHandle[IMAGE_NODE_FETCHER_SOURCE] ?: ImagePreviewFetcherSource.TIMELINE
@@ -122,16 +136,58 @@ class ImagePreviewViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(ImagePreviewState())
 
+    private var isHidingActionAllowed: Boolean = false
+
     val state: StateFlow<ImagePreviewState> = _state
 
     private val menu: ImagePreviewMenu?
         get() = imagePreviewMenuMap[imagePreviewMenuSource]
 
     init {
-        monitorImageNodes()
-        monitorOfflineNodeUpdates()
-        monitorAccountDetail()
-        monitorIsHiddenNodesOnboarded()
+        viewModelScope.launch {
+            if (getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)) {
+                handleInitFlow()
+            } else {
+                monitorImageNodes()
+            }
+            monitorOfflineNodeUpdates()
+            isHidingActionAllowed = isHidingActionAllowed()
+        }
+    }
+
+    private suspend fun handleInitFlow() {
+        val imageFetcher = imageNodeFetchers[imagePreviewFetcherSource] ?: return
+        combine(
+            monitorShowHiddenItemsUseCase(),
+            monitorAccountDetailUseCase(),
+            flowOf(isHiddenNodesOnboardedUseCase()),
+            imageFetcher.monitorImageNodes(params),
+        ) { showHiddenItems, accountDetail, isHiddenNodesOnboarded, imageNodes ->
+
+            val filteredImageNodes = filterNonSensitiveNodes(
+                imageNodes = imageNodes,
+                showHiddenItems = showHiddenItems,
+                isPaid = accountDetail.levelDetail?.accountType?.isPaid,
+            )
+            val (currentImageNodeIndex, currentImageNode) = findCurrentImageNode(
+                filteredImageNodes
+            )
+            val isCurrentImageNodeAvailableOffline =
+                currentImageNode?.isAvailableOffline ?: false
+
+            _state.update {
+                it.copy(
+                    isInitialized = true,
+                    imageNodes = filteredImageNodes,
+                    currentImageNodeIndex = currentImageNodeIndex,
+                    currentImageNode = currentImageNode,
+                    isCurrentImageNodeAvailableOffline = isCurrentImageNodeAvailableOffline,
+                    accountDetail = accountDetail,
+                    isHiddenNodesOnboarded = isHiddenNodesOnboarded
+                )
+            }
+        }.catch { Timber.e(it) }
+            .launchIn(viewModelScope)
     }
 
     private fun monitorOfflineNodeUpdates() {
@@ -160,7 +216,10 @@ class ImagePreviewViewModel @Inject constructor(
         imageFetcher.monitorImageNodes(params)
             .catch { Timber.e(it) }
             .mapLatest { imageNodes ->
-                val (currentImageNodeIndex, currentImageNode) = findCurrentImageNode(imageNodes)
+
+                val (currentImageNodeIndex, currentImageNode) = findCurrentImageNode(
+                    imageNodes
+                )
                 val isCurrentImageNodeAvailableOffline =
                     currentImageNode?.isAvailableOffline ?: false
 
@@ -177,25 +236,6 @@ class ImagePreviewViewModel @Inject constructor(
                 }
             }
             .launchIn(viewModelScope)
-    }
-
-    private fun monitorAccountDetail() {
-        monitorAccountDetailUseCase()
-            .onEach { accountDetail ->
-                _state.update {
-                    it.copy(accountDetail = accountDetail)
-                }
-            }
-            .launchIn(viewModelScope)
-    }
-
-    private fun monitorIsHiddenNodesOnboarded() {
-        viewModelScope.launch {
-            val isHiddenNodesOnboarded = isHiddenNodesOnboardedUseCase()
-            _state.update {
-                it.copy(isHiddenNodesOnboarded = isHiddenNodesOnboarded)
-            }
-        }
     }
 
     fun setHiddenNodesOnboarded() {
@@ -222,6 +262,21 @@ class ImagePreviewViewModel @Inject constructor(
             if (currentImageNodeIndex > imageNodes.lastIndex) imageNodes.lastIndex else currentImageNodeIndex
 
         return targetImageNodeIndex to imageNodes.getOrNull(targetImageNodeIndex)
+    }
+
+    suspend fun filterNonSensitiveNodes(
+        imageNodes: List<ImageNode>,
+        showHiddenItems: Boolean?,
+        isPaid: Boolean?,
+    ) = withContext(defaultDispatcher) {
+        showHiddenItems ?: return@withContext imageNodes
+        isPaid ?: return@withContext imageNodes
+
+        return@withContext if (showHiddenItems || !isPaid) {
+            imageNodes
+        } else {
+            imageNodes.filter { !it.isMarkedSensitive && !it.isSensitiveInherited }
+        }
     }
 
     suspend fun isHiddenNodesEnabled(): Boolean {
@@ -281,11 +336,11 @@ class ImagePreviewViewModel @Inject constructor(
     }
 
     suspend fun isHideMenuVisible(imageNode: ImageNode): Boolean {
-        return menu?.isHideMenuVisible(imageNode) ?: false
+        return menu?.isHideMenuVisible(imageNode) ?: false && isHidingActionAllowed
     }
 
     suspend fun isUnhideMenuVisible(imageNode: ImageNode): Boolean {
-        return menu?.isUnhideMenuVisible(imageNode) ?: false
+        return menu?.isUnhideMenuVisible(imageNode) ?: false && isHidingActionAllowed
     }
 
     suspend fun isMoveMenuVisible(imageNode: ImageNode): Boolean {
@@ -684,8 +739,10 @@ class ImagePreviewViewModel @Inject constructor(
     }
 
     suspend fun isAvailableOffline(imageNode: ImageNode): Boolean {
-        val typedNode = addImageTypeUseCase(imageNode)
-        return isAvailableOfflineUseCase(typedNode)
+        return runCatching {
+            val typedNode = addImageTypeUseCase(imageNode)
+            isAvailableOfflineUseCase(typedNode)
+        }.onFailure { Timber.e(it) }.getOrDefault(false)
     }
 
     /**
@@ -711,20 +768,26 @@ class ImagePreviewViewModel @Inject constructor(
 
     suspend fun getFallbackImagePath(imageResult: ImageResult?): String? {
         return imageResult?.run {
-            checkUri(previewUri) ?: checkUri(thumbnailUri)
+            safeCheckUri(previewUri) ?: safeCheckUri(thumbnailUri)
         }
     }
 
     suspend fun getHighestResolutionImagePath(imageResult: ImageResult?): String? {
         return imageResult?.run {
-            checkUri(fullSizeUri) ?: checkUri(previewUri) ?: checkUri(thumbnailUri)
+            safeCheckUri(fullSizeUri) ?: safeCheckUri(previewUri) ?: safeCheckUri(thumbnailUri)
         }
     }
 
     suspend fun getLowestResolutionImagePath(imageResult: ImageResult?): String? {
         return imageResult?.run {
-            checkUri(thumbnailUri) ?: checkUri(previewUri) ?: checkUri(fullSizeUri)
+            safeCheckUri(thumbnailUri) ?: safeCheckUri(previewUri) ?: safeCheckUri(fullSizeUri)
         }
+    }
+
+    private suspend fun safeCheckUri(uriPath: String?): String? {
+        return runCatching {
+            checkUri(uriPath)
+        }.onFailure { Timber.e(it) }.getOrNull()
     }
 
     /**
@@ -780,14 +843,21 @@ class ImagePreviewViewModel @Inject constructor(
      * Hide the node (mark as sensitive)
      */
     fun hideNode(nodeId: NodeId) = viewModelScope.launch {
-        updateNodeSensitiveUseCase(nodeId = nodeId, isSensitive = true)
+        runCatching {
+            updateNodeSensitiveUseCase(nodeId = nodeId, isSensitive = true)
+        }.onFailure {
+            Timber.e(it)
+        }
     }
 
     /**
      * Unhide the node (unmark as sensitive)
      */
     fun unhideNode(nodeId: NodeId) = viewModelScope.launch {
-        updateNodeSensitiveUseCase(nodeId = nodeId, isSensitive = false)
+        runCatching {
+            updateNodeSensitiveUseCase(nodeId = nodeId, isSensitive = false)
+        }.onFailure { Timber.e(it) }
+
     }
 
     fun playVideo(
@@ -801,6 +871,14 @@ class ImagePreviewViewModel @Inject constructor(
         )
     }
 
+    private suspend fun isHidingActionAllowed(): Boolean = runCatching {
+        (getParentNodeUseCase(NodeId(currentImageNodeIdValue))?.id?.longValue ?: 0) !in listOf(
+            getPrimarySyncHandleUseCase(),
+            getSecondarySyncHandleUseCase(),
+            getMyChatsFilesFolderIdUseCase(),
+        )
+    }.getOrElse { false }
+
     companion object {
         const val IMAGE_NODE_FETCHER_SOURCE = "image_node_fetcher_source"
         const val IMAGE_PREVIEW_MENU_OPTIONS = "image_preview_menu_options"
@@ -809,3 +887,4 @@ class ImagePreviewViewModel @Inject constructor(
         const val IMAGE_PREVIEW_IS_FOREIGN = "image_preview_is_foreign"
     }
 }
+

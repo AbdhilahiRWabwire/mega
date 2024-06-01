@@ -1,5 +1,7 @@
 package mega.privacy.android.app.mediaplayer
 
+import mega.privacy.android.shared.resources.R as sharedR
+import android.app.Activity
 import android.app.Dialog
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -23,6 +25,9 @@ import android.view.Menu
 import android.view.MenuItem
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.ColorInt
 import androidx.annotation.ColorRes
@@ -70,6 +75,7 @@ import mega.privacy.android.app.mediaplayer.service.MediaPlayerCallback
 import mega.privacy.android.app.mediaplayer.service.Metadata
 import mega.privacy.android.app.presentation.extensions.getStorageState
 import mega.privacy.android.app.presentation.fileinfo.FileInfoActivity
+import mega.privacy.android.app.presentation.hidenode.HiddenNodesOnboardingActivity
 import mega.privacy.android.app.usecase.exception.MegaException
 import mega.privacy.android.app.utils.AlertDialogUtil
 import mega.privacy.android.app.utils.AlertsAndWarnings
@@ -172,6 +178,8 @@ class VideoPlayerActivity : MediaPlayerActivity() {
     private var currentPlayingHandle: Long? = null
 
     private var playbackPositionDialog: Dialog? = null
+
+    private var tempNodeId: NodeId? = null
 
     private val headsetPlugReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -587,7 +595,8 @@ class VideoPlayerActivity : MediaPlayerActivity() {
 
                         FILE_LINK_ADAPTER -> {
                             val mediaItem = mediaPlayerGateway.getCurrentMediaItem()
-                            val nodeName = videoViewModel.getPlaylistItem(mediaItem?.mediaId)?.nodeName
+                            val nodeName =
+                                videoViewModel.getPlaylistItem(mediaItem?.mediaId)?.nodeName
 
                             MegaNodeUtil.shareLink(
                                 context = this,
@@ -668,39 +677,11 @@ class VideoPlayerActivity : MediaPlayerActivity() {
                 }
 
                 R.id.hide -> {
-                    megaApi.getNodeByHandle(playingHandle)?.let { node ->
-                        megaApi.setNodeSensitive(
-                            node,
-                            true,
-                            OptionalMegaRequestListenerInterface(onRequestFinish = { _, error ->
-                                if (error.errorCode == MegaError.API_OK) {
-                                    // Some times checking node.isMarkedSensitive immediately will still
-                                    // get true, so let's add some delay here.
-                                    RunOnUIThreadUtils.runDelay(500L) {
-                                        refreshMenuOptionsVisibility()
-                                    }
-                                }
-                            })
-                        )
-                    }
+                    handleHideNodeClick(playingHandle = playingHandle)
                 }
 
                 R.id.unhide -> {
-                    megaApi.getNodeByHandle(playingHandle)?.let { node ->
-                        megaApi.setNodeSensitive(
-                            node,
-                            false,
-                            OptionalMegaRequestListenerInterface(onRequestFinish = { _, error ->
-                                if (error.errorCode == MegaError.API_OK) {
-                                    // Some times checking node.isMarkedSensitive immediately will still
-                                    // get true, so let's add some delay here.
-                                    RunOnUIThreadUtils.runDelay(500L) {
-                                        refreshMenuOptionsVisibility()
-                                    }
-                                }
-                            })
-                        )
-                    }
+                    hideOrUnhideNode(playingHandle = playingHandle, hide = false)
                 }
 
                 R.id.move -> {
@@ -1017,7 +998,8 @@ class VideoPlayerActivity : MediaPlayerActivity() {
 
         menuInflater.inflate(R.menu.menu_video_player, menu)
 
-        menu.findItem(R.id.get_link).title = resources.getQuantityString(R.plurals.get_links, 1)
+        menu.findItem(R.id.get_link).title =
+            resources.getQuantityString(sharedR.plurals.label_share_links, 1)
 
         searchMenuItem = menu.findItem(R.id.action_search).apply {
             actionView?.let { searchView ->
@@ -1182,11 +1164,42 @@ class VideoPlayerActivity : MediaPlayerActivity() {
                         }
 
                         adapterType == FOLDER_LINK_ADAPTER
-                                || adapterType == FROM_IMAGE_VIEWER
                                 || adapterType == FROM_ALBUM_SHARING
                                 || adapterType == VERSIONS_ADAPTER -> {
                             menu.toggleAllMenuItemsVisibility(false)
                             menu.findItem(R.id.save_to_device).isVisible = true
+                        }
+
+                        adapterType == FROM_IMAGE_VIEWER -> {
+                            menu.toggleAllMenuItemsVisibility(false)
+                            menu.findItem(R.id.save_to_device).isVisible = true
+                            val node =
+                                megaApi.getNodeByHandle(videoViewModel.getCurrentPlayingHandle())
+
+                            if (node == null) {
+                                Timber.d("refreshMenuOptionsVisibility node is null")
+
+                                menu.toggleAllMenuItemsVisibility(false)
+                                return
+                            }
+                            val shouldShowHideNode =
+                                isHiddenNodesEnabled
+                                        && !isInSharedItems
+                                        && !megaApi.getRootParentNode(node).isInShare
+                                        && !node.isMarkedSensitive
+
+                            val shouldShowUnhideNode =
+                                isHiddenNodesEnabled
+                                        && !isInSharedItems
+                                        && !megaApi.getRootParentNode(node).isInShare
+                                        && node.isMarkedSensitive
+
+                            menu.findItem(R.id.hide).isVisible = shouldShowHideNode
+                            menu.findItem(R.id.hide).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+
+                            menu.findItem(R.id.unhide).isVisible = shouldShowUnhideNode
+                            menu.findItem(R.id.unhide)
+                                .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
                         }
 
                         else -> {
@@ -1668,6 +1681,80 @@ class VideoPlayerActivity : MediaPlayerActivity() {
             setVideoPlayType(type)
         }
     }
+
+    private fun handleHideNodeClick(playingHandle: Long) {
+        val (isPaid, isHiddenNodesOnboarded) = with(viewModel.state.value) {
+            (this.accountType?.isPaid ?: false) to this.isHiddenNodesOnboarded
+        }
+
+        if (!isPaid) {
+            val intent = HiddenNodesOnboardingActivity.createScreen(
+                context = this,
+                isOnboarding = false,
+            )
+            hiddenNodesOnboardingLauncher.launch(intent)
+            this.overridePendingTransition(0, 0)
+        } else if (isHiddenNodesOnboarded) {
+            hideOrUnhideNode(
+                playingHandle = playingHandle,
+                hide = true,
+            )
+        } else {
+            tempNodeId = NodeId(longValue = playingHandle)
+            showHiddenNodesOnboarding()
+        }
+    }
+
+    private fun showHiddenNodesOnboarding() {
+        viewModel.setHiddenNodesOnboarded()
+
+        val intent = HiddenNodesOnboardingActivity.createScreen(
+            context = this,
+            isOnboarding = true,
+        )
+        hiddenNodesOnboardingLauncher.launch(intent)
+        this.overridePendingTransition(0, 0)
+    }
+
+    private val hiddenNodesOnboardingLauncher: ActivityResultLauncher<Intent> =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+            ::handleHiddenNodesOnboardingResult,
+        )
+
+    private fun handleHiddenNodesOnboardingResult(result: ActivityResult) {
+        if (result.resultCode != Activity.RESULT_OK) return
+
+        hideOrUnhideNode(
+            playingHandle = tempNodeId?.longValue ?: 0,
+            hide = true,
+        )
+
+        val message =
+            resources.getQuantityString(
+                R.plurals.hidden_nodes_result_message,
+                1,
+                1,
+            )
+        mega.privacy.android.app.utils.Util.showSnackbar(this, message)
+    }
+
+    private fun hideOrUnhideNode(playingHandle: Long, hide: Boolean) =
+        megaApi.getNodeByHandle(playingHandle)?.let { node ->
+            megaApi.setNodeSensitive(
+                node,
+                hide,
+                OptionalMegaRequestListenerInterface(onRequestFinish = { _, error ->
+                    if (error.errorCode == MegaError.API_OK) {
+                        // Some times checking node.isMarkedSensitive immediately will still
+                        // get true, so let's add some delay here.
+                        RunOnUIThreadUtils.runDelay(500L) {
+                            refreshMenuOptionsVisibility()
+                        }
+                    }
+                })
+            )
+        }
 
     companion object {
         private const val MEDIA_PLAYER_STATE_ENDED = 4

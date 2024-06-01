@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.palm.composestateevents.consumed
 import de.palm.composestateevents.triggered
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +16,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MimeTypeList.Companion.typeForName
@@ -23,10 +26,10 @@ import mega.privacy.android.app.domain.usecase.GetNodeByHandle
 import mega.privacy.android.app.domain.usecase.GetNodeListByIds
 import mega.privacy.android.app.domain.usecase.GetPublicNodeListByIds
 import mega.privacy.android.app.featuretoggle.AppFeatures
-import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.namecollision.data.NameCollisionType
 import mega.privacy.android.app.namecollision.usecase.CheckNameCollisionUseCase
 import mega.privacy.android.app.presentation.copynode.mapper.CopyRequestMessageMapper
+import mega.privacy.android.app.presentation.copynode.toCopyRequestResult
 import mega.privacy.android.app.presentation.photos.mediadiscovery.MediaDiscoveryFragment.Companion.INTENT_KEY_CURRENT_FOLDER_ID
 import mega.privacy.android.app.presentation.photos.mediadiscovery.MediaDiscoveryFragment.Companion.PARAM_ERROR_MESSAGE
 import mega.privacy.android.app.presentation.photos.mediadiscovery.model.MediaDiscoveryViewState
@@ -42,31 +45,35 @@ import mega.privacy.android.app.presentation.photos.util.createYearsCardList
 import mega.privacy.android.app.presentation.photos.util.groupPhotosByDay
 import mega.privacy.android.app.presentation.settings.model.MediaDiscoveryViewSettings
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
-import mega.privacy.android.app.usecase.CopyNodeListUseCase
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_NEED_STOP_HTTP_SERVER
 import mega.privacy.android.app.utils.FileUtil
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.photos.Photo
 import mega.privacy.android.domain.entity.preference.ViewType
+import mega.privacy.android.domain.qualifier.DefaultDispatcher
 import mega.privacy.android.domain.usecase.GetCameraSortOrder
 import mega.privacy.android.domain.usecase.GetFileUrlByNodeHandleUseCase
 import mega.privacy.android.domain.usecase.GetLocalFolderLinkFromMegaApiUseCase
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.HasCredentialsUseCase
+import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.MonitorMediaDiscoveryView
 import mega.privacy.android.domain.usecase.SetCameraSortOrder
 import mega.privacy.android.domain.usecase.SetMediaDiscoveryView
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
+import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.file.GetFingerprintUseCase
 import mega.privacy.android.domain.usecase.folderlink.GetPublicChildNodeFromIdUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunningUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
+import mega.privacy.android.domain.usecase.node.CopyNodesUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.photos.GetPhotosByFolderIdInFolderLinkUseCase
 import mega.privacy.android.domain.usecase.photos.GetPhotosByFolderIdUseCase
+import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorSubFolderMediaDiscoverySettingsUseCase
 import mega.privacy.android.domain.usecase.viewtype.SetViewType
 import nz.mega.sdk.MegaNode
@@ -94,17 +101,21 @@ class MediaDiscoveryViewModel @Inject constructor(
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
     private val checkNameCollisionUseCase: CheckNameCollisionUseCase,
     private val authorizeNode: AuthorizeNode,
-    private val copyNodeListUseCase: CopyNodeListUseCase,
+    private val copyNodesUseCase: CopyNodesUseCase,
     private val copyRequestMessageMapper: CopyRequestMessageMapper,
     private val hasCredentialsUseCase: HasCredentialsUseCase,
     private val getPublicNodeListByIds: GetPublicNodeListByIds,
     private val setViewType: SetViewType,
     private val monitorSubFolderMediaDiscoverySettingsUseCase: MonitorSubFolderMediaDiscoverySettingsUseCase,
-    private var getFeatureFlagUseCase: GetFeatureFlagValueUseCase,
     private val isNodeInRubbishBinUseCase: IsNodeInRubbishBinUseCase,
     private val getNodeByIdUseCase: GetNodeByIdUseCase,
     private val getPublicChildNodeFromIdUseCase: GetPublicChildNodeFromIdUseCase,
     private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase,
+    private val isHiddenNodesOnboardedUseCase: IsHiddenNodesOnboardedUseCase,
+    private val monitorShowHiddenItemsUseCase: MonitorShowHiddenItemsUseCase,
+    private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
+    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
+    @DefaultDispatcher val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -117,6 +128,7 @@ class MediaDiscoveryViewModel @Inject constructor(
 
     private var fetchPhotosJob: Job? = null
     private var fromFolderLink: Boolean? = null
+    internal var showHiddenItems: Boolean? = null
 
     init {
         fromFolderLink =
@@ -124,8 +136,43 @@ class MediaDiscoveryViewModel @Inject constructor(
         checkConnectivity()
         checkMDSetting()
         loadSortRule()
-        fetchPhotos()
+        monitorPhotos()
+        handleHiddenNodes()
     }
+
+    private fun handleHiddenNodes() = viewModelScope.launch {
+        if (getFeatureFlagValueUseCase(AppFeatures.HiddenNodes) && fromFolderLink != true) {
+            monitorShowHiddenItems(
+                loadPhotosDone = _state.value.loadPhotosDone,
+                sourcePhotos = _state.value.sourcePhotos,
+            )
+            monitorAccountDetail(
+                loadPhotosDone = _state.value.loadPhotosDone,
+                sourcePhotos = _state.value.sourcePhotos,
+            )
+            monitorIsHiddenNodesOnboarded()
+        }
+    }
+
+    internal fun monitorShowHiddenItems(loadPhotosDone: Boolean, sourcePhotos: List<Photo>) =
+        monitorShowHiddenItemsUseCase()
+            .onEach {
+                showHiddenItems = it
+                if (!loadPhotosDone) return@onEach
+
+                handleFolderPhotosAndLogic(sourcePhotos)
+            }.launchIn(viewModelScope)
+
+    internal fun monitorAccountDetail(loadPhotosDone: Boolean, sourcePhotos: List<Photo>) =
+        monitorAccountDetailUseCase()
+            .onEach { accountDetail ->
+                _state.update {
+                    it.copy(accountType = accountDetail.levelDetail?.accountType)
+                }
+                if (!loadPhotosDone) return@onEach
+
+                handleFolderPhotosAndLogic(sourcePhotos)
+            }.launchIn(viewModelScope)
 
     /**
      * Is connected
@@ -178,10 +225,10 @@ class MediaDiscoveryViewModel @Inject constructor(
         }
     }
 
-    private fun fetchPhotos() {
+    private fun monitorPhotos() {
         fetchPhotosJob?.cancel()
 
-        val currentFolderId = savedStateHandle.get<Long>(INTENT_KEY_CURRENT_FOLDER_ID)
+        val currentFolderId = _state.value.currentFolderId
 
         fetchPhotosJob = currentFolderId?.let { folderId ->
             viewModelScope.launch {
@@ -227,24 +274,24 @@ class MediaDiscoveryViewModel @Inject constructor(
             }
     }
 
-    private suspend fun handleFolderPhotosAndLogic(
+    internal suspend fun handleFolderPhotosAndLogic(
         sourcePhotos: List<Photo>,
     ) {
-        if (isMDFolderInRubbish(sourcePhotos)) {
+        if (sourcePhotos.isEmpty() && isMDFolderInRubbish()) {
             _state.update {
                 it.copy(shouldGoBack = true)
             }
         } else {
             handlePhotoItems(
-                sortedPhotos = sortAndFilterPhotos(sourcePhotos),
+                sortedPhotosWithoutHandleSensitive = sortAndFilterPhotos(sourcePhotos),
                 sourcePhotos = sourcePhotos
             )
         }
     }
 
-    private suspend fun isMDFolderInRubbish(sourcePhotos: List<Photo>) =
+    private suspend fun isMDFolderInRubbish() =
         _state.value.currentFolderId?.let { currentFolderId ->
-            sourcePhotos.isEmpty() && isNodeInRubbishBinUseCase(NodeId(currentFolderId))
+            isNodeInRubbishBinUseCase(NodeId(currentFolderId))
         } ?: false
 
     internal fun sortAndFilterPhotos(sourcePhotos: List<Photo>): List<Photo> {
@@ -260,7 +307,25 @@ class MediaDiscoveryViewModel @Inject constructor(
         }
     }
 
-    internal fun handlePhotoItems(sortedPhotos: List<Photo>, sourcePhotos: List<Photo>? = null) {
+    internal fun filterNonSensitivePhotos(photos: List<Photo>, isPaid: Boolean?): List<Photo> {
+        val showHiddenItems = showHiddenItems ?: return photos
+        isPaid ?: return photos
+
+        return if (showHiddenItems || !isPaid) {
+            photos
+        } else {
+            photos.filter { !it.isSensitive && !it.isSensitiveInherited }
+        }
+    }
+
+    internal fun handlePhotoItems(
+        sortedPhotosWithoutHandleSensitive: List<Photo>,
+        sourcePhotos: List<Photo>? = null,
+    ) = viewModelScope.launch(defaultDispatcher) {
+        val sortedPhotos = filterNonSensitivePhotos(
+            photos = sortedPhotosWithoutHandleSensitive,
+            isPaid = _state.value.accountType?.isPaid,
+        )
         val dayPhotos = groupPhotosByDay(sortedPhotos = sortedPhotos)
         val yearsCardList = createYearsCardList(dayPhotos = dayPhotos)
         val monthsCardList = createMonthsCardList(dayPhotos = dayPhotos)
@@ -548,34 +613,46 @@ class MediaDiscoveryViewModel @Inject constructor(
             }
         }
 
-    suspend fun checkNameCollision(nodes: List<MegaNode>, toHandle: Long) {
+    /**
+     * Checks the list of nodes to copy in order to know which names already exist
+     *
+     * @param nodes         List of node handles to copy.
+     * @param toHandle      Handle of destination node
+     */
+    fun checkNameCollision(nodes: List<MegaNode>, toHandle: Long) = viewModelScope.launch {
         runCatching {
             checkNameCollisionUseCase.checkNodeListAsync(
                 nodes = nodes,
                 parentHandle = toHandle,
                 type = NameCollisionType.COPY
             )
-        }.map { result: Pair<ArrayList<NameCollision>, List<MegaNode>> ->
-            if (result.first.isNotEmpty()) {
+        }.onSuccess { result ->
+            val collisions = result.first
+            if (collisions.isNotEmpty()) {
                 _state.update {
-                    it.copy(collisions = result.first)
+                    it.copy(collisions = collisions)
                 }
             }
-            copyNodeListUseCase(result.second, toHandle)
-        }.onSuccess { copyRequestResult ->
-            _state.update {
-                it.copy(
-                    copyResultText = copyRequestMessageMapper(
-                        copyRequestResult
-                    )
-                )
+            val nodesWithoutCollisions = result.second.associate {
+                it.handle to toHandle
+            }
+            if (nodesWithoutCollisions.isNotEmpty()) {
+                runCatching {
+                    copyNodesUseCase(nodesWithoutCollisions)
+                }.onSuccess { copyResult ->
+                    _state.update {
+                        it.copy(
+                            copyResultText = copyRequestMessageMapper(copyResult.toCopyRequestResult())
+                        )
+                    }
+                }.onFailure { throwable ->
+                    _state.update {
+                        it.copy(copyThrowable = throwable)
+                    }
+                }
             }
         }.onFailure { throwable ->
-            _state.update {
-                it.copy(
-                    copyThrowable = throwable
-                )
-            }
+            Timber.e(throwable)
         }
     }
 
@@ -632,7 +709,7 @@ class MediaDiscoveryViewModel @Inject constructor(
      */
     fun onSaveToDeviceClicked(legacySaveToDevice: () -> Unit) {
         viewModelScope.launch {
-            if (getFeatureFlagUseCase(AppFeatures.DownloadWorker)) {
+            if (getFeatureFlagValueUseCase(AppFeatures.DownloadWorker)) {
                 val nodes = getNodes().mapNotNull {
                     if (fromFolderLink == true) {
                         getPublicChildNodeFromIdUseCase(NodeId(it.handle))
@@ -660,6 +737,24 @@ class MediaDiscoveryViewModel @Inject constructor(
                     updateNodeSensitiveUseCase(nodeId = NodeId(nodeId), isSensitive = hide)
                 }.onFailure { Timber.e("Hide node exception: $it") }
             }
+        }
+    }
+
+    private fun monitorIsHiddenNodesOnboarded() {
+        viewModelScope.launch {
+            val isHiddenNodesOnboarded = isHiddenNodesOnboardedUseCase()
+            _state.update {
+                it.copy(isHiddenNodesOnboarded = isHiddenNodesOnboarded)
+            }
+        }
+    }
+
+    /**
+     * Mark hidden nodes onboarding has shown
+     */
+    fun setHiddenNodesOnboarded() {
+        _state.update {
+            it.copy(isHiddenNodesOnboarded = true)
         }
     }
 }

@@ -1,10 +1,10 @@
-import groovy.lang.Closure
 import mega.privacy.android.build.preBuiltSdkDependency
 import mega.privacy.android.build.shouldApplyDefaultConfiguration
 
 plugins {
     alias(convention.plugins.mega.android.library)
     alias(convention.plugins.mega.android.room)
+    alias(convention.plugins.mega.android.test)
     id("kotlin-android")
     id("kotlin-kapt")
     id("de.mannodermaus.android-junit5")
@@ -64,10 +64,6 @@ android {
     namespace = "mega.privacy.android.data"
 }
 
-tasks.withType<Test> {
-    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).takeIf { it > 0 } ?: 1
-}
-
 android.testVariants.all {
     compileConfiguration.exclude(group = "com.google.guava", module = "listenablefuture")
     runtimeConfiguration.exclude(group = "com.google.guava", module = "listenablefuture")
@@ -75,6 +71,8 @@ android.testVariants.all {
 
 dependencies {
     implementation(project(":domain"))
+    implementation(project(":shared:sync"))
+    implementation("com.google.guava:guava:31.0.1-jre")
     preBuiltSdkDependency(rootProject.extra)
 
     implementation(lib.coroutines.core)
@@ -112,6 +110,7 @@ dependencies {
 
     implementation(lib.sqlcipher)
     implementation(androidx.security.crypto)
+    implementation(google.tink)
 
     // Testing dependencies
     testImplementation(testlib.bundles.unit.test)

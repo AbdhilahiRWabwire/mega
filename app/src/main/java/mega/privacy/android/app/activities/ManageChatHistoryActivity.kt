@@ -1,5 +1,9 @@
 package mega.privacy.android.app.activities
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
@@ -7,26 +11,24 @@ import android.widget.NumberPicker.OnScrollListener
 import android.widget.NumberPicker.OnValueChangeListener
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
+import mega.privacy.android.app.constants.BroadcastConstants.ACTION_UPDATE_RETENTION_TIME
+import mega.privacy.android.app.constants.BroadcastConstants.RETENTION_TIME
 import mega.privacy.android.app.databinding.ActivityManageChatHistoryBinding
+import mega.privacy.android.app.presentation.chat.model.ChatRoomUiState
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.ClearChatConfirmationDialog
 import mega.privacy.android.app.presentation.meeting.managechathistory.ManageChatHistoryViewModel
 import mega.privacy.android.app.presentation.meeting.managechathistory.model.ChatHistoryRetentionOption
-import mega.privacy.android.app.presentation.meeting.managechathistory.view.screen.CHAT_HISTORY_RETENTION_TIME_CONFIRMATION_TAG
+import mega.privacy.android.app.presentation.meeting.managechathistory.view.dialog.ChatHistoryRetentionConfirmationDialog
 import mega.privacy.android.app.utils.ChatUtil
 import mega.privacy.android.app.utils.Constants.DISABLED_RETENTION_TIME
 import mega.privacy.android.app.utils.Constants.SECONDS_IN_DAY
@@ -35,9 +37,7 @@ import mega.privacy.android.app.utils.Constants.SECONDS_IN_MONTH_30
 import mega.privacy.android.app.utils.Constants.SECONDS_IN_WEEK
 import mega.privacy.android.app.utils.Constants.SECONDS_IN_YEAR
 import mega.privacy.android.app.utils.TextUtil
-import mega.privacy.android.core.ui.controls.dialogs.ConfirmationDialogWithRadioButtons
 import mega.privacy.android.domain.entity.ThemeMode
-import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.shared.theme.MegaAppTheme
 import timber.log.Timber
@@ -61,6 +61,11 @@ class ManageChatHistoryActivity : PasscodeActivity(), View.OnClickListener {
         private const val MAXIMUM_VALUE_NUMBER_PICKER_MONTHS = 12
         private const val MINIMUM_VALUE_TEXT_PICKER = 0
         private const val MAXIMUM_VALUE_TEXT_PICKER = 4
+
+        private const val IS_HISTORY_RETENTION_CONFIRMATION_SHOWN =
+            "IS_HISTORY_RETENTION_CONFIRMATION_SHOWN"
+        private const val IS_CLEAR_CHAT_CONFIRMATION_SHOWN =
+            "IS_CLEAR_CHAT_CONFIRMATION_SHOWN"
     }
 
     /**
@@ -80,9 +85,47 @@ class ManageChatHistoryActivity : PasscodeActivity(), View.OnClickListener {
         }
     }
 
-    @OptIn(ExperimentalComposeUiApi::class)
+    private val retentionTimeReceiver: BroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == null || intent.action != ACTION_UPDATE_RETENTION_TIME) {
+                return
+            }
+
+            val seconds =
+                intent.getLongExtra(RETENTION_TIME, DISABLED_RETENTION_TIME)
+            viewModel.updateRetentionTimeState(seconds)
+            updateRetentionTimeUI(seconds)
+        }
+    }
+
+    private var shouldShowHistoryRetentionConfirmation by mutableStateOf(false)
+    private var shouldShowClearChatConfirmation by mutableStateOf(false)
+
+    /**
+     * Called to retrieve per-instance state from an activity before being killed
+     * so that the state can be restored in onCreate or onRestoreInstanceState
+     * (the Bundle populated by this method will be passed to both).
+     */
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(
+            IS_HISTORY_RETENTION_CONFIRMATION_SHOWN,
+            shouldShowHistoryRetentionConfirmation
+        )
+        outState.putBoolean(
+            IS_CLEAR_CHAT_CONFIRMATION_SHOWN,
+            shouldShowClearChatConfirmation
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        savedInstanceState?.let {
+            shouldShowHistoryRetentionConfirmation =
+                it.getBoolean(IS_HISTORY_RETENTION_CONFIRMATION_SHOWN)
+            shouldShowClearChatConfirmation = it.getBoolean(IS_CLEAR_CHAT_CONFIRMATION_SHOWN)
+        }
 
         if (intent == null || intent.extras == null) {
             Timber.e("Cannot init view, Intent is null")
@@ -93,6 +136,11 @@ class ManageChatHistoryActivity : PasscodeActivity(), View.OnClickListener {
 
         collectFlows()
 
+        registerReceiver(
+            retentionTimeReceiver,
+            IntentFilter(ACTION_UPDATE_RETENTION_TIME)
+        )
+
         binding = ActivityManageChatHistoryBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -101,44 +149,35 @@ class ManageChatHistoryActivity : PasscodeActivity(), View.OnClickListener {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
             MegaAppTheme(isDark = themeMode.isDarkMode()) {
-                if (uiState.shouldShowClearChatConfirmation) {
+                if (shouldShowClearChatConfirmation) {
                     uiState.chatRoom?.apply {
                         ClearChatConfirmationDialog(
                             isMeeting = isMeeting,
                             onConfirm = {
-                                viewModel.apply {
-                                    dismissClearChatConfirmation()
-                                    clearChatHistory(chatId)
-                                }
+                                shouldShowClearChatConfirmation = false
+                                viewModel.clearChatHistory(chatId)
                             },
-                            onDismiss = viewModel::dismissClearChatConfirmation
+                            onDismiss = {
+                                shouldShowClearChatConfirmation = false
+                            }
                         )
                     }
                 }
 
-                if (uiState.shouldShowHistoryRetentionConfirmation) {
-                    ConfirmationDialogWithRadioButtons(
-                        modifier = Modifier
-                            .semantics { testTagsAsResourceId = true }
-                            .testTag(CHAT_HISTORY_RETENTION_TIME_CONFIRMATION_TAG),
-                        titleText = stringResource(id = R.string.title_properties_history_retention),
-                        subTitleText = stringResource(id = R.string.subtitle_properties_manage_chat),
-                        radioOptions = ChatHistoryRetentionOption.entries,
-                        initialSelectedOption = uiState.selectedHistoryRetentionTimeOption,
-                        optionDescriptionMapper = @Composable {
-                            stringResource(id = it.stringId)
+                if (shouldShowHistoryRetentionConfirmation) {
+                    ChatHistoryRetentionConfirmationDialog(
+                        currentRetentionTime = uiState.retentionTime,
+                        onDismissRequest = {
+                            shouldShowHistoryRetentionConfirmation = false
                         },
-                        onOptionSelected = viewModel::updateHistoryRetentionTimeConfirmation,
-                        confirmButtonText = stringResource(id = uiState.confirmButtonStringId),
-                        isConfirmButtonEnable = { uiState.isConfirmButtonEnable },
-                        onConfirmRequest = {
-                            viewModel.apply {
-                                onNewRetentionTimeOptionConfirmed(it)
-                                dismissHistoryRetentionConfirmation()
+                        onConfirmClick = {
+                            if (it == ChatHistoryRetentionOption.Custom) {
+                                showPickers(uiState.retentionTime)
+                            } else {
+                                viewModel.setChatRetentionTime(getSecondsFromRetentionTimeOption(it))
                             }
-                        },
-                        cancelButtonText = stringResource(id = R.string.general_cancel),
-                        onDismissRequest = viewModel::dismissHistoryRetentionConfirmation,
+                            shouldShowHistoryRetentionConfirmation = false
+                        }
                     )
                 }
             }
@@ -147,16 +186,19 @@ class ManageChatHistoryActivity : PasscodeActivity(), View.OnClickListener {
         onBackPressedDispatcher.addCallback(this, onBackPressCallback)
     }
 
+    private fun getSecondsFromRetentionTimeOption(option: ChatHistoryRetentionOption) =
+        when (option) {
+            ChatHistoryRetentionOption.OneDay -> SECONDS_IN_DAY.toLong()
+            ChatHistoryRetentionOption.OneWeek -> SECONDS_IN_WEEK.toLong()
+            ChatHistoryRetentionOption.OneMonth -> SECONDS_IN_MONTH_30.toLong()
+            else -> DISABLED_RETENTION_TIME
+        }
+
     private fun collectFlows() {
         collectFlow(viewModel.uiState) { uiState ->
             if (uiState.shouldNavigateUp) {
                 finish()
                 viewModel.onNavigatedUp()
-            }
-
-            if (uiState.shouldShowCustomTimePicker) {
-                showPickers(uiState.retentionTime)
-                viewModel.hideCustomTimePicker()
             }
         }
 
@@ -169,7 +211,7 @@ class ManageChatHistoryActivity : PasscodeActivity(), View.OnClickListener {
         }
     }
 
-    private fun setupUI(chat: ChatRoom?) {
+    private fun setupUI(chat: ChatRoomUiState?) {
         setSupportActionBar(binding.manageChatToolbar)
         val actionBar = supportActionBar
         actionBar?.setDisplayHomeAsUpEnabled(true)
@@ -523,19 +565,19 @@ class ManageChatHistoryActivity : PasscodeActivity(), View.OnClickListener {
     override fun onClick(v: View) {
         when (v.id) {
             R.id.clear_chat_history_layout -> {
-                viewModel.showClearChatConfirmation()
+                shouldShowClearChatConfirmation = true
             }
 
             R.id.history_retention_switch_layout -> {
                 if (binding.historyRetentionSwitch.isChecked) {
                     viewModel.setChatRetentionTime(period = DISABLED_RETENTION_TIME)
                 } else {
-                    viewModel.showHistoryRetentionConfirmation()
+                    shouldShowHistoryRetentionConfirmation = true
                 }
             }
 
             R.id.retention_time_text_layout -> {
-                viewModel.showHistoryRetentionConfirmation()
+                shouldShowHistoryRetentionConfirmation = true
             }
 
             R.id.picker_button -> {
@@ -576,5 +618,10 @@ class ManageChatHistoryActivity : PasscodeActivity(), View.OnClickListener {
             onBackPressedDispatcher.onBackPressed()
 
         return super.onOptionsItemSelected(item)
+    }
+
+    override fun onDestroy() {
+        unregisterReceiver(retentionTimeReceiver)
+        super.onDestroy()
     }
 }

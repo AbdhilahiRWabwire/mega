@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mega.privacy.android.app.R
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.generalusecase.FilePrepareUseCase
 import mega.privacy.android.app.globalmanagement.MegaChatRequestHandler
 import mega.privacy.android.app.globalmanagement.MyAccountInfo
@@ -100,11 +101,12 @@ import mega.privacy.android.domain.usecase.avatar.GetMyAvatarFileUseCase
 import mega.privacy.android.domain.usecase.avatar.SetAvatarUseCase
 import mega.privacy.android.domain.usecase.billing.GetPaymentMethodUseCase
 import mega.privacy.android.domain.usecase.contact.GetCurrentUserEmail
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.file.GetFileVersionsOption
 import mega.privacy.android.domain.usecase.login.CheckPasswordReminderUseCase
 import mega.privacy.android.domain.usecase.login.LogoutUseCase
 import mega.privacy.android.domain.usecase.verification.MonitorVerificationStatus
-import mega.privacy.android.domain.usecase.verification.ResetSMSVerifiedPhoneNumber
+import mega.privacy.android.domain.usecase.verification.ResetSMSVerifiedPhoneNumberUseCase
 import nz.mega.sdk.MegaAccountDetails
 import nz.mega.sdk.MegaApiAndroid
 import nz.mega.sdk.MegaApiJava
@@ -128,7 +130,7 @@ import javax.inject.Inject
  * @property cancelSubscriptionsUseCase
  * @property getMyAvatarFileUseCase
  * @property checkPasswordReminderUseCase
- * @property resetSMSVerifiedPhoneNumber
+ * @property resetSMSVerifiedPhoneNumberUseCase
  * @property getUserDataUseCase
  * @property getFileVersionsOption
  * @property queryCancelLinkUseCase Queries information on an Account Cancellation Link
@@ -162,7 +164,7 @@ class MyAccountViewModel @Inject constructor(
     private val cancelSubscriptionsUseCase: CancelSubscriptionsUseCase,
     private val getMyAvatarFileUseCase: GetMyAvatarFileUseCase,
     private val checkPasswordReminderUseCase: CheckPasswordReminderUseCase,
-    private val resetSMSVerifiedPhoneNumber: ResetSMSVerifiedPhoneNumber,
+    private val resetSMSVerifiedPhoneNumberUseCase: ResetSMSVerifiedPhoneNumberUseCase,
     private val getUserDataUseCase: GetUserDataUseCase,
     private val getFileVersionsOption: GetFileVersionsOption,
     private val queryCancelLinkUseCase: QueryCancelLinkUseCase,
@@ -187,6 +189,7 @@ class MyAccountViewModel @Inject constructor(
     private val monitorBackupFolder: MonitorBackupFolder,
     private val getFolderTreeInfo: GetFolderTreeInfo,
     private val getNodeByIdUseCase: GetNodeByIdUseCase,
+    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     private val snackBarHandler: SnackBarHandler,
 ) : ViewModel() {
@@ -277,6 +280,31 @@ class MyAccountViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         resetJob?.cancel()
+    }
+
+    /**
+     * Checks if the new cancel subscription feature is enabled.
+     */
+    fun checkForNewCancelSubscriptionFeature() {
+        viewModelScope.launch {
+            runCatching {
+                val isEnabled = getFeatureFlagValueUseCase(AppFeatures.CancelSubscription)
+                _state.update {
+                    it.copy(showNewCancelSubscriptionFeature = isEnabled)
+                }
+            }.onFailure {
+                Timber.e(it, "Failed to check for new cancel subscription feature")
+            }
+        }
+    }
+
+    /**
+     * Resets the check for the new cancel subscription feature flag.
+     */
+    fun resetCheckForNewCancelSubscriptionFeature() {
+        _state.update {
+            it.copy(showNewCancelSubscriptionFeature = null)
+        }
     }
 
     private fun refreshUserName(forceRefresh: Boolean) {
@@ -954,7 +982,7 @@ class MyAccountViewModel @Inject constructor(
      */
     fun resetPhoneNumber(isModify: Boolean, snackbarShower: SnackbarShower) {
         resetJob = viewModelScope.launch {
-            runCatching { resetSMSVerifiedPhoneNumber() }
+            runCatching { resetSMSVerifiedPhoneNumberUseCase() }
                 .onSuccess {
                     getUserData(isModify, snackbarShower)
                 }

@@ -13,14 +13,13 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.R
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.settings.camerauploads.SettingsCameraUploadsViewModel
 import mega.privacy.android.app.presentation.settings.camerauploads.mapper.UploadOptionUiItemMapper
 import mega.privacy.android.app.presentation.settings.camerauploads.mapper.VideoQualityUiItemMapper
 import mega.privacy.android.app.presentation.settings.camerauploads.model.UploadConnectionType
 import mega.privacy.android.app.presentation.settings.camerauploads.model.UploadOptionUiItem
 import mega.privacy.android.app.presentation.settings.camerauploads.model.VideoQualityUiItem
-import mega.privacy.android.app.presentation.snackbar.MegaSnackbarDuration
-import mega.privacy.android.app.presentation.snackbar.SnackBarHandler
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.CameraUploadsFolderDestinationUpdate
 import mega.privacy.android.domain.entity.VideoQuality
@@ -48,6 +47,7 @@ import mega.privacy.android.domain.usecase.camerauploads.GetVideoCompressionSize
 import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsByWifiUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsEnabledUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsChargingRequiredForVideoCompressionUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsChargingRequiredToUploadContentUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsPrimaryFolderNodeValidUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsPrimaryFolderPathValidUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsSecondaryFolderNodeValidUseCase
@@ -58,6 +58,7 @@ import mega.privacy.android.domain.usecase.camerauploads.MonitorCameraUploadsSet
 import mega.privacy.android.domain.usecase.camerauploads.PreparePrimaryFolderPathUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetCameraUploadsByWifiUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetChargingRequiredForVideoCompressionUseCase
+import mega.privacy.android.domain.usecase.camerauploads.SetChargingRequiredToUploadContentUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetLocationTagsEnabledUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetPrimaryFolderPathUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetSecondaryFolderLocalPathUseCase
@@ -70,6 +71,7 @@ import mega.privacy.android.domain.usecase.camerauploads.SetupDefaultSecondaryFo
 import mega.privacy.android.domain.usecase.camerauploads.SetupMediaUploadsSettingUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetupPrimaryFolderUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetupSecondaryFolderUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.workers.StartCameraUploadUseCase
 import mega.privacy.android.domain.usecase.workers.StopCameraUploadsUseCase
@@ -111,6 +113,7 @@ internal class SettingsCameraUploadsViewModelTest {
     private val deleteCameraUploadsTemporaryRootDirectoryUseCase =
         mock<DeleteCameraUploadsTemporaryRootDirectoryUseCase>()
     private val disableMediaUploadsSettingsUseCase = mock<DisableMediaUploadsSettingsUseCase>()
+    private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase>()
     private val getPrimaryFolderNodeUseCase = mock<GetPrimaryFolderNodeUseCase>()
     private val getPrimaryFolderPathUseCase = mock<GetPrimaryFolderPathUseCase>()
     private val getSecondaryFolderNodeUseCase = mock<GetSecondaryFolderNodeUseCase>()
@@ -122,6 +125,8 @@ internal class SettingsCameraUploadsViewModelTest {
     private val isCameraUploadsEnabledUseCase = mock<IsCameraUploadsEnabledUseCase>()
     private val isChargingRequiredForVideoCompressionUseCase =
         mock<IsChargingRequiredForVideoCompressionUseCase>()
+    private val isChargingRequiredToUploadContentUseCase =
+        mock<IsChargingRequiredToUploadContentUseCase>()
     private val isConnectedToInternetUseCase = mock<IsConnectedToInternetUseCase>()
     private val isPrimaryFolderNodeValidUseCase = mock<IsPrimaryFolderNodeValidUseCase>()
     private val isPrimaryFolderPathValidUseCase = mock<IsPrimaryFolderPathValidUseCase>()
@@ -137,6 +142,8 @@ internal class SettingsCameraUploadsViewModelTest {
     private val setCameraUploadsByWifiUseCase = mock<SetCameraUploadsByWifiUseCase>()
     private val setChargingRequiredForVideoCompressionUseCase =
         mock<SetChargingRequiredForVideoCompressionUseCase>()
+    private val setChargingRequiredToUploadContentUseCase =
+        mock<SetChargingRequiredToUploadContentUseCase>()
     private val setLocationTagsEnabledUseCase = mock<SetLocationTagsEnabledUseCase>()
     private val setPrimaryFolderPathUseCase = mock<SetPrimaryFolderPathUseCase>()
     private val setSecondaryFolderLocalPathUseCase = mock<SetSecondaryFolderLocalPathUseCase>()
@@ -149,7 +156,6 @@ internal class SettingsCameraUploadsViewModelTest {
     private val setupMediaUploadsSettingUseCase = mock<SetupMediaUploadsSettingUseCase>()
     private val setupPrimaryFolderUseCase = mock<SetupPrimaryFolderUseCase>()
     private val setupSecondaryFolderUseCase = mock<SetupSecondaryFolderUseCase>()
-    private val snackBarHandler = mock<SnackBarHandler>()
     private val startCameraUploadUseCase = mock<StartCameraUploadUseCase>()
     private val stopCameraUploadsUseCase = mock<StopCameraUploadsUseCase>()
     private val uploadOptionUiItemMapper = Mockito.spy(UploadOptionUiItemMapper())
@@ -168,6 +174,7 @@ internal class SettingsCameraUploadsViewModelTest {
             clearCameraUploadsRecordUseCase,
             deleteCameraUploadsTemporaryRootDirectoryUseCase,
             disableMediaUploadsSettingsUseCase,
+            getFeatureFlagValueUseCase,
             getPrimaryFolderNodeUseCase,
             getPrimaryFolderPathUseCase,
             getSecondaryFolderNodeUseCase,
@@ -178,6 +185,7 @@ internal class SettingsCameraUploadsViewModelTest {
             isCameraUploadsByWifiUseCase,
             isCameraUploadsEnabledUseCase,
             isChargingRequiredForVideoCompressionUseCase,
+            isChargingRequiredToUploadContentUseCase,
             isConnectedToInternetUseCase,
             isPrimaryFolderNodeValidUseCase,
             isPrimaryFolderPathValidUseCase,
@@ -190,6 +198,7 @@ internal class SettingsCameraUploadsViewModelTest {
             preparePrimaryFolderPathUseCase,
             setCameraUploadsByWifiUseCase,
             setChargingRequiredForVideoCompressionUseCase,
+            setChargingRequiredToUploadContentUseCase,
             setLocationTagsEnabledUseCase,
             setPrimaryFolderPathUseCase,
             setSecondaryFolderLocalPathUseCase,
@@ -202,7 +211,6 @@ internal class SettingsCameraUploadsViewModelTest {
             setupMediaUploadsSettingUseCase,
             setupPrimaryFolderUseCase,
             setupSecondaryFolderUseCase,
-            snackBarHandler,
             startCameraUploadUseCase,
             stopCameraUploadsUseCase,
         )
@@ -218,6 +226,7 @@ internal class SettingsCameraUploadsViewModelTest {
         maximumNonChargingVideoCompressionSize: Int = 500,
         primaryFolderPath: String = "primary/folder/path",
         requireChargingDuringVideoCompression: Boolean = true,
+        requireChargingWhenUploadingContent: Boolean = false,
         secondaryFolderPath: String = "secondary/folder/path",
         shouldIncludeLocationTags: Boolean = true,
         shouldKeepUploadFileNames: Boolean = true,
@@ -234,6 +243,9 @@ internal class SettingsCameraUploadsViewModelTest {
         }
         whenever(areLocationTagsEnabledUseCase()).thenReturn(shouldIncludeLocationTags)
         whenever(areUploadFileNamesKeptUseCase()).thenReturn(shouldKeepUploadFileNames)
+        whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
+            true
+        )
         whenever(getPrimaryFolderNodeUseCase()).thenReturn(cameraUploadsFolderNode)
         whenever(getPrimaryFolderPathUseCase()).thenReturn(primaryFolderPath)
         whenever(getSecondaryFolderNodeUseCase()).thenReturn(mediaUploadsFolderNode)
@@ -248,6 +260,9 @@ internal class SettingsCameraUploadsViewModelTest {
         whenever(isChargingRequiredForVideoCompressionUseCase()).thenReturn(
             requireChargingDuringVideoCompression
         )
+        whenever(isChargingRequiredToUploadContentUseCase()).thenReturn(
+            requireChargingWhenUploadingContent
+        )
         whenever(isSecondaryFolderEnabled()).thenReturn(isMediaUploadsEnabled)
         whenever(monitorCameraUploadsSettingsActionsUseCase()).thenReturn(
             fakeMonitorCameraUploadsSettingsActionsFlow
@@ -261,6 +276,7 @@ internal class SettingsCameraUploadsViewModelTest {
             clearCameraUploadsRecordUseCase = clearCameraUploadsRecordUseCase,
             deleteCameraUploadsTemporaryRootDirectoryUseCase = deleteCameraUploadsTemporaryRootDirectoryUseCase,
             disableMediaUploadsSettingsUseCase = disableMediaUploadsSettingsUseCase,
+            getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             getPrimaryFolderNodeUseCase = getPrimaryFolderNodeUseCase,
             getPrimaryFolderPathUseCase = getPrimaryFolderPathUseCase,
             getSecondaryFolderNodeUseCase = getSecondaryFolderNodeUseCase,
@@ -271,6 +287,7 @@ internal class SettingsCameraUploadsViewModelTest {
             isCameraUploadsByWifiUseCase = isCameraUploadsByWifiUseCase,
             isCameraUploadsEnabledUseCase = isCameraUploadsEnabledUseCase,
             isChargingRequiredForVideoCompressionUseCase = isChargingRequiredForVideoCompressionUseCase,
+            isChargingRequiredToUploadContentUseCase = isChargingRequiredToUploadContentUseCase,
             isConnectedToInternetUseCase = isConnectedToInternetUseCase,
             isPrimaryFolderNodeValidUseCase = isPrimaryFolderNodeValidUseCase,
             isPrimaryFolderPathValidUseCase = isPrimaryFolderPathValidUseCase,
@@ -283,6 +300,7 @@ internal class SettingsCameraUploadsViewModelTest {
             preparePrimaryFolderPathUseCase = preparePrimaryFolderPathUseCase,
             setCameraUploadsByWifiUseCase = setCameraUploadsByWifiUseCase,
             setChargingRequiredForVideoCompressionUseCase = setChargingRequiredForVideoCompressionUseCase,
+            setChargingRequiredToUploadContentUseCase = setChargingRequiredToUploadContentUseCase,
             setLocationTagsEnabledUseCase = setLocationTagsEnabledUseCase,
             setPrimaryFolderPathUseCase = setPrimaryFolderPathUseCase,
             setupSecondaryFolderUseCase = setupSecondaryFolderUseCase,
@@ -295,7 +313,6 @@ internal class SettingsCameraUploadsViewModelTest {
             setupDefaultSecondaryFolderUseCase = setupDefaultSecondaryFolderUseCase,
             setupMediaUploadsSettingUseCase = setupMediaUploadsSettingUseCase,
             setupPrimaryFolderUseCase = setupPrimaryFolderUseCase,
-            snackBarHandler = snackBarHandler,
             startCameraUploadUseCase = startCameraUploadUseCase,
             stopCameraUploadsUseCase = stopCameraUploadsUseCase,
             uploadOptionUiItemMapper = uploadOptionUiItemMapper,
@@ -320,10 +337,9 @@ internal class SettingsCameraUploadsViewModelTest {
 
                 underTest.onCameraUploadsStateChanged(enabled = false)
 
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -333,10 +349,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(isConnectedToInternetUseCase()).thenThrow(RuntimeException())
 
                 assertDoesNotThrow { underTest.onCameraUploadsStateChanged(enabled = false) }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -372,10 +388,9 @@ internal class SettingsCameraUploadsViewModelTest {
 
                 underTest.onCameraUploadsStateChanged(enabled = true)
 
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -385,10 +400,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(isConnectedToInternetUseCase()).thenThrow(RuntimeException())
 
                 assertDoesNotThrow { underTest.onCameraUploadsStateChanged(enabled = true) }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -470,10 +485,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 initializeUnderTest()
 
                 assertDoesNotThrow { underTest.onMediaPermissionsGranted() }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -486,10 +501,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 initializeUnderTest()
 
                 assertDoesNotThrow { underTest.onMediaPermissionsGranted() }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -507,6 +522,21 @@ internal class SettingsCameraUploadsViewModelTest {
                     val state = awaitItem()
                     assertThat(state.isCameraUploadsEnabled).isTrue()
                     assertThat(state.isMediaUploadsEnabled).isTrue()
+                }
+            }
+
+        @Test
+        fun `test that a snackbar is shown when enabling camera uploads and the user is on a regular or active business administrator account`() =
+            runTest {
+                whenever(checkEnableCameraUploadsStatusUseCase()).thenReturn(
+                    EnableCameraUploadsStatus.CAN_ENABLE_CAMERA_UPLOADS
+                )
+                initializeUnderTest()
+
+                underTest.onMediaPermissionsGranted()
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.settings_camera_notif_initializing_title))
                 }
             }
 
@@ -561,12 +591,11 @@ internal class SettingsCameraUploadsViewModelTest {
                 initializeUnderTest()
 
                 assertDoesNotThrow { underTest.onRegularBusinessAccountSubUserPromptAcknowledged() }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
                 underTest.uiState.test {
-                    assertThat(awaitItem().businessAccountPromptType).isNull()
+                    val state = awaitItem()
+                    assertThat(state.businessAccountPromptType).isNull()
+                    assertThat(state.snackbarMessage).isEqualTo(triggered(R.string.general_error))
                 }
             }
 
@@ -610,10 +639,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 assertDoesNotThrow {
                     underTest.onHowToUploadPromptOptionSelected(UploadConnectionType.WIFI_OR_MOBILE_DATA)
                 }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @ParameterizedTest(name = "new upload connection type: {0}")
@@ -635,6 +664,50 @@ internal class SettingsCameraUploadsViewModelTest {
     }
 
     /**
+     * The Test Group that verifies behaviors when Device Charging is enabled / disabled when
+     * the active Camera Uploads begins uploading content
+     */
+    @Nested
+    @DisplayName("Upload only while charging")
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    internal inner class UploadOnlyWhileChargingTestGroup {
+        @Test
+        fun `test that an error snackbar is displayed when changing the device charging state throws an exception`() =
+            runTest {
+                initializeUnderTest()
+                whenever(setChargingRequiredToUploadContentUseCase(any())).thenThrow(
+                    RuntimeException()
+                )
+
+                assertDoesNotThrow { underTest.onChargingWhenUploadingContentStateChanged(false) }
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
+            }
+
+        @ParameterizedTest(name = "new device charging state when uploading content: {0}")
+        @ValueSource(booleans = [true, false])
+        fun `test that the device charging state is changed`(requireChargingWhenUploadingContent: Boolean) =
+            runTest {
+                initializeUnderTest()
+
+                underTest.onChargingWhenUploadingContentStateChanged(
+                    requireChargingWhenUploadingContent
+                )
+
+                verify(setChargingRequiredToUploadContentUseCase).invoke(
+                    requireChargingWhenUploadingContent
+                )
+                underTest.uiState.test {
+                    assertThat(awaitItem().requireChargingWhenUploadingContent).isEqualTo(
+                        requireChargingWhenUploadingContent
+                    )
+                }
+            }
+    }
+
+    /**
      * The Test Group that verifies behaviors when changing the type of content being uploaded by
      * Camera Uploads. The functionality is triggered when the User clicks the File Upload Tile
      */
@@ -649,10 +722,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(setUploadOptionUseCase(any())).thenThrow(RuntimeException())
 
                 assertDoesNotThrow { underTest.onUploadOptionUiItemSelected(UploadOptionUiItem.PhotosOnly) }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @ParameterizedTest(name = "new upload option ui item: {0}")
@@ -689,10 +762,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(setUploadVideoQualityUseCase(any())).thenThrow(RuntimeException())
 
                 assertDoesNotThrow { underTest.onVideoQualityUiItemSelected(VideoQualityUiItem.High) }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @ParameterizedTest(name = "new video quality ui item: {0}")
@@ -727,10 +800,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(setUploadFileNamesKeptUseCase(any())).thenThrow(RuntimeException())
 
                 assertDoesNotThrow { underTest.onKeepFileNamesStateChanged(false) }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @ParameterizedTest(name = "new keep upload file names state: {0}")
@@ -767,10 +840,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(setLocationTagsEnabledUseCase(any())).thenThrow(RuntimeException())
 
                 assertDoesNotThrow { underTest.onIncludeLocationTagsStateChanged(false) }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @ParameterizedTest(name = "new include location tags state: {0}")
@@ -809,10 +882,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 )
 
                 assertDoesNotThrow { underTest.onChargingDuringVideoCompressionStateChanged(false) }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @ParameterizedTest(name = "new device charging state during video compression: {0}")
@@ -853,10 +926,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(setVideoCompressionSizeLimitUseCase(any())).thenThrow(RuntimeException())
 
                 assertDoesNotThrow { underTest.onNewVideoCompressionSizeLimitProvided(500) }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -891,10 +964,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(isPrimaryFolderPathValidUseCase(any())).thenThrow(RuntimeException())
 
                 assertDoesNotThrow { underTest.onLocalPrimaryFolderSelected("new/primary/folder/path") }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -904,10 +977,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(isPrimaryFolderPathValidUseCase(any())).thenReturn(false)
 
                 underTest.onLocalPrimaryFolderSelected("new/primary/folder/path")
-                snackBarHandler.postSnackbarMessage(
-                    resId = R.string.error_invalid_folder_selected,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.error_invalid_folder_selected))
+                }
             }
 
         @Test
@@ -917,10 +990,9 @@ internal class SettingsCameraUploadsViewModelTest {
 
                 underTest.onLocalPrimaryFolderSelected(null)
 
-                snackBarHandler.postSnackbarMessage(
-                    resId = R.string.error_invalid_folder_selected,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.error_invalid_folder_selected))
+                }
             }
 
         @Test
@@ -986,10 +1058,9 @@ internal class SettingsCameraUploadsViewModelTest {
 
                 assertDoesNotThrow { underTest.onPrimaryFolderNodeSelected(NodeId(123456L)) }
 
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -1000,10 +1071,9 @@ internal class SettingsCameraUploadsViewModelTest {
 
                 underTest.onPrimaryFolderNodeSelected(NodeId(123456L))
 
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.error_invalid_folder_selected,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.error_invalid_folder_selected))
+                }
             }
 
         @Test
@@ -1095,10 +1165,9 @@ internal class SettingsCameraUploadsViewModelTest {
 
                 underTest.onMediaUploadsStateChanged(enabled = false)
 
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -1108,10 +1177,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(isConnectedToInternetUseCase()).thenThrow(RuntimeException())
 
                 assertDoesNotThrow { underTest.onMediaUploadsStateChanged(enabled = false) }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -1135,10 +1204,9 @@ internal class SettingsCameraUploadsViewModelTest {
 
                 underTest.onMediaUploadsStateChanged(enabled = true)
 
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -1148,10 +1216,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(isConnectedToInternetUseCase()).thenThrow(RuntimeException())
 
                 assertDoesNotThrow { underTest.onMediaUploadsStateChanged(enabled = true) }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -1253,10 +1321,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(isSecondaryFolderPathValidUseCase(any())).thenThrow(RuntimeException())
 
                 assertDoesNotThrow { underTest.onLocalSecondaryFolderSelected("new/secondary/folder/path") }
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -1266,10 +1334,10 @@ internal class SettingsCameraUploadsViewModelTest {
                 whenever(isSecondaryFolderPathValidUseCase(any())).thenReturn(false)
 
                 underTest.onLocalSecondaryFolderSelected("new/secondary/folder/path")
-                snackBarHandler.postSnackbarMessage(
-                    resId = R.string.error_invalid_folder_selected,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.error_invalid_folder_selected))
+                }
             }
 
         @Test
@@ -1279,10 +1347,9 @@ internal class SettingsCameraUploadsViewModelTest {
 
                 underTest.onLocalSecondaryFolderSelected(null)
 
-                snackBarHandler.postSnackbarMessage(
-                    resId = R.string.error_invalid_folder_selected,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.error_invalid_folder_selected))
+                }
             }
 
         @Test
@@ -1337,10 +1404,9 @@ internal class SettingsCameraUploadsViewModelTest {
 
                 assertDoesNotThrow { underTest.onSecondaryFolderNodeSelected(NodeId(789012L)) }
 
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.general_error,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.general_error))
+                }
             }
 
         @Test
@@ -1351,10 +1417,9 @@ internal class SettingsCameraUploadsViewModelTest {
 
                 underTest.onSecondaryFolderNodeSelected(NodeId(789012L))
 
-                verify(snackBarHandler).postSnackbarMessage(
-                    resId = R.string.error_invalid_folder_selected,
-                    snackbarDuration = MegaSnackbarDuration.Long,
-                )
+                underTest.uiState.test {
+                    assertThat(awaitItem().snackbarMessage).isEqualTo(triggered(R.string.error_invalid_folder_selected))
+                }
             }
 
         @Test

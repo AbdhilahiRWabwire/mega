@@ -22,11 +22,11 @@ import mega.privacy.android.app.presentation.settings.reportissue.ReportIssueVie
 import mega.privacy.android.app.presentation.settings.reportissue.model.SubmitIssueResult
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.Progress
-import mega.privacy.android.domain.usecase.AreChatLogsEnabled
-import mega.privacy.android.domain.usecase.AreSdkLogsEnabled
 import mega.privacy.android.domain.usecase.GetSupportEmailUseCase
 import mega.privacy.android.domain.usecase.SubmitIssueUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.domain.usecase.logging.AreChatLogsEnabledUseCase
+import mega.privacy.android.domain.usecase.logging.AreSdkLogsEnabledUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -53,8 +53,8 @@ class ReportIssueViewModelTest {
     private lateinit var underTest: ReportIssueViewModel
 
     private val submitIssueUseCase = mock<SubmitIssueUseCase>()
-    private val areSdkLogsEnabled = mock<AreSdkLogsEnabled>()
-    private val areChatLogsEnabled = mock<AreChatLogsEnabled>()
+    private val areSdkLogsEnabledUseCase = mock<AreSdkLogsEnabledUseCase>()
+    private val areChatLogsEnabledUseCase = mock<AreChatLogsEnabledUseCase>()
 
     private var savedStateHandle = SavedStateHandle(mapOf())
 
@@ -70,10 +70,10 @@ class ReportIssueViewModelTest {
         monitorConnectivityUseCase.stub {
             on { invoke() } doReturn true.asHotFlow()
         }
-        areSdkLogsEnabled.stub {
+        areSdkLogsEnabledUseCase.stub {
             on { invoke() } doReturn false.asHotFlow()
         }
-        areChatLogsEnabled.stub {
+        areChatLogsEnabledUseCase.stub {
             on { invoke() } doReturn false.asHotFlow()
         }
         getFeatureFlagValueUseCase.stub {
@@ -85,10 +85,9 @@ class ReportIssueViewModelTest {
     private fun initViewModel() {
         underTest = ReportIssueViewModel(
             submitIssueUseCase = submitIssueUseCase,
-            areSdkLogsEnabled = areSdkLogsEnabled,
-            areChatLogsEnabled = areChatLogsEnabled,
+            areSdkLogsEnabledUseCase = areSdkLogsEnabledUseCase,
+            areChatLogsEnabledUseCase = areChatLogsEnabledUseCase,
             savedStateHandle = savedStateHandle,
-            ioDispatcher = StandardTestDispatcher(),
             monitorConnectivityUseCase = monitorConnectivityUseCase,
             getSupportEmailUseCase = getSupportEmail,
             getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
@@ -100,8 +99,8 @@ class ReportIssueViewModelTest {
         savedStateHandle = SavedStateHandle(mapOf())
         reset(
             submitIssueUseCase,
-            areSdkLogsEnabled,
-            areChatLogsEnabled,
+            areSdkLogsEnabledUseCase,
+            areChatLogsEnabledUseCase,
             monitorConnectivityUseCase,
             getSupportEmail,
             getFeatureFlagValueUseCase,
@@ -111,7 +110,7 @@ class ReportIssueViewModelTest {
     @Test
     fun `test that initial state is returned`() = runTest {
         initViewModel()
-        underTest.state.test {
+        underTest.uiState.test {
             val initial = awaitItem()
             assertThat(initial.description).isEmpty()
             assertThat(initial.includeLogsVisible).isFalse()
@@ -128,7 +127,7 @@ class ReportIssueViewModelTest {
         savedStateHandle.set(underTest.includeLogsKey, true)
         initViewModel()
 
-        underTest.state.filter {
+        underTest.uiState.filter {
             it.description == expectedDescription &&
                     it.includeLogsVisible &&
                     it.includeLogs
@@ -142,11 +141,11 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that when logging is enabled include logs toggle is shown`() = runTest {
-        whenever(areSdkLogsEnabled()).thenReturn(flowOf(true))
-        whenever(areChatLogsEnabled()).thenReturn(flowOf(true))
+        whenever(areSdkLogsEnabledUseCase()).thenReturn(flowOf(true))
+        whenever(areChatLogsEnabledUseCase()).thenReturn(flowOf(true))
 
         initViewModel()
-        underTest.state.map { it.includeLogsVisible }.distinctUntilChanged()
+        underTest.uiState.map { it.includeLogsVisible }.distinctUntilChanged()
             .test {
                 assertThat(awaitItem()).isFalse()
                 assertThat(awaitItem()).isTrue()
@@ -155,11 +154,11 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that include logs is set to true if logging is enabled`() = runTest {
-        whenever(areSdkLogsEnabled()).thenReturn(flowOf(true))
-        whenever(areChatLogsEnabled()).thenReturn(flowOf(true))
+        whenever(areSdkLogsEnabledUseCase()).thenReturn(flowOf(true))
+        whenever(areChatLogsEnabledUseCase()).thenReturn(flowOf(true))
 
         initViewModel()
-        underTest.state.map { it.includeLogs }.distinctUntilChanged()
+        underTest.uiState.map { it.includeLogs }.distinctUntilChanged()
             .test {
                 assertThat(awaitItem()).isFalse()
                 assertThat(awaitItem()).isTrue()
@@ -169,7 +168,7 @@ class ReportIssueViewModelTest {
     @Test
     fun `test that description is updated if new description is provided`() = runTest {
         initViewModel()
-        underTest.state.map { it.description }.distinctUntilChanged()
+        underTest.uiState.map { it.description }.distinctUntilChanged()
             .test {
                 val newDescription = "New description"
                 assertThat(awaitItem()).isEmpty()
@@ -180,12 +179,12 @@ class ReportIssueViewModelTest {
 
     @Test
     fun `test that include logs is updated if new boolean is provided`() = runTest {
-        whenever(areSdkLogsEnabled()).thenReturn(flowOf(true))
-        whenever(areChatLogsEnabled()).thenReturn(flowOf(true))
+        whenever(areSdkLogsEnabledUseCase()).thenReturn(flowOf(true))
+        whenever(areChatLogsEnabledUseCase()).thenReturn(flowOf(true))
 
         initViewModel()
 
-        underTest.state.map { it.includeLogs }.distinctUntilChanged()
+        underTest.uiState.map { it.includeLogs }.distinctUntilChanged()
             .test {
                 assertThat(awaitItem()).isFalse()
                 assertThat(awaitItem()).isTrue()
@@ -197,7 +196,7 @@ class ReportIssueViewModelTest {
     @Test
     fun `test that can submit is is false by default`() = runTest {
         initViewModel()
-        underTest.state.test {
+        underTest.uiState.test {
             assertThat(awaitItem().canSubmit).isFalse()
         }
     }
@@ -205,7 +204,7 @@ class ReportIssueViewModelTest {
     @Test
     fun `test that can submit is true when a description exists`() = runTest {
         initViewModel()
-        underTest.state.map { it.canSubmit }.distinctUntilChanged()
+        underTest.uiState.map { it.canSubmit }.distinctUntilChanged()
             .test {
                 assertThat(awaitItem()).isFalse()
                 underTest.setDescription("Not empty")
@@ -216,7 +215,7 @@ class ReportIssueViewModelTest {
     @Test
     fun `test that after setting a description can submit is true`() = runTest {
         initViewModel()
-        underTest.state.distinctUntilChangedBy { it.canSubmit }.test {
+        underTest.uiState.distinctUntilChangedBy { it.canSubmit }.test {
             assertThat(awaitItem().canSubmit).isFalse()
             underTest.setDescription("A Description")
             assertThat(awaitItem().canSubmit).isTrue()
@@ -226,7 +225,7 @@ class ReportIssueViewModelTest {
     @Test
     fun `test that can submit becomes false if description is removed`() = runTest {
         initViewModel()
-        underTest.state.distinctUntilChangedBy { it.canSubmit }.test {
+        underTest.uiState.distinctUntilChangedBy { it.canSubmit }.test {
             assertThat(awaitItem().canSubmit).isFalse()
 
             underTest.setDescription("A Description")
@@ -245,7 +244,7 @@ class ReportIssueViewModelTest {
 
             initViewModel()
 
-            underTest.state.map { it.error }.distinctUntilChanged()
+            underTest.uiState.map { it.error }.distinctUntilChanged()
                 .test {
                     assertThat(awaitItem()).isNull()
                     underTest.submit()
@@ -259,7 +258,7 @@ class ReportIssueViewModelTest {
             whenever(submitIssueUseCase(any())).thenReturn(emptyFlow())
             initViewModel()
             scheduler.advanceUntilIdle()
-            underTest.state.map { it.result }.distinctUntilChanged()
+            underTest.uiState.map { it.result }.distinctUntilChanged()
                 .test {
                     assertThat(awaitItem()).isNull()
                     underTest.submit()
@@ -280,7 +279,7 @@ class ReportIssueViewModelTest {
 
                 initViewModel()
                 scheduler.advanceUntilIdle()
-                underTest.state.map { it.result }.distinctUntilChanged()
+                underTest.uiState.map { it.result }.distinctUntilChanged()
                     .test {
                         assertThat(awaitItem()).isNull()
                         underTest.submit()
@@ -309,7 +308,7 @@ class ReportIssueViewModelTest {
         whenever(submitIssueUseCase(any())).thenReturn(getProgressFlow())
         initViewModel()
         scheduler.advanceUntilIdle()
-        underTest.state.mapNotNull { it.uploadProgress }.distinctUntilChanged()
+        underTest.uiState.mapNotNull { it.uploadProgress }.distinctUntilChanged()
             .test {
                 underTest.submit()
                 (0..100).map { it / 100f }.forEach {
@@ -327,7 +326,7 @@ class ReportIssueViewModelTest {
 
         initViewModel()
         scheduler.advanceUntilIdle()
-        underTest.state.mapNotNull { it.uploadProgress }.distinctUntilChanged()
+        underTest.uiState.mapNotNull { it.uploadProgress }.distinctUntilChanged()
             .test {
                 underTest.submit()
                 (0..50).map { it / 100f }.forEach {
@@ -346,7 +345,7 @@ class ReportIssueViewModelTest {
         initViewModel()
         scheduler.advanceUntilIdle()
 
-        underTest.state.map { it.result }.distinctUntilChanged()
+        underTest.uiState.map { it.result }.distinctUntilChanged()
             .test {
                 assertThat(awaitItem()).isNull()
                 underTest.submit()
@@ -365,7 +364,7 @@ class ReportIssueViewModelTest {
 
         initViewModel()
         scheduler.advanceUntilIdle()
-        underTest.state.map { it.uploadProgress == null }.distinctUntilChanged().test {
+        underTest.uiState.map { it.uploadProgress == null }.distinctUntilChanged().test {
             assertThat(awaitItem()).isTrue()
             underTest.submit()
             assertThat(awaitItem()).isFalse()
@@ -380,16 +379,16 @@ class ReportIssueViewModelTest {
                 onBlocking { invoke(AppFeatures.PermanentLogging) } doReturn true
             }
 
-            areSdkLogsEnabled.stub {
+            areSdkLogsEnabledUseCase.stub {
                 on { invoke() } doReturn flowOf(false)
             }
-            areChatLogsEnabled.stub {
+            areChatLogsEnabledUseCase.stub {
                 on { invoke() } doReturn flowOf(false)
             }
 
             initViewModel()
 
-            underTest.state.map { it.includeLogsVisible }.distinctUntilChanged()
+            underTest.uiState.map { it.includeLogsVisible }.distinctUntilChanged()
                 .test {
                     assertThat(awaitItem()).isFalse()
                     assertThat(awaitItem()).isTrue()

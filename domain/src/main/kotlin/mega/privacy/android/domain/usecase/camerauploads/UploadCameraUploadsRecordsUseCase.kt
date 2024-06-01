@@ -27,7 +27,6 @@ import mega.privacy.android.domain.entity.camerauploads.CameraUploadFolderType
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRecord
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRecordUploadStatus
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsTransferProgress
-import mega.privacy.android.domain.entity.camerauploads.CameraUploadsConcurrentUploadsLimit
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.transfer.TransferAppData
 import mega.privacy.android.domain.entity.transfer.TransferEvent
@@ -35,6 +34,7 @@ import mega.privacy.android.domain.exception.NotEnoughStorageException
 import mega.privacy.android.domain.repository.FileSystemRepository
 import mega.privacy.android.domain.usecase.CreateTempFileAndRemoveCoordinatesUseCase
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
+import mega.privacy.android.domain.usecase.environment.GetAvailableProcessorsUseCase
 import mega.privacy.android.domain.usecase.environment.MonitorBatteryInfoUseCase
 import mega.privacy.android.domain.usecase.file.GetFingerprintUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodeUseCase
@@ -50,6 +50,7 @@ import java.io.FileNotFoundException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
+import kotlin.math.max
 
 /**
  * Camera Uploads upload process
@@ -91,6 +92,7 @@ class UploadCameraUploadsRecordsUseCase @Inject constructor(
     private val monitorBatteryInfoUseCase: MonitorBatteryInfoUseCase,
     private val isChargingRequiredForVideoCompressionUseCase: IsChargingRequiredForVideoCompressionUseCase,
     private val monitorConcurrentUploadsLimitUseCase: MonitorConcurrentUploadsLimitUseCase,
+    private val getAvailableProcessorsUseCase: GetAvailableProcessorsUseCase,
 ) {
 
     companion object {
@@ -112,11 +114,14 @@ class UploadCameraUploadsRecordsUseCase @Inject constructor(
         secondaryUploadNodeId: NodeId,
         tempRoot: String,
     ): Flow<CameraUploadsTransferProgress> = channelFlow {
-        // Limit the number of concurrent uploads to [CONCURRENT_UPLOADS_LIMIT]
-        val semaphore = Semaphore(CameraUploadsConcurrentUploadsLimit.Default.limit)
+        // Calculate the default number of concurrent uploads based on the available processors
+        val defaultConcurrentUploadsCount = max(2, getAvailableProcessorsUseCase())
+
+        // Limit the number of concurrent uploads to defaultConcurrentUploadsCount
+        val semaphore = Semaphore(defaultConcurrentUploadsCount)
 
         // Limit the number of concurrent uploads based on the device state
-        val deviceStateSemaphore = Semaphore(CameraUploadsConcurrentUploadsLimit.Default.limit)
+        val deviceStateSemaphore = Semaphore(defaultConcurrentUploadsCount)
 
         // Keep tracks of number of permits preempted in [deviceStateSemaphore]
         // to avoid releasing more than acquired
@@ -131,10 +136,9 @@ class UploadCameraUploadsRecordsUseCase @Inject constructor(
         val isChargingRequiredForVideoCompression = isChargingRequiredForVideoCompressionUseCase()
 
         launch {
-            monitorConcurrentUploadsLimitUseCase(CameraUploadsConcurrentUploadsLimit.Default.limit)
+            monitorConcurrentUploadsLimitUseCase(defaultConcurrentUploadsCount)
                 .collectLatest { concurrentUploadsLimit ->
-                    val permitsToRestrict =
-                        CameraUploadsConcurrentUploadsLimit.Default.limit - concurrentUploadsLimit
+                    val permitsToRestrict = defaultConcurrentUploadsCount - concurrentUploadsLimit
                     while (permitsToRestrict != preemptedPermitsCount.get()) {
                         when {
                             preemptedPermitsCount.get() < permitsToRestrict -> {
@@ -562,8 +566,8 @@ class UploadCameraUploadsRecordsUseCase @Inject constructor(
 
         listOf(
             launch {
-                setOriginalFingerprintUseCase(
-                    record = record,
+                setOriginalFingerprint(
+                    originalFingerprint = record.originalFingerprint,
                     nodeId = nodeId,
                 ).onFailure { trySend(it) }
             },
@@ -629,22 +633,26 @@ class UploadCameraUploadsRecordsUseCase @Inject constructor(
                 existingNodeId = existingNodeId,
                 newNodeId = newNodeId,
             )
+            setOriginalFingerprint(
+                originalFingerprint = record.originalFingerprint,
+                nodeId = newNodeId,
+            )
         }
     }
 
     /**
      * Set the original fingerprint to the node
      *
-     * @param record
+     * @param originalFingerprint
      * @param nodeId
      */
-    private suspend fun setOriginalFingerprintUseCase(
-        record: CameraUploadsRecord,
+    private suspend fun setOriginalFingerprint(
+        originalFingerprint: String,
         nodeId: NodeId,
     ) = runCatching {
         setOriginalFingerprintUseCase(
             nodeId = nodeId,
-            originalFingerprint = record.originalFingerprint,
+            originalFingerprint = originalFingerprint,
         )
     }
 

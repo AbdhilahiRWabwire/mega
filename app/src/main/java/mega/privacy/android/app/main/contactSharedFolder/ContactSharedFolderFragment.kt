@@ -16,6 +16,8 @@ import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import mega.privacy.android.app.R
+import mega.privacy.android.shared.resources.R as sharedR
+import android.annotation.SuppressLint
 import mega.privacy.android.app.components.SimpleDividerItemDecoration
 import mega.privacy.android.app.databinding.FragmentContactSharedFolderListBinding
 import mega.privacy.android.app.interfaces.ActionNodeCallback
@@ -284,7 +286,7 @@ class ContactSharedFolderFragment : ContactFileBaseFragment() {
             val selected = adapter?.selectedNodes ?: listOf()
             menu?.apply {
                 findItem(R.id.cab_menu_share_link)?.title =
-                    resources.getQuantityString(R.plurals.get_links, selected.size)
+                    resources.getQuantityString(sharedR.plurals.label_share_links, selected.size)
 
                 var showRename = false
                 var showMove = false
@@ -424,16 +426,20 @@ class ContactSharedFolderFragment : ContactFileBaseFragment() {
             return false
         }
 
+        @SuppressLint("NotifyDataSetChanged")
         override fun onDestroyActionMode(mode: ActionMode?) {
             clearSelections()
             adapter?.isMultipleSelect = false
+            adapter?.notifyDataSetChanged()
         }
 
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     override fun activateActionMode() {
         Timber.d("activateActionMode")
         if (adapter?.isMultipleSelect == false) {
+            adapter?.notifyDataSetChanged()
             adapter?.isMultipleSelect = true
             actionMode =
                 (requireActivity() as AppCompatActivity).startSupportActionMode(ActionBarCallBack())

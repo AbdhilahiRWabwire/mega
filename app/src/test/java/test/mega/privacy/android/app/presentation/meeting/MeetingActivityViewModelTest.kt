@@ -20,16 +20,16 @@ import mega.privacy.android.domain.usecase.CheckChatLinkUseCase
 import mega.privacy.android.domain.usecase.CreateChatLink
 import mega.privacy.android.domain.usecase.GetChatParticipants
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
-import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
 import mega.privacy.android.domain.usecase.MonitorUserUpdates
 import mega.privacy.android.domain.usecase.QueryChatLink
 import mega.privacy.android.domain.usecase.RemoveFromChat
 import mega.privacy.android.domain.usecase.SetOpenInvite
-import mega.privacy.android.domain.usecase.UpdateChatPermissions
 import mega.privacy.android.domain.usecase.account.GetCurrentSubscriptionPlanUseCase
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.chat.IsEphemeralPlusPlusUseCase
+import mega.privacy.android.domain.usecase.chat.MonitorChatRoomUpdatesUseCase
 import mega.privacy.android.domain.usecase.chat.StartConversationUseCase
+import mega.privacy.android.domain.usecase.chat.UpdateChatPermissionsUseCase
 import mega.privacy.android.domain.usecase.contact.GetMyFullNameUseCase
 import mega.privacy.android.domain.usecase.contact.InviteContactUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
@@ -38,11 +38,9 @@ import mega.privacy.android.domain.usecase.login.MonitorFinishActivityUseCase
 import mega.privacy.android.domain.usecase.meeting.AllowUsersJoinCallUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.BroadcastCallEndedUseCase
-import mega.privacy.android.domain.usecase.meeting.BroadcastCallRecordingConsentEventUseCase
 import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.MonitorCallEndedUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorScheduledMeetingUpdatesUseCase
@@ -83,22 +81,19 @@ class MeetingActivityViewModelTest {
     private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase = mock()
     private val monitorChatSessionUpdatesUseCase: MonitorChatSessionUpdatesUseCase = mock()
     private val getChatRoomUseCase: GetChatRoomUseCase = mock()
-    private val monitorChatRoomUpdates: MonitorChatRoomUpdates = mock()
+    private val monitorChatRoomUpdatesUseCase: MonitorChatRoomUpdatesUseCase = mock()
     private val queryChatLink: QueryChatLink = mock()
     private val setOpenInvite: SetOpenInvite = mock()
     private val chatParticipantMapper: ChatParticipantMapper = mock()
     private val isEphemeralPlusPlusUseCase: IsEphemeralPlusPlusUseCase = mock()
     private val createChatLink: CreateChatLink = mock()
     private val inviteContactUseCase: InviteContactUseCase = mock()
-    private val updateChatPermissionsUseCase: UpdateChatPermissions = mock()
+    private val updateChatPermissionsUseCase: UpdateChatPermissionsUseCase = mock()
     private val removeFromChaUseCase: RemoveFromChat = mock()
     private val startConversationUseCase: StartConversationUseCase = mock()
     private val isConnectedToInternetUseCase: IsConnectedToInternetUseCase = mock()
     private val monitorStorageStateEventUseCase: MonitorStorageStateEventUseCase = mock()
     private val hangChatCallUseCase: HangChatCallUseCase = mock()
-    private val broadcastCallRecordingConsentEventUseCase: BroadcastCallRecordingConsentEventUseCase =
-        mock()
-    private val monitorCallEndedUseCase: MonitorCallEndedUseCase = mock()
     private val broadcastCallEndedUseCase: BroadcastCallEndedUseCase = mock()
     private val getScheduledMeetingByChat: GetScheduledMeetingByChat = mock()
     private val getMyFullNameUseCase: GetMyFullNameUseCase = mock()
@@ -143,7 +138,7 @@ class MeetingActivityViewModelTest {
             monitorChatCallUpdatesUseCase,
             monitorChatSessionUpdatesUseCase,
             getChatRoomUseCase,
-            monitorChatRoomUpdates,
+            monitorChatRoomUpdatesUseCase,
             queryChatLink,
             setOpenInvite,
             chatParticipantMapper,
@@ -156,8 +151,6 @@ class MeetingActivityViewModelTest {
             isConnectedToInternetUseCase,
             monitorStorageStateEventUseCase,
             hangChatCallUseCase,
-            broadcastCallRecordingConsentEventUseCase,
-            monitorCallEndedUseCase,
             broadcastCallEndedUseCase,
             getScheduledMeetingByChat,
             getMyFullNameUseCase,
@@ -194,7 +187,7 @@ class MeetingActivityViewModelTest {
             monitorChatCallUpdatesUseCase = monitorChatCallUpdatesUseCase,
             monitorChatSessionUpdatesUseCase = monitorChatSessionUpdatesUseCase,
             getChatRoomUseCase = getChatRoomUseCase,
-            monitorChatRoomUpdates = monitorChatRoomUpdates,
+            monitorChatRoomUpdatesUseCase = monitorChatRoomUpdatesUseCase,
             queryChatLink = queryChatLink,
             setOpenInvite = setOpenInvite,
             chatParticipantMapper = chatParticipantMapper,
@@ -207,8 +200,6 @@ class MeetingActivityViewModelTest {
             isConnectedToInternetUseCase = isConnectedToInternetUseCase,
             monitorStorageStateEventUseCase = monitorStorageStateEventUseCase,
             hangChatCallUseCase = hangChatCallUseCase,
-            broadcastCallRecordingConsentEventUseCase = broadcastCallRecordingConsentEventUseCase,
-            monitorCallEndedUseCase = monitorCallEndedUseCase,
             broadcastCallEndedUseCase = broadcastCallEndedUseCase,
             getScheduledMeetingByChat = getScheduledMeetingByChat,
             getMyFullNameUseCase = getMyFullNameUseCase,

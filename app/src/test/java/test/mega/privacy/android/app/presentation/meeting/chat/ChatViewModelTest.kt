@@ -11,9 +11,11 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -75,7 +77,6 @@ import mega.privacy.android.domain.exception.chat.ResourceDoesNotExistChatExcept
 import mega.privacy.android.domain.usecase.AddNodeType
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
-import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.cache.GetCacheFileUseCase
 import mega.privacy.android.domain.usecase.chat.ArchiveChatUseCase
@@ -97,6 +98,7 @@ import mega.privacy.android.domain.usecase.chat.LeaveChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorCallInChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatConnectionStateUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatPendingChangesUseCase
+import mega.privacy.android.domain.usecase.chat.MonitorChatRoomUpdatesUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorLeaveChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorLeavingChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorParticipatingInACallInOtherChatsUseCase
@@ -194,7 +196,7 @@ internal class ChatViewModelTest {
     private val isChatNotificationMuteUseCase: IsChatNotificationMuteUseCase = mock()
     private val getParticipantFirstNameUseCase: GetParticipantFirstNameUseCase = mock()
     private val getMyUserHandleUseCase: GetMyUserHandleUseCase = mock()
-    private val monitorChatRoomUpdates: MonitorChatRoomUpdates = mock {
+    private val monitorChatRoomUpdatesUseCase: MonitorChatRoomUpdatesUseCase = mock {
         onBlocking { invoke(any()) } doReturn emptyFlow()
     }
     private val monitorUpdatePushNotificationSettingsUseCase
@@ -302,17 +304,18 @@ internal class ChatViewModelTest {
     private val getChatFromContactMessagesUseCase = mock<GetChatFromContactMessagesUseCase>()
     private val getCacheFileUseCase = mock<GetCacheFileUseCase>()
     private val setUsersCallLimitRemindersUseCase = mock<SetUsersCallLimitRemindersUseCase>()
-    private val getUsersCallLimitRemindersUseCase = mock<GetUsersCallLimitRemindersUseCase>()
     private val recordAudioUseCase = mock<RecordAudioUseCase>()
     private val deleteFileUseCase = mock<DeleteFileUseCase>()
     private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase>()
+    private val getUsersCallLimitRemindersUseCase = mock<GetUsersCallLimitRemindersUseCase> {
+        on { invoke() }.thenReturn(emptyFlow())
+    }
     private val monitorLeaveChatUseCase = mock<MonitorLeaveChatUseCase> {
         on { invoke() } doReturn emptyFlow()
     }
     private val leaveChatUseCase = mock<LeaveChatUseCase>()
     private val broadcastChatArchivedUseCase = mock<BroadcastChatArchivedUseCase>()
     private val broadcastUpgradeDialogClosedUseCase = mock<BroadcastUpgradeDialogClosedUseCase>()
-
 
     @BeforeEach
     fun resetMocks() {
@@ -382,9 +385,9 @@ internal class ChatViewModelTest {
             broadcastUpgradeDialogClosedUseCase
         )
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
-        whenever(getUsersCallLimitRemindersUseCase()).thenReturn(flowOf(UsersCallLimitReminders.Enabled))
+        whenever(getUsersCallLimitRemindersUseCase()).thenReturn(emptyFlow())
         wheneverBlocking { isAnonymousModeUseCase() } doReturn false
-        wheneverBlocking { monitorChatRoomUpdates(any()) } doReturn emptyFlow()
+        wheneverBlocking { monitorChatRoomUpdatesUseCase(any()) } doReturn emptyFlow()
         wheneverBlocking { monitorUpdatePushNotificationSettingsUseCase() } doReturn emptyFlow()
         wheneverBlocking { monitorUserChatStatusByHandleUseCase(any()) } doReturn emptyFlow()
         wheneverBlocking { monitorStorageStateEventUseCase() } doReturn MutableStateFlow(
@@ -415,7 +418,7 @@ internal class ChatViewModelTest {
         underTest = ChatViewModel(
             getChatRoomUseCase = getChatRoomUseCase,
             isChatNotificationMuteUseCase = isChatNotificationMuteUseCase,
-            monitorChatRoomUpdates = monitorChatRoomUpdates,
+            monitorChatRoomUpdatesUseCase = monitorChatRoomUpdatesUseCase,
             monitorUpdatePushNotificationSettingsUseCase = monitorUpdatePushNotificationSettingsUseCase,
             getUserOnlineStatusByHandleUseCase = getUserOnlineStatusByHandleUseCase,
             monitorUserChatStatusByHandleUseCase = monitorUserChatStatusByHandleUseCase,
@@ -494,6 +497,26 @@ internal class ChatViewModelTest {
             broadcastUpgradeDialogClosedUseCase = broadcastUpgradeDialogClosedUseCase
         )
     }
+
+    @Test
+    fun `test that the option returned by getUsersCallLimitRemindersUseCase is set as enabled`() =
+        runTest {
+            initTestClass()
+            whenever(getUsersCallLimitRemindersUseCase()).thenReturn(flowOf(UsersCallLimitReminders.Enabled))
+            underTest.state.map { it.usersCallLimitReminders }.distinctUntilChanged().test {
+                testScheduler.advanceUntilIdle()
+                assertThat(awaitItem()).isEqualTo(UsersCallLimitReminders.Enabled)
+            }
+        }
+
+    @Test
+    fun `test that setUsersCallLimitRemindersUseCase calls the set use case with the correct value`() =
+        runTest {
+            initTestClass()
+            underTest.setUsersCallLimitReminder(false)
+            testScheduler.advanceUntilIdle()
+            verify(setUsersCallLimitRemindersUseCase).invoke(UsersCallLimitReminders.Disabled)
+        }
 
     @Test
     fun `test that title update when we passing the chatId`() = runTest {
@@ -632,7 +655,7 @@ internal class ChatViewModelTest {
         val updateFlow = MutableSharedFlow<ChatRoom>()
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
-        whenever(monitorChatRoomUpdates(chatId)).thenReturn(updateFlow)
+        whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(updateFlow)
         initTestClass()
         underTest.state.test {
             assertThat(awaitItem().title).isEqualTo("title")
@@ -658,7 +681,7 @@ internal class ChatViewModelTest {
             whenever(monitorUpdatePushNotificationSettingsUseCase()).thenReturn(
                 pushNotificationSettingFlow
             )
-            whenever(monitorChatRoomUpdates(chatId)).thenReturn(chatRoomUpdate)
+            whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(chatRoomUpdate)
 
             initTestClass()
             underTest.state.test {
@@ -695,7 +718,7 @@ internal class ChatViewModelTest {
         val updateFlow = MutableSharedFlow<ChatRoom>()
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
-        whenever(monitorChatRoomUpdates(chatId)).thenReturn(updateFlow)
+        whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(updateFlow)
         whenever(isChatNotificationMuteUseCase(chatId)).thenReturn(false)
         initTestClass()
         underTest.state.test {
@@ -817,7 +840,7 @@ internal class ChatViewModelTest {
         )
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
-        whenever(monitorChatRoomUpdates(chatId)).thenReturn(updateFlow)
+        whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(updateFlow)
         initTestClass()
         underTest.state.test {
             val actual = awaitItem()
@@ -918,7 +941,7 @@ internal class ChatViewModelTest {
         val updateFlow = MutableSharedFlow<ChatRoom>()
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
-        whenever(monitorChatRoomUpdates(chatId)).thenReturn(updateFlow)
+        whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(updateFlow)
         initTestClass()
         underTest.state.test {
             assertThat(awaitItem().isOpenInvite).isTrue()
@@ -943,7 +966,7 @@ internal class ChatViewModelTest {
             val updateFlow = MutableSharedFlow<ChatRoom>()
             whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
             whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
-            whenever(monitorChatRoomUpdates(chatId)).thenReturn(updateFlow)
+            whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(updateFlow)
             initTestClass()
             underTest.state.test {
                 val actual = awaitItem()
@@ -975,7 +998,7 @@ internal class ChatViewModelTest {
         val updateFlow = MutableSharedFlow<ChatRoom>()
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
-        whenever(monitorChatRoomUpdates(chatId)).thenReturn(updateFlow)
+        whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(updateFlow)
         initTestClass()
         underTest.state.test {
             assertThat(awaitItem().isArchived).isFalse()
@@ -1131,7 +1154,7 @@ internal class ChatViewModelTest {
             whenever(getParticipantFirstNameUseCase(userHandle)).thenReturn(expectedFirstName)
             whenever(getMyUserHandleUseCase()).thenReturn(myUserHandle)
             val updateFlow = MutableSharedFlow<ChatRoom>()
-            whenever(monitorChatRoomUpdates(chatId)).thenReturn(updateFlow)
+            whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(updateFlow)
             initTestClass()
             underTest.state.test {
                 assertThat(awaitItem().usersTyping).isEmpty()
@@ -1162,7 +1185,7 @@ internal class ChatViewModelTest {
             whenever(getParticipantFirstNameUseCase(userHandle)).thenReturn(expectedFirstName)
             whenever(getMyUserHandleUseCase()).thenReturn(myUserHandle)
             val updateFlow = MutableSharedFlow<ChatRoom>()
-            whenever(monitorChatRoomUpdates(chatId)).thenReturn(updateFlow)
+            whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(updateFlow)
             initTestClass()
             underTest.state.test {
                 assertThat(awaitItem().usersTyping).isEmpty()
@@ -1388,7 +1411,7 @@ internal class ChatViewModelTest {
         val updateFlow = MutableSharedFlow<ChatRoom>()
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
-        whenever(monitorChatRoomUpdates(chatId)).thenReturn(updateFlow)
+        whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(updateFlow)
         whenever(getCustomSubtitleListUseCase(chatId, userHandles))
             .thenReturn(customSubtitleList)
             .thenReturn(updatedCustomSubtitleList)
@@ -1451,7 +1474,7 @@ internal class ChatViewModelTest {
         val updateFlow = MutableSharedFlow<ChatRoom>()
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
-        whenever(monitorChatRoomUpdates(chatId)).thenReturn(updateFlow)
+        whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(updateFlow)
         initTestClass()
         underTest.state.test {
             val actual = awaitItem()
@@ -1492,7 +1515,7 @@ internal class ChatViewModelTest {
     fun `test that monitor all contacts participant in the chat call when monitor chat room updates with participant change`() =
         runTest {
             val flow = MutableSharedFlow<ChatRoom>()
-            whenever(monitorChatRoomUpdates(chatId)).thenReturn(flow)
+            whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(flow)
             val newChatRoom = mock<ChatRoom> {
                 on { ownPrivilege } doReturn ChatRoomPermission.Moderator
                 on { peerHandlesList } doReturn listOf(1L, 2L, 3L)
@@ -1690,7 +1713,7 @@ internal class ChatViewModelTest {
         val updateFlow = MutableSharedFlow<ChatRoom>()
         whenever(savedStateHandle.get<Long>(Constants.CHAT_ID)).thenReturn(chatId)
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
-        whenever(monitorChatRoomUpdates(chatId)).thenReturn(updateFlow)
+        whenever(monitorChatRoomUpdatesUseCase(chatId)).thenReturn(updateFlow)
         initTestClass()
         underTest.state.test {
             assertThat(awaitItem().isWaitingRoom).isEqualTo(expectedIsWaitingRoom)
@@ -2995,6 +3018,17 @@ internal class ChatViewModelTest {
             advanceUntilIdle()
             underTest.state.test {
                 assertThat(awaitItem().shouldUpgradeToProPlan).isTrue()
+            }
+        }
+
+    @Test
+    fun `test that when consumeShowFreePlanParticipantsLimitDialogEvent is invoked it updates the state`() =
+        runTest {
+            initTestClass()
+            underTest.consumeShowFreePlanParticipantsLimitDialogEvent()
+            underTest.state.test {
+                assertThat(awaitItem().callEndedDueToFreePlanLimits).isFalse()
+                verify(setUsersCallLimitRemindersUseCase).invoke(UsersCallLimitReminders.Disabled)
             }
         }
 

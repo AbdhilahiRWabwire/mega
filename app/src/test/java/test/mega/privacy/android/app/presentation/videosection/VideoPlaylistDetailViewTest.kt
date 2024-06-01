@@ -1,13 +1,18 @@
 package test.mega.privacy.android.app.presentation.videosection
 
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import coil.Coil
+import coil.ImageLoader
+import coil.annotation.ExperimentalCoilApi
+import coil.test.FakeImageLoaderEngine
 import mega.privacy.android.app.presentation.videosection.model.VideoPlaylistUIEntity
 import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
 import mega.privacy.android.app.presentation.videosection.view.playlist.DETAIL_DELETE_VIDEOS_DIALOG_TEST_TAG
@@ -20,16 +25,27 @@ import mega.privacy.android.app.presentation.videosection.view.playlist.PLAYLIST
 import mega.privacy.android.app.presentation.videosection.view.playlist.VIDEO_PLAYLIST_DETAIL_EMPTY_VIEW_TEST_TAG
 import mega.privacy.android.app.presentation.videosection.view.playlist.VideoPlaylistDetailView
 import mega.privacy.android.domain.entity.node.NodeId
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 
+@OptIn(ExperimentalCoilApi::class)
 @RunWith(AndroidJUnit4::class)
 class VideoPlaylistDetailViewTest {
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Before
+    fun setUp() {
+        val engine = FakeImageLoaderEngine.Builder().build()
+        val imageLoader = ImageLoader.Builder(composeTestRule.activity)
+            .components { add(engine) }
+            .build()
+        Coil.setImageLoader(imageLoader)
+    }
 
     private val playlist = mock<VideoPlaylistUIEntity> {
         on { id }.thenReturn(NodeId(1L))
@@ -221,7 +237,10 @@ class VideoPlaylistDetailViewTest {
         val expectedNumberOfVideos = 1
 
         val testVideo = mock<VideoUIEntity> {
+            on { id }.thenReturn(NodeId(123456L))
             on { name }.thenReturn("video")
+            on { size }.thenReturn(700L)
+            on { durationString }.thenReturn("10:00")
         }
 
         val playlist = VideoPlaylistUIEntity(

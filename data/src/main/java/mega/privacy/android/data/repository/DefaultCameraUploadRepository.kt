@@ -616,6 +616,21 @@ internal class DefaultCameraUploadRepository @Inject constructor(
         megaLocalRoomGateway.deleteCameraUploadsRecords(folderTypes)
     }
 
+    override fun monitorIsChargingRequiredToUploadContent(): Flow<Boolean?> =
+        cameraUploadsSettingsPreferenceGateway.monitorIsChargingRequiredToUploadContent()
+            .flowOn(ioDispatcher)
+
+    override suspend fun isChargingRequiredToUploadContent() = withContext(ioDispatcher) {
+        cameraUploadsSettingsPreferenceGateway.isChargingRequiredToUploadContent()
+    }
+
+    override suspend fun setChargingRequiredToUploadContent(chargingRequired: Boolean) =
+        withContext(ioDispatcher) {
+            cameraUploadsSettingsPreferenceGateway.setChargingRequiredToUploadContent(
+                chargingRequired
+            )
+        }
+
     private companion object {
         private const val SUB_STATE_NO_CHANGE = -1
         private const val TARGET_NODE_NO_CHANGE = -1L

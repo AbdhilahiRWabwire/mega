@@ -6,13 +6,16 @@ import android.content.Intent
 import android.net.Uri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import mega.privacy.android.app.activities.ManageChatHistoryActivity
 import mega.privacy.android.app.activities.settingsActivities.LegacyCameraUploadsPreferencesActivity
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.megachat.ChatActivity
 import mega.privacy.android.app.presentation.meeting.chat.ChatHostActivity
 import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_ACTION
 import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_LINK
+import mega.privacy.android.app.presentation.meeting.managechathistory.view.screen.ManageChatHistoryActivityV2
 import mega.privacy.android.app.presentation.settings.camerauploads.SettingsCameraUploadsComposeActivity
+import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
@@ -79,6 +82,13 @@ internal class MegaNavigatorImpl @Inject constructor(
         }
     }
 
+    override fun openUpgradeAccount(context: Context) {
+        applicationScope.launch {
+            val intent = Intent(context, UpgradeAccountActivity::class.java)
+            context.startActivity(intent)
+        }
+    }
+
     private fun getChatActivityIntent(
         context: Context,
         action: String?,
@@ -124,5 +134,25 @@ internal class MegaNavigatorImpl @Inject constructor(
         messageId?.let { putExtra("ID_MSG", messageId) }
         isOverQuota?.let { putExtra("IS_OVERQUOTA", isOverQuota) }
         if (flags > 0) setFlags(flags)
+    }
+
+    override fun openManageChatHistoryActivity(
+        context: Context,
+        chatId: Long,
+        email: String?,
+    ) {
+        applicationScope.launch {
+            val activity =
+                if (getFeatureFlagValueUseCase(AppFeatures.NewManageChatHistoryActivity)) {
+                    ManageChatHistoryActivityV2::class.java
+                } else {
+                    ManageChatHistoryActivity::class.java
+                }
+            val intent = Intent(context, activity).apply {
+                putExtra(Constants.CHAT_ID, chatId)
+                email?.let { putExtra(Constants.EMAIL, it) }
+            }
+            context.startActivity(intent)
+        }
     }
 }

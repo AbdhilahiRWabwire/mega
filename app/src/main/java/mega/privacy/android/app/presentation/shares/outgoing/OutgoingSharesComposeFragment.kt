@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.shares.outgoing
 
+import mega.privacy.android.shared.resources.R as sharedR
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -10,15 +11,16 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
 import androidx.compose.material.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
@@ -33,7 +35,6 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
-import mega.privacy.android.app.BaseActivity
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.WebViewActivity
 import mega.privacy.android.app.arch.extensions.collectFlow
@@ -52,25 +53,26 @@ import mega.privacy.android.app.presentation.contact.authenticitycredendials.Aut
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.manager.model.SharesTab
-import mega.privacy.android.app.presentation.mapper.GetIntentToOpenFileMapper
 import mega.privacy.android.app.presentation.mapper.GetOptionsForToolbarMapper
 import mega.privacy.android.app.presentation.mapper.OptionsItemInfo
+import mega.privacy.android.app.presentation.node.NodeActionsViewModel
+import mega.privacy.android.app.presentation.node.action.HandleNodeAction
 import mega.privacy.android.app.presentation.shares.SharesActionListener
 import mega.privacy.android.app.presentation.shares.outgoing.ui.OutgoingSharesView
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.StartTransferComponent
 import mega.privacy.android.app.sync.fileBackups.FileBackupManager
 import mega.privacy.android.app.utils.CloudStorageOptionControlUtil
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.app.utils.MegaApiUtils
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.app.utils.Util
+import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.domain.entity.ThemeMode
-import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.MoveRequestResult
+import mega.privacy.android.domain.entity.node.TypedFileNode
+import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.shares.ShareNode
 import mega.privacy.android.domain.usecase.GetThemeMode
-import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.shared.theme.MegaAppTheme
 import timber.log.Timber
 import javax.inject.Inject
@@ -105,12 +107,6 @@ class OutgoingSharesComposeFragment : Fragment() {
     lateinit var getThemeMode: GetThemeMode
 
     /**
-     * Mapper to open file
-     */
-    @Inject
-    lateinit var getIntentToOpenFileMapper: GetIntentToOpenFileMapper
-
-    /**
      * Mapper to get options for Action Bar
      */
     @Inject
@@ -123,6 +119,7 @@ class OutgoingSharesComposeFragment : Fragment() {
     lateinit var fileTypeIconMapper: FileTypeIconMapper
 
     private val viewModel: OutgoingSharesComposeViewModel by activityViewModels()
+    private val nodeActionsViewModel: NodeActionsViewModel by viewModels()
     private val sortByHeaderViewModel: SortByHeaderViewModel by viewModels()
 
     /**
@@ -168,13 +165,31 @@ class OutgoingSharesComposeFragment : Fragment() {
                 val themeMode by getThemeMode()
                     .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
                 val uiState by viewModel.state.collectAsStateWithLifecycle()
+                val nodeActionState by nodeActionsViewModel.state.collectAsStateWithLifecycle()
                 val snackbarHostState = remember { SnackbarHostState() }
                 val coroutineScope = rememberCoroutineScope()
+                var clickedFile: TypedFileNode? by remember {
+                    mutableStateOf(null)
+                }
                 MegaAppTheme(isDark = themeMode.isDarkMode()) {
                     OutgoingSharesView(
                         uiState = uiState,
                         emptyState = getEmptyFolderDrawable(uiState.isOutgoingSharesEmpty),
-                        onItemClick = viewModel::onItemClicked,
+                        onItemClick = {
+                            if (uiState.selectedNodeHandles.isEmpty()) {
+                                when (it.node) {
+                                    is TypedFileNode -> clickedFile = it.node
+
+                                    is TypedFolderNode -> {
+                                        viewModel.onFolderItemClicked(it.id.longValue)
+                                    }
+
+                                    else -> Timber.e("Unsupported click")
+                                }
+                            } else {
+                                viewModel.onItemClicked(it)
+                            }
+                        },
                         onLongClick = {
                             val clicked = viewModel.onLongItemClicked(it)
                             if (clicked && actionMode == null) {
@@ -221,6 +236,12 @@ class OutgoingSharesComposeFragment : Fragment() {
                         },
                         snackBarHostState = snackbarHostState,
                     )
+                    EventEffect(
+                        event = nodeActionState.downloadEvent,
+                        onConsumed = nodeActionsViewModel::markDownloadEventConsumed
+                    ) {
+                        viewModel.onDownloadFileTriggered(it)
+                    }
                 }
                 LaunchedEffect(uiState.isInRootLevel) {
                     if (!uiState.isInRootLevel) {
@@ -242,8 +263,17 @@ class OutgoingSharesComposeFragment : Fragment() {
                         folderCount = uiState.totalSelectedFolderNodes
                     )
                 }
-                LaunchedEffect(uiState.currentFileNode) {
-                    onItemClick(uiState.currentFileNode)
+                clickedFile?.let {
+                    HandleNodeAction(
+                        typedFileNode = it,
+                        nodeSourceType = Constants.OUTGOING_SHARES_ADAPTER,
+                        sortOrder = uiState.sortOrder,
+                        snackBarHostState = snackbarHostState,
+                        onActionHandled = {
+                            clickedFile = null
+                        },
+                        nodeActionsViewModel = nodeActionsViewModel
+                    )
                 }
                 ToolbarTitleUpdateEffect(uiState.updateToolbarTitleEvent) {
                     viewModel.consumeUpdateToolbarTitleEvent()
@@ -330,22 +360,6 @@ class OutgoingSharesComposeFragment : Fragment() {
             onConsumed = onConsumeEvent,
             action = { outgoingSharesActionListener?.exitSharesPage() },
         )
-    }
-
-    /**
-     * On Item click event received from [OutgoingSharesComposeViewModel]
-     *
-     * @param currentFileNode [FileNode]
-     */
-    private fun onItemClick(currentFileNode: FileNode?) {
-        currentFileNode?.let {
-            openFile(fileNode = it)
-            viewModel.onItemPerformedClicked()
-        } ?: run {
-            outgoingSharesActionListener?.updateSharesPageToolbarTitleAndFAB(
-                invalidateOptionsMenu = false
-            )
-        }
     }
 
     /**
@@ -459,7 +473,7 @@ class OutgoingSharesComposeFragment : Fragment() {
                 viewModel.state.value.selectedNodes.takeUnless { it.isEmpty() }
                     ?: return false
             menu.findItem(R.id.cab_menu_share_link).title =
-                resources.getQuantityString(R.plurals.get_links, selected.size)
+                resources.getQuantityString(sharedR.plurals.label_share_links, selected.size)
             lifecycleScope.launch {
                 val control = getOptionsForToolbarMapper(
                     selectedNodeHandleList = viewModel.state.value.selectedNodeHandles,
@@ -629,40 +643,6 @@ class OutgoingSharesComposeFragment : Fragment() {
                     )
                     disableSelectMode()
                 }
-            }
-        }
-    }
-
-    /**
-     * Open File
-     * @param fileNode [FileNode]
-     */
-    private fun openFile(fileNode: FileNode) {
-        lifecycleScope.launch {
-            runCatching {
-                val intent = getIntentToOpenFileMapper(
-                    activity = requireActivity(),
-                    fileNode = fileNode,
-                    viewType = Constants.OUTGOING_SHARES_ADAPTER
-                )
-                intent?.let {
-                    if (MegaApiUtils.isIntentAvailable(context, it)) {
-                        startActivity(it)
-                    } else {
-                        Toast.makeText(
-                            context,
-                            getString(R.string.intent_not_available),
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
-            }.onFailure {
-                Timber.e("itemClick:ERROR:httpServerGetLocalLink")
-                (activity as? BaseActivity)?.showSnackbar(
-                    type = Constants.SNACKBAR_TYPE,
-                    content = getString(R.string.general_text_error),
-                    chatId = -1,
-                )
             }
         }
     }

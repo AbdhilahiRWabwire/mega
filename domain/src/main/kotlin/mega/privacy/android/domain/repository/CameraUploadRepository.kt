@@ -554,4 +554,30 @@ interface CameraUploadRepository {
      * @param folderTypes a list of folder type (Primary, Secondary, or both)
      */
     suspend fun clearRecords(folderTypes: List<CameraUploadFolderType>)
+
+    /**
+     * Observes the User's Setting in the DataStore, as to whether or not the Device must be charged
+     * for the active Camera Uploads to start uploading content
+     *
+     * @return A Boolean [Flow] that observes the User's Setting. The [Flow] may emit null if the
+     * Setting cannot be found
+     */
+    fun monitorIsChargingRequiredToUploadContent(): Flow<Boolean?>
+
+    /**
+     * Checks whether or not the Device must be charged for the active Camera Uploads to
+     * start uploading content
+     *
+     * @return true if the Device must be charged for the active Camera Uploads to upload content.
+     * The function may return null if the value could not be retrieved from the DataStore
+     */
+    suspend fun isChargingRequiredToUploadContent(): Boolean?
+
+    /**
+     * Updates the state in which the Device must be charged or not for the active Camera Uploads to
+     * begin uploading content
+     *
+     * @param chargingRequired The new Device charging state
+     */
+    suspend fun setChargingRequiredToUploadContent(chargingRequired: Boolean)
 }

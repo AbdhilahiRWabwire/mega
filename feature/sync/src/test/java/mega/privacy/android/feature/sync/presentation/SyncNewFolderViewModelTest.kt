@@ -2,12 +2,15 @@ package mega.privacy.android.feature.sync.presentation
 
 import android.net.Uri
 import com.google.common.truth.Truth.assertThat
+import de.palm.composestateevents.consumed
+import de.palm.composestateevents.triggered
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
+import mega.privacy.android.domain.usecase.account.IsStorageOverQuotaUseCase
 import mega.privacy.android.domain.usecase.file.GetExternalPathByContentUriUseCase
 import mega.privacy.android.feature.sync.domain.entity.RemoteFolder
 import mega.privacy.android.feature.sync.domain.usecase.sync.SyncFolderPairUseCase
@@ -32,11 +35,17 @@ internal class SyncNewFolderViewModelTest {
     private val getExternalPathByContentUriUseCase: GetExternalPathByContentUriUseCase = mock()
     private val monitorSelectedMegaFolderUseCase: MonitorSelectedMegaFolderUseCase = mock()
     private val syncFolderPairUseCase: SyncFolderPairUseCase = mock()
+    private val isStorageOverQuotaUseCase: IsStorageOverQuotaUseCase = mock()
     private lateinit var underTest: SyncNewFolderViewModel
 
     @AfterEach
     fun resetAndTearDown() {
-        reset(getExternalPathByContentUriUseCase, monitorSelectedMegaFolderUseCase)
+        reset(
+            getExternalPathByContentUriUseCase,
+            monitorSelectedMegaFolderUseCase,
+            syncFolderPairUseCase,
+            isStorageOverQuotaUseCase,
+        )
     }
 
     @Test
@@ -59,32 +68,16 @@ internal class SyncNewFolderViewModelTest {
     }
 
     @Test
-    fun `test that folder name changed action results in updated state`() {
-        whenever(monitorSelectedMegaFolderUseCase()).thenReturn(flowOf(mock()))
-        initViewModel()
-        val folderPairName = "folderPairName"
-        val expectedState = SyncNewFolderState(folderPairName = folderPairName)
-
-        underTest.handleAction(SyncNewFolderAction.FolderNameChanged(folderPairName))
-
-        assertThat(expectedState.folderPairName).isEqualTo(underTest.state.value.folderPairName)
-    }
-
-    @Test
     fun `test that when mega folder is updated state is also updated`() = runTest {
         val remoteFolder = RemoteFolder(123L, "someFolder")
-        whenever(monitorSelectedMegaFolderUseCase()).thenReturn(
-            flow {
-                emit(remoteFolder)
-                awaitCancellation()
-            }
-        )
-        whenever(monitorSelectedMegaFolderUseCase()).thenReturn(
-            flow {
-                emit(remoteFolder)
-                awaitCancellation()
-            }
-        )
+        whenever(monitorSelectedMegaFolderUseCase()).thenReturn(flow {
+            emit(remoteFolder)
+            awaitCancellation()
+        })
+        whenever(monitorSelectedMegaFolderUseCase()).thenReturn(flow {
+            emit(remoteFolder)
+            awaitCancellation()
+        })
         initViewModel()
         val expectedState = SyncNewFolderState(selectedMegaFolder = remoteFolder)
 
@@ -92,14 +85,20 @@ internal class SyncNewFolderViewModelTest {
     }
 
     @Test
-    fun `test that next button create new folder pair`() = runTest {
+    fun `test that next click creates new folder pair and navigates to next screen`() = runTest {
         val remoteFolder = RemoteFolder(123L, "someFolder")
-        whenever(monitorSelectedMegaFolderUseCase()).thenReturn(
-            flow {
-                emit(remoteFolder)
-                awaitCancellation()
-            }
-        )
+        whenever(isStorageOverQuotaUseCase()).thenReturn(false)
+        whenever(monitorSelectedMegaFolderUseCase()).thenReturn(flow {
+            emit(remoteFolder)
+            awaitCancellation()
+        })
+        whenever(
+            syncFolderPairUseCase.invoke(
+                name = remoteFolder.name,
+                localPath = "",
+                remotePath = remoteFolder
+            )
+        ).thenReturn(true)
         val state = SyncNewFolderState(
             selectedMegaFolder = remoteFolder
         )
@@ -108,17 +107,56 @@ internal class SyncNewFolderViewModelTest {
         underTest.handleAction(SyncNewFolderAction.NextClicked)
 
         verify(syncFolderPairUseCase).invoke(
-            name = "",
+            name = remoteFolder.name,
             localPath = state.selectedLocalFolder,
-            remotePath = state.selectedMegaFolder!!
+            remotePath = remoteFolder
         )
+        assertThat(underTest.state.value.openSyncListScreen).isEqualTo(triggered)
+    }
+
+    @Test
+    fun `test that next click shows error when storage is over quota`() = runTest {
+        whenever(monitorSelectedMegaFolderUseCase()).thenReturn(flow {
+            awaitCancellation()
+        })
+        whenever(isStorageOverQuotaUseCase()).thenReturn(true)
+        initViewModel()
+
+        underTest.handleAction(SyncNewFolderAction.NextClicked)
+
+        assertThat(underTest.state.value.showStorageOverQuota).isEqualTo(true)
+    }
+
+    @Test
+    fun `test that storage over quota shown resets showStorageOverQuota event`() {
+        whenever(monitorSelectedMegaFolderUseCase()).thenReturn(flow {
+            awaitCancellation()
+        })
+        initViewModel()
+
+        underTest.handleAction(SyncNewFolderAction.StorageOverquotaShown)
+
+        assertThat(underTest.state.value.showStorageOverQuota).isEqualTo(false)
+    }
+
+    @Test
+    fun `test that sync list screen opened resets openSyncListScreen event`() {
+        whenever(monitorSelectedMegaFolderUseCase()).thenReturn(flow {
+            awaitCancellation()
+        })
+        initViewModel()
+
+        underTest.handleAction(SyncNewFolderAction.SyncListScreenOpened)
+
+        assertThat(underTest.state.value.openSyncListScreen).isEqualTo(consumed)
     }
 
     private fun initViewModel() {
         underTest = SyncNewFolderViewModel(
             getExternalPathByContentUriUseCase,
             monitorSelectedMegaFolderUseCase,
-            syncFolderPairUseCase
+            syncFolderPairUseCase,
+            isStorageOverQuotaUseCase,
         )
     }
 }

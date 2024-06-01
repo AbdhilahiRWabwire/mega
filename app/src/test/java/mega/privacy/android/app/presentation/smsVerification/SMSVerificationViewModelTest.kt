@@ -12,12 +12,12 @@ import mega.privacy.android.app.presentation.verification.model.SMSVerificationU
 import mega.privacy.android.app.presentation.verification.model.mapper.SMSVerificationTextMapper
 import mega.privacy.android.app.presentation.verification.model.mapper.SmsVerificationTextErrorMapper
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
-import mega.privacy.android.domain.usecase.GetCountryCallingCodes
 import mega.privacy.android.domain.usecase.GetCurrentCountryCodeUseCase
-import mega.privacy.android.domain.usecase.SetSMSVerificationShown
 import mega.privacy.android.domain.usecase.login.LogoutUseCase
+import mega.privacy.android.domain.usecase.verification.GetCountryCallingCodesUseCase
 import mega.privacy.android.domain.usecase.verification.GetFormattedPhoneNumberUseCase
-import mega.privacy.android.domain.usecase.verification.SendSMSVerificationCode
+import mega.privacy.android.domain.usecase.verification.SendSMSVerificationCodeUseCase
+import mega.privacy.android.domain.usecase.verification.SetSMSVerificationShownUseCase
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -37,9 +37,9 @@ class SMSVerificationViewModelTest {
 
     private lateinit var underTest: SMSVerificationViewModel
 
-    private val setSMSVerificationShown: SetSMSVerificationShown = mock()
-    private val getCountryCallingCodes: GetCountryCallingCodes = mock()
-    private val sendSMSVerificationCode: SendSMSVerificationCode = mock()
+    private val setSMSVerificationShownUseCase: SetSMSVerificationShownUseCase = mock()
+    private val getCountryCallingCodesUseCase: GetCountryCallingCodesUseCase = mock()
+    private val sendSMSVerificationCodeUseCase: SendSMSVerificationCodeUseCase = mock()
     private val smsVerificationTextMapper: SMSVerificationTextMapper = mock()
     private val smsVerificationTextErrorMapper: SmsVerificationTextErrorMapper = mock()
     private val getCurrentCountryCodeUseCase: GetCurrentCountryCodeUseCase = mock()
@@ -64,12 +64,12 @@ class SMSVerificationViewModelTest {
             whenever(savedState.get<String>(COUNTRY_CODE)).thenReturn(countryCode)
             whenever(savedState.get<String>(COUNTRY_NAME)).thenReturn(countryName)
             whenever(savedState.get<String>(DIAL_CODE)).thenReturn(dialCode)
-            whenever(getCountryCallingCodes()).thenReturn(countryCallingCodes)
+            whenever(getCountryCallingCodesUseCase()).thenReturn(countryCallingCodes)
         }
         underTest = SMSVerificationViewModel(
-            setSMSVerificationShown = setSMSVerificationShown,
-            getCountryCallingCodes = getCountryCallingCodes,
-            sendSMSVerificationCode = sendSMSVerificationCode,
+            setSMSVerificationShownUseCase = setSMSVerificationShownUseCase,
+            getCountryCallingCodesUseCase = getCountryCallingCodesUseCase,
+            sendSMSVerificationCodeUseCase = sendSMSVerificationCodeUseCase,
             getCurrentCountryCodeUseCase = getCurrentCountryCodeUseCase,
             getFormattedPhoneNumberUseCase = getFormattedPhoneNumberUseCase,
             savedState = savedState,
@@ -138,7 +138,7 @@ class SMSVerificationViewModelTest {
                 phoneNumber = phoneNumber
             )
         whenever(getFormattedPhoneNumberUseCase(any(), any())).thenReturn(phoneNumber)
-        whenever(sendSMSVerificationCode(phoneNumber)).thenReturn(Unit)
+        whenever(sendSMSVerificationCodeUseCase(phoneNumber)).thenReturn(Unit)
         underTest.setPhoneNumber(phoneNumber)
         underTest.validatePhoneNumber()
         advanceUntilIdle()

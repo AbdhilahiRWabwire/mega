@@ -457,7 +457,7 @@ internal class NodeRepositoryImpl @Inject constructor(
         offline: Offline? = null,
     ): UnTypedNode {
         return nodeMapper(
-            megaNode = node, offline = offline
+            megaNode = node, offline = offline,
         )
     }
 
@@ -694,6 +694,22 @@ internal class NodeRepositoryImpl @Inject constructor(
                 ?.let { nodeMapper(megaNode = it, offline = getOfflineNode(nodeId.longValue)) }
         }
     }
+
+    override suspend fun getRootParentNode(nodeId: NodeId): UnTypedNode? =
+        withContext(ioDispatcher) {
+            var currentRootParent = megaApiGateway.getMegaNodeByHandle(nodeId.longValue)
+            while (currentRootParent != null) {
+                megaApiGateway.getParentNode(currentRootParent)?.let {
+                    currentRootParent = it
+                } ?: break
+            }
+            currentRootParent?.let {
+                nodeMapper(
+                    megaNode = it,
+                    offline = getOfflineNode(nodeId.longValue)
+                )
+            }
+        }
 
     override suspend fun getNodeByOriginalFingerprint(
         originalFingerprint: String,
@@ -1108,4 +1124,15 @@ internal class NodeRepositoryImpl @Inject constructor(
             return true
         }
     }
+
+    override suspend fun setNodeDescription(nodeHandle: NodeId, description: String?) =
+        withContext(ioDispatcher) {
+            val node = megaApiGateway.getMegaNodeByHandle(nodeHandle.longValue)
+            requireNotNull(node) { "Node not found" }
+            suspendCancellableCoroutine { continuation ->
+                val listener = continuation.getRequestListener("setNodeDescription") {}
+                megaApiGateway.setNodeDescription(node, description, listener)
+                continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
+            }
+        }
 }

@@ -4,7 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,7 +37,6 @@ import mega.privacy.android.domain.entity.contacts.ContactRequest
 import mega.privacy.android.domain.entity.contacts.ContactRequestStatus
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
-import mega.privacy.android.domain.entity.meeting.ChatSessionChanges
 import mega.privacy.android.domain.entity.meeting.ScheduledMeetingStatus
 import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.FolderNode
@@ -79,8 +77,6 @@ import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.MonitorCallEndedUseCase
-import mega.privacy.android.domain.usecase.meeting.MonitorCallRecordingConsentEventUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorUpgradeDialogClosedUseCase
@@ -110,6 +106,7 @@ import mega.privacy.android.domain.usecase.workers.StartCameraUploadUseCase
 import mega.privacy.android.domain.usecase.workers.StopCameraUploadsUseCase
 import mega.privacy.android.feature.sync.domain.usecase.sync.MonitorSyncStalledIssuesUseCase
 import mega.privacy.android.feature.sync.domain.usecase.sync.MonitorSyncsUseCase
+import mega.privacy.android.shared.sync.featuretoggle.SyncFeatures
 import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
@@ -241,8 +238,6 @@ class ManagerViewModel @Inject constructor(
     private val monitorSyncsUseCase: MonitorSyncsUseCase,
     private val monitorChatSessionUpdatesUseCase: MonitorChatSessionUpdatesUseCase,
     private val hangChatCallUseCase: HangChatCallUseCase,
-    private val monitorCallRecordingConsentEventUseCase: MonitorCallRecordingConsentEventUseCase,
-    private val monitorCallEndedUseCase: MonitorCallEndedUseCase,
     private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase,
     private val setUsersCallLimitRemindersUseCase: SetUsersCallLimitRemindersUseCase,
     private val getUsersCallLimitRemindersUseCase: GetUsersCallLimitRemindersUseCase,
@@ -328,8 +323,6 @@ class ManagerViewModel @Inject constructor(
         key = isFirstLoginKey,
         initialValue = false
     )
-
-    private var monitorChatSessionUpdatesJob: Job? = null
 
     init {
         checkUsersCallLimitReminders()
@@ -468,7 +461,7 @@ class ManagerViewModel @Inject constructor(
 
         viewModelScope.launch {
             val androidSyncEnabled =
-                getFeatureFlagValueUseCase(AppFeatures.AndroidSync)
+                getFeatureFlagValueUseCase(SyncFeatures.AndroidSync)
 
             _state.update {
                 it.copy(
@@ -482,30 +475,6 @@ class ManagerViewModel @Inject constructor(
                 monitorSyncsUseCase().catch { Timber.e(it) }.collect { syncFolders ->
                     val isServiceEnabled = syncFolders.isNotEmpty()
                     _state.update { it.copy(androidSyncServiceEnabled = isServiceEnabled) }
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            monitorCallRecordingConsentEventUseCase().conflate()
-                .collect { isRecordingConsentAccepted ->
-                    _state.update {
-                        it.copy(
-                            isSessionOnRecording = true,
-                            showRecordingConsentDialog = false,
-                            isRecordingConsentAccepted = isRecordingConsentAccepted
-                        )
-                    }
-                    if (!isRecordingConsentAccepted) {
-                        hangChatCall(state.value.callInProgressChatId)
-                    }
-                }
-        }
-
-        viewModelScope.launch {
-            monitorCallEndedUseCase().conflate().collect { chatId ->
-                if (chatId == state.value.callInProgressChatId) {
-                    resetCallRecordingState()
                 }
             }
         }
@@ -749,8 +718,19 @@ class ManagerViewModel @Inject constructor(
      *
      */
     fun onConsumeShowFreePlanParticipantsLimitDialogEvent() {
-        setUsersCallLimitReminderDisabled()
+        setUsersCallLimitReminder(enabled = false)
         _state.update { state -> state.copy(callEndedDueToFreePlanLimits = false) }
+    }
+
+    /**
+     * Enable or disable users call limit reminder
+     */
+    fun setUsersCallLimitReminder(enabled: Boolean) = viewModelScope.launch {
+        runCatching {
+            setUsersCallLimitRemindersUseCase(if (enabled) UsersCallLimitReminders.Enabled else UsersCallLimitReminders.Disabled)
+        }.onFailure { exception ->
+            Timber.e("An error occurred when setting the call limit reminder", exception)
+        }
     }
 
     /**
@@ -1224,83 +1204,7 @@ class ManagerViewModel @Inject constructor(
             call.chatId,
             true,
             passcodeManagement,
-            state().isSessionOnRecording
         )
-    }
-
-    /**
-     * Sets showRecordingConsentDialog as consumed.
-     */
-    fun setShowRecordingConsentDialogConsumed() =
-        _state.update { state -> state.copy(showRecordingConsentDialog = false) }
-
-    /**
-     * Sets isRecordingConsentAccepted.
-     */
-    fun setIsRecordingConsentAccepted(value: Boolean) =
-        _state.update { state -> state.copy(isRecordingConsentAccepted = value) }
-
-    /**
-     * Hang chat call
-     */
-    fun hangChatCall(chatId: Long) = viewModelScope.launch {
-        runCatching {
-            getChatCallUseCase(chatId)?.let { chatCall ->
-                hangChatCallUseCase(chatCall.callId)
-            }
-        }.onSuccess {
-            resetCallRecordingState()
-        }.onFailure { exception ->
-            Timber.e(exception)
-        }
-    }
-
-    /**
-     * Monitor chat session updates
-     *
-     * @param chatId    Chat ID to monitor
-     */
-    fun startMonitorChatSessionUpdates(chatId: Long) {
-        _state.update { it.copy(callInProgressChatId = chatId) }
-        monitorChatSessionUpdatesJob = viewModelScope.launch {
-            monitorChatSessionUpdatesUseCase()
-                .filter { it.chatId == chatId }
-                .collectLatest { result ->
-                    result.session?.let { session ->
-                        session.changes?.apply {
-                            if (contains(ChatSessionChanges.SessionOnRecording)) {
-                                _state.update { state ->
-                                    state.copy(
-                                        isSessionOnRecording = session.isRecording,
-                                        showRecordingConsentDialog = if (!state.isRecordingConsentAccepted) session.isRecording else false
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-        }
-    }
-
-    /**
-     * Stop monitor chat session updates
-     */
-    fun stopMonitorChatSessionUpdates() {
-        monitorChatSessionUpdatesJob?.cancel()
-    }
-
-    /**
-     * Reset call recording status properties
-     */
-    fun resetCallRecordingState() {
-        _state.update {
-            it.copy(
-                callInProgressChatId = -1L,
-                isSessionOnRecording = false,
-                showRecordingConsentDialog = false,
-                isRecordingConsentAccepted = false
-            )
-        }
     }
 
     /**
@@ -1322,15 +1226,6 @@ class ManagerViewModel @Inject constructor(
             getUsersCallLimitRemindersUseCase().collectLatest { result ->
                 _state.update { it.copy(usersCallLimitReminders = result) }
             }
-        }
-    }
-
-    /**
-     * Disable users call limit reminder
-     */
-    private fun setUsersCallLimitReminderDisabled() = viewModelScope.launch {
-        runCatching {
-            setUsersCallLimitRemindersUseCase(UsersCallLimitReminders.Disabled)
         }
     }
 

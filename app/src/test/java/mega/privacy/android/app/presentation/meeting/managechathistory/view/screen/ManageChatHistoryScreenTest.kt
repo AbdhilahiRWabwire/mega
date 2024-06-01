@@ -2,6 +2,11 @@ package mega.privacy.android.app.presentation.meeting.managechathistory.view.scr
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasAnySibling
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -11,15 +16,24 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
 import mega.privacy.android.app.R
+import mega.privacy.android.app.presentation.chat.model.ChatRoomUiState
 import mega.privacy.android.app.presentation.meeting.chat.view.dialog.TEST_TAG_CLEAR_CHAT_CONFIRMATION_DIALOG
 import mega.privacy.android.app.presentation.meeting.chat.view.message.management.getRetentionTimeString
 import mega.privacy.android.app.presentation.meeting.managechathistory.model.ChatHistoryRetentionOption
 import mega.privacy.android.app.presentation.meeting.managechathistory.model.ManageChatHistoryUIState
+import mega.privacy.android.app.presentation.meeting.managechathistory.view.dialog.CHAT_HISTORY_RETENTION_TIME_CONFIRMATION_TAG
+import mega.privacy.android.app.utils.Constants.DISABLED_RETENTION_TIME
+import mega.privacy.android.app.utils.Constants.SECONDS_IN_DAY
+import mega.privacy.android.app.utils.Constants.SECONDS_IN_MONTH_30
+import mega.privacy.android.app.utils.Constants.SECONDS_IN_WEEK
+import mega.privacy.android.core.ui.controls.dialogs.CONFIRMATION_DIALOG_CANCEL_BUTTON_TAG
+import mega.privacy.android.core.ui.controls.dialogs.CONFIRMATION_DIALOG_CONFIRM_BUTTON_TAG
+import mega.privacy.android.core.ui.controls.dialogs.internal.CONFIRM_TAG
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import test.mega.privacy.android.app.fromId
 import test.mega.privacy.android.app.onNodeWithText
-import test.mega.privacy.android.app.presentation.meeting.model.newChatRoom
 
 @RunWith(AndroidJUnit4::class)
 class ManageChatHistoryScreenTest {
@@ -29,10 +43,10 @@ class ManageChatHistoryScreenTest {
 
     @Test
     fun `test that meeting history title is shown when chat room is a meeting`() {
-        composeRule.apply {
+        with(composeRule) {
             setScreen(
                 uiState = ManageChatHistoryUIState(
-                    chatRoom = newChatRoom(withIsMeeting = true)
+                    chatRoom = ChatRoomUiState(isMeeting = true)
                 )
             )
 
@@ -42,10 +56,10 @@ class ManageChatHistoryScreenTest {
 
     @Test
     fun `test that chat history title is shown when chat room is not a meeting`() {
-        composeRule.apply {
+        with(composeRule) {
             setScreen(
                 uiState = ManageChatHistoryUIState(
-                    chatRoom = newChatRoom()
+                    chatRoom = ChatRoomUiState()
                 )
             )
 
@@ -55,7 +69,7 @@ class ManageChatHistoryScreenTest {
 
     @Test
     fun `test that the screen is navigated up when navigation icon is clicked`() {
-        composeRule.apply {
+        with(composeRule) {
             var isNavigatedUp = false
             setScreen(
                 onNavigateUp = { isNavigatedUp = true }
@@ -69,10 +83,10 @@ class ManageChatHistoryScreenTest {
 
     @Test
     fun `test that the custom retention time picker is shown`() {
-        composeRule.apply {
-            setScreen(
-                uiState = ManageChatHistoryUIState(shouldShowCustomTimePicker = true)
-            )
+        with(composeRule) {
+            setScreen()
+
+            selectARetentionTimeOption(ChatHistoryRetentionOption.Custom)
 
             onNodeWithTag(CUSTOM_TIME_PICKER_TAG).assertIsDisplayed()
         }
@@ -80,7 +94,7 @@ class ManageChatHistoryScreenTest {
 
     @Test
     fun `test that the custom retention time picker is not shown`() {
-        composeRule.apply {
+        with(composeRule) {
             setScreen()
 
             onNodeWithTag(CUSTOM_TIME_PICKER_TAG).assertIsNotDisplayed()
@@ -89,10 +103,10 @@ class ManageChatHistoryScreenTest {
 
     @Test
     fun `test that 'clear meeting history' text is shown when chat room is a meeting`() {
-        composeRule.apply {
+        with(composeRule) {
             setScreen(
                 uiState = ManageChatHistoryUIState(
-                    chatRoom = newChatRoom(withIsMeeting = true)
+                    chatRoom = ChatRoomUiState(isMeeting = true)
                 )
             )
 
@@ -102,10 +116,10 @@ class ManageChatHistoryScreenTest {
 
     @Test
     fun `test that 'clear chat history' text is shown when chat room is not a meeting`() {
-        composeRule.apply {
+        with(composeRule) {
             setScreen(
                 uiState = ManageChatHistoryUIState(
-                    chatRoom = newChatRoom()
+                    chatRoom = ChatRoomUiState()
                 )
             )
 
@@ -115,26 +129,30 @@ class ManageChatHistoryScreenTest {
 
     @Test
     fun `test that the clear chat confirmation is shown`() {
-        composeRule.apply {
+        with(composeRule) {
             setScreen(
                 uiState = ManageChatHistoryUIState(
-                    chatRoom = newChatRoom(),
-                    shouldShowClearChatConfirmation = true
+                    chatRoom = ChatRoomUiState()
                 )
             )
+
+            onNodeWithTag(CLEAR_HISTORY_OPTION_TAG).performClick()
 
             onNodeWithTag(TEST_TAG_CLEAR_CHAT_CONFIRMATION_DIALOG).assertIsDisplayed()
         }
     }
 
     @Test
-    fun `test that the clear chat confirmation is not shown`() {
-        composeRule.apply {
+    fun `test that the clear chat confirmation is dismissed after the user confirms it`() {
+        with(composeRule) {
             setScreen(
                 uiState = ManageChatHistoryUIState(
-                    chatRoom = newChatRoom()
+                    chatRoom = ChatRoomUiState()
                 )
             )
+
+            onNodeWithTag(CLEAR_HISTORY_OPTION_TAG).performClick()
+            onNodeWithTag(CONFIRM_TAG).performClick()
 
             onNodeWithTag(TEST_TAG_CLEAR_CHAT_CONFIRMATION_DIALOG).assertIsNotDisplayed()
         }
@@ -142,12 +160,10 @@ class ManageChatHistoryScreenTest {
 
     @Test
     fun `test that the chat history retention confirmation is shown`() {
-        composeRule.apply {
-            setScreen(
-                uiState = ManageChatHistoryUIState(
-                    shouldShowHistoryRetentionConfirmation = true
-                )
-            )
+        with(composeRule) {
+            setScreen()
+
+            onNodeWithTag(HISTORY_CLEARING_OPTION_SWITCH_TAG).performClick()
 
             onNodeWithTag(CHAT_HISTORY_RETENTION_TIME_CONFIRMATION_TAG).assertIsDisplayed()
         }
@@ -155,7 +171,7 @@ class ManageChatHistoryScreenTest {
 
     @Test
     fun `test that the chat history retention confirmation is not shown`() {
-        composeRule.apply {
+        with(composeRule) {
             setScreen()
 
             onNodeWithTag(CHAT_HISTORY_RETENTION_TIME_CONFIRMATION_TAG).assertIsNotDisplayed()
@@ -164,7 +180,7 @@ class ManageChatHistoryScreenTest {
 
     @Test
     fun `test that correct subtitle is shown when retention time is blank`() {
-        composeRule.apply {
+        with(composeRule) {
             setScreen()
 
             onNodeWithText(R.string.subtitle_properties_history_retention).assertIsDisplayed()
@@ -173,7 +189,7 @@ class ManageChatHistoryScreenTest {
 
     @Test
     fun `test that correct subtitle is shown when retention time is not blank`() {
-        composeRule.apply {
+        with(composeRule) {
             setScreen(
                 uiState = ManageChatHistoryUIState(
                     retentionTime = 3600L
@@ -188,7 +204,7 @@ class ManageChatHistoryScreenTest {
     fun `test that retention is shown when retention time is not blank`() {
         val retentionTime = 3600L
 
-        composeRule.apply {
+        with(composeRule) {
             setScreen(
                 uiState = ManageChatHistoryUIState(
                     retentionTime = retentionTime
@@ -202,60 +218,116 @@ class ManageChatHistoryScreenTest {
     }
 
     @Test
-    fun `test that the dismiss retention time confirmation request callback is invoked when the cancel button is clicked`() {
-        composeRule.apply {
-            var isDismissRequestInvoked = false
+    fun `test that the retention time is updated to seconds in day when the confirmed option is one day`() {
+        with(composeRule) {
+            var chosenTime: Long? = null
             setScreen(
-                uiState = ManageChatHistoryUIState(
-                    shouldShowHistoryRetentionConfirmation = true
-                ),
-                onRetentionTimeConfirmationDismiss = { isDismissRequestInvoked = true }
+                onSetChatRetentionTime = { chosenTime = it }
             )
 
-            onNodeWithText(R.string.general_cancel).performClick()
+            selectARetentionTimeOption(ChatHistoryRetentionOption.OneDay)
 
-            assertThat(isDismissRequestInvoked).isTrue()
+            assertThat(chosenTime).isEqualTo(SECONDS_IN_DAY)
         }
     }
 
     @Test
-    fun `test that the confirm retention time callback is invoked with the correct selected option when the confirm button is clicked`() {
-        val currentOption = ChatHistoryRetentionOption.OneDay
-
-        composeRule.apply {
-            var confirmOption: ChatHistoryRetentionOption? = null
+    fun `test that the retention time is updated to seconds in week when the confirmed option is one week`() {
+        with(composeRule) {
+            var chosenTime: Long? = null
             setScreen(
-                uiState = ManageChatHistoryUIState(
-                    shouldShowHistoryRetentionConfirmation = true,
-                    selectedHistoryRetentionTimeOption = currentOption,
-                    isConfirmButtonEnable = true,
-                    confirmButtonStringId = R.string.general_ok
-                ),
-                onConfirmRetentionTimeClick = { confirmOption = it }
+                onSetChatRetentionTime = { chosenTime = it }
             )
 
+            selectARetentionTimeOption(ChatHistoryRetentionOption.OneWeek)
+
+            assertThat(chosenTime).isEqualTo(SECONDS_IN_WEEK)
+        }
+    }
+
+    @Test
+    fun `test that the retention time is updated to seconds in month (30 days) when the confirmed option is one month`() {
+        with(composeRule) {
+            var chosenTime: Long? = null
+            setScreen(
+                onSetChatRetentionTime = { chosenTime = it }
+            )
+
+            selectARetentionTimeOption(ChatHistoryRetentionOption.OneMonth)
+
+            assertThat(chosenTime).isEqualTo(SECONDS_IN_MONTH_30)
+        }
+    }
+
+    @Test
+    fun `test that the custom picker is not displayed after being set`() {
+        with(composeRule) {
+            setScreen()
+
+            selectARetentionTimeOption(ChatHistoryRetentionOption.Custom)
             onNodeWithText(R.string.general_ok).performClick()
 
-            assertThat(confirmOption).isEqualTo(currentOption)
+            onNodeWithTag(CUSTOM_TIME_PICKER_TAG).assertIsNotDisplayed()
+        }
+    }
+
+    private fun ComposeContentTestRule.selectARetentionTimeOption(option: ChatHistoryRetentionOption) {
+        onNodeWithTag(HISTORY_CLEARING_OPTION_SWITCH_TAG).performClick()
+
+        onNode(
+            isSelectable().and(hasAnySibling(hasText(fromId(option.stringId)))),
+            useUnmergedTree = true
+        ).performClick()
+
+        onNodeWithTag(CONFIRMATION_DIALOG_CONFIRM_BUTTON_TAG).performClick()
+    }
+
+    @Test
+    fun `test that the history retention confirmation is displayed`() {
+        with(composeRule) {
+            setScreen()
+
+            onNodeWithTag(HISTORY_CLEARING_OPTION_SWITCH_TAG).performClick()
+
+            onNodeWithTag(CHAT_HISTORY_RETENTION_TIME_CONFIRMATION_TAG).assertIsDisplayed()
         }
     }
 
     @Test
-    fun `test that the retention time option selected callback is invoked when an option is chosen`() {
-        val option = ChatHistoryRetentionOption.OneDay
+    fun `test that the history retention confirmation is not displayed when dismissed`() {
+        with(composeRule) {
+            setScreen()
 
-        composeRule.apply {
-            var selectedOption: ChatHistoryRetentionOption? = null
+            onNodeWithTag(HISTORY_CLEARING_OPTION_SWITCH_TAG).performClick()
+            onNodeWithTag(CONFIRMATION_DIALOG_CANCEL_BUTTON_TAG).performClick()
+
+            onNodeWithTag(CHAT_HISTORY_RETENTION_TIME_CONFIRMATION_TAG).assertIsNotDisplayed()
+        }
+    }
+
+    @Test
+    fun `test that the switch is on when the selected option is not disabled`() {
+        with(composeRule) {
             setScreen(
-                uiState = ManageChatHistoryUIState(
-                    shouldShowHistoryRetentionConfirmation = true
-                ),
-                onRetentionTimeOptionSelected = { selectedOption = it }
+                uiState = ManageChatHistoryUIState(retentionTime = SECONDS_IN_WEEK.toLong())
             )
 
-            onNodeWithText(option.stringId).performClick()
+            onNodeWithTag(HISTORY_CLEARING_OPTION_SWITCH_TAG).performClick()
 
-            assertThat(selectedOption).isEqualTo(option)
+            onNodeWithTag(HISTORY_CLEARING_OPTION_SWITCH_TAG).assertIsOn()
+        }
+    }
+
+    @Test
+    fun `test that the switch is off when the selected option is disabled`() {
+        with(composeRule) {
+            setScreen(
+                uiState = ManageChatHistoryUIState(retentionTime = DISABLED_RETENTION_TIME)
+            )
+
+            onNodeWithTag(HISTORY_CLEARING_OPTION_SWITCH_TAG).performClick()
+
+            onNodeWithTag(HISTORY_CLEARING_OPTION_SWITCH_TAG).assertIsOff()
         }
     }
 
@@ -263,24 +335,14 @@ class ManageChatHistoryScreenTest {
         uiState: ManageChatHistoryUIState = ManageChatHistoryUIState(),
         onNavigateUp: () -> Unit = {},
         onConfirmClearChatClick: (chatRoomId: Long) -> Unit = {},
-        onClearChatConfirmationDismiss: () -> Unit = {},
-        onRetentionTimeOptionSelected: (option: ChatHistoryRetentionOption) -> Unit = {},
-        onConfirmRetentionTimeClick: (option: ChatHistoryRetentionOption) -> Unit = {},
-        onRetentionTimeConfirmationDismiss: () -> Unit = {},
-        onHistoryClearingCheckChange: (value: Boolean) -> Unit = {},
-        onCustomTimePickerClick: () -> Unit = {},
+        onSetChatRetentionTime: (period: Long) -> Unit = {},
     ) {
         setContent {
             ManageChatHistoryScreen(
                 uiState = uiState,
                 onNavigateUp = onNavigateUp,
                 onConfirmClearChatClick = onConfirmClearChatClick,
-                onClearChatConfirmationDismiss = onClearChatConfirmationDismiss,
-                onRetentionTimeOptionSelected = onRetentionTimeOptionSelected,
-                onConfirmRetentionTimeClick = onConfirmRetentionTimeClick,
-                onRetentionTimeConfirmationDismiss = onRetentionTimeConfirmationDismiss,
-                onHistoryClearingCheckChange = onHistoryClearingCheckChange,
-                onCustomTimePickerClick = onCustomTimePickerClick
+                onSetChatRetentionTime = onSetChatRetentionTime,
             )
         }
     }

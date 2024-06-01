@@ -14,9 +14,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import mega.privacy.android.app.presentation.data.NodeUIItem
+import mega.privacy.android.app.presentation.view.extension.getIcon
+import mega.privacy.android.core.ui.controls.lists.NodeGridViewItem
+import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
+import mega.privacy.android.domain.entity.VideoFileTypeInfo
+import mega.privacy.android.domain.entity.node.FileNode
+import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
-import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.legacy.core.ui.controls.lists.HeaderViewItem
 
 /**
@@ -51,17 +56,20 @@ fun <T : TypedNode> NodeGridView(
     showSortOrder: Boolean,
     gridState: LazyGridState,
     showMediaDiscoveryButton: Boolean,
+    fileTypeIconMapper: FileTypeIconMapper,
     modifier: Modifier = Modifier,
     spanCount: Int = 2,
     showChangeViewType: Boolean = true,
     isPublicNode: Boolean = false,
+    inSelectionMode: Boolean = false,
     listContentPadding: PaddingValues = PaddingValues(0.dp),
-    fileTypeIconMapper: FileTypeIconMapper,
 ) {
     LazyVerticalGrid(
         state = gridState,
         columns = GridCells.Fixed(spanCount),
-        modifier = modifier.padding(horizontal = 2.dp).semantics { testTagsAsResourceId = true },
+        modifier = modifier
+            .padding(horizontal = 4.dp)
+            .semantics { testTagsAsResourceId = true },
         verticalArrangement = Arrangement.spacedBy(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         contentPadding = listContentPadding
@@ -86,22 +94,29 @@ fun <T : TypedNode> NodeGridView(
                 )
             }
         }
-        items(count = nodeUIItems.size,
+        items(
+            count = nodeUIItems.size,
             key = {
                 if (nodeUIItems[it].isInvisible) {
                     it
                 } else {
                     nodeUIItems[it].uniqueKey
                 }
-            }) {
+            },
+        ) {
             NodeGridViewItem(
-                modifier = modifier,
-                nodeUIItem = nodeUIItems[it],
-                onMenuClick = onMenuClick,
-                onItemClicked = onItemClicked,
-                onLongClick = onLongClick,
+                isSelected = nodeUIItems[it].isSelected,
+                name = nodeUIItems[it].node.name,
+                iconRes = nodeUIItems[it].node.getIcon(fileTypeIconMapper = fileTypeIconMapper),
                 thumbnailData = ThumbnailRequest(nodeUIItems[it].node.id, isPublicNode),
-                fileTypeIconMapper = fileTypeIconMapper,
+                duration = nodeUIItems[it].fileDuration,
+                isTakenDown = nodeUIItems[it].isTakenDown,
+                onClick = { onItemClicked(nodeUIItems[it]) },
+                onLongClick = { onLongClick(nodeUIItems[it]) },
+                onMenuClick = { onMenuClick(nodeUIItems[it]) }.takeIf { !inSelectionMode },
+                isVideoNode = (nodeUIItems[it].node as? FileNode)?.type is VideoFileTypeInfo,
+                isFolderNode = nodeUIItems[it].node is TypedFolderNode,
+                inVisible = nodeUIItems[it].isInvisible,
             )
         }
     }

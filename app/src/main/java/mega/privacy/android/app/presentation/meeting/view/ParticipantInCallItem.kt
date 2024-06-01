@@ -29,6 +29,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import mega.privacy.android.app.R
+import mega.privacy.android.icon.pack.R as IconR
+import androidx.compose.ui.platform.testTag
 import mega.privacy.android.app.presentation.contact.view.ContactStatusView
 import mega.privacy.android.app.presentation.contact.view.DefaultAvatarView
 import mega.privacy.android.app.presentation.contact.view.UriAvatarView
@@ -112,7 +114,7 @@ fun ParticipantInCallItem(
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
                                     .padding(6.dp),
-                                painter = painterResource(id = R.drawable.ic_verified),
+                                painter = painterResource(id = IconR.drawable.ic_contact_verified),
                                 contentDescription = "Verified user"
                             )
                         }
@@ -187,6 +189,7 @@ fun ParticipantInCallItem(
                             if (myPermission == ChatRoomPermission.Moderator && !isGuest) {
                                 Icon(
                                     modifier = Modifier
+                                        .testTag(TEST_TAG_DENY_PARTICIPANT_ICON)
                                         .padding(end = 10.dp)
                                         .clickable {
                                             onDenyParticipantClicked(
@@ -199,6 +202,7 @@ fun ParticipantInCallItem(
                                 )
 
                                 MegaButtonWithIcon(
+                                    modifier = Modifier.testTag(TEST_TAG_ADMIT_PARTICIPANT_ICON),
                                     onClick = {
                                         onAdmitParticipantClicked(
                                             participant
@@ -524,3 +528,6 @@ fun PreviewGuestParticipantNotInCallItem() {
         )
     }
 }
+
+internal const val TEST_TAG_ADMIT_PARTICIPANT_ICON = "participants_view:participant_item:admit_icon"
+internal const val TEST_TAG_DENY_PARTICIPANT_ICON = "participants_view:participant_item:deny_icon"

@@ -19,7 +19,6 @@ import mega.privacy.android.domain.usecase.GetChatParticipants
 import mega.privacy.android.domain.usecase.InviteContact
 import mega.privacy.android.domain.usecase.InviteToChat
 import mega.privacy.android.domain.usecase.MonitorChatListItemUpdates
-import mega.privacy.android.domain.usecase.MonitorChatRoomUpdates
 import mega.privacy.android.domain.usecase.QueryChatLink
 import mega.privacy.android.domain.usecase.RemoveChatLink
 import mega.privacy.android.domain.usecase.RemoveFromChat
@@ -27,9 +26,7 @@ import mega.privacy.android.domain.usecase.SetMyChatFilesFolder
 import mega.privacy.android.domain.usecase.SetOpenInvite
 import mega.privacy.android.domain.usecase.SetPublicChatToPrivate
 import mega.privacy.android.domain.usecase.SignalChatPresenceActivity
-import mega.privacy.android.domain.usecase.UpdateChatPermissions
 import mega.privacy.android.domain.usecase.meeting.FetchNumberOfScheduledMeetingOccurrencesByChat
-import mega.privacy.android.domain.usecase.meeting.FetchScheduledMeetingOccurrencesByChat
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeeting
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 import mega.privacy.android.domain.usecase.meeting.StartChatCall
@@ -65,13 +62,6 @@ abstract class ChatModule {
         @Provides
         fun provideGetScheduledMeeting(callRepository: CallRepository): GetScheduledMeeting =
             GetScheduledMeeting(callRepository::getScheduledMeeting)
-
-        /**
-         * Provides the Use Case [FetchScheduledMeetingOccurrencesByChat]
-         */
-        @Provides
-        fun provideFetchScheduledMeetingOccurrencesByChat(callRepository: CallRepository): FetchScheduledMeetingOccurrencesByChat =
-            FetchScheduledMeetingOccurrencesByChat(callRepository::fetchScheduledMeetingOccurrencesByChat)
 
         /**
          * Provides the Use Case [FetchNumberOfScheduledMeetingOccurrencesByChat]
@@ -130,25 +120,11 @@ abstract class ChatModule {
             QueryChatLink(chatRepository::queryChatLink)
 
         /**
-         * Provides the Use Case [MonitorChatRoomUpdates]
-         */
-        @Provides
-        fun provideMonitorChatRoomUpdates(chatRepository: ChatRepository): MonitorChatRoomUpdates =
-            MonitorChatRoomUpdates(chatRepository::monitorChatRoomUpdates)
-
-        /**
          * Provides the Use Case [MonitorChatListItemUpdates]
          */
         @Provides
         fun provideMonitorChatListItemUpdates(chatRepository: ChatRepository): MonitorChatListItemUpdates =
             MonitorChatListItemUpdates(chatRepository::monitorChatListItemUpdates)
-
-        /**
-         * Provides the Use Case [UpdateChatPermissions]
-         */
-        @Provides
-        fun provideUpdateChatPermissions(chatRepository: ChatRepository): UpdateChatPermissions =
-            UpdateChatPermissions(chatRepository::updateChatPermissions)
 
         /**
          * Provides the Use Case [RemoveFromChat]

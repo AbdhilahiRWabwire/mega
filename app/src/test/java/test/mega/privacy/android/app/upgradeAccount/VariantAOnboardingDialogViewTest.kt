@@ -1,9 +1,11 @@
 package test.mega.privacy.android.app.upgradeAccount
 
+import mega.privacy.android.shared.resources.R as sharedR
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.printToString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dagger.hilt.android.testing.HiltAndroidTest
 import mega.privacy.android.app.R
@@ -14,7 +16,6 @@ import mega.privacy.android.app.upgradeAccount.model.mapper.LocalisedPriceCurren
 import mega.privacy.android.app.upgradeAccount.model.mapper.LocalisedPriceStringMapper
 import mega.privacy.android.app.upgradeAccount.view.BACKUP_DESCRIPTION_ROW
 import mega.privacy.android.app.upgradeAccount.view.CHAT_DESCRIPTION_ROW
-import mega.privacy.android.app.upgradeAccount.view.FEATURE_TITLE
 import mega.privacy.android.app.upgradeAccount.view.FILE_SHARING_DESCRIPTION_ROW
 import mega.privacy.android.app.upgradeAccount.view.IMAGE_TAG
 import mega.privacy.android.app.upgradeAccount.view.PRO_PLAN_TEXT
@@ -27,8 +28,7 @@ import mega.privacy.android.app.upgradeAccount.view.VariantAOnboardingDialogView
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.Currency
 import mega.privacy.android.domain.entity.account.CurrencyAmount
-import mega.privacy.android.shared.resources.R as sharedR
-import androidx.compose.ui.test.printToString
+import mega.privacy.android.shared.resources.R.string.dialog_onboarding_feature_storage_description
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -65,14 +65,6 @@ class VariantAOnboardingDialogViewTest {
     }
 
     @Test
-    fun `test that title for features is shown correctly`() {
-        setContent()
-        composeRule.onNodeWithTag(FEATURE_TITLE).assertIsDisplayed()
-        composeRule.onNodeWithText(fromId(R.string.dialog_onboarding_some_features_title))
-            .assertIsDisplayed()
-    }
-
-    @Test
     fun `test that storage row is displayed`() {
         setContent()
         composeRule.onNodeWithTag(STORAGE_DESCRIPTION_ROW).printToString()
@@ -80,7 +72,7 @@ class VariantAOnboardingDialogViewTest {
         composeRule.onNodeWithText(fromId(R.string.dialog_onboarding_feature_title_storage))
             .assertIsDisplayed()
         composeRule.onNodeWithText(
-            fromId(R.string.dialog_onboarding_feature_description_storage, "400 GB")
+            fromId(dialog_onboarding_feature_storage_description, "400", "GB")
         )
             .assertIsDisplayed()
     }

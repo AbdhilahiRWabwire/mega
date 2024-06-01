@@ -10,6 +10,7 @@ import mega.privacy.android.domain.entity.chat.ChatInitState
 import mega.privacy.android.domain.entity.chat.ChatListItem
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ChatPendingChanges
+import mega.privacy.android.domain.entity.chat.ChatPresenceConfig
 import mega.privacy.android.domain.entity.chat.ChatPreview
 import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.chat.CombinedChatRoom
@@ -138,6 +139,13 @@ interface ChatRepository {
      * Get chat files folder id if it exists
      */
     suspend fun getChatFilesFolderId(): NodeId?
+
+    /**
+     * Get chat rooms
+     *
+     * @return  List of [ChatRoom]
+     */
+    suspend fun getChatRooms(): List<ChatRoom>
 
     /**
      * Get all chat rooms
@@ -272,13 +280,13 @@ interface ChatRepository {
      * Update chat permissions
      *
      * @param chatId        The chat id.
-     * @param handle        User handle.
+     * @param nodeId        The node id.
      * @param permission    User privilege.
      * @return              The Chat Request.
      */
     suspend fun updateChatPermissions(
         chatId: Long,
-        handle: Long,
+        nodeId: NodeId,
         permission: ChatRoomPermission,
     ): ChatRequest
 
@@ -1025,4 +1033,13 @@ interface ChatRepository {
      *
      */
     suspend fun broadcastUpgradeDialogClosed()
+
+    /**
+     * Get the current presence configuration
+     *
+     * @see [ChatPresenceConfig] for further details.
+     *
+     * @return The current presence configuration
+     */
+    suspend fun getChatPresenceConfig(): ChatPresenceConfig?
 }
