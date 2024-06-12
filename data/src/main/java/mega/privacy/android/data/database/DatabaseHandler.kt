@@ -6,14 +6,11 @@ import mega.privacy.android.data.model.chat.AndroidMegaChatMessage
 import mega.privacy.android.data.model.chat.NonContactInfo
 import mega.privacy.android.domain.entity.Contact
 import mega.privacy.android.domain.entity.Offline
-import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.login.EphemeralCredentials
 import mega.privacy.android.domain.entity.settings.ChatSettings
 import mega.privacy.android.domain.entity.user.UserCredentials
 
 interface DatabaseHandler {
-
-    val myEmail: String?
 
     //get the credential of last login
     val credentials: UserCredentials?
@@ -44,21 +41,8 @@ interface DatabaseHandler {
      */
     var chatVideoQuality: Int
 
-    /**
-     * Sets the flag to indicate if the local path selected as Media Uploads local folder belongs to an external SD card.
-     *
-     * @param mediaFolderExternalSdCard true if the local path selected belongs to an external SD card, false otherwise
-     */
-    var passcodeLockType: String?
     var isPasscodeLockEnabled: Boolean
     var passcodeLockCode: String
-
-    /**
-     * Sets the time required before ask for the passcode.
-     *
-     * @param requiredTime The time required before ask for the passcode.
-     */
-    var passcodeRequiredTime: Int
 
     /**
      * Sets if the fingerprint lock setting is enabled or not.
@@ -88,13 +72,6 @@ interface DatabaseHandler {
     var lastPublicHandleType: Int
 
     /**
-     * Set the storage state value into the database.
-     *
-     * @param storageState Storage state value.
-     */
-    var storageState: StorageState
-
-    /**
      * Set the handle of "My chat files" folder into the database.
      *
      * @param myChatFilesFolderHandle Handle value.
@@ -118,38 +95,19 @@ interface DatabaseHandler {
      */
     var attributes: MegaAttributes?
 
-    fun saveCredentials(userCredentials: UserCredentials)
-    fun saveMyEmail(email: String?)
-    fun saveMyFirstName(firstName: String?)
-    fun saveMyLastName(lastName: String?)
-    fun shouldAskForDisplayOver(): Boolean
-    fun dontAskForDisplayOver()
     fun setNotificationSoundChat(sound: String?)
     fun setVibrationEnabledChat(enabled: String?)
     fun setWrittenTextItem(handle: String?, text: String?, editedMsgId: String?): Int
-    fun areNotificationsEnabled(handle: String?): String?
-
     fun setNonContactFirstName(name: String?, handle: String?): Int
     fun setNonContactLastName(lastName: String?, handle: String?): Int
     fun setNonContactEmail(email: String?, handle: String?): Int
-    fun setContactNickname(nickname: String?, handle: Long)
-
     fun exists(handle: Long): Boolean
     fun removeById(id: Int): Int
     fun setFirstTime(firstTime: Boolean)
-    fun setCamSyncWifi(wifi: Boolean)
-    fun setPreferredViewList(list: Boolean)
-    fun setPreferredViewListCamera(list: Boolean)
     fun setPreferredSortCloud(order: String?)
     fun setPreferredSortCameraUpload(order: String?)
     fun setPreferredSortOthers(order: String?)
-    fun setLastUploadFolder(folderPath: String)
     fun setLastCloudFolder(folderHandle: String)
-    fun setKeepFileNames(charging: Boolean)
-    fun setCamSyncEnabled(enabled: Boolean)
-    fun setSecondaryUploadEnabled(enabled: Boolean)
-    fun setCamSyncHandle(handle: Long)
-    fun setSecondaryFolderHandle(handle: Long)
     fun setAccountDetailsTimeStamp()
     fun resetAccountDetailsTimeStamp()
     fun setExtendedAccountDetailsTimestamp()
@@ -158,7 +116,6 @@ interface DatabaseHandler {
     fun setStorageDownloadLocation(storageDownloadLocation: String?)
     fun setAttrAskSizeDownload(askSizeDownload: String?)
     fun setAttrAskNoAppDownload(askNoAppDownload: String?)
-    fun setAttrAttempts(attempt: Int)
     fun setUseHttpsOnly(useHttpsOnly: Boolean)
     fun setShowCopyright(showCopyright: Boolean)
     fun setShowNotifOff(showNotifOff: Boolean)
@@ -167,7 +124,6 @@ interface DatabaseHandler {
     fun setLastPublicHandleTimeStamp()
     fun setInvalidateSdkCache(invalidateSdkCache: Boolean)
     fun clearCredentials()
-
     @Deprecated("Call to ClearEphemeralCredentialsUseCase instead")
     fun clearEphemeral()
     fun clearPreferences()
@@ -210,7 +166,6 @@ interface DatabaseHandler {
     fun removePendingMessageByChatId(idChat: Long)
     fun removePendingMessageById(idMsg: Long)
     fun setAutoPlayEnabled(enabled: String)
-    fun setShowInviteBanner(show: String)
     fun findNonContactByHandle(handle: String): NonContactInfo?
     fun findContactByHandle(handleParam: Long): Contact?
     fun findContactByEmail(mail: String?): Contact?

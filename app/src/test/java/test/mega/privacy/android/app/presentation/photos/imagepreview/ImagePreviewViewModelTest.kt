@@ -3,13 +3,11 @@
 package test.mega.privacy.android.app.presentation.photos.imagepreview
 
 import androidx.lifecycle.SavedStateHandle
-import com.google.common.truth.Truth
-import com.google.common.truth.Truth.*
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.domain.usecase.CheckNameCollision
-import mega.privacy.android.app.domain.usecase.offline.SetNodeAvailableOffline
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.namecollision.usecase.CheckNameCollisionUseCase
 import mega.privacy.android.app.presentation.imagepreview.ImagePreviewVideoLauncher
@@ -21,12 +19,9 @@ import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewMenu
 import mega.privacy.android.app.presentation.movenode.mapper.MoveRequestMessageMapper
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.node.ImageNode
-import mega.privacy.android.domain.usecase.GetParentNodeUseCase
 import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
-import mega.privacy.android.domain.usecase.camerauploads.GetPrimarySyncHandleUseCase
-import mega.privacy.android.domain.usecase.camerauploads.GetSecondarySyncHandleUseCase
 import mega.privacy.android.domain.usecase.favourites.AddFavouritesUseCase
 import mega.privacy.android.domain.usecase.favourites.IsAvailableOfflineUseCase
 import mega.privacy.android.domain.usecase.favourites.RemoveFavouritesUseCase
@@ -46,8 +41,6 @@ import mega.privacy.android.domain.usecase.node.MoveNodesToRubbishUseCase
 import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.offline.RemoveOfflineNodeUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
-import mega.privacy.android.domain.usecase.transfers.chatuploads.GetMyChatsFilesFolderIdUseCase
-import mega.privacy.android.domain.usecase.transfers.downloads.ResetTotalDownloadsUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -82,7 +75,6 @@ class ImagePreviewViewModelTest {
     private val moveNodeUseCase: MoveNodeUseCase = mock()
     private val addFavouritesUseCase: AddFavouritesUseCase = mock()
     private val removeFavouritesUseCase: RemoveFavouritesUseCase = mock()
-    private val setNodeAvailableOffline: SetNodeAvailableOffline = mock()
     private val removeOfflineNodeUseCase: RemoveOfflineNodeUseCase = mock()
     private val monitorOfflineNodeUpdatesUseCase: MonitorOfflineNodeUpdatesUseCase = mock()
     private val isAvailableOfflineUseCase: IsAvailableOfflineUseCase = mock()
@@ -95,17 +87,12 @@ class ImagePreviewViewModelTest {
     private val getPublicChildNodeFromIdUseCase: GetPublicChildNodeFromIdUseCase = mock()
     private val getPublicNodeFromSerializedDataUseCase: GetPublicNodeFromSerializedDataUseCase =
         mock()
-    private val resetTotalDownloadsUseCase: ResetTotalDownloadsUseCase = mock()
     private val deleteNodesUseCase: DeleteNodesUseCase = mock()
     private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase = mock()
     private val imagePreviewVideoLauncher: ImagePreviewVideoLauncher = mock()
     private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase = mock()
     private val isHiddenNodesOnboardedUseCase: IsHiddenNodesOnboardedUseCase = mock()
     private val monitorShowHiddenItemsUseCase: MonitorShowHiddenItemsUseCase = mock()
-    private val getPrimarySyncHandleUseCase: GetPrimarySyncHandleUseCase = mock()
-    private val getSecondarySyncHandleUseCase: GetSecondarySyncHandleUseCase = mock()
-    private val getMyChatsFilesFolderIdUseCase: GetMyChatsFilesFolderIdUseCase = mock()
-    private val getParentNodeUseCase: GetParentNodeUseCase = mock()
 
     @BeforeAll
     fun setup() {
@@ -127,7 +114,6 @@ class ImagePreviewViewModelTest {
         moveNodeUseCase,
         addFavouritesUseCase,
         removeFavouritesUseCase,
-        setNodeAvailableOffline,
         removeOfflineNodeUseCase,
         monitorOfflineNodeUpdatesUseCase,
         isAvailableOfflineUseCase,
@@ -139,17 +125,12 @@ class ImagePreviewViewModelTest {
         getFeatureFlagValueUseCase,
         getPublicChildNodeFromIdUseCase,
         getPublicNodeFromSerializedDataUseCase,
-        resetTotalDownloadsUseCase,
         deleteNodesUseCase,
         updateNodeSensitiveUseCase,
         imagePreviewVideoLauncher,
         monitorAccountDetailUseCase,
         isHiddenNodesOnboardedUseCase,
         monitorShowHiddenItemsUseCase,
-        getPrimarySyncHandleUseCase,
-        getSecondarySyncHandleUseCase,
-        getMyChatsFilesFolderIdUseCase,
-        getParentNodeUseCase,
     )
 
     private fun initViewModel() {
@@ -168,7 +149,6 @@ class ImagePreviewViewModelTest {
             moveNodeUseCase = moveNodeUseCase,
             addFavouritesUseCase = addFavouritesUseCase,
             removeFavouritesUseCase = removeFavouritesUseCase,
-            setNodeAvailableOffline = setNodeAvailableOffline,
             removeOfflineNodeUseCase = removeOfflineNodeUseCase,
             monitorOfflineNodeUpdatesUseCase = monitorOfflineNodeUpdatesUseCase,
             isAvailableOfflineUseCase = isAvailableOfflineUseCase,
@@ -180,17 +160,12 @@ class ImagePreviewViewModelTest {
             getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             getPublicChildNodeFromIdUseCase = getPublicChildNodeFromIdUseCase,
             getPublicNodeFromSerializedDataUseCase = getPublicNodeFromSerializedDataUseCase,
-            resetTotalDownloadsUseCase = resetTotalDownloadsUseCase,
             deleteNodesUseCase = deleteNodesUseCase,
             updateNodeSensitiveUseCase = updateNodeSensitiveUseCase,
             imagePreviewVideoLauncher = imagePreviewVideoLauncher,
             monitorAccountDetailUseCase = monitorAccountDetailUseCase,
             isHiddenNodesOnboardedUseCase = isHiddenNodesOnboardedUseCase,
             monitorShowHiddenItemsUseCase = monitorShowHiddenItemsUseCase,
-            getPrimarySyncHandleUseCase = getPrimarySyncHandleUseCase,
-            getSecondarySyncHandleUseCase = getSecondarySyncHandleUseCase,
-            getMyChatsFilesFolderIdUseCase =  getMyChatsFilesFolderIdUseCase,
-            getParentNodeUseCase = getParentNodeUseCase,
             defaultDispatcher = UnconfinedTestDispatcher(),
         )
     }

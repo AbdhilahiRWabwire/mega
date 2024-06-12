@@ -1,8 +1,11 @@
 package mega.privacy.android.data.gateway.api
 
+import mega.privacy.android.domain.entity.SortOrder
 import nz.mega.sdk.MegaCancelToken
 import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaRequestListenerInterface
+import nz.mega.sdk.MegaSearchFilter
+import nz.mega.sdk.MegaSearchPage
 
 /**
  * Mega api folder gateway
@@ -84,14 +87,6 @@ interface MegaApiFolderGateway {
     suspend fun getRootNode(): MegaNode?
 
     /**
-     * Get children nodes by megaNodeList
-     * @param parent parent node
-     * @param order order for the returned list
-     * @return children nodes list
-     */
-    suspend fun getChildren(parent: MegaNode, order: Int, ): List<MegaNode>
-
-    /**
      * Get thumbnail from server
      *
      * @param node
@@ -141,47 +136,12 @@ interface MegaApiFolderGateway {
     suspend fun getNumChildFiles(node: MegaNode): Int
 
     /**
-     * Get children nodes by node
-     * @param parentNode parent node
-     * @param order order for the returned list, if null the default order is applied
-     * @return children nodes list
-     */
-    suspend fun getChildrenByNode(parentNode: MegaNode, order: Int? = null): List<MegaNode>
-
-    /**
      * Get the parent node of a MegaNode
      *
      * @param node
      * @return the parent node of the node, null if node doesn't exist
      */
     suspend fun getParentNode(node: MegaNode): MegaNode?
-
-    /**
-     *
-     * Allow to search nodes with the following options:
-     * - Search given a parent node of the tree to explore
-     * - Search recursively
-     * - Containing a search string in their name
-     * - Filter by the type of the node
-     * - Order the returned list
-     *
-     * @param parentNode parentNode
-     * @param searchString containing a search string in their name
-     * @param cancelToken use for cancel search
-     * @param recursive is search recursively
-     * @param order
-     * @param type type of nodes requested in the search
-     *
-     * @return List of nodes that match with the search parameters
-     */
-    suspend fun searchByType(
-        parentNode: MegaNode,
-        searchString: String,
-        cancelToken: MegaCancelToken,
-        recursive: Boolean,
-        order: Int,
-        type: Int,
-    ): List<MegaNode>
 
     /**
      * Retrieve basic information about a folder link
@@ -233,4 +193,32 @@ interface MegaApiFolderGateway {
      * @param listener
      */
     fun getFolderInfo(node: MegaNode?, listener: MegaRequestListenerInterface)
+
+
+    /**
+     * Search query with search filter
+     *
+     * @param filter filter to apply [MegaSearchFilter]
+     * @param order [SortOrder]
+     * @param megaCancelToken [MegaCancelToken]
+     */
+    suspend fun search(
+        filter: MegaSearchFilter,
+        order: Int,
+        megaCancelToken: MegaCancelToken,
+        megaSearchPage: MegaSearchPage? = null
+    ): List<MegaNode>
+
+    /**
+     * Get children of a node
+     * @param filter filter to apply [MegaSearchFilter]
+     * @param order [SortOrder]
+     * @param megaCancelToken [MegaCancelToken]
+     */
+    suspend fun getChildren(
+        filter: MegaSearchFilter,
+        order: Int,
+        megaCancelToken: MegaCancelToken,
+        megaSearchPage: MegaSearchPage? = null
+    ): List<MegaNode>
 }

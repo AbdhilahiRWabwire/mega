@@ -1,4 +1,3 @@
-import groovy.lang.Closure
 import mega.privacy.android.build.shouldApplyDefaultConfiguration
 
 plugins {
@@ -20,26 +19,13 @@ android {
         kotlinCompilerExtensionVersion = androidx.versions.compose.compiler.get()
     }
 
-    kotlin {
-        val jdk: String by rootProject.extra
-        jvmToolchain(jdk.toInt())
-    }
-
-    kotlinOptions {
-        val jdk: String by rootProject.extra
-        jvmTarget = jdk
-        val shouldSuppressWarnings: Boolean by rootProject.extra
-        suppressWarnings = shouldSuppressWarnings
-        freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
-    }
-
     lint {
         abortOnError = false
         xmlOutput = file("build/reports/lint-results.xml")
     }
     dependencies {
         lintChecks(project(":lint"))
-        implementation(project(":core-ui"))
+        implementation(project(":shared:original-core-ui"))
 
         implementation(platform(androidx.compose.bom))
         implementation(androidx.bundles.compose.bom)

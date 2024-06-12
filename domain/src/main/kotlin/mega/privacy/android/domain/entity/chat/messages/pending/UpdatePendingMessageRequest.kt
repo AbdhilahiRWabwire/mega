@@ -34,11 +34,25 @@ data class UpdatePendingMessageStateAndNodeHandleRequest(
 ) : UpdatePendingMessageRequest
 
 /**
- * Entity to update the state of a pending message
+ * Entity to update the tag and state of a pending message
  * @property pendingMessageId
  * @property transferTag
+ * @property state
  */
 data class UpdatePendingMessageTransferTagRequest(
     override val pendingMessageId: Long,
     val transferTag: Int,
+    val state: PendingMessageState,
+) : UpdatePendingMessageRequest
+
+/**
+ * Entity to update the state of a pending message
+ * @property pendingMessageId
+ * @property state
+ * @property filePath
+ */
+data class UpdatePendingMessageStateAndPathRequest(
+    override val pendingMessageId: Long,
+    val state: PendingMessageState,
+    val filePath: String
 ) : UpdatePendingMessageRequest

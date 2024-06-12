@@ -39,7 +39,6 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
-import mega.privacy.android.app.fragments.homepage.EventObserver
 import mega.privacy.android.app.fragments.homepage.HomepageSearchable
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.main.ManagerActivity
@@ -70,7 +69,7 @@ import mega.privacy.android.app.utils.callManager
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.GetThemeMode
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -143,7 +142,7 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
             val themeMode by getThemeMode()
                 .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
             val uiState by videoSectionViewModel.state.collectAsStateWithLifecycle()
-            MegaAppTheme(isDark = themeMode.isDarkMode()) {
+            OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                 ConstraintLayout(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -349,9 +348,9 @@ class VideoSectionFragment : Fragment(), HomepageSearchable {
      * onViewCreated
      */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        sortByHeaderViewModel.orderChangeEvent.observe(
-            viewLifecycleOwner, EventObserver { videoSectionViewModel.refreshWhenOrderChanged() }
-        )
+        viewLifecycleOwner.collectFlow(sortByHeaderViewModel.orderChangeState) {
+            videoSectionViewModel.refreshWhenOrderChanged()
+        }
 
         viewLifecycleOwner.collectFlow(
             videoSectionViewModel.state.map { it.isPendingRefresh }.distinctUntilChanged()

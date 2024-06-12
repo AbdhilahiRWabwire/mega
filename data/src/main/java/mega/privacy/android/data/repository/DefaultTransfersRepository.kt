@@ -108,6 +108,8 @@ internal class DefaultTransfersRepository @Inject constructor(
 
     private val monitorPausedTransfers = MutableStateFlow(false)
 
+    private val monitorAskedResumeTransfers = MutableStateFlow(false)
+
     /**
      * to store current transferred bytes in memory instead of in database
      */
@@ -599,6 +601,7 @@ internal class DefaultTransfersRepository @Inject constructor(
 
         monitorPausedTransfers.emit(isPauseResponse)
         localStorageGateway.setTransferQueueStatus(isPauseResponse)
+        monitorAskedResumeTransfers.emit(false)
         return@withContext isPauseResponse
     }
 
@@ -716,6 +719,21 @@ internal class DefaultTransfersRepository @Inject constructor(
     companion object {
         internal const val TRANSFERS_SD_TEMPORARY_FOLDER = "transfersSdTempMEGA"
     }
+
+    override fun monitorAskedResumeTransfers() = monitorAskedResumeTransfers.asStateFlow()
+
+    override suspend fun setAskedResumeTransfers() {
+        monitorAskedResumeTransfers.emit(true)
+    }
+
+    override suspend fun startUploadsWorker() = withContext(ioDispatcher) {
+        workerManagerGateway.enqueueUploadsWorkerRequest()
+    }
+
+    override fun isUploadsWorkerEnqueuedFlow() =
+        workerManagerGateway.monitorUploadsStatusInfo().map { workInfos ->
+            workInfos.any { it.state == WorkInfo.State.ENQUEUED }
+        }
 }
 
 private fun MegaTransfer.isCUUpload() =

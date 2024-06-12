@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
@@ -35,18 +36,20 @@ import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
 import mega.privacy.android.app.presentation.videosection.model.VideosFilterOptionEntity
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.core.formatter.formatFileSize
-import mega.privacy.android.core.ui.controls.progressindicator.MegaCircularProgressIndicator
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaCircularProgressIndicator
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
 import mega.privacy.android.legacy.core.ui.controls.lists.HeaderViewItem
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import nz.mega.sdk.MegaNode
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 internal fun AllVideosView(
     items: List<VideoUIEntity>,
+    accountType: AccountType?,
     progressBarShowing: Boolean,
     searchMode: Boolean,
     scrollToTop: Boolean,
@@ -203,7 +206,11 @@ internal fun AllVideosView(
                                 nodeAvailableOffline = videoItem.nodeAvailableOffline,
                                 onClick = { onClick(videoItem, it) },
                                 onMenuClick = { onMenuClick(videoItem) },
-                                onLongClick = { onLongClick(videoItem, it) }
+                                onLongClick = { onLongClick(videoItem, it) },
+                                modifier = Modifier
+                                    .alpha(0.5f.takeIf {
+                                        accountType?.isPaid == true && (videoItem.isMarkedSensitive || videoItem.isSensitiveInherited)
+                                    } ?: 1f),
                             )
                         }
                     }
@@ -269,9 +276,10 @@ internal fun AllVideosView(
 @CombinedThemePreviews
 @Composable
 private fun AllVideosViewPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         AllVideosView(
             items = emptyList(),
+            accountType = null,
             progressBarShowing = false,
             searchMode = false,
             scrollToTop = false,
@@ -285,7 +293,7 @@ private fun AllVideosViewPreview() {
             selectedLocationFilterOption = LocationFilterOption.AllLocations,
             selectedDurationFilterOption = DurationFilterOption.MoreThan20,
             onLocationFilterItemClicked = { },
-            onDurationFilterItemClicked = { }
+            onDurationFilterItemClicked = { },
         )
     }
 }

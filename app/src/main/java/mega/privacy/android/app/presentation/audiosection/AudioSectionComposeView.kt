@@ -17,7 +17,7 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.presentation.audiosection.model.AudioSectionState
 import mega.privacy.android.app.presentation.audiosection.model.AudioUiEntity
-import mega.privacy.android.core.ui.controls.progressindicator.MegaCircularProgressIndicator
+import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaCircularProgressIndicator
 import mega.privacy.android.domain.entity.preference.ViewType
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
 
@@ -39,6 +39,7 @@ fun AudioSectionComposeView(
     val progressBarShowing = uiState.progressBarShowing
     val items = uiState.allAudios
     val scrollToTop = uiState.scrollToTop
+    val accountType = uiState.accountDetail?.levelDetail?.accountType
 
     LaunchedEffect(items) {
         if (scrollToTop) {
@@ -75,6 +76,7 @@ fun AudioSectionComposeView(
             else -> {
                 AudiosView(
                     items = items,
+                    accountType = accountType,
                     isListView = uiState.currentViewType == ViewType.LIST,
                     listState = listState,
                     gridState = gridState,

@@ -35,16 +35,16 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.presentation.documentsection.model.DocumentSectionUiState
 import mega.privacy.android.app.presentation.documentsection.model.DocumentUiEntity
-import mega.privacy.android.core.ui.controls.layouts.MegaScaffold
-import mega.privacy.android.core.ui.controls.progressindicator.MegaCircularProgressIndicator
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.white_black
+import mega.privacy.android.shared.original.core.ui.controls.layouts.MegaScaffold
+import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaCircularProgressIndicator
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.extensions.white_black
 import mega.privacy.android.domain.entity.PdfFileTypeInfo
 import mega.privacy.android.domain.entity.TextFileTypeInfo
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.preference.ViewType
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import nz.mega.sdk.MegaNode
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -63,6 +63,7 @@ internal fun DocumentSectionComposeView(
     val gridState = rememberLazyGridState()
     val progressBarShowing = uiState.isLoading
     val items = uiState.allDocuments
+    val accountType = uiState.accountDetail?.levelDetail?.accountType
     val scrollToTop = uiState.scrollToTop
 
     LaunchedEffect(items) {
@@ -126,6 +127,7 @@ internal fun DocumentSectionComposeView(
                     if (uiState.currentViewType == ViewType.LIST) {
                         DocumentListView(
                             items = items,
+                            accountType = accountType,
                             lazyListState = listState,
                             sortOrder = sortOrder,
                             modifier = modifier.testTag(DOCUMENT_SECTION_LIST_VIEW_TEST_TAG),
@@ -139,6 +141,7 @@ internal fun DocumentSectionComposeView(
                     } else {
                         DocumentGridView(
                             items = items,
+                            accountType = accountType,
                             lazyGridState = gridState,
                             sortOrder = sortOrder,
                             modifier = modifier.testTag(DOCUMENT_SECTION_GRID_VIEW_TEST_TAG),
@@ -184,7 +187,7 @@ internal fun AddDocumentFabButton(
 @CombinedThemePreviews
 @Composable
 private fun DocumentSectionComposeViewWithoutDocumentsPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DocumentSectionComposeView(
             uiState = DocumentSectionUiState(
                 isLoading = false
@@ -203,7 +206,7 @@ private fun DocumentSectionComposeViewWithoutDocumentsPreview() {
 @CombinedThemePreviews
 @Composable
 private fun DocumentSectionComposeViewPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DocumentSectionComposeView(
             uiState = DocumentSectionUiState(
                 allDocuments = getPreviewItems(),
@@ -223,7 +226,7 @@ private fun DocumentSectionComposeViewPreview() {
 @CombinedThemePreviews
 @Composable
 private fun AddDocumentFabButtonPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         AddDocumentFabButton(
             onAddDocumentClick = {},
         )

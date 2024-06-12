@@ -91,7 +91,7 @@
     <!-- Title for Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
     <string name="dialog_onboarding_feature_title_backup_rewind">Never lose data again</string>
     <!-- Description about Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_feature_description_backup_rewind">Back up and sync your data for complete confidence. Plus, use Rewind to restore folders to any date up to 180 days.</string>
+    <string name="dialog_onboarding_feature_description_backup_rewind">Rewind to restore files and folders back to any date up to 180 days, so your data is accident and tamper-proof.</string>
     <!-- Title for MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
     <string name="dialog_onboarding_feature_title_vpn">MEGA&#160;VPN</string>
     <!-- Description about MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
@@ -171,7 +171,7 @@
     <!-- Error message when the playlist name already exists -->
     <string name="video_section_playlists_error_message_playlist_name_exists">A playlist with this name already exists. Enter a different name.</string>
     <!-- Delete playlist dialog title of the video section playlists tab -->
-    <string name="video_section_playlists_delete_playlist_dialog_title">Delete playlist\?</string>
+    <string name="video_section_playlists_delete_playlist_dialog_title">Delete playlist?</string>
     <!-- Delete button title of the video section playlists tab delete playlist dialog -->
     <string name="video_section_playlists_delete_playlist_dialog_delete_button">Delete</string>
     <!-- Text that indicates that there’s no playlist to show. -->
@@ -179,7 +179,7 @@
     <!-- Delete option title of the video section playlist bottom sheet -->
     <string name="video_section_playlist_bottom_sheet_option_title_delete">Delete playlist</string>
     <!-- Remove videos dialog title of the video section playlist detail -->
-    <string name="video_section_playlist_detail_remove_videos_dialog_title">Remove from playlist\?</string>
+    <string name="video_section_playlist_detail_remove_videos_dialog_title">Remove from playlist?</string>
     <!-- Remove button title of the video section playlist detail remove videos dialog -->
     <string name="video_section_playlist_detail_remove_videos_dialog_remove_button">Remove</string>
     <!-- Play all button title of the video section playlist detail -->
@@ -255,7 +255,7 @@
         <item quantity="other">Share links</item>
     </plurals>
     <!-- Title of the dialog to ask the user to use the selected location as default location for next downloads-->
-    <string name="transfers_dialog_save_download_location_title">Download to this location\?</string>
+    <string name="transfers_dialog_save_download_location_title">Download to this location?</string>
     <!-- Option to don't use the selected location as default location for next downloads-->
     <string name="transfers_dialog_save_download_location_only_this_time_option">Only this time</string>
     <!-- Option to use the selected location as default location for next downloads-->
@@ -279,9 +279,109 @@
     <!-- Hint text explaining that you can change the email and resend the create account link to the new email address. This appears on the confirmation email screen under the email address text input field. -->
     <string name="account_confirm_email_misspelled_email_description">If you have misspelt your email address, correct it and tap [A]Resend[/A].</string>
     <!-- Title of the insufficient storage error banner -->
-    <string name="sync_error_storage_over_quota_banner_title">Syncing paused, your MEGA plan has run out of storage.</string>
+    <string name="sync_error_storage_over_quota_banner_title">Syncing paused, your MEGA plan has run out of storage</string>
     <!-- Title of the insufficient storage error action -->
     <string name="sync_error_storage_over_quota_banner_action">Upgrade</string>
     <!-- The warning message shown when the User enables the Device Charging requirement in Settings Camera Uploads, enables Camera Uploads, begins uploading content and the Device is not charged -->
-    <string name="camera_uploads_phone_not_charging_message">Upload paused, phone is not charging</string>
+    <string name="camera_uploads_phone_not_charging_message">Upload paused, device is not charging</string>
+    <!-- Label of the Device Status informing the user that Nothing is set up for the Current Device -->
+    <string name="device_center_list_view_item_status_nothing_setup">No syncs set up</string>
+    <!-- The title of the warning dialog shown to a suspended Pro Flexi Account User -->
+    <string name="account_pro_flexi_account_deactivated_dialog_title">Account deactivated</string>
+    <!-- The body of the warning dialog shown to a suspended Pro Flexi Account User -->
+    <string name="account_pro_flexi_account_deactivated_dialog_body">Your Pro&#160;Flexi account has been deactivated due to payment failure or you’ve cancelled your subscription. You won’t be able to access the data stored in your account. \nTo make a payment and reactivate your subscription, log in to MEGA through a browser.</string>
+    <!-- Label for new low-tier plan Starter. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_starter_label">Starter</string>
+    <!-- Label for new low-tier plan Basic. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_basic_label">Basic</string>
+    <!-- Label for new low-tier plan Essential. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_essential_label">Essential</string>
+    <!-- The Body Text of a Settings Camera Uploads Option that decides whether or not the Device must be charged for Camera Uploads to start uploading content -->
+    <string name="settings_camera_uploads_upload_only_while_charging_option_body">Uploads will be paused until you start charging your device. Uploads will still remain paused if your battery is below 20%.</string>
+    <!-- Title of the synced folder list empty state -->
+    <string name="device_center_sync_list_empty_state_title">No syncs set up</string>
+    <!-- Message of the synced folder list empty state -->
+    <string name="device_center_sync_list_empty_state_message">Sync a local folder on your device with a folder on MEGA.</string>
+    <!-- Label for the button or menu option to add a new sync -->
+    <string name="device_center_sync_add_new_syn_button_option">Add new sync</string>
+    <!-- Text for the Sync solved issues chip -->
+    <string name="device_center_sync_solved_issues_chip_text">Solved issues</string>
+    <!-- Warning message to indicate that cannot select a currently synced folder -->
+    <string name="device_center_new_sync_select_local_device_folder_currently_synced_message">This folder can’t be synced. Set it up to sync to MEGA using Camera uploads.</string>
+    <!-- Label for the file info information screen description field -->
+    <string name="file_info_information_description_label">Description</string>
+    <!-- Placeholder for the file info information screen description field -->
+    <string name="file_info_information_description_placeholder">Add description</string>
+    <!-- Description added snack bar for the file info information screen-->
+    <string name="file_info_information_snackbar_description_added">Description added</string>
+    <!-- Description updated snack bar for the file info information screen-->
+    <string name="file_info_information_snackbar_description_updated">Description updated</string>
+    <!-- Title to mention other features of Pro plans on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_title_additional_features">Plus access to these great benefits:</string>
+    <!-- Description to mention other features of Pro plans (e.g. Mega VPN, chats and meetings, Android Sync and no ads) on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_description_additional_features_with_ads">&#8226;&#160;MEGA&#160;VPN \n&#8226;&#160;Unrestricted calls and meetings \n&#8226;&#160;Automatically sync the folders on your mobile device \n&#8226;&#160;No advertisements</string>
+    <!-- Description to mention other features of Pro plans (e.g. Mega VPN, chats and meetings, Android Sync and no ads) on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_description_additional_features_without_ads">&#8226;&#160;MEGA&#160;VPN \n&#8226;&#160;Unrestricted calls and meetings \n&#8226;&#160;Automatically sync the folders on your mobile device</string>
+    <!-- Text for the Sync solved issues list empty state -->
+    <string name="device_center_sync_solved_issues_empty_state_text">No solved issues</string>
+    <!-- Title of first tour screen -->
+    <string name="cloud_drive_tour_first_title">You hold the keys</string>
+    <!-- Title of second tour screen -->
+    <string name="cloud_drive_tour_second_title">Encrypted chat</string>
+    <!-- Title of third tour screen -->
+    <string name="cloud_drive_tour_third_title">Create your network</string>
+    <!-- Title of fourth tour screen -->
+    <string name="cloud_drive_tour_fourth_title">Your photos in the cloud</string>
+    <!-- Title of fifth tour screen -->
+    <string name="cloud_drive_tour_fifth_title">MEGA meeting</string>
+    <!-- First subtitle of the tour screen -->
+    <string name="cloud_drive_tour_first_subtitle">Security is why we exist, your files are safe with us behind a well oiled encryption machine where only you can access your files.</string>
+    <!-- Second subtitle of the tour screen -->
+    <string name="cloud_drive_tour_second_subtitle">Fully encrypted chat with voice and video calls, group messaging and file sharing integration with your Cloud Drive.</string>
+    <!-- Third subtitle of the tour screen -->
+    <string name="cloud_drive_tour_third_subtitle">Add contacts, create a network, collaborate, and make voice and video calls without ever leaving MEGA.</string>
+    <!-- Fourth subtitle of the tour screen -->
+    <string name="cloud_drive_tour_fourth_subtitle">Camera uploads is an essential feature for any mobile device and we have got you covered. Create your account now.</string>
+    <!-- Fifth subtitle of the tour screen -->
+    <string name="cloud_drive_tour_fifth_subtitle">Zero-knowledge encrypted video meeting.</string>
+    <!-- Titles of the tour screen to onboard users with the MEGA application -->
+    <string-array name="cloud_drive_tour_titles">
+        <item>&#64;string/cloud_drive_tour_first_title</item>
+        <item>&#64;string/cloud_drive_tour_second_title</item>
+        <item>&#64;string/cloud_drive_tour_third_title</item>
+        <item>&#64;string/cloud_drive_tour_fourth_title</item>
+        <item>&#64;string/cloud_drive_tour_fifth_title</item>
+    </string-array>
+    <!-- Subtitles of the tour screen to onboard users with the MEGA application -->
+    <string-array name="cloud_drive_tour_subtitles">
+        <item>&#64;string/cloud_drive_tour_first_subtitle</item>
+        <item>&#64;string/cloud_drive_tour_second_subtitle</item>
+        <item>&#64;string/cloud_drive_tour_third_subtitle</item>
+        <item>&#64;string/cloud_drive_tour_fourth_subtitle</item>
+        <item>&#64;string/cloud_drive_tour_fifth_subtitle</item>
+    </string-array>
+    <!-- Title of the Raise to Hand Feature Introduction Tooltip -->
+    <string name="meetings_raised_hand_tooltip_title">[A]New feature: Raise hand[/A]</string>
+    <!-- Message of the synced folder list empty state for free accounts -->
+    <string name="device_center_sync_list_empty_state_message_free_account">Keep your information syncing and up to date by upgrading to one of our Pro plans.</string>
+    <!-- "Upgrade now" label for a button, menu entry, etc -->
+    <string name="general_upgrade_now_label">Upgrade now</string>
+    <!-- Title of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_title">Upgrade to Pro</string>
+    <!-- Message of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_message">Unlock the power to sync your mobile device to the cloud with our Pro plans.</string>
+    <!-- Confirm button text of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_confirm_button">Upgrade</string>
+    <!-- Cancel button text of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_cancel_button">Not now</string>
+    <!-- Title of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_title">Uploads folder conflict</string>
+    <!-- Body of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_body">Your Camera uploads folder and secondary media uploads folder cannot be related to each other. Choose a different folder.</string>
+    <!-- The confirmation Button text of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_confirm_button">Okay, got it</string>
+    <!-- Warning message shown when trying to select a local folder but there isn’t any app to do that. -->
+    <string name="general_no_picker_warning">This device doesn’t have an app to select folders</string>
+    <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to sync folders. Keep the bullet point, as this string is part of the bullet point list. -->
+    <string name="account_upgrade_account_description_feature_sync">&#8226;&#160;Automatically sync the folders on your mobile device</string>
 </resources>

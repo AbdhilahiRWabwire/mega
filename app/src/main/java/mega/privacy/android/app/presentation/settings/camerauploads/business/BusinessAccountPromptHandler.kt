@@ -6,9 +6,9 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import mega.privacy.android.app.presentation.account.business.BusinessAccountSuspendedDialog
 import mega.privacy.android.app.presentation.settings.camerauploads.dialogs.CameraUploadsBusinessAccountDialog
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.domain.entity.account.EnableCameraUploadsStatus
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * A [Composable] to handle what kind of Business Account Dialog should be displayed, depending on
@@ -59,7 +59,7 @@ internal fun BusinessAccountPromptHandler(
 private fun BusinessAccountPromptHandlerPreview(
     @PreviewParameter(BusinessAccountPromptHandlerParameterProvider::class) businessAccountPromptType: EnableCameraUploadsStatus?,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         BusinessAccountPromptHandler(
             businessAccountPromptType = businessAccountPromptType,
             onBusinessAccountPromptDismissed = {},

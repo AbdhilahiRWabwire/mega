@@ -8,13 +8,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.meeting.chat.view.message.voiceclip.VoiceClipMessageViewModel
-import mega.privacy.android.core.ui.controls.chat.messages.CoreVoiceClipMessageView
-import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
-import mega.privacy.android.core.ui.controls.layouts.LocalSnackBarHostState
 import mega.privacy.android.domain.entity.chat.messages.VoiceClipMessage
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.CoreVoiceClipMessageView
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.reaction.model.UIReaction
+import mega.privacy.android.shared.original.core.ui.controls.layouts.LocalSnackBarHostState
 
 /**
  * UI message for voice clip
@@ -31,6 +32,7 @@ class VoiceClipUiMessage(
         interactionEnabled: Boolean,
         onLongClick: () -> Unit,
         initialiseModifier: (onClick: () -> Unit) -> Modifier,
+        navHostController: NavHostController,
     ) {
         val viewModel: VoiceClipMessageViewModel = hiltViewModel()
 

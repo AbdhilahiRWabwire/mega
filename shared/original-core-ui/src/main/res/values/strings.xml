@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="ImpliedQuantity, ExtraTranslation, MissingTranslation">
+    <!-- password label -->
+    <string name="password_text">Password</string>
+    <string name="back_up_recovery_key">Back up Recovery key</string>
+    <string name="backup_recovery_key_subtitle">Do you remember your password?\nMEGA cannot reset your password if you forget it.</string>
+    <string name="manual_retry_alert">Message not sent. Tap for options</string>
+    <string name="edit_chat_message">Edit message</string>
+    <string name="chat_toolbar_bottom_sheet_allow_gallery_access_title">Allow access to your gallery</string>
+    <string name="chat_toolbar_bottom_sheet_grant_gallery_access_button">Grant access</string>
+    <plurals name="number_unread_messages">
+        <item quantity="one">%1$s unread message</item>
+        <item quantity="other">%1$s unread messages</item>
+    </plurals>
+    <string name="slide_to_cancel">Slide to cancel</string>
+    <string name="general_cancel">Cancel</string>
+    <string name="recording_less_than_second"/>
+    <string name="error_message_voice_clip"/>
+    <string name="general_allow"/>
+    <string name="chat_microphone_permissions_denied_for_voice_clip"/>
+    <string name="context_send"/>
+    <string name="camera_photo_button">Photo</string>
+    <string name="video_button">Video</string>
+    <string name="edited_message_text">(edited)</string>
+    <string name="chat_click_link_in_message_intent_not_available">You may not have any apps installed which can open this website</string>
+    <string name="manual_resume_alert">Transfers paused. Tap to resume.</string>
+</resources>

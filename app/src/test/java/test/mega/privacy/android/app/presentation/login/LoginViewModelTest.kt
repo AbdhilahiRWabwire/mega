@@ -23,6 +23,7 @@ import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.login.EphemeralCredentials
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.usecase.RootNodeExistsUseCase
+import mega.privacy.android.domain.usecase.account.ClearUserCredentialsUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountBlockedUseCase
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.camerauploads.HasCameraSyncEnabledUseCase
@@ -52,6 +53,7 @@ import mega.privacy.android.domain.usecase.transfers.CancelTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.OngoingTransfersExistUseCase
 import mega.privacy.android.domain.usecase.transfers.chatuploads.StartChatUploadsWorkerUseCase
 import mega.privacy.android.domain.usecase.transfers.downloads.StartDownloadWorkerUseCase
+import mega.privacy.android.domain.usecase.transfers.uploads.StartUploadsWorkerUseCase
 import mega.privacy.android.domain.usecase.workers.StopCameraUploadsUseCase
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -108,6 +110,8 @@ internal class LoginViewModelTest {
     private val clearLastRegisteredEmailUseCase = mock<ClearLastRegisteredEmailUseCase>()
     private val installReferrerHandler = mock<InstallReferrerHandler>()
     private val transfersManagement = mock<TransfersManagement>()
+    private val clearUserCredentialsUseCase = mock<ClearUserCredentialsUseCase>()
+    private val startUploadsWorkerUseCase = mock<StartUploadsWorkerUseCase>()
 
     @BeforeEach
     fun setUp() {
@@ -148,6 +152,8 @@ internal class LoginViewModelTest {
             installReferrerHandler = installReferrerHandler,
             transfersManagement = transfersManagement,
             createSupportTicketEmailUseCase = mock(),
+            clearUserCredentialsUseCase = clearUserCredentialsUseCase,
+            startUploadsWorkerUseCase = startUploadsWorkerUseCase,
         )
     }
 
@@ -359,6 +365,13 @@ internal class LoginViewModelTest {
             assertThat(analyticsExtension.events).isEmpty()
             verifyNoInteractions(installReferrerHandler, clearLastRegisteredEmailUseCase)
         }
+
+    @Test
+    fun `test that clear user credentials invoke correctly`() = runTest {
+        underTest.clearUserCredentials()
+        advanceUntilIdle()
+        verify(clearUserCredentialsUseCase).invoke()
+    }
 
     companion object {
         private val scheduler = TestCoroutineScheduler()

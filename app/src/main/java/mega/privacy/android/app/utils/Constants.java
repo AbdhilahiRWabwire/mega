@@ -21,7 +21,6 @@ public class Constants {
     public static final int REQUEST_CODE_SELECT_IMPORT_FOLDER = 1007;
     public static final int REQUEST_CODE_SELECT_CONTACT = 1009;
     public static final int TAKE_PHOTO_CODE = 1010;
-    public static final int WRITE_SD_CARD_REQUEST_CODE = 1011;
     public static final int REQUEST_CODE_SELECT_FILE = 1012;
     public static final int REQUEST_CODE_TREE = 1014;
     public static final int TAKE_PICTURE_PROFILE_CODE = 1015;
@@ -93,6 +92,7 @@ public class Constants {
     public static final int LOGIN_FRAGMENT = 6001;
     public static final int CONFIRM_EMAIL_FRAGMENT = 6002;
     public static final int CREATE_ACCOUNT_FRAGMENT = 604;
+    public static final int REPORT_ISSUE_VIA_EMAIL_FRAGMENT = 605;
 
 
     public static final int UPDATE_ACCOUNT_DETAILS = 9003;
@@ -157,6 +157,7 @@ public class Constants {
     public static final String ACTION_FILE_PROVIDER = "ACTION_FILE_PROVIDER";
     public static final String ACTION_EXPLORE_ZIP = "EXPLORE_ZIP";
     public static final String EXTRA_PATH_ZIP = "PATH_ZIP";
+    public static final String EXTRA_HANDLE_ZIP = "HANDLE_ZIP";
     public static final String EXTRA_OPEN_FOLDER = "EXTRA_OPEN_FOLDER";
     public static final String ACTION_OVERQUOTA_STORAGE = "OVERQUOTA_STORAGE";
     public static final String ACTION_TAKE_SELFIE = "TAKE_SELFIE";
@@ -744,16 +745,7 @@ public class Constants {
     public static final long AUDIO_PLAYER_TRACK_NAME_FADE_DURATION_MS = 200;
     public static final long AUDIO_PLAYER_TOOLBAR_INIT_HIDE_DELAY_MS = 3000;
     public static final long MEDIA_PLAYER_TOOLBAR_SHOW_HIDE_DURATION_MS = 300;
-
-    /**
-     * Event Keys
-     */
-    public static final String EVENT_ORDER_CHANGE = "order_change";
     public static final String EVENT_CHAT_STATUS_CHANGE = "chat_status_change";
-    public static final String EVENT_HOMEPAGE_VISIBILITY = "homepage_visibility";
-    public static final String EVENT_DRAG_TO_EXIT_THUMBNAIL_VISIBILITY = "drag_to_exit_thumbnail_visibility";
-    public static final String EVENT_DRAG_TO_EXIT_SCROLL = "drag_to_exit_scroll";
-
     public static final String KEY_IS_SHOWED_WARNING_MESSAGE = "is_showed_meeting_warning_message_";
 
     public static final String STRING_SEPARATOR = " · ";

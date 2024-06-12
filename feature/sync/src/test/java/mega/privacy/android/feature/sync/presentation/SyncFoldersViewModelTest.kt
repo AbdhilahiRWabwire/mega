@@ -1,17 +1,23 @@
 package mega.privacy.android.feature.sync.presentation
 
 import app.cash.turbine.test
-import com.google.common.truth.Truth
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.BatteryInfo
+import mega.privacy.android.domain.entity.account.AccountDetail
+import mega.privacy.android.domain.entity.account.AccountLevelDetail
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.GetFolderTreeInfo
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
+import mega.privacy.android.domain.usecase.account.GetAccountTypeUseCase
+import mega.privacy.android.domain.usecase.account.IsStorageOverQuotaUseCase
+import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.environment.MonitorBatteryInfoUseCase
 import mega.privacy.android.feature.sync.R
 import mega.privacy.android.feature.sync.domain.entity.FolderPair
@@ -36,6 +42,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.verify
@@ -56,6 +63,9 @@ class SyncFoldersViewModelTest {
     private val monitorBatteryInfoUseCase: MonitorBatteryInfoUseCase = mock()
     private val getNodeByIdUseCase: GetNodeByIdUseCase = mock()
     private val getFolderTreeInfo: GetFolderTreeInfo = mock()
+    private val isStorageOverQuotaUseCase: IsStorageOverQuotaUseCase = mock()
+    private val getAccountTypeUseCase: GetAccountTypeUseCase = mock()
+    private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase = mock()
 
     private lateinit var underTest: SyncFoldersViewModel
 
@@ -91,7 +101,21 @@ class SyncFoldersViewModelTest {
 
     @BeforeEach
     fun setupMock(): Unit = runBlocking {
+        whenever(monitorSyncsUseCase()).thenReturn(flow {
+            emit(folderPairs)
+            awaitCancellation()
+        })
         whenever(monitorBatteryInfoUseCase()).thenReturn(flowOf(BatteryInfo(100, true)))
+
+        val accountLevelDetail = mock<AccountLevelDetail> {
+            on { accountType } doReturn AccountType.FREE
+        }
+        val accountDetail = mock<AccountDetail> {
+            on { levelDetail } doReturn accountLevelDetail
+        }
+        whenever(monitorAccountDetailUseCase()).thenReturn(
+            flowOf(accountDetail)
+        )
     }
 
     @AfterEach
@@ -103,33 +127,30 @@ class SyncFoldersViewModelTest {
             resumeSyncUseCase,
             pauseSyncUseCase,
             getSyncStalledIssuesUseCase,
-            setUserPausedSyncsUseCase
+            setUserPausedSyncsUseCase,
+            isStorageOverQuotaUseCase,
+            getAccountTypeUseCase,
+            monitorAccountDetailUseCase,
         )
     }
 
     @Test
     fun `test that viewmodel fetches all folder pairs upon initialization`() = runTest {
-        whenever(monitorSyncsUseCase()).thenReturn(flow {
-            emit(folderPairs)
-            awaitCancellation()
-        })
+        whenever(isStorageOverQuotaUseCase()).thenReturn(false)
         whenever(getSyncStalledIssuesUseCase()).thenReturn(emptyList())
         whenever(syncUiItemMapper(folderPairs)).thenReturn(syncUiItems)
         val expectedState = SyncFoldersState(syncUiItems)
 
         initViewModel()
 
-        underTest.state.test {
-            Truth.assertThat(awaitItem()).isEqualTo(expectedState)
+        underTest.uiState.test {
+            assertThat(awaitItem()).isEqualTo(expectedState)
         }
     }
 
     @Test
     fun `test that card click change the state to expanded`() = runTest {
-        whenever(monitorSyncsUseCase()).thenReturn(flow {
-            emit(folderPairs)
-            awaitCancellation()
-        })
+        whenever(isStorageOverQuotaUseCase()).thenReturn(false)
         whenever(getSyncStalledIssuesUseCase()).thenReturn(emptyList())
         whenever(syncUiItemMapper(folderPairs)).thenReturn(syncUiItems)
         val expectedState = SyncFoldersState(syncUiItems.map { it.copy(expanded = true) })
@@ -139,17 +160,13 @@ class SyncFoldersViewModelTest {
             SyncFoldersAction.CardExpanded(syncUiItems.first(), true)
         )
 
-        underTest.state.test {
-            Truth.assertThat(awaitItem()).isEqualTo(expectedState)
+        underTest.uiState.test {
+            assertThat(awaitItem()).isEqualTo(expectedState)
         }
     }
 
     @Test
     fun `test that remove action removes folder pair`() = runTest {
-        whenever(monitorSyncsUseCase()).thenReturn(flow {
-            emit(folderPairs)
-            awaitCancellation()
-        })
         whenever(syncUiItemMapper(folderPairs)).thenReturn(syncUiItems)
         val folderPairId = 9999L
         whenever(removeFolderPairUseCase(folderPairId)).thenReturn(Unit)
@@ -164,10 +181,6 @@ class SyncFoldersViewModelTest {
 
     @Test
     fun `test that view model pause run click pauses sync if sync is not paused`() = runTest {
-        whenever(monitorSyncsUseCase()).thenReturn(flow {
-            emit(folderPairs)
-            awaitCancellation()
-        })
         val syncUiItem = getSyncUiItem(SyncStatus.SYNCING)
         initViewModel()
 
@@ -179,10 +192,6 @@ class SyncFoldersViewModelTest {
 
     @Test
     fun `test that view model pause run clicked runs sync if sync is paused`() = runTest {
-        whenever(monitorSyncsUseCase()).thenReturn(flow {
-            emit(folderPairs)
-            awaitCancellation()
-        })
         val syncUiItem = getSyncUiItem(SyncStatus.PAUSED)
         initViewModel()
 
@@ -195,10 +204,6 @@ class SyncFoldersViewModelTest {
     @Test
     fun `test that the folder is in error status when the stalled issues are not empty`() =
         runTest {
-            whenever(monitorSyncsUseCase()).thenReturn(flow {
-                emit(folderPairs)
-                awaitCancellation()
-            })
             whenever(syncUiItemMapper(folderPairs)).thenReturn(syncUiItems)
             whenever(getSyncStalledIssuesUseCase()).thenReturn(stalledIssues)
             val expectedState =
@@ -206,9 +211,25 @@ class SyncFoldersViewModelTest {
 
             initViewModel()
 
-            underTest.state.test {
-                Truth.assertThat(awaitItem()).isEqualTo(expectedState)
+            underTest.uiState.test {
+                assertThat(awaitItem()).isEqualTo(expectedState)
             }
+        }
+
+    @Test
+    fun `test that storage over quota use case returns true changes ui state to show storage overquota`() =
+        runTest {
+            whenever(isStorageOverQuotaUseCase()).thenReturn(true)
+            initViewModel()
+            assertThat(underTest.uiState.value.isStorageOverQuota).isTrue()
+        }
+
+    @Test
+    fun `test that storage over quota use case returns false changes ui state to not show storage overquota`() =
+        runTest {
+            whenever(isStorageOverQuotaUseCase()).thenReturn(false)
+            initViewModel()
+            assertThat(underTest.uiState.value.isStorageOverQuota).isFalse()
         }
 
     private fun getSyncUiItem(status: SyncStatus): SyncUiItem = SyncUiItem(
@@ -236,6 +257,9 @@ class SyncFoldersViewModelTest {
             monitorBatteryInfoUseCase = monitorBatteryInfoUseCase,
             getNodeByIdUseCase = getNodeByIdUseCase,
             getFolderTreeInfo = getFolderTreeInfo,
+            isStorageOverQuotaUseCase = isStorageOverQuotaUseCase,
+            getAccountTypeUseCase = getAccountTypeUseCase,
+            monitorAccountDetailUseCase = monitorAccountDetailUseCase,
         )
     }
 }

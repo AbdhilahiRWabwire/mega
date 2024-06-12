@@ -21,7 +21,7 @@ import mega.privacy.android.feature.sync.navigation.syncNavGraph
 import mega.privacy.android.feature.sync.navigation.syncRoute
 import mega.privacy.android.feature.sync.ui.permissions.SyncPermissionsManager
 import mega.privacy.android.navigation.MegaNavigator
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import javax.inject.Inject
 
 /**
@@ -31,11 +31,16 @@ import javax.inject.Inject
 class SyncFragment : Fragment() {
 
     companion object {
+        private const val TITLE_KEY = "titleKey"
+
         /**
          * Returns the instance of SyncFragment
          */
         @JvmStatic
-        fun newInstance(): SyncFragment = SyncFragment()
+        fun newInstance(title: String? = null): SyncFragment {
+            val args = Bundle().apply { putString(TITLE_KEY, title) }
+            return SyncFragment().apply { arguments = args }
+        }
     }
 
     /**
@@ -68,13 +73,14 @@ class SyncFragment : Fragment() {
     ): View {
         return ComposeView(requireContext()).apply {
             setContent {
+                val title = arguments?.getString(TITLE_KEY)
                 val animatedNavController = rememberNavController()
                 val themeMode by getThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.System)
 
                 val state by viewModel.state.collectAsStateWithLifecycle()
 
                 state.showOnboarding?.let { showOnboarding ->
-                    MegaAppTheme(isDark = themeMode.isDarkMode()) {
+                    OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                         NavHost(
                             navController = animatedNavController,
                             startDestination = syncRoute,
@@ -86,7 +92,8 @@ class SyncFragment : Fragment() {
                                 syncPermissionsManager = syncPermissionsManager,
                                 openUpgradeAccountPage = {
                                     megaNavigator.openUpgradeAccount(requireContext())
-                                }
+                                },
+                                title = title,
                             )
                         }
                     }

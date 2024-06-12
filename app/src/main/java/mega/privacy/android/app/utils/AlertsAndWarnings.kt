@@ -17,7 +17,6 @@ import mega.privacy.android.app.BaseActivity
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.OverDiskQuotaPaywallActivity
-import mega.privacy.android.app.main.megachat.ChatActivity
 import mega.privacy.android.app.presentation.login.LoginActivity
 import mega.privacy.android.domain.entity.AccountType
 import timber.log.Timber
@@ -69,6 +68,7 @@ object AlertsAndWarnings {
      * @param context current Context.
      */
     @JvmStatic
+    @Deprecated("Use ResumeTransfersDialog Composable dialog instead")
     fun showResumeTransfersWarning(
         context: Context,
         onResumePausedTransfers: () -> Unit,
@@ -85,10 +85,6 @@ object AlertsAndWarnings {
             .setCancelable(false)
             .setPositiveButton(context.getString(R.string.button_resume_individual_transfer)) { dialog, _ ->
                 onResumePausedTransfers()
-
-                if (context is ChatActivity) {
-                    context.updatePausedUploadingMessages()
-                }
 
                 dialog.dismiss()
             }
@@ -184,39 +180,6 @@ object AlertsAndWarnings {
             .setCancelable(false)
             .create()
             .show()
-    }
-
-    @JvmStatic
-    fun askForCustomizedPlan(context: Context, myEmail: String?, accountType: Int) {
-        Timber.d("askForCustomizedPlan")
-        val body = StringBuilder()
-        body.append(context.getString(R.string.subject_mail_upgrade_plan))
-            .append("\n\n\n\n\n\n\n")
-            .append(
-                """${context.getString(R.string.settings_about_app_version)} v${
-                    context.getString(
-                        R.string.app_version
-                    )
-                }"""
-            )
-            .append(context.getString(R.string.user_account_feedback).toString() + "  " + myEmail)
-
-        when (accountType) {
-            0 -> body.append(" (" + context.getString(R.string.my_account_free) + ")")
-            1 -> body.append(" (" + context.getString(R.string.my_account_pro1) + ")")
-            2 -> body.append(" (" + context.getString(R.string.my_account_pro2) + ")")
-            3 -> body.append(" (" + context.getString(R.string.my_account_pro3) + ")")
-            4 -> body.append(" (" + context.getString(R.string.my_account_prolite_feedback_email) + ")")
-            else -> body.append(" (" + context.getString(R.string.my_account_free) + ")")
-        }
-
-        val emailAndroid = Constants.MAIL_SUPPORT
-        val subject = context.getString(R.string.title_mail_upgrade_plan)
-        val emailIntent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$emailAndroid"))
-            .putExtra(Intent.EXTRA_SUBJECT, subject)
-            .putExtra(Intent.EXTRA_TEXT, body.toString())
-
-        context.startActivity(Intent.createChooser(emailIntent, " "))
     }
 
     @JvmStatic

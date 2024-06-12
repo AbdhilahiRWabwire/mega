@@ -6,9 +6,9 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import mega.privacy.android.app.R
-import mega.privacy.android.core.ui.controls.dialogs.MegaAlertDialog
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDialog
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * Leave share Dialog
@@ -38,7 +38,7 @@ private fun LeaveShareDialogBody(
     onOkClicked: () -> Unit,
     onCancelClicked: () -> Unit,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         val title = pluralStringResource(
             R.plurals.confirmation_leave_share_folder,
             totalNodes,

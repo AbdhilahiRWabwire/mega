@@ -11,7 +11,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -26,10 +25,11 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mega.privacy.android.app.R
+import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.CustomizedGridLayoutManager
 import mega.privacy.android.app.components.PositionDividerItemDecoration
 import mega.privacy.android.app.databinding.FragmentFileexplorerlistBinding
-import mega.privacy.android.app.domain.usecase.search.GetSearchFromMegaNodeParentUseCase
+import mega.privacy.android.app.domain.usecase.search.LegacySearchUseCase
 import mega.privacy.android.app.fragments.homepage.EventObserver
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.main.FileExplorerActivity.Companion.CLOUD_FRAGMENT
@@ -45,7 +45,10 @@ import mega.privacy.android.app.utils.TextUtil.formatEmptyScreenText
 import mega.privacy.android.app.utils.Util.getPreferences
 import mega.privacy.android.app.utils.Util.isScreenInPortrait
 import mega.privacy.android.data.database.DatabaseHandler
+import mega.privacy.android.data.mapper.SortOrderIntMapper
 import mega.privacy.android.data.qualifier.MegaApi
+import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.domain.entity.node.NodeSourceType
 import mega.privacy.android.domain.entity.preference.ViewType
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.usecase.canceltoken.CancelCancelTokenUseCase
@@ -64,10 +67,10 @@ import javax.inject.Inject
 class CloudDriveExplorerFragment : RotatableFragment(), CheckScrollInterface, SearchCallback.View {
 
     /**
-     * [GetSearchFromMegaNodeParentUseCase]
+     * [LegacySearchUseCase]
      */
     @Inject
-    lateinit var getSearchFromMegaNodeParentUseCase: GetSearchFromMegaNodeParentUseCase
+    lateinit var legacySearchUseCase: LegacySearchUseCase
 
     /**
      * [CancelCancelTokenUseCase]
@@ -92,7 +95,10 @@ class CloudDriveExplorerFragment : RotatableFragment(), CheckScrollInterface, Se
     @IoDispatcher
     lateinit var ioDispatcher: CoroutineDispatcher
 
-    private val sortByHeaderViewModel by viewModels<SortByHeaderViewModel>()
+    @Inject
+    lateinit var sortOrderIntMapper: SortOrderIntMapper
+
+    private val sortByHeaderViewModel by activityViewModels<SortByHeaderViewModel>()
     private val fileExplorerViewModel by activityViewModels<FileExplorerViewModel>()
     private lateinit var binding: FragmentFileexplorerlistBinding
 
@@ -343,6 +349,7 @@ class CloudDriveExplorerFragment : RotatableFragment(), CheckScrollInterface, Se
         }
 
         initOriginalData()
+        fileExplorerViewModel.init()
 
         when (modeCloud) {
             FileExplorerActivity.MOVE,
@@ -405,6 +412,14 @@ class CloudDriveExplorerFragment : RotatableFragment(), CheckScrollInterface, Se
                 rotatableFragmentViewType = state.viewType
                 switchListGridView(state.viewType)
             }.launchIn(viewLifecycleOwner.lifecycleScope)
+
+            refreshData(isUpdatedOrderChangeState = true)
+
+            viewLifecycleOwner.collectFlow(orderChangeState) { order ->
+                (this@CloudDriveExplorerFragment.activity as? FileExplorerActivity)?.refreshCloudExplorerOrderNodes(
+                    sortOrderIntMapper(order.cloudSortOrder)
+                )
+            }
         }
         super.onViewCreated(view, savedInstanceState)
     }
@@ -725,9 +740,17 @@ class CloudDriveExplorerFragment : RotatableFragment(), CheckScrollInterface, Se
      *
      * @param data original nodes
      */
-    fun updateNodesByAdapter(data: List<MegaNode?>) {
+    fun updateNodesByAdapter(sourceData: List<MegaNode?>) {
+        val data = if (fileExplorerViewModel.showHiddenItems) {
+            sourceData
+        } else {
+            sourceData.filter {
+                it != null && !it.isMarkedSensitive && !megaApi.isSensitiveInherited(it)
+            }
+        }
         data.toList().let {
             nodes.clear()
+            adapter.setAccountDetail(fileExplorerViewModel.accountDetail)
             adapter.setNodes(it)
             nodes.addAll(it)
             updateView()
@@ -830,11 +853,10 @@ class CloudDriveExplorerFragment : RotatableFragment(), CheckScrollInterface, Se
         lifecycleScope.launch {
             initNewSearch()
             runCatching {
-                getSearchFromMegaNodeParentUseCase(
+                legacySearchUseCase(
                     query = searchString,
-                    parentHandleSearch = INVALID_HANDLE,
-                    parent = megaApi.getNodeByHandle(parentHandle),
-                    searchFilter = null
+                    parentHandle = NodeId(parentHandle),
+                    nodeSourceType = NodeSourceType.CLOUD_DRIVE
                 )
             }.onSuccess {
                 finishSearch(it)

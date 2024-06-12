@@ -23,10 +23,11 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import mega.privacy.android.data.mapper.transfer.DownloadNotificationMapper
 import mega.privacy.android.data.mapper.transfer.OverQuotaNotificationBuilder
 import mega.privacy.android.data.mapper.transfer.TransfersFinishedNotificationMapper
+import mega.privacy.android.data.mapper.transfer.TransfersNotificationMapper
 import mega.privacy.android.data.worker.AbstractTransfersWorker
+import mega.privacy.android.data.worker.AbstractTransfersWorker.Companion.ON_TRANSFER_UPDATE_REFRESH_MILLIS
 import mega.privacy.android.data.worker.AreNotificationsEnabledUseCase
 import mega.privacy.android.data.worker.DownloadsWorker
 import mega.privacy.android.data.worker.ForegroundSetter
@@ -43,7 +44,7 @@ import mega.privacy.android.domain.usecase.transfers.active.ClearActiveTransfers
 import mega.privacy.android.domain.usecase.transfers.active.CorrectActiveTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.active.GetActiveTransferTotalsUseCase
 import mega.privacy.android.domain.usecase.transfers.active.HandleTransferEventUseCase
-import mega.privacy.android.domain.usecase.transfers.active.MonitorOngoingActiveTransfersUseCase
+import mega.privacy.android.domain.usecase.transfers.active.MonitorOngoingActiveTransfersUntilFinishedUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
 import org.junit.After
 import org.junit.Before
@@ -75,11 +76,11 @@ class DownloadsWorkerTest {
 
     private val monitorTransferEventsUseCase = mock<MonitorTransferEventsUseCase>()
     private val handleTransferEventUseCase = mock<HandleTransferEventUseCase>()
-    private val monitorOngoingActiveTransfersUseCase =
-        mock<MonitorOngoingActiveTransfersUseCase>()
+    private val monitorOngoingActiveTransfersUntilFinishedUseCase =
+        mock<MonitorOngoingActiveTransfersUntilFinishedUseCase>()
     private val areTransfersPausedUseCase = mock<AreTransfersPausedUseCase>()
     private val getActiveTransferTotalsUseCase = mock<GetActiveTransferTotalsUseCase>()
-    private val downloadNotificationMapper = mock<DownloadNotificationMapper>()
+    private val transfersNotificationMapper = mock<TransfersNotificationMapper>()
     private val areNotificationsEnabledUseCase = mock<AreNotificationsEnabledUseCase>()
     private val correctActiveTransfersUseCase = mock<CorrectActiveTransfersUseCase>()
     private val overQuotaNotificationBuilder = mock<OverQuotaNotificationBuilder>()
@@ -122,9 +123,9 @@ class DownloadsWorkerTest {
             monitorTransferEventsUseCase = monitorTransferEventsUseCase,
             handleTransferEventUseCase = handleTransferEventUseCase,
             areTransfersPausedUseCase = areTransfersPausedUseCase,
-            monitorOngoingActiveTransfersUseCase = monitorOngoingActiveTransfersUseCase,
+            monitorOngoingActiveTransfersUntilFinishedUseCase = monitorOngoingActiveTransfersUntilFinishedUseCase,
             getActiveTransferTotalsUseCase = getActiveTransferTotalsUseCase,
-            downloadNotificationMapper = downloadNotificationMapper,
+            transfersNotificationMapper = transfersNotificationMapper,
             overQuotaNotificationBuilder = overQuotaNotificationBuilder,
             areNotificationsEnabledUseCase = areNotificationsEnabledUseCase,
             notificationManager = mock(),
@@ -133,7 +134,8 @@ class DownloadsWorkerTest {
             transfersFinishedNotificationMapper = transfersFinishedNotificationMapper,
             scanMediaFileUseCase = scanMediaFileUseCase,
             crashReporter = crashReporter,
-            foregroundSetter = setForeground
+            foregroundSetter = setForeground,
+            notificationSamplePeriod = 0L,
         )
     }
 
@@ -172,7 +174,7 @@ class DownloadsWorkerTest {
         runTest {
             commonStub()
             underTest.doWork()
-            verify(monitorOngoingActiveTransfersUseCase).invoke(TransferType.DOWNLOAD)
+            verify(monitorOngoingActiveTransfersUntilFinishedUseCase).invoke(TransferType.DOWNLOAD)
         }
 
     @Test
@@ -183,11 +185,12 @@ class DownloadsWorkerTest {
                 inOrder(
                     monitorTransferEventsUseCase,
                     correctActiveTransfersUseCase,
-                    monitorOngoingActiveTransfersUseCase
+                    monitorOngoingActiveTransfersUntilFinishedUseCase
                 )
             underTest.doWork()
             inOrder.verify(correctActiveTransfersUseCase).invoke(TransferType.DOWNLOAD)
-            inOrder.verify(monitorOngoingActiveTransfersUseCase).invoke(TransferType.DOWNLOAD)
+            inOrder.verify(monitorOngoingActiveTransfersUntilFinishedUseCase)
+                .invoke(TransferType.DOWNLOAD)
         }
 
 
@@ -208,9 +211,9 @@ class DownloadsWorkerTest {
     @Test
     fun `test that notification is created when worker starts`() = runTest {
         val transferTotal: ActiveTransferTotals = mockActiveTransferTotals(true)
-        commonStub(transferTotals = listOf(transferTotal))
+        commonStub(initialTransferTotals = transferTotal)
         underTest.doWork()
-        verify(downloadNotificationMapper).invoke(transferTotal, false)
+        verify(transfersNotificationMapper).invoke(transferTotal, false)
     }
 
     @Test
@@ -224,9 +227,9 @@ class DownloadsWorkerTest {
             transferTotals = transferTotals,
         )
         underTest.doWork()
-        verify(downloadNotificationMapper, atLeastOnce()).invoke(initial, false)
+        verify(transfersNotificationMapper, atLeastOnce()).invoke(initial, false)
         transferTotals.forEach {
-            verify(downloadNotificationMapper).invoke(it, false)
+            verify(transfersNotificationMapper).invoke(it, false)
         }
     }
 
@@ -277,7 +280,7 @@ class DownloadsWorkerTest {
         runTest {
             val initial: ActiveTransferTotals = mockActiveTransferTotals(true)
             whenever(initial.totalTransfers).thenReturn(1)
-            commonStub(initialTransferTotals = initial)
+            commonStub(initialTransferTotals = initial, transferTotals = emptyList())
             underTest.doWork()
             verify(transfersFinishedNotificationMapper).invoke(initial)
         }
@@ -317,7 +320,7 @@ class DownloadsWorkerTest {
         val transferTotal = mockActiveTransferTotals(true)
         val expectedProgress = Progress(1f)
         whenever(transferTotal.transferProgress).thenReturn(expectedProgress)
-        commonStub(transferTotals = listOf(transferTotal))
+        commonStub(initialTransferTotals = transferTotal)
         underTest.doWork()
         val expectedData =
             workDataOf(AbstractTransfersWorker.PROGRESS to expectedProgress.floatValue)
@@ -345,16 +348,22 @@ class DownloadsWorkerTest {
     ) = runTest {
         val transfer: Transfer = mock()
         val transferEvent = TransferEvent.TransferFinishEvent(transfer, null)
-        whenever(getActiveTransferTotalsUseCase(TransferType.DOWNLOAD))
-            .thenReturn(initialTransferTotals)
         whenever(areTransfersPausedUseCase())
             .thenReturn(false)
         whenever(monitorTransferEventsUseCase())
             .thenReturn(flowOf(transferEvent))
-        whenever(monitorOngoingActiveTransfersUseCase(TransferType.DOWNLOAD))
+        whenever(monitorOngoingActiveTransfersUntilFinishedUseCase(TransferType.DOWNLOAD))
             .thenReturn(flow {
-                delay(100)//to be sure that other events are received
+                emit(
+                    MonitorOngoingActiveTransfersResult(
+                        activeTransferTotals = initialTransferTotals,
+                        paused = false,
+                        transfersOverQuota = false,
+                        storageOverQuota = false
+                    )
+                )
                 transferTotals.forEach {
+                    delay(ON_TRANSFER_UPDATE_REFRESH_MILLIS) // events are sampled in the worker
                     emit(
                         MonitorOngoingActiveTransfersResult(
                             activeTransferTotals = it,
@@ -364,11 +373,12 @@ class DownloadsWorkerTest {
                         )
                     )
                 }
+                delay(ON_TRANSFER_UPDATE_REFRESH_MILLIS + 10) //to be sure the last event is received
             })
         whenever(areNotificationsEnabledUseCase()).thenReturn(true)
         whenever(workProgressUpdater.updateProgress(any(), any(), any()))
             .thenReturn(SettableFuture.create<Void?>().also { it.set(null) })
-        whenever(downloadNotificationMapper(any(), any())).thenReturn(mock())
+        whenever(transfersNotificationMapper(any(), any())).thenReturn(mock())
     }
 
     private fun mockActiveTransferTotals(

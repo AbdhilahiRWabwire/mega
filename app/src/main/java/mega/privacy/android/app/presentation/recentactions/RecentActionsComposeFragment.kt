@@ -45,7 +45,7 @@ import mega.privacy.android.domain.entity.RecentActionsSharesType
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.usecase.GetThemeMode
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import javax.inject.Inject
 
 /**
@@ -97,7 +97,7 @@ class RecentActionsComposeFragment : Fragment() {
                     mutableStateOf(null)
                 }
 
-                MegaAppTheme(isDark = themeMode.isDarkMode()) {
+                OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                     Surface(
                         modifier = Modifier.nestedScroll(rememberNestedScrollInteropConnection()),
                         color = backgroundColor
@@ -150,7 +150,8 @@ class RecentActionsComposeFragment : Fragment() {
                             clickedFile = null
                             parentFolderSharesType = null
                         },
-                        nodeActionsViewModel = nodeActionsViewModel
+                        nodeActionsViewModel = nodeActionsViewModel,
+                        coroutineScope = coroutineScope
                     )
                 }
             }

@@ -5,6 +5,7 @@ import de.palm.composestateevents.consumed
 import mega.privacy.android.app.meeting.adapter.Participant
 import mega.privacy.android.domain.entity.chat.ChatCall
 import mega.privacy.android.domain.entity.meeting.AnotherCallType
+import mega.privacy.android.domain.entity.meeting.CallOnHoldType
 import mega.privacy.android.domain.entity.meeting.CallUIStatusType
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import mega.privacy.android.domain.entity.meeting.SubtitleCallType
@@ -15,7 +16,6 @@ import mega.privacy.android.domain.entity.meeting.SubtitleCallType
  * @property error                                  String resource id for showing an error.
  * @property isOpenInvite                           True if it's enabled, false if not.
  * @property callUIStatus                           [CallUIStatusType]
- * @property participantsInCall                     List of [Participant]
  * @property call                                   [ChatCall]
  * @property currentChatId                          Chat Id
  * @property previousState                          [ChatCallStatus]
@@ -31,7 +31,7 @@ import mega.privacy.android.domain.entity.meeting.SubtitleCallType
  * @property updateNumParticipants                  Update the num of participants
  * @property isOneToOneCall                         True, if it's one to one call. False, if it's a group call or a meeting.
  * @property showMeetingInfoFragment                True to show meeting info fragment or False otherwise
- * @property snackbarMessage                        Message to show in Snackbar.
+ * @property snackbarInSpeakerViewMessage           Message to show in Snackbar in speaker view.
  * @property addScreensSharedParticipantsList       List of [Participant] to add the screen shared in the carousel
  * @property removeScreensSharedParticipantsList    List of [Participant] to remove the screen shared in the carousel
  * @property isMeeting                              True if it's meetings. False, if not.
@@ -42,12 +42,20 @@ import mega.privacy.android.domain.entity.meeting.SubtitleCallType
  * @property shouldFinish                           True, if the activity should finish. False, if not.
  * @property minutesToEndMeeting                    Minutes to end the meeting
  * @property showMeetingEndWarningDialog            True, show the dialog to warn the user that the meeting is going to end. False otherwise
+ * @property isRaiseToSpeakFeatureFlagEnabled       True, if Raise to speak feature flag enabled. False, otherwise.
+ * @property anotherCall                            Another call in progress or on hold.
+ * @property showCallOptionsBottomSheet             True, if should be shown the call options bottom panel. False, otherwise
+ * @property isEphemeralAccount                     True, if it's ephemeral account. False, if not.
+ * @property showOnlyMeEndCallTime                  Show only me end call remaining time
+ * @property participantsChanges                    Message to show when a participant changes
+ * @property userIdsWithChangesInRaisedHand         User identifiers with changes in the raised hand
+ * @property shouldParticipantInCallListBeShown         True, it must be shown. False, must be hidden
+ * @property isRaiseToHandSuggestionShown           True, if the Raise to Hand suggestion has been shown. False, otherwise.
  */
 data class InMeetingUiState(
     val error: Int? = null,
     val isOpenInvite: Boolean? = null,
     var callUIStatus: CallUIStatusType = CallUIStatusType.None,
-    val participantsInCall: List<Participant> = emptyList(),
     val call: ChatCall? = null,
     val currentChatId: Long = -1L,
     val previousState: ChatCallStatus = ChatCallStatus.Initial,
@@ -63,7 +71,7 @@ data class InMeetingUiState(
     val updateNumParticipants: Int = 1,
     val isOneToOneCall: Boolean = true,
     val showMeetingInfoFragment: Boolean = false,
-    val snackbarMessage: StateEventWithContent<Int> = consumed(),
+    val snackbarInSpeakerViewMessage: StateEventWithContent<String> = consumed(),
     val addScreensSharedParticipantsList: List<Participant>? = null,
     val removeScreensSharedParticipantsList: List<Participant>? = null,
     val isMeeting: Boolean = false,
@@ -74,4 +82,57 @@ data class InMeetingUiState(
     val shouldFinish: Boolean = false,
     val minutesToEndMeeting: Int? = null,
     val showMeetingEndWarningDialog: Boolean = false,
+    val isRaiseToSpeakFeatureFlagEnabled: Boolean = false,
+    val anotherCall: ChatCall? = null,
+    val showCallOptionsBottomSheet: Boolean = false,
+    val isEphemeralAccount: Boolean? = null,
+    val showOnlyMeEndCallTime: Long? = null,
+    val participantsChanges: ParticipantsChange? = null,
+    val userIdsWithChangesInRaisedHand: List<Long> = emptyList(),
+    val isRaiseToHandSuggestionShown: Boolean = true,
+) {
+    /**
+     * Is call on hold
+     */
+    val isCallOnHold
+        get():Boolean = call?.isOnHold == true
+
+    /**
+     * Get the button to be displayed depending on the type of call on hold you have
+     */
+    val getButtonTypeToShow
+        get():CallOnHoldType = when {
+            anotherCall != null -> CallOnHoldType.SwapCalls
+            !isCallOnHold -> CallOnHoldType.PutCallOnHold
+            else -> CallOnHoldType.ResumeCall
+        }
+}
+
+/**
+ * Data class to represent a change in the participants list
+ */
+data class ParticipantsChange(
+    /**
+     * Text to show
+     */
+    val text: String,
+    /**
+     * Type of change
+     */
+    val type: ParticipantsChangeType,
 )
+
+/**
+ * Enum class to represent the type of change in the participants list
+ */
+enum class ParticipantsChangeType {
+    /**
+     * A participant joined the call
+     */
+    Join,
+
+    /**
+     * A participant left the call
+     */
+    Left
+}

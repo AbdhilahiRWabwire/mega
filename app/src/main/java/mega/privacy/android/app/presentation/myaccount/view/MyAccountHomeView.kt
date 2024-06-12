@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.myaccount.view
 
+import mega.privacy.android.shared.resources.R as sharedR
 import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedVisibility
@@ -78,7 +79,6 @@ import mega.privacy.android.app.presentation.changepassword.view.Constants
 import mega.privacy.android.app.presentation.meeting.view.dialog.ChangeSFUIdDialog
 import mega.privacy.android.app.presentation.myaccount.MyAccountHomeViewActions
 import mega.privacy.android.app.presentation.myaccount.model.MyAccountHomeUIState
-import mega.privacy.android.app.presentation.myaccount.model.mapper.toAccountAttributes
 import mega.privacy.android.app.presentation.myaccount.view.Constants.ACCOUNT_TYPE_SECTION
 import mega.privacy.android.app.presentation.myaccount.view.Constants.ACCOUNT_TYPE_TOP_PADDING
 import mega.privacy.android.app.presentation.myaccount.view.Constants.ACHIEVEMENTS
@@ -111,30 +111,30 @@ import mega.privacy.android.app.presentation.myaccount.view.Constants.USAGE_TRAN
 import mega.privacy.android.app.presentation.myaccount.view.Constants.USAGE_TRANSFER_SECTION
 import mega.privacy.android.app.utils.TimeUtils
 import mega.privacy.android.app.utils.Util
-import mega.privacy.android.core.ui.controls.buttons.RaisedDefaultMegaButton
-import mega.privacy.android.core.ui.model.SpanIndicator
-import mega.privacy.android.core.ui.theme.black
-import mega.privacy.android.core.ui.theme.extensions.amber_700_amber_300
-import mega.privacy.android.core.ui.theme.extensions.black_white
-import mega.privacy.android.core.ui.theme.extensions.blue_700_blue_200
-import mega.privacy.android.core.ui.theme.extensions.body2medium
-import mega.privacy.android.core.ui.theme.extensions.grey_020_black
-import mega.privacy.android.core.ui.theme.extensions.grey_050_grey_700
-import mega.privacy.android.core.ui.theme.extensions.grey_050_grey_900
-import mega.privacy.android.core.ui.theme.extensions.grey_100_grey_600
-import mega.privacy.android.core.ui.theme.extensions.red_600_red_300
-import mega.privacy.android.core.ui.theme.extensions.subtitle2medium
-import mega.privacy.android.core.ui.theme.extensions.teal_300_teal_200
-import mega.privacy.android.core.ui.theme.extensions.teal_600_teal_200
-import mega.privacy.android.core.ui.theme.extensions.textColorPrimary
-import mega.privacy.android.core.ui.theme.extensions.textColorSecondary
-import mega.privacy.android.core.ui.theme.extensions.white_grey_800
-import mega.privacy.android.core.ui.theme.white
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.account.business.BusinessAccountStatus
 import mega.privacy.android.legacy.core.ui.controls.lists.ImageIconItem
 import mega.privacy.android.legacy.core.ui.controls.text.MegaSpannedText
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.controls.buttons.RaisedDefaultMegaButton
+import mega.privacy.android.shared.original.core.ui.model.SpanIndicator
+import mega.privacy.android.shared.original.core.ui.theme.black
+import mega.privacy.android.shared.original.core.ui.theme.extensions.amber_700_amber_300
+import mega.privacy.android.shared.original.core.ui.theme.extensions.black_white
+import mega.privacy.android.shared.original.core.ui.theme.extensions.blue_700_blue_200
+import mega.privacy.android.shared.original.core.ui.theme.extensions.body2medium
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_020_black
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_050_grey_700
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_050_grey_900
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_100_grey_600
+import mega.privacy.android.shared.original.core.ui.theme.extensions.red_600_red_300
+import mega.privacy.android.shared.original.core.ui.theme.extensions.subtitle2medium
+import mega.privacy.android.shared.original.core.ui.theme.extensions.teal_300_teal_200
+import mega.privacy.android.shared.original.core.ui.theme.extensions.teal_600_teal_200
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorPrimary
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorSecondary
+import mega.privacy.android.shared.original.core.ui.theme.extensions.white_grey_800
+import mega.privacy.android.shared.original.core.ui.theme.white
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import org.jetbrains.anko.displayMetrics
 import java.io.File
 
@@ -478,14 +478,15 @@ private fun AccountInfoSection(
     val scope = rememberCoroutineScope()
     var lastSessionClick by remember { mutableIntStateOf(0) }
     val isExpiredOrGracePeriod =
-        uiState.isMasterBusinessAccount && uiState.isBusinessStatusActive.not()
+        (uiState.isMasterBusinessAccount || uiState.isProFlexiAccount) && uiState.isBusinessProFlexiStatusActive.not()
     val isPaymentAlertVisible =
-        (uiState.isMasterBusinessAccount && uiState.isBusinessStatusActive) || uiState.isBusinessAccount.not()
+        ((uiState.isMasterBusinessAccount || uiState.isProFlexiAccount) && uiState.isBusinessProFlexiStatusActive) || (uiState.isBusinessAccount.not() && uiState.isProFlexiAccount.not())
     val isSubscriptionRenewableOrExpired =
         uiState.hasRenewableSubscription || uiState.hasExpireAbleSubscription
 
     var showChangeApiServerDialog by rememberSaveable { mutableStateOf(false) }
     var showChangeSFUIdDialog by rememberSaveable { mutableStateOf(false) }
+    val isUpgradeButtonEnabled = (uiState.isBusinessAccount || uiState.isProFlexiAccount).not()
 
     Column(
         modifier = modifier
@@ -499,11 +500,9 @@ private fun AccountInfoSection(
                 .wrapContentHeight()
                 .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 8.dp),
             accountType = uiState.accountType,
-            showButton = (uiState.isBusinessAccount || uiState.accountType == AccountType.PRO_FLEXI).not(),
+            showUpgradeButton = isUpgradeButtonEnabled,
             onButtonClickListener = {
-                if (uiState.isBusinessAccount.not()) {
-                    uiActions.onUpgradeAccount()
-                }
+                uiActions.onUpgradeAccount()
             }
         )
 
@@ -519,7 +518,7 @@ private fun AccountInfoSection(
             usedStoragePercentage = uiState.usedStoragePercentage,
             usedTransferPercentage = uiState.usedTransferPercentage,
             showTransfer = uiState.accountType != AccountType.FREE,
-            showProgressBar = (uiState.isBusinessAccount || uiState.accountType == AccountType.PRO_FLEXI).not(),
+            showProgressBar = (uiState.isBusinessAccount || uiState.isProFlexiAccount).not(),
             onUsageMeterClick = uiActions::onClickUsageMeter
         )
 
@@ -533,7 +532,7 @@ private fun AccountInfoSection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .wrapContentHeight(),
-                    businessStatus = uiState.businessStatus,
+                    businessStatus = uiState.businessProFlexiStatus,
                 )
             }
             AnimatedVisibility(
@@ -658,15 +657,35 @@ private fun AccountInfoSection(
     }
 }
 
+/**
+ * Get the account description based on the account type
+ * @param accountType Account type
+ */
+private fun getAccountDescriptionResId(accountType: AccountType?): Int =
+    when (accountType) {
+        AccountType.FREE -> R.string.free_account
+        AccountType.PRO_LITE -> R.string.prolite_account
+        AccountType.PRO_I -> R.string.pro1_account
+        AccountType.PRO_II -> R.string.pro2_account
+        AccountType.PRO_III -> R.string.pro3_account
+        AccountType.PRO_FLEXI -> R.string.pro_flexi_account
+        AccountType.BUSINESS -> R.string.business_label
+        AccountType.STARTER -> sharedR.string.general_low_tier_plan_starter_label
+        AccountType.BASIC -> sharedR.string.general_low_tier_plan_basic_label
+        AccountType.ESSENTIAL -> sharedR.string.general_low_tier_plan_essential_label
+        else -> R.string.recovering_info
+    }
+
 @Composable
 internal fun AccountTypeSection(
     accountType: AccountType?,
-    showButton: Boolean,
+    showUpgradeButton: Boolean,
     onButtonClickListener: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val attributes = accountType.toAccountAttributes()
 
+    val accountDescription =
+        remember(accountType) { getAccountDescriptionResId(accountType = accountType) }
     ConstraintLayout(
         modifier = modifier
             .testTag(ACCOUNT_TYPE_SECTION)
@@ -684,7 +703,7 @@ internal fun AccountTypeSection(
                     start.linkTo(parent.start, 16.dp)
                 },
             painter = painterResource(id = R.drawable.ic_account_type),
-            contentDescription = stringResource(id = attributes.description),
+            contentDescription = stringResource(id = accountDescription),
         )
 
         constrain(planChain) {
@@ -709,12 +728,12 @@ internal fun AccountTypeSection(
                     bottom.linkTo(parent.bottom)
                     start.linkTo(iconIv.end, 16.dp)
                 },
-            text = stringResource(id = attributes.description),
+            text = stringResource(id = accountDescription),
             style = MaterialTheme.typography.body2medium,
             color = MaterialTheme.colors.textColorPrimary,
         )
 
-        if (showButton) {
+        if (showUpgradeButton) {
             RaisedDefaultMegaButton(
                 textId = R.string.my_account_upgrade_pro,
                 onClick = onButtonClickListener,
@@ -961,7 +980,7 @@ private fun shouldShowPaymentInfo(uiState: MyAccountHomeUIState): Boolean {
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, name = "MyAccountHomePreviewDark")
 @Composable
 internal fun MyAccountHomePreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         MyAccountHomeView(
             uiState = MyAccountHomeUIState(
                 name = "QWERTY UIOP",
@@ -979,10 +998,10 @@ internal fun MyAccountHomePreview() {
                 hasExpireAbleSubscription = true,
                 hasRenewableSubscription = true,
                 isMasterBusinessAccount = true,
-                isBusinessStatusActive = false,
+                isBusinessProFlexiStatusActive = false,
                 subscriptionRenewTime = 1000000,
                 proExpirationTime = 150000,
-                businessStatus = BusinessAccountStatus.Expired
+                businessProFlexiStatus = BusinessAccountStatus.Expired
             ),
             uiActions = object : MyAccountHomeViewActions {
                 override val isPhoneNumberDialogShown: Boolean

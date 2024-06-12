@@ -12,12 +12,15 @@ import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.filterNot
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
+import mega.privacy.android.app.featuretoggle.ApiFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.main.dialog.shares.RemoveShareResultMapper
@@ -25,6 +28,7 @@ import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
 import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.manager.ManagerViewModel
 import mega.privacy.android.app.presentation.manager.model.SharesTab
+import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.CameraUploadsFolderDestinationUpdate
@@ -44,6 +48,7 @@ import mega.privacy.android.domain.entity.chat.ChatCall
 import mega.privacy.android.domain.entity.chat.ChatLinkContent
 import mega.privacy.android.domain.entity.contacts.ContactRequest
 import mega.privacy.android.domain.entity.contacts.ContactRequestStatus
+import mega.privacy.android.domain.entity.environment.DevicePowerConnectionState
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
 import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
@@ -66,12 +71,13 @@ import mega.privacy.android.domain.usecase.GetRootNodeUseCase
 import mega.privacy.android.domain.usecase.MonitorOfflineFileAvailabilityUseCase
 import mega.privacy.android.domain.usecase.MonitorUserUpdates
 import mega.privacy.android.domain.usecase.account.GetFullAccountInfoUseCase
-import mega.privacy.android.domain.usecase.account.GetIncomingContactRequestsUseCase
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.account.RenameRecoveryKeyFileUseCase
 import mega.privacy.android.domain.usecase.account.RequireTwoFactorAuthenticationUseCase
 import mega.privacy.android.domain.usecase.account.SetCopyLatestTargetPathUseCase
 import mega.privacy.android.domain.usecase.account.SetMoveLatestTargetPathUseCase
+import mega.privacy.android.domain.usecase.account.contactrequest.GetIncomingContactRequestsUseCase
+import mega.privacy.android.domain.usecase.account.contactrequest.MonitorContactRequestUpdatesUseCase
 import mega.privacy.android.domain.usecase.camerauploads.EstablishCameraUploadsSyncHandlesUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetPrimarySyncHandleUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetSecondarySyncHandleUseCase
@@ -157,13 +163,15 @@ class ManagerViewModelTest {
         mock<GetNumUnreadUserAlertsUseCase> { onBlocking { invoke() }.thenReturn(0) }
     private val getNumUnreadPromoNotificationsUseCase =
         mock<GetNumUnreadPromoNotificationsUseCase>()
-    private lateinit var monitorContactRequestUpdates: MutableStateFlow<List<ContactRequest>>
+    private val monitorContactRequestUpdatesUseCase = mock<MonitorContactRequestUpdatesUseCase> {
+        on { invoke() }.thenReturn(emptyFlow())
+    }
 
     private val initialIsFirsLoginValue = true
     private val sendStatisticsMediaDiscoveryUseCase = mock<SendStatisticsMediaDiscoveryUseCase>()
     private val savedStateHandle = SavedStateHandle(
         mapOf(
-            ManagerViewModel.isFirstLoginKey to initialIsFirsLoginValue
+            ManagerViewModel.IS_FIRST_LOGIN_KEY to initialIsFirsLoginValue
         )
     )
     private val monitorStorageState = mock<MonitorStorageStateEventUseCase> {
@@ -303,6 +311,8 @@ class ManagerViewModelTest {
     private val monitorChatSessionUpdatesUseCase: MonitorChatSessionUpdatesUseCase = mock()
     private val hangChatCallUseCase: HangChatCallUseCase = mock()
     private val fakeCallUpdatesFlow = MutableSharedFlow<ChatCall>()
+    private var monitorDevicePowerConnectionFakeFlow =
+        MutableSharedFlow<DevicePowerConnectionState>()
 
     private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase = mock {
         onBlocking { invoke() }.thenReturn(fakeCallUpdatesFlow)
@@ -323,7 +333,7 @@ class ManagerViewModelTest {
             },
             monitorContactUpdates = { monitorContactUpdates },
             monitorUserAlertUpdates = { monitorUserAlertUpdates },
-            monitorContactRequestUpdates = { monitorContactRequestUpdates },
+            monitorContactRequestUpdatesUseCase = monitorContactRequestUpdatesUseCase,
             getNumUnreadUserAlertsUseCase = getNumUnreadUserAlertsUseCase,
             getNumUnreadPromoNotificationsUseCase = getNumUnreadPromoNotificationsUseCase,
             sendStatisticsMediaDiscoveryUseCase = sendStatisticsMediaDiscoveryUseCase,
@@ -392,7 +402,10 @@ class ManagerViewModelTest {
             getUsersCallLimitRemindersUseCase = getUsersCallLimitRemindersUseCase,
             setUsersCallLimitRemindersUseCase = setUsersCallLimitRemindersUseCase,
             broadcastHomeBadgeCountUseCase = broadcastHomeBadgeCountUseCase,
-            monitorUpgradeDialogClosedUseCase = monitorUpgradeDialogClosedUseCase
+            monitorUpgradeDialogClosedUseCase = monitorUpgradeDialogClosedUseCase,
+            monitorDevicePowerConnectionStateUseCase = mock {
+                on { invoke() }.thenReturn(monitorDevicePowerConnectionFakeFlow)
+            },
         )
     }
 
@@ -440,7 +453,8 @@ class ManagerViewModelTest {
             getUsersCallLimitRemindersUseCase,
             setUsersCallLimitRemindersUseCase,
             broadcastHomeBadgeCountUseCase,
-            monitorUpgradeDialogClosedUseCase
+            monitorUpgradeDialogClosedUseCase,
+            monitorContactRequestUpdatesUseCase,
         )
         wheneverBlocking { getCloudSortOrder() }.thenReturn(SortOrder.ORDER_DEFAULT_ASC)
         whenever(getUsersCallLimitRemindersUseCase()).thenReturn(emptyFlow())
@@ -453,10 +467,11 @@ class ManagerViewModelTest {
         wheneverBlocking { getNumUnreadUserAlertsUseCase() }.thenReturn(0)
         wheneverBlocking { getNumUnreadPromoNotificationsUseCase() }.thenReturn(0)
         wheneverBlocking { getIncomingContactRequestUseCase() }.thenReturn(emptyList())
-        monitorContactRequestUpdates = MutableStateFlow(emptyList())
+        whenever(monitorContactRequestUpdatesUseCase()).thenReturn(emptyFlow())
         monitorNodeUpdatesFakeFlow = MutableSharedFlow()
         monitorSyncsUseCaseFakeFlow = MutableSharedFlow()
         monitorMyAccountUpdateFakeFlow = MutableSharedFlow()
+        monitorDevicePowerConnectionFakeFlow = MutableSharedFlow()
         initViewModel()
     }
 
@@ -756,9 +771,9 @@ class ManagerViewModelTest {
                 )
             )
             whenever(getIncomingContactRequestUseCase()).thenReturn(contactRequests)
-            monitorContactRequestUpdates.emit(
-                contactRequests
-            )
+            whenever(monitorContactRequestUpdatesUseCase()).thenReturn(flowOf(contactRequests))
+
+            initViewModel()
             testScheduler.advanceUntilIdle()
             underTest.incomingContactRequests.test {
                 assertThat(awaitItem()).isEqualTo(contactRequests)
@@ -827,7 +842,8 @@ class ManagerViewModelTest {
             whenever(getIncomingContactRequestUseCase()).thenReturn(contactRequests)
             whenever(getNumUnreadUserAlertsUseCase()).thenReturn(3)
             whenever(getNumUnreadPromoNotificationsUseCase()).thenReturn(1)
-            monitorContactRequestUpdates.emit(contactRequests)
+            whenever(monitorContactRequestUpdatesUseCase()).thenReturn(flowOf(contactRequests))
+            initViewModel()
             advanceUntilIdle()
             verify(saveContactByEmailUseCase).invoke("sourceEmail@mega.co.nz")
         }
@@ -851,7 +867,8 @@ class ManagerViewModelTest {
             whenever(getIncomingContactRequestUseCase()).thenReturn(contactRequests)
             whenever(getNumUnreadUserAlertsUseCase()).thenReturn(3)
             whenever(getNumUnreadPromoNotificationsUseCase()).thenReturn(1)
-            monitorContactRequestUpdates.emit(contactRequests)
+            whenever(monitorContactRequestUpdatesUseCase()).thenReturn(flowOf(contactRequests))
+            initViewModel()
             advanceUntilIdle()
             verify(saveContactByEmailUseCase).invoke("targetEmail@mega.co.nz")
         }
@@ -863,7 +880,6 @@ class ManagerViewModelTest {
             val expectedUserAlertsCount = 3
             val expectedTotalCount = expectedPromoNotificationsCount + expectedUserAlertsCount
             advanceUntilIdle()
-            assertThat(underTest.onGetNumUnreadUserAlerts().test().value().second).isEqualTo(0)
             val contactRequests = listOf(
                 ContactRequest(
                     handle = 1L,
@@ -882,7 +898,8 @@ class ManagerViewModelTest {
             whenever(getNumUnreadPromoNotificationsUseCase()).thenReturn(
                 expectedPromoNotificationsCount
             )
-            monitorContactRequestUpdates.emit(contactRequests)
+            whenever(monitorContactRequestUpdatesUseCase()).thenReturn(flowOf(contactRequests))
+            initViewModel()
             advanceUntilIdle()
             verify(broadcastHomeBadgeCountUseCase).invoke(expectedTotalCount + contactRequests.size)
             assertThat(underTest.onGetNumUnreadUserAlerts().test().value().second).isEqualTo(
@@ -896,8 +913,12 @@ class ManagerViewModelTest {
             val expectedPromoNotificationsCount = 1
             val expectedUserAlertsCount = 3
             val expectedTotalCount = expectedPromoNotificationsCount + expectedUserAlertsCount
+            val requests = MutableStateFlow<List<ContactRequest>>(emptyList())
+            whenever(monitorContactRequestUpdatesUseCase()).thenReturn(requests.filterNot { it.isEmpty() })
+            initViewModel()
             advanceUntilIdle()
             assertThat(underTest.numUnreadUserAlerts.value.second).isEqualTo(0)
+
             val contactRequests = listOf(
                 ContactRequest(
                     handle = 1L,
@@ -917,7 +938,7 @@ class ManagerViewModelTest {
                 expectedPromoNotificationsCount
             )
 
-            monitorContactRequestUpdates.emit(contactRequests)
+            requests.emit(contactRequests)
             advanceUntilIdle()
             verify(broadcastHomeBadgeCountUseCase).invoke(expectedTotalCount + contactRequests.size)
             assertThat(underTest.numUnreadUserAlerts.value.second).isEqualTo(expectedTotalCount)
@@ -1202,7 +1223,7 @@ class ManagerViewModelTest {
         underTest.state.test {
             assertThat(awaitItem().message).isNull()
             underTest.removeShares(listOf(1L))
-            assertThat(awaitItem().message).isEqualTo(message)
+            assertThat(awaitItem().message).isEqualTo(InfoToShow.RawString(message))
         }
     }
 
@@ -1215,7 +1236,7 @@ class ManagerViewModelTest {
         underTest.state.test {
             assertThat(awaitItem().message).isNull()
             underTest.removeShares(listOf(1L))
-            assertThat(awaitItem().message).isEqualTo(message)
+            assertThat(awaitItem().message).isEqualTo(InfoToShow.RawString(message))
         }
         underTest.markHandledMessage()
         underTest.state.test {
@@ -1232,7 +1253,7 @@ class ManagerViewModelTest {
         underTest.state.test {
             assertThat(awaitItem().message).isNull()
             underTest.disableExport(listOf(1L))
-            assertThat(awaitItem().message).isEqualTo(message)
+            assertThat(awaitItem().message).isEqualTo(InfoToShow.RawString(message))
         }
     }
 
@@ -1354,7 +1375,7 @@ class ManagerViewModelTest {
         runTest {
             whenever(
                 getFeatureFlagValueUseCase(
-                    AppFeatures.CallUnlimitedProPlan
+                    ApiFeatures.CallUnlimitedProPlan
                 )
             ).thenReturn(true)
             initViewModel()
@@ -1375,7 +1396,7 @@ class ManagerViewModelTest {
         runTest {
             whenever(
                 getFeatureFlagValueUseCase(
-                    AppFeatures.CallUnlimitedProPlan
+                    ApiFeatures.CallUnlimitedProPlan
                 )
             ).thenReturn(true)
             initViewModel()
@@ -1391,10 +1412,105 @@ class ManagerViewModelTest {
             }
         }
 
+    @Test
+    fun `test that manager state is updated when search query is updated`() = runTest {
+        val query = "query"
+        underTest.updateSearchQuery(query)
+        underTest.state.test {
+            assertThat(awaitItem().searchQuery).isEqualTo(query)
+        }
+    }
+
     private fun provideChatCallStatusParameters(): Stream<Arguments> = Stream.of(
         Arguments.of(ChatCallStatus.TerminatingUserParticipation),
         Arguments.of(ChatCallStatus.GenericNotification),
     )
+
+    @Test
+    fun `test that camera uploads automatically starts when the device begins charging and the charging feature flag is enabled`() =
+        runTest {
+            whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
+                true
+            )
+            monitorDevicePowerConnectionFakeFlow.emit(DevicePowerConnectionState.Connected)
+            testScheduler.advanceUntilIdle()
+
+            verify(startCameraUploadUseCase).invoke()
+        }
+
+    @Test
+    fun `test that camera uploads does not automatically start when the device begins charging and the charging feature flag is disabled`() =
+        runTest {
+            whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
+                false
+            )
+            monitorDevicePowerConnectionFakeFlow.emit(DevicePowerConnectionState.Connected)
+            testScheduler.advanceUntilIdle()
+
+            verifyNoInteractions(startCameraUploadUseCase)
+        }
+
+    @Test
+    fun `test that camera uploads does not automatically start when the device is not charging and the charging feature flag is enabled`() =
+        runTest {
+            whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
+                true
+            )
+            monitorDevicePowerConnectionFakeFlow.emit(DevicePowerConnectionState.Disconnected)
+            testScheduler.advanceUntilIdle()
+
+            verifyNoInteractions(startCameraUploadUseCase)
+        }
+
+    @Test
+    fun `test that camera uploads does not automatically start when the device is not charging and the charging feature flag is disabled`() =
+        runTest {
+            whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
+                false
+            )
+            monitorDevicePowerConnectionFakeFlow.emit(DevicePowerConnectionState.Disconnected)
+            testScheduler.advanceUntilIdle()
+
+            verifyNoInteractions(startCameraUploadUseCase)
+        }
+
+    @Test
+    fun `test that camera uploads does not automatically start when the device charging state is unknown and the feature flag is enabled`() =
+        runTest {
+            whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
+                true
+            )
+            monitorDevicePowerConnectionFakeFlow.emit(DevicePowerConnectionState.Unknown)
+            testScheduler.advanceUntilIdle()
+
+            verifyNoInteractions(startCameraUploadUseCase)
+        }
+
+    @Test
+    fun `test that camera uploads does not automatically start when the device charging state is unknown and the feature flag is disabled`() =
+        runTest {
+            whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
+                false
+            )
+            monitorDevicePowerConnectionFakeFlow.emit(DevicePowerConnectionState.Unknown)
+            testScheduler.advanceUntilIdle()
+
+            verifyNoInteractions(startCameraUploadUseCase)
+        }
+
+    @Test
+    fun `test that message update correctly when chat call update status emit the call with too many participants code`() =
+        runTest {
+            val call = mock<ChatCall> {
+                on { status } doReturn ChatCallStatus.TerminatingUserParticipation
+                on { termCode } doReturn ChatCallTermCodeType.TooManyParticipants
+            }
+            fakeCallUpdatesFlow.emit(call)
+            testScheduler.advanceUntilIdle()
+            underTest.state.test {
+                assertThat(awaitItem().message).isEqualTo(InfoToShow.SimpleString(R.string.call_error_too_many_participants))
+            }
+        }
 
     companion object {
         @JvmField

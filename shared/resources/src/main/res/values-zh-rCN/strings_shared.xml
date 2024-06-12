@@ -91,7 +91,7 @@
     <!-- Title for Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
     <string name="dialog_onboarding_feature_title_backup_rewind">再也不会丢失数据</string>
     <!-- Description about Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_feature_description_backup_rewind">让您完全放心的备份和同步您的数据。另外，使用还原功能将可将文件夹恢复到任何日期，最长可达180天。</string>
+    <string name="dialog_onboarding_feature_description_backup_rewind">Rewind to restore files and folders back to any date up to 180 days, so your data is accident and tamper-proof.</string>
     <!-- Title for MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
     <string name="dialog_onboarding_feature_title_vpn">MEGA&#160;VPN</string>
     <!-- Description about MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
@@ -271,9 +271,117 @@
     <!-- Hint text explaining that you can change the email and resend the create account link to the new email address. This appears on the confirmation email screen under the email address text input field. -->
     <string name="account_confirm_email_misspelled_email_description">如果您拼错了您的电子邮件地址，请更正并点按[A]重新发送[/A]。</string>
     <!-- Title of the insufficient storage error banner -->
-    <string name="sync_error_storage_over_quota_banner_title">同步已暂停，您MEGA方案的存储空间已用完。</string>
+    <string name="sync_error_storage_over_quota_banner_title">同步已暂停，您MEGA方案的存储空间已耗尽</string>
     <!-- Title of the insufficient storage error action -->
     <string name="sync_error_storage_over_quota_banner_action">升级</string>
     <!-- The warning message shown when the User enables the Device Charging requirement in Settings Camera Uploads, enables Camera Uploads, begins uploading content and the Device is not charged -->
-    <string name="camera_uploads_phone_not_charging_message">上传已暂停，手机未在充电</string>
+    <string name="camera_uploads_phone_not_charging_message">Upload paused, device is not charging</string>
+    <!-- Label of the Device Status informing the user that Nothing is set up for the Current Device -->
+    <string name="device_center_list_view_item_status_nothing_setup">未设置同步</string>
+    <!-- The title of the warning dialog shown to a suspended Pro Flexi Account User -->
+    <string name="account_pro_flexi_account_deactivated_dialog_title">帐户已停用</string>
+    <!-- The body of the warning dialog shown to a suspended Pro Flexi Account User -->
+    <string name="account_pro_flexi_account_deactivated_dialog_body">由于付款失败或您已取消订阅，您的Pro&#160;Flexi帐户已被停用。您将无法访问存储在您帐户中的数据。 \n若要付款并重新激活您的订阅，请通过浏览器登录MEGA进行。</string>
+    <!-- Label for new low-tier plan Starter. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_starter_label">Starter</string>
+    <!-- Label for new low-tier plan Basic. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_basic_label">Basic</string>
+    <!-- Label for new low-tier plan Essential. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_essential_label">Essential</string>
+    <!-- The Body Text of a Settings Camera Uploads Option that decides whether or not the Device must be charged for Camera Uploads to start uploading content -->
+    <string name="settings_camera_uploads_upload_only_while_charging_option_body">上传将暂停，直到您开始为设备充电。如果您的电池电量低于20%，上传仍将保持暂停状态。</string>
+    <!-- Title of the synced folder list empty state -->
+    <string name="device_center_sync_list_empty_state_title">未设置同步</string>
+    <!-- Message of the synced folder list empty state -->
+    <string name="device_center_sync_list_empty_state_message">将设备上的本地文件夹与MEGA上的文件夹同步。</string>
+    <!-- Label for the button or menu option to add a new sync -->
+    <string name="device_center_sync_add_new_syn_button_option">添加新同步</string>
+    <!-- Text for the Sync solved issues chip -->
+    <string name="device_center_sync_solved_issues_chip_text">已解决的问题</string>
+    <!-- Warning message to indicate that cannot select a currently synced folder -->
+    <string name="device_center_new_sync_select_local_device_folder_currently_synced_message">This folder can’t be synced. Set it up to sync to MEGA using Camera uploads.</string>
+    <!-- Label for the file info information screen description field -->
+    <string name="file_info_information_description_label">描述</string>
+    <!-- Placeholder for the file info information screen description field -->
+    <string name="file_info_information_description_placeholder">添加说明</string>
+    <!-- Description added snack bar for the file info information screen-->
+    <string name="file_info_information_snackbar_description_added">已添加描述</string>
+    <!-- Description updated snack bar for the file info information screen-->
+    <string name="file_info_information_snackbar_description_updated">已更新描述</string>
+    <!-- Title to mention other features of Pro plans on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_title_additional_features">此外还可获得以下丰厚受益：</string>
+    <!-- Description to mention other features of Pro plans (e.g. Mega VPN, chats and meetings, Android Sync and no ads) on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_description_additional_features_with_ads">&#8226;&#160;MEGA&#160;VPN\n&#8226;&#160;无限制的通话和会议\n&#8226;&#160;自动同步移动设备上的文件夹\n&#8226;&#160;无广告</string>
+    <!-- Description to mention other features of Pro plans (e.g. Mega VPN, chats and meetings, Android Sync and no ads) on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_description_additional_features_without_ads">&#8226;&#160;MEGA&#160;VPN\n&#8226;&#160;无限制的通话和会议\n&#8226;&#160;自动同步移动设备上的文件夹</string>
+    <!-- Text for the Sync solved issues list empty state -->
+    <string name="device_center_sync_solved_issues_empty_state_text">没有已解决问题</string>
+    <!-- Title of first tour screen -->
+    <string name="cloud_drive_tour_first_title">您持有这把密钥</string>
+    <!-- Title of second tour screen -->
+    <string name="cloud_drive_tour_second_title">已加密聊天</string>
+    <!-- Title of third tour screen -->
+    <string name="cloud_drive_tour_third_title">创建您的网络</string>
+    <!-- Title of fourth tour screen -->
+    <string name="cloud_drive_tour_fourth_title">您在云盘的照片</string>
+    <!-- Title of fifth tour screen -->
+    <string name="cloud_drive_tour_fifth_title">MEGA会议</string>
+    <!-- First subtitle of the tour screen -->
+    <string name="cloud_drive_tour_first_subtitle">安全即是我们存在的意义。您的文件会在我们的加密机器下受到安全保护，并且只有您可以访问您的文件。</string>
+    <!-- Second subtitle of the tour screen -->
+    <string name="cloud_drive_tour_second_subtitle">使用您的云盘即可享有完全加密的语音与视频通话、群发信息以及文件共享整合。</string>
+    <!-- Third subtitle of the tour screen -->
+    <string name="cloud_drive_tour_third_subtitle">添加联系人、创建关系网、协同合作以及进行语音和视频通话，一切尽在MEGA</string>
+    <!-- Fourth subtitle of the tour screen -->
+    <string name="cloud_drive_tour_fourth_subtitle">相机上传是任何移动设备的基本功能，我们已为您提供这项服务。立即创建您的帐户。</string>
+    <!-- Fifth subtitle of the tour screen -->
+    <string name="cloud_drive_tour_fifth_subtitle">零知识加密视频会议。</string>
+    <!-- Titles of the tour screen to onboard users with the MEGA application -->
+    <string-array name="cloud_drive_tour_titles">
+        <item>@string/cloud_drive_tour_first_title</item>
+        <item>@string/cloud_drive_tour_second_title</item>
+        <item>@string/cloud_drive_tour_third_title</item>
+        <item>@string/cloud_drive_tour_fourth_title</item>
+        <item>@string/cloud_drive_tour_fifth_title</item>
+    </string-array>
+    <!-- Subtitles of the tour screen to onboard users with the MEGA application -->
+    <string-array name="cloud_drive_tour_subtitles">
+        <item>@string/cloud_drive_tour_first_subtitle</item>
+        <item>@string/cloud_drive_tour_second_subtitle</item>
+        <item>@string/cloud_drive_tour_third_subtitle</item>
+        <item>@string/cloud_drive_tour_fourth_subtitle</item>
+        <item>@string/cloud_drive_tour_fifth_subtitle</item>
+    </string-array>
+    <!-- Title of the Raise to Hand Feature Introduction Tooltip -->
+    <string name="meetings_raised_hand_tooltip_title">[A]新功能：举手[/A]</string>
+    <!-- Message of the synced folder list empty state for free accounts -->
+    <string name="device_center_sync_list_empty_state_message_free_account">通过升级到我们的Pro方案之一，让您的信息保持同步并且是最新状态。</string>
+    <!-- "Upgrade now" label for a button, menu entry, etc -->
+    <string name="general_upgrade_now_label">立即升级</string>
+    <!-- Title of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_title">升级为Pro帐户</string>
+    <!-- Message of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_message">Unlock the power to sync your mobile device to the cloud with our Pro plans.</string>
+    <!-- Confirm button text of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_confirm_button">升级</string>
+    <!-- Cancel button text of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_cancel_button">现在不用</string>
+    <!-- Title of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_title">Uploads folder conflict</string>
+    <!-- Body of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_body">Your Camera uploads folder and secondary media uploads folder cannot be related to each other. Choose a different folder.</string>
+    <!-- The confirmation Button text of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_confirm_button">Okay, got it</string>
+    <!-- Warning message shown when trying to select a local folder but there isn’t any app to do that. -->
+    <string name="general_no_picker_warning">This device doesn’t have an app to select folders</string>
+    <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to sync folders. Keep the bullet point, as this string is part of the bullet point list. -->
+    <string name="account_upgrade_account_description_feature_sync">&#8226;&#160;Automatically sync the folders on your mobile device</string>
+    <!-- The error dialog text displayed when user opens Android Sync while having previously established syncs -->
+    <string name="sync_error_dialog_free_user">Your syncs have been paused. Syncing is a Pro plan feature.</string>
+    <!-- The error dialog confirm action text -->
+    <string name="sync_error_dialog_free_user_confirm_action">Ok</string>
+    <!-- The error banner text displayed when user opens Android Sync while having previously established syncs -->
+    <string name="sync_error_banner_free_user">Syncing is paused because your MEGA Pro plan was cancelled. Upgrade to continue syncing.</string>
+    <!-- Hidden items -->
+    <string name="hidden_items">隐藏的项目</string>
 </resources>

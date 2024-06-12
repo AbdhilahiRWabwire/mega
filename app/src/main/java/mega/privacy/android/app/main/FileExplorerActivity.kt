@@ -29,6 +29,7 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.kotlin.addTo
 import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import mega.privacy.android.app.MegaApplication.Companion.getInstance
 import mega.privacy.android.app.R
@@ -61,9 +62,8 @@ import mega.privacy.android.app.main.FileExplorerActivity.Companion.UPLOAD
 import mega.privacy.android.app.main.adapters.FileExplorerPagerAdapter
 import mega.privacy.android.app.main.adapters.MegaNodeAdapter
 import mega.privacy.android.app.main.listeners.CreateGroupChatWithPublicLink
-import mega.privacy.android.app.main.megachat.ChatExplorerFragment
-import mega.privacy.android.app.main.megachat.ChatExplorerListItem
-import mega.privacy.android.app.main.megachat.ChatUploadService
+import mega.privacy.android.app.main.megachat.chat.explorer.ChatExplorerFragment
+import mega.privacy.android.app.main.megachat.chat.explorer.ChatExplorerListItem
 import mega.privacy.android.app.modalbottomsheet.ModalBottomSheetUtil.isBottomSheetDialogShown
 import mega.privacy.android.app.modalbottomsheet.SortByBottomSheetDialogFragment.Companion.newInstance
 import mega.privacy.android.app.namecollision.data.NameCollision
@@ -71,7 +71,6 @@ import mega.privacy.android.app.namecollision.data.NameCollision.Upload.Companio
 import mega.privacy.android.app.namecollision.usecase.CheckNameCollisionUseCase
 import mega.privacy.android.app.presentation.login.LoginActivity
 import mega.privacy.android.app.presentation.transfers.TransfersManagementActivity
-import mega.privacy.android.app.usecase.LegacyCopyNodeUseCase
 import mega.privacy.android.app.usecase.UploadUseCase
 import mega.privacy.android.app.usecase.chat.GetChatChangesUseCase
 import mega.privacy.android.app.usecase.exception.MegaNodeException.ChildDoesNotExistsException
@@ -100,6 +99,7 @@ import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.permission.PermissionUtils.checkNotificationsPermission
 import mega.privacy.android.data.model.MegaPreferences
 import mega.privacy.android.domain.entity.StorageState
+import mega.privacy.android.domain.entity.contacts.User
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.user.UserCredentials
 import mega.privacy.android.domain.qualifier.LoginMutex
@@ -196,9 +196,7 @@ class FileExplorerActivity : TransfersManagementActivity(), MegaRequestListenerI
     private var newChatMenuItem: MenuItem? = null
     private var searchMenuItem: MenuItem? = null
     private var fragmentHandle: Long = -1
-    private var gSession: String? = null
     private var credentials: UserCredentials? = null
-    private var lastEmail: String? = null
     private var moveFromHandles: LongArray? = null
     private var copyFromHandles: LongArray? = null
     private var importChatHandles: LongArray? = null
@@ -391,7 +389,11 @@ class FileExplorerActivity : TransfersManagementActivity(), MegaRequestListenerI
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         Timber.d("onCreate first")
         super.onCreate(savedInstanceState)
-        credentials = dbH.credentials
+        credentials = runBlocking {
+            runCatching {
+                getAccountCredentialsUseCase()
+            }.getOrNull()
+        }
         onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
 
         createChatLauncher =
@@ -593,7 +595,7 @@ class FileExplorerActivity : TransfersManagementActivity(), MegaRequestListenerI
                     fileLoginPrepareNodesText.isVisible = false
                 }
 
-                gSession = credentials?.session
+                val gSession = credentials?.session
                 lifecycleScope.launch {
                     loginMutex.lock()
                     ChatUtil.initMegaChatApi(gSession, this@FileExplorerActivity)
@@ -1495,53 +1497,6 @@ class FileExplorerActivity : TransfersManagementActivity(), MegaRequestListenerI
         viewModel.uploadFilesToChatIfFeatureFlagIsTrue(chatIds, files, nodeIds,
             toDoAfter = {
                 openManagerAndFinish()
-            },
-            toDoIfFalse = {
-                val intent = Intent(this, ChatUploadService::class.java)
-
-                if (notEmptyAttachedNodes) {
-                    // There are exist files and files for upload
-                    intent.putExtra(
-                        ChatUploadService.EXTRA_ATTACH_FILES, nodeHandles.toLongArray()
-                    )
-                }
-                intent.putExtra(ChatUploadService.EXTRA_ATTACH_CHAT_IDS, chatIds.toLongArray())
-
-                val idPendMsgs = LongArray(uploadInfos.size * chatListItems.size)
-                val filesToUploadFingerPrint = HashMap<String, String>()
-                var pos = 0
-
-                for (info in infoToShare ?: return@uploadFilesToChatIfFeatureFlagIsTrue) {
-                    val fingerprint = megaApi.getFingerprint(info.fileAbsolutePath)
-
-                    if (fingerprint == null) {
-                        Timber.w("Error, fingerprint == NULL is not possible to access file for some reason")
-                        continue
-                    }
-
-                    filesToUploadFingerPrint[fingerprint] = info.fileAbsolutePath
-
-                    for (item in chatListItems) {
-                        val pendingMsg = ChatUtil.createAttachmentPendingMessage(
-                            item.chatId,
-                            info.fileAbsolutePath, info.getTitle(), true
-                        )
-
-                        idPendMsgs[pos] = pendingMsg.id
-                        pos++
-                    }
-                }
-                intent.apply {
-                    putExtra(ChatUploadService.EXTRA_NAME_EDITED, viewModel.fileNames.value)
-                    putExtra(
-                        ChatUploadService.EXTRA_UPLOAD_FILES_FINGERPRINTS,
-                        filesToUploadFingerPrint
-                    )
-                    putExtra(ChatUploadService.EXTRA_PEND_MSG_IDS, idPendMsgs)
-                    putExtra(ChatUploadService.EXTRA_COMES_FROM_FILE_EXPLORER, true)
-                    putExtra(ChatUploadService.EXTRA_PARENT_NODE, myChatFilesNode?.serialize())
-                }
-                startService(intent)
             }
         )
     }
@@ -1882,7 +1837,7 @@ class FileExplorerActivity : TransfersManagementActivity(), MegaRequestListenerI
                     Timber.e("The new Cloud Drive Folder is invalid")
                 }
                 val intent = Intent()
-                intent.putExtra("SELECT_MEGA_FOLDER", parentNode?.handle)
+                intent.putExtra(EXTRA_MEGA_SELECTED_FOLDER, parentNode?.handle)
                 setResult(RESULT_OK, intent)
                 finishAndRemoveTask()
             }
@@ -2107,10 +2062,13 @@ class FileExplorerActivity : TransfersManagementActivity(), MegaRequestListenerI
                     fileLoginFetchNodesText.isVisible = true
                     fileLoginPrepareNodesText.isVisible = false
                 }
-
-                gSession = megaApi.dumpSession()
-                credentials = UserCredentials(lastEmail, gSession, "", "", "")
-                dbH.saveCredentials(credentials ?: return)
+                lifecycleScope.launch {
+                    runCatching {
+                        saveAccountCredentialsUseCase()
+                    }.onFailure {
+                        Timber.e(it)
+                    }
+                }
                 Timber.d("Logged in with session")
                 Timber.d("Setting account auth token for folder links.")
                 megaApiFolder.accountAuth = megaApi.accountAuth
@@ -2121,17 +2079,13 @@ class FileExplorerActivity : TransfersManagementActivity(), MegaRequestListenerI
             }
         } else if (request.type == MegaRequest.TYPE_FETCH_NODES) {
             if (error.errorCode == MegaError.API_OK) {
-                gSession = megaApi.dumpSession()
-                val myUser = megaApi.myUser
-                var myUserHandle = ""
-
-                if (myUser != null) {
-                    lastEmail = megaApi.myUser?.email
-                    myUserHandle = megaApi.myUser?.handle.toString() + ""
+                lifecycleScope.launch {
+                    runCatching {
+                        saveAccountCredentialsUseCase()
+                    }.onFailure {
+                        Timber.e(it)
+                    }
                 }
-
-                credentials = UserCredentials(lastEmail, gSession, "", "", myUserHandle)
-                dbH.saveCredentials(credentials ?: return)
                 binding.fileLoggingInLayout.isVisible = false
                 afterLoginAndFetch()
                 runCatching { loginMutex.unlock() }
@@ -2344,7 +2298,7 @@ class FileExplorerActivity : TransfersManagementActivity(), MegaRequestListenerI
 
     private fun getChatAdded(listItems: ArrayList<ChatExplorerListItem>) {
         val chats = ArrayList<MegaChatRoom>()
-        val users = ArrayList<MegaUser>()
+        val users = ArrayList<User>()
         createAndShowProgressDialog(true, getString(R.string.preparing_chats))
 
         for (item in listItems) {
@@ -2352,17 +2306,17 @@ class FileExplorerActivity : TransfersManagementActivity(), MegaRequestListenerI
                 megaChatApi.getChatRoom(item.chat.chatId)?.let {
                     chats.add(it)
                 }
-            } else if (item.contact != null && item.contact.megaUser != null) {
-                users.add(item.contact.megaUser)
+            } else if (item.contactItem?.user != null) {
+                users.add(item.contactItem.user)
             }
         }
         if (users.isNotEmpty()) {
             val listener = CreateChatListener(
-                CreateChatListener.SEND_FILE_EXPLORER_CONTENT,
-                chats,
-                users,
-                this,
-                this
+                action = CreateChatListener.SEND_FILE_EXPLORER_CONTENT,
+                chats = chats,
+                usersNoChatSize = users.size,
+                context = this,
+                snackbarShower = this
             ) { resultChats: List<MegaChatRoom> -> sendToChats(resultChats) }
 
             for (user in users) {
@@ -2506,13 +2460,21 @@ class FileExplorerActivity : TransfersManagementActivity(), MegaRequestListenerI
         }
 
     /**
-     * Refresh the order of nodes.
+     * Refresh the order of nodes for cloud explorer.
      *
      * @param order Order to apply.
      */
-    fun refreshOrderNodes(order: Int) {
+    fun refreshCloudExplorerOrderNodes(order: Int) {
         cDriveExplorer = cloudExplorerFragment
         cDriveExplorer?.orderNodes(order)
+    }
+
+    /**
+     * Refresh the order of nodes for incoming explorer.
+     *
+     * @param order Order to apply.
+     */
+    fun refreshIncomingExplorerOrderNodes(order: Int) {
         iSharesExplorer = incomingExplorerFragment
         iSharesExplorer?.updateNodesByOrder(order)
     }
@@ -2761,6 +2723,11 @@ class FileExplorerActivity : TransfersManagementActivity(), MegaRequestListenerI
          * Intent extra for selected folder.
          */
         const val EXTRA_SELECTED_FOLDER = "selected_folder"
+
+        /**
+         * Intent extra for the selected MEGA Folder
+         */
+        const val EXTRA_MEGA_SELECTED_FOLDER = "EXTRA_MEGA_SELECTED_FOLDER"
 
         /**
          * Intent action for processed info.

@@ -3,20 +3,21 @@ package mega.privacy.android.app.nav
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.activities.ManageChatHistoryActivity
-import mega.privacy.android.app.activities.settingsActivities.LegacyCameraUploadsPreferencesActivity
 import mega.privacy.android.app.featuretoggle.AppFeatures
-import mega.privacy.android.app.main.megachat.ChatActivity
 import mega.privacy.android.app.presentation.meeting.chat.ChatHostActivity
 import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_ACTION
 import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_LINK
 import mega.privacy.android.app.presentation.meeting.managechathistory.view.screen.ManageChatHistoryActivityV2
-import mega.privacy.android.app.presentation.settings.camerauploads.SettingsCameraUploadsComposeActivity
+import mega.privacy.android.app.presentation.settings.camerauploads.SettingsCameraUploadsActivity
+import mega.privacy.android.app.presentation.zipbrowser.ZipBrowserComposeActivity
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.app.utils.Constants.EXTRA_HANDLE_ZIP
+import mega.privacy.android.app.utils.Constants.EXTRA_PATH_ZIP
+import mega.privacy.android.app.zippreview.ui.ZipBrowserActivity
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.navigation.MegaNavigator
@@ -34,13 +35,12 @@ internal class MegaNavigatorImpl @Inject constructor(
     AppNavigatorImpl {
     override fun openSettingsCameraUploads(activity: Activity) {
         applicationScope.launch {
-            val settingsCameraUploadsClass =
-                if (getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsCompose)) {
-                    SettingsCameraUploadsComposeActivity::class.java
-                } else {
-                    LegacyCameraUploadsPreferencesActivity::class.java
-                }
-            activity.startActivity(Intent(activity, settingsCameraUploadsClass))
+            activity.startActivity(
+                Intent(
+                    activity,
+                    SettingsCameraUploadsActivity::class.java,
+                )
+            )
         }
     }
 
@@ -54,32 +54,17 @@ internal class MegaNavigatorImpl @Inject constructor(
         isOverQuota: Int?,
         flags: Int,
     ) {
-        applicationScope.launch {
-            val intent = if (getFeatureFlagValueUseCase(AppFeatures.NewChatActivity)) {
-                getChatActivityIntent(
-                    context = context,
-                    action = action,
-                    link = link,
-                    text = text,
-                    chatId = chatId,
-                    messageId = messageId,
-                    isOverQuota = isOverQuota,
-                    flags = flags
-                )
-            } else {
-                getLegacyChatIntent(
-                    context = context,
-                    action = action,
-                    link = link,
-                    text = text,
-                    chatId = chatId,
-                    messageId = messageId,
-                    isOverQuota = isOverQuota,
-                    flags = flags
-                )
-            }
-            context.startActivity(intent)
-        }
+        val intent = getChatActivityIntent(
+            context = context,
+            action = action,
+            link = link,
+            text = text,
+            chatId = chatId,
+            messageId = messageId,
+            isOverQuota = isOverQuota,
+            flags = flags
+        )
+        context.startActivity(intent)
     }
 
     override fun openUpgradeAccount(context: Context) {
@@ -114,28 +99,6 @@ internal class MegaNavigatorImpl @Inject constructor(
         return intent
     }
 
-    private fun getLegacyChatIntent(
-        context: Context,
-        action: String?,
-        link: String?,
-        text: String?,
-        chatId: Long?,
-        messageId: Long?,
-        isOverQuota: Int?,
-        flags: Int,
-    ) = Intent(context, ChatActivity::class.java).apply {
-        this.action = action
-        putExtra(EXTRA_ACTION, action)
-        link?.let {
-            this.data = Uri.parse(it)
-        }
-        text?.let { putExtra(Constants.SHOW_SNACKBAR, text) }
-        chatId?.let { putExtra(Constants.CHAT_ID, chatId) }
-        messageId?.let { putExtra("ID_MSG", messageId) }
-        isOverQuota?.let { putExtra("IS_OVERQUOTA", isOverQuota) }
-        if (flags > 0) setFlags(flags)
-    }
-
     override fun openManageChatHistoryActivity(
         context: Context,
         chatId: Long,
@@ -153,6 +116,32 @@ internal class MegaNavigatorImpl @Inject constructor(
                 email?.let { putExtra(Constants.EMAIL, it) }
             }
             context.startActivity(intent)
+        }
+    }
+
+    override fun openZipBrowserActivity(
+        context: Context,
+        zipFilePath: String,
+        nodeHandle: Long?,
+        onError: () -> Unit,
+    ) {
+        applicationScope.launch {
+            if (getFeatureFlagValueUseCase(AppFeatures.NewZipBrowser)) {
+                if (ZipBrowserComposeActivity.zipFileFormatCheck(context, zipFilePath)) {
+                    ZipBrowserComposeActivity::class.java
+                } else null
+            } else {
+                if (ZipBrowserActivity.zipFileFormatCheck(context, zipFilePath)) {
+                    ZipBrowserActivity::class.java
+                } else null
+            }?.let { activity ->
+                context.startActivity(Intent(context, activity).apply {
+                    putExtra(EXTRA_PATH_ZIP, zipFilePath)
+                    putExtra(EXTRA_HANDLE_ZIP, nodeHandle)
+                })
+            } ?: run {
+                onError()
+            }
         }
     }
 }

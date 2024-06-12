@@ -11,7 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import mega.privacy.android.analytics.Analytics
-import mega.privacy.android.core.ui.model.MenuAction
+import mega.privacy.android.shared.original.core.ui.model.MenuAction
 import mega.privacy.android.feature.sync.domain.entity.StalledIssueResolutionActionType
 import mega.privacy.android.feature.sync.ui.model.SyncOption
 import mega.privacy.android.feature.sync.ui.permissions.SyncPermissionsManager
@@ -32,6 +32,8 @@ internal fun SyncListRoute(
     viewModel: SyncListViewModel,
     syncPermissionsManager: SyncPermissionsManager,
     addFolderClicked: () -> Unit,
+    onOpenUpgradeAccountClicked: () -> Unit,
+    title: String? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -89,6 +91,10 @@ internal fun SyncListRoute(
         actions = prepareMenuActions(state),
         onActionPressed = {
             when (it) {
+                is SyncListMenuAction.AddNewSync -> {
+                    addFolderClicked()
+                }
+
                 is SyncListMenuAction.ClearSyncOptions -> {
                     Analytics.tracker.trackEvent(AndroidSyncClearResolvedIssuesEvent)
                     viewModel.onClearSyncOptionsPressed()
@@ -98,7 +104,9 @@ internal fun SyncListRoute(
                     showSyncOptionsDialog = true
                 }
             }
-        }
+        },
+        onOpenUpgradeAccountClicked = onOpenUpgradeAccountClicked,
+        title = title,
     )
 
     if (showSyncOptionsDialog) {
@@ -137,13 +145,9 @@ internal fun SyncListRoute(
 
 }
 
-internal const val SYNC_OPTIONS_TEST_TAG =
-    "sync_options_test_tag"
-internal const val CLEAN_SOLVED_ISSUES_TEST_TAG =
-    "clean_solved_issues_test_tag"
-
 private fun prepareMenuActions(state: SyncListState): List<MenuAction> {
     val menuActionList = mutableListOf<MenuAction>()
+    menuActionList.add(SyncListMenuAction.AddNewSync)
     if (state.shouldShowSyncOptionsMenuItem) {
         menuActionList.add(SyncListMenuAction.SyncOptions)
     }

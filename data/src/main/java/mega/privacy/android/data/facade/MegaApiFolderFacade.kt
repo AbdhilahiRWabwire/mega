@@ -6,6 +6,8 @@ import nz.mega.sdk.MegaApiAndroid
 import nz.mega.sdk.MegaCancelToken
 import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaRequestListenerInterface
+import nz.mega.sdk.MegaSearchFilter
+import nz.mega.sdk.MegaSearchPage
 import javax.inject.Inject
 
 /**
@@ -46,9 +48,6 @@ internal class MegaApiFolderFacade @Inject constructor(
 
     override suspend fun getRootNode(): MegaNode? = megaApiFolder.rootNode
 
-    override suspend fun getChildren(parent: MegaNode, order: Int): List<MegaNode> =
-        megaApiFolder.getChildren(parent, order)
-
     override fun getThumbnail(
         node: MegaNode,
         thumbnailFilePath: String,
@@ -70,36 +69,13 @@ internal class MegaApiFolderFacade @Inject constructor(
     override suspend fun getNumChildFiles(node: MegaNode): Int =
         megaApiFolder.getNumChildFiles(node)
 
-    override suspend fun getChildrenByNode(parentNode: MegaNode, order: Int?): List<MegaNode> =
-        if (order == null)
-            megaApiFolder.getChildren(parentNode)
-        else
-            megaApiFolder.getChildren(parentNode, order)
-
     override suspend fun getParentNode(node: MegaNode): MegaNode? =
         megaApiFolder.getParentNode(node)
 
-    override suspend fun searchByType(
-        parentNode: MegaNode,
-        searchString: String,
-        cancelToken: MegaCancelToken,
-        recursive: Boolean,
-        order: Int,
-        type: Int,
-    ): List<MegaNode> =
-        megaApiFolder.searchByType(
-            parentNode,
-            searchString,
-            cancelToken,
-            recursive,
-            order,
-            type
-        )
-
     override fun getPublicLinkInformation(
-        folderLink: String,
+        megaFolderLink: String,
         listener: MegaRequestListenerInterface,
-    ) = megaApiFolder.getPublicLinkInformation(folderLink, listener)
+    ) = megaApiFolder.getPublicLinkInformation(megaFolderLink, listener)
 
     override suspend fun setPublicKeyPinning(enable: Boolean) =
         megaApiFolder.setPublicKeyPinning(enable)
@@ -109,4 +85,18 @@ internal class MegaApiFolderFacade @Inject constructor(
 
     override fun getFolderInfo(node: MegaNode?, listener: MegaRequestListenerInterface) =
         megaApiFolder.getFolderInfo(node, listener)
+
+    override suspend fun getChildren(
+        filter: MegaSearchFilter,
+        order: Int,
+        megaCancelToken: MegaCancelToken,
+        megaSearchPage: MegaSearchPage?,
+    ): List<MegaNode> = megaApiFolder.getChildren(filter, order, megaCancelToken, megaSearchPage)
+
+    override suspend fun search(
+        filter: MegaSearchFilter,
+        order: Int,
+        megaCancelToken: MegaCancelToken,
+        megaSearchPage: MegaSearchPage?,
+    ): List<MegaNode> = megaApiFolder.search(filter, order, megaCancelToken, megaSearchPage)
 }

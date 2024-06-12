@@ -8,6 +8,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jeremyliao.liveeventbus.LiveEventBus
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,9 +16,11 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import de.palm.composestateevents.consumed
 import de.palm.composestateevents.triggered
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.kotlin.addTo
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,13 +35,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
-import mega.privacy.android.app.arch.BaseRxViewModel
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.constants.EventConstants
 import mega.privacy.android.app.constants.EventConstants.EVENT_AUDIO_OUTPUT_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_CHAT_TITLE_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_MEETING_CREATED
 import mega.privacy.android.app.extensions.updateItemAt
+import mega.privacy.android.app.featuretoggle.ApiFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.globalmanagement.MegaChatRequestHandler
 import mega.privacy.android.app.listeners.InviteToChatRoomListener
@@ -53,6 +56,7 @@ import mega.privacy.android.app.meeting.listeners.OpenVideoDeviceListener
 import mega.privacy.android.app.presentation.chat.model.AnswerCallResult
 import mega.privacy.android.app.presentation.contactinfo.model.ContactInfoUiState
 import mega.privacy.android.app.presentation.extensions.getState
+import mega.privacy.android.app.presentation.mapper.GetPluralStringFromStringResMapper
 import mega.privacy.android.app.presentation.mapper.GetStringFromStringResMapper
 import mega.privacy.android.app.presentation.meeting.mapper.ChatParticipantMapper
 import mega.privacy.android.app.presentation.meeting.model.MeetingState
@@ -63,6 +67,7 @@ import mega.privacy.android.app.utils.ChatUtil.amIParticipatingInAChat
 import mega.privacy.android.app.utils.ChatUtil.getTitleChat
 import mega.privacy.android.app.utils.Constants.AUDIO_MANAGER_CREATING_JOINING_MEETING
 import mega.privacy.android.app.utils.Constants.REQUEST_ADD_PARTICIPANTS
+import mega.privacy.android.app.utils.RunOnUIThreadUtils.runDelay
 import mega.privacy.android.app.utils.VideoCaptureUtils
 import mega.privacy.android.data.gateway.DeviceGateway
 import mega.privacy.android.domain.entity.ChatRoomPermission
@@ -96,7 +101,8 @@ import mega.privacy.android.domain.usecase.chat.MonitorChatRoomUpdatesUseCase
 import mega.privacy.android.domain.usecase.chat.StartConversationUseCase
 import mega.privacy.android.domain.usecase.chat.UpdateChatPermissionsUseCase
 import mega.privacy.android.domain.usecase.contact.GetMyFullNameUseCase
-import mega.privacy.android.domain.usecase.contact.InviteContactUseCase
+import mega.privacy.android.domain.usecase.contact.GetMyUserHandleUseCase
+import mega.privacy.android.domain.usecase.contact.InviteContactWithHandleUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.login.LogoutUseCase
 import mega.privacy.android.domain.usecase.login.MonitorFinishActivityUseCase
@@ -149,7 +155,7 @@ import javax.inject.Inject
  * @property queryChatLink                                  [QueryChatLink]
  * @property isEphemeralPlusPlusUseCase                     [IsEphemeralPlusPlusUseCase]
  * @property createChatLink                                 [CreateChatLink]
- * @property inviteContactUseCase                           [InviteContactUseCase]
+ * @property inviteContactWithHandleUseCase                           [InviteContactWithHandleUseCase]
  * @property updateChatPermissionsUseCase                   [UpdateChatPermissionsUseCase]
  * @property removeFromChaUseCase                           [RemoveFromChat]
  * @property startConversationUseCase                       [StartConversationUseCase]
@@ -192,7 +198,7 @@ class MeetingActivityViewModel @Inject constructor(
     private val chatParticipantMapper: ChatParticipantMapper,
     private val isEphemeralPlusPlusUseCase: IsEphemeralPlusPlusUseCase,
     private val createChatLink: CreateChatLink,
-    private val inviteContactUseCase: InviteContactUseCase,
+    private val inviteContactWithHandleUseCase: InviteContactWithHandleUseCase,
     private val updateChatPermissionsUseCase: UpdateChatPermissionsUseCase,
     private val removeFromChaUseCase: RemoveFromChat,
     private val startConversationUseCase: StartConversationUseCase,
@@ -212,10 +218,14 @@ class MeetingActivityViewModel @Inject constructor(
     private val getStringFromStringResMapper: GetStringFromStringResMapper,
     private val getCurrentSubscriptionPlanUseCase: GetCurrentSubscriptionPlanUseCase,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
+    private val getPluralStringFromStringResMapper: GetPluralStringFromStringResMapper,
+    private val getMyUserHandleUseCase: GetMyUserHandleUseCase,
     savedStateHandle: SavedStateHandle,
     @ApplicationContext private val context: Context,
-) : BaseRxViewModel(), OpenVideoDeviceListener.OnOpenVideoDeviceCallback,
+) : ViewModel(), OpenVideoDeviceListener.OnOpenVideoDeviceCallback,
     DisableAudioVideoCallListener.OnDisableAudioVideoCallback {
+
+    private val composite = CompositeDisposable()
 
     private val _state = MutableStateFlow(
         MeetingState(
@@ -249,6 +259,8 @@ class MeetingActivityViewModel @Inject constructor(
     val avatarLiveData: LiveData<Bitmap> = _avatarLiveData
 
     var tips: MutableLiveData<String> = MutableLiveData<String>()
+
+    private var monitorChatCallUpdatesJob: Job? = null
 
     // OnOffFab
     private val _micLiveData: MutableLiveData<Boolean> = MutableLiveData<Boolean>(false)
@@ -342,6 +354,20 @@ class MeetingActivityViewModel @Inject constructor(
     ).post(isVisible)
 
     init {
+        viewModelScope.launch {
+            runCatching {
+                getFeatureFlagValueUseCase(AppFeatures.RaiseToSpeak).let { flag ->
+                    _state.update { state ->
+                        state.copy(
+                            isRaiseToSpeakFeatureFlagEnabled = flag,
+                        )
+                    }
+                }
+            }.onFailure {
+                Timber.e(it)
+            }
+        }
+
         startMonitoringChatCallUpdates()
         startMonitorChatSessionUpdates()
         getMyFullName()
@@ -351,20 +377,7 @@ class MeetingActivityViewModel @Inject constructor(
         }
 
         getCurrentSubscriptionPlan()
-        viewModelScope.launch {
-            runCatching {
-                getFeatureFlagValueUseCase(AppFeatures.CallUnlimitedProPlan).let { flag ->
-                    _state.update { state ->
-                        state.copy(
-                            isCallUnlimitedProPlanFeatureFlagEnabled = flag,
-                        )
-                    }
-                }
-            }.onFailure {
-                Timber.e(it)
-            }
-
-        }
+        getApiFeatureFlag()
 
         LiveEventBus.get(EVENT_AUDIO_OUTPUT_CHANGE, AppRTCAudioManager.AudioDevice::class.java)
             .observeForever(audioOutputStateObserver)
@@ -374,8 +387,6 @@ class MeetingActivityViewModel @Inject constructor(
 
         LiveEventBus.get(EVENT_MEETING_CREATED, Long::class.java)
             .observeForever(meetingCreatedObserver)
-
-
 
         getCallUseCase.getCallEnded()
             .subscribeOn(Schedulers.io())
@@ -405,6 +416,25 @@ class MeetingActivityViewModel @Inject constructor(
                 when (it) {
                     UserChanges.Firstname, UserChanges.Lastname -> getMyFullName()
                     else -> Unit
+                }
+            }
+        }
+    }
+
+    /**
+     * Get call unlimited pro plan api feature flag
+     */
+    private fun getApiFeatureFlag() {
+        viewModelScope.launch {
+            runCatching {
+                getFeatureFlagValueUseCase(ApiFeatures.CallUnlimitedProPlan)
+            }.onFailure { exception ->
+                Timber.e(exception)
+            }.onSuccess { flag ->
+                _state.update { state ->
+                    state.copy(
+                        isCallUnlimitedProPlanFeatureFlagEnabled = flag,
+                    )
                 }
             }
         }
@@ -488,6 +518,20 @@ class MeetingActivityViewModel @Inject constructor(
     }
 
     /**
+     * load my user handle and save to ui state
+     */
+    private fun getMyUserHandle() {
+        if (state.value.myUserHandle != null) return
+
+        viewModelScope.launch {
+            runCatching {
+                val myUserHandle = getMyUserHandleUseCase()
+                _state.update { state -> state.copy(myUserHandle = myUserHandle) }
+            }.onFailure { Timber.e(it) }
+        }
+    }
+
+    /**
      * Get chat room
      */
     private fun getChatRoom() = viewModelScope.launch {
@@ -537,6 +581,7 @@ class MeetingActivityViewModel @Inject constructor(
                             currentCall = it
                         )
                     }
+                    getMyUserHandle()
 
                     when (call.status) {
                         ChatCallStatus.UserNoPresent -> {
@@ -551,6 +596,9 @@ class MeetingActivityViewModel @Inject constructor(
 
                         else -> {
                             checkIfPresenting(it)
+                            if (state.value.isRaiseToSpeakFeatureFlagEnabled) {
+                                initialiseUserToShowInHandRaisedSnackbar(call)
+                            }
                             if (checkEphemeralAccount) {
                                 checkEphemeralAccountAndWaitingRoom(it)
                             }
@@ -743,6 +791,79 @@ class MeetingActivityViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Trigger event to show Snackbar message
+     *
+     * @param message     Content for snack bar
+     */
+    private fun triggerHandRaisedSnackbarMsg(message: String) {
+        clearUserToShowInHandRaisedSnackbar()
+        onSnackbarMessageConsumed()
+        _state.update { it.copy(handRaisedSnackbarMsg = triggered(message)) }
+    }
+
+    /**
+     * Reset and notify that snackbarMessage is consumed
+     */
+    fun onHandRaisedSnackbarMsgConsumed() {
+        _state.update {
+            it.copy(handRaisedSnackbarMsg = consumed())
+        }
+    }
+
+    /**
+     * Control the snackbar to be displayed when someone raises their hand.
+     */
+    private fun checkShowHandRaisedSnackbar() {
+        _state.update {
+            it.copy(
+                showLowerHandButtonInSnackbar = state.value.isMyHandRaisedToShowSnackbar
+            )
+        }
+
+        when (val numberOfParticipants = state.value.userToShowInHandRaisedSnackbarNumber()) {
+            0 -> Timber.d("No users with hand raised")
+            1 -> when {
+                state.value.isMyHandRaisedToShowSnackbar -> triggerHandRaisedSnackbarMsg(
+                    getStringFromStringResMapper(
+                        R.string.meeting_your_hand_is_raised_message
+                    )
+                )
+
+                else -> {
+                    val name = state.value.getParticipantNameWithRaisedHand()
+                    triggerHandRaisedSnackbarMsg(
+                        getStringFromStringResMapper(
+                            R.string.meetings_one_participant_raised_their_hand_message,
+                            name
+                        )
+                    )
+                }
+            }
+
+            else -> when {
+                state.value.isMyHandRaisedToShowSnackbar -> triggerHandRaisedSnackbarMsg(
+                    getPluralStringFromStringResMapper(
+                        stringId = R.plurals.meeting_you_and_others_raised_your_hands_message,
+                        quantity = numberOfParticipants - 1,
+                        numberOfParticipants - 1
+                    )
+                )
+
+                else -> state.value.getParticipantNameWithRaisedHand()
+                    .let { name ->
+                        triggerHandRaisedSnackbarMsg(
+                            getPluralStringFromStringResMapper(
+                                stringId = R.plurals.meetings_other_participants_raised_their_hands_message,
+                                quantity = numberOfParticipants - 1,
+                                name,
+                                numberOfParticipants - 1
+                            )
+                        )
+                    }
+            }
+        }
+    }
 
     /**
      * Check ephemeral account and waiting room
@@ -786,8 +907,9 @@ class MeetingActivityViewModel @Inject constructor(
     /**
      * Get chat call updates
      */
-    private fun startMonitoringChatCallUpdates() =
-        viewModelScope.launch {
+    private fun startMonitoringChatCallUpdates() {
+        monitorChatCallUpdatesJob?.cancel()
+        monitorChatCallUpdatesJob = viewModelScope.launch {
             monitorChatCallUpdatesUseCase()
                 .filter { it.chatId == _state.value.chatId }
                 .collectLatest { call ->
@@ -799,77 +921,128 @@ class MeetingActivityViewModel @Inject constructor(
 
                     checkIfPresenting(call)
                     call.changes?.apply {
-                        if (contains(ChatCallChanges.Status)) {
-                            Timber.d("Chat call status: ${call.status}")
-                            when (call.status) {
-                                ChatCallStatus.InProgress -> {
-                                    checkEphemeralAccountAndWaitingRoom(call)
-                                }
-
-                                ChatCallStatus.TerminatingUserParticipation, ChatCallStatus.GenericNotification -> {
-                                    Timber.d("Chat call termCode: ${call.termCode}")
-                                    if (call.termCode == ChatCallTermCodeType.CallUsersLimit || call.termCode == ChatCallTermCodeType.TooManyParticipants
-                                        && _state.value.isCallUnlimitedProPlanFeatureFlagEnabled
-                                    ) {
-                                        _state.update { state ->
-                                            state.copy(
-                                                callEndedDueToFreePlanLimits = true
-                                            )
-                                        }
+                        when {
+                            contains(ChatCallChanges.Status) -> {
+                                Timber.d("Chat call status: ${call.status}")
+                                when (call.status) {
+                                    ChatCallStatus.InProgress -> {
+                                        checkEphemeralAccountAndWaitingRoom(call)
                                     }
-                                }
 
-                                else -> {}
-                            }
-                        }
-
-                        if (contains(ChatCallChanges.LocalAVFlags)) {
-                            val isEnable = call.hasLocalAudio
-                            _micLiveData.value = isEnable
-                            Timber.d("open Mic: $isEnable")
-                            tips.value = when (isEnable) {
-                                true -> context.getString(
-                                    R.string.general_mic_unmute
-                                )
-
-                                false -> context.getString(
-                                    R.string.general_mic_mute
-                                )
-                            }
-
-                            call.auxHandle?.let { auxClientId ->
-                                if (auxClientId != 0L) {
-                                    state.value.usersInCall.find { it.clientId == auxClientId }
-                                        ?.let {
-                                            showSnackBar(
-                                                context.getString(
-                                                    R.string.meetings_muted_by_a_participant_snackbar_message,
-                                                    it.name
+                                    ChatCallStatus.TerminatingUserParticipation, ChatCallStatus.GenericNotification -> {
+                                        Timber.d("Chat call termCode: ${call.termCode}")
+                                        if (call.termCode == ChatCallTermCodeType.CallUsersLimit) {
+                                            _state.update { state ->
+                                                state.copy(
+                                                    callEndedDueToFreePlanLimits = true
                                                 )
-                                            )
+                                            }
                                         }
+                                    }
+
+                                    else -> {}
                                 }
                             }
-                        }
 
-                        if (contains(ChatCallChanges.WaitingRoomUsersEntered) || contains(
-                                ChatCallChanges.WaitingRoomUsersLeave
-                            )
-                        ) {
-                            call.waitingRoom?.apply {
-                                peers?.let { ids ->
-                                    _state.update {
-                                        it.copy(
-                                            usersInWaitingRoomIDs = ids
-                                        )
+                            contains(ChatCallChanges.CallRaiseHand) -> {
+                                if (state.value.isRaiseToSpeakFeatureFlagEnabled) {
+                                    when (call.flag) {
+                                        true -> {
+                                            val listToUpdate =
+                                                state.value.userToShowInHandRaisedSnackbar +
+                                                        (call.raisedHandsList?.filterNot {
+                                                            state.value.userToShowInHandRaisedSnackbar.containsKey(
+                                                                it
+                                                            )
+                                                        }
+                                                            ?.associateWith { true } ?: emptyMap())
+
+                                            updateUserToShowInHandRaisedSnackbar(listToUpdate)
+                                            monitorGroupHandRaisedSnackbar()
+                                        }
+
+                                        false -> {
+                                            val listToUpdate =
+                                                state.value.userToShowInHandRaisedSnackbar.filter { entry ->
+                                                    call.raisedHandsList?.contains(entry.key)
+                                                        ?: false
+                                                }.toMap()
+
+                                            updateUserToShowInHandRaisedSnackbar(listToUpdate)
+                                        }
                                     }
-                                    checkParticipantLists()
+                                }
+                            }
+
+                            contains(ChatCallChanges.LocalAVFlags) -> {
+                                val isEnable = call.hasLocalAudio
+                                _micLiveData.value = isEnable
+                                Timber.d("open Mic: $isEnable")
+                                tips.value = when (isEnable) {
+                                    true -> context.getString(
+                                        R.string.general_mic_unmute
+                                    )
+
+                                    false -> context.getString(
+                                        R.string.general_mic_mute
+                                    )
+                                }
+
+                                call.auxHandle?.let { auxClientId ->
+                                    if (auxClientId != 0L) {
+                                        state.value.usersInCall.find { it.clientId == auxClientId }
+                                            ?.let {
+                                                showSnackBar(
+                                                    context.getString(
+                                                        R.string.meetings_muted_by_a_participant_snackbar_message,
+                                                        it.name
+                                                    )
+                                                )
+                                            }
+                                    }
+                                }
+                            }
+
+                            contains(ChatCallChanges.WaitingRoomUsersEntered) ||
+                                    contains(ChatCallChanges.WaitingRoomUsersLeave) -> {
+                                call.waitingRoom?.apply {
+                                    peers?.let { ids ->
+                                        _state.update {
+                                            it.copy(
+                                                usersInWaitingRoomIDs = ids
+                                            )
+                                        }
+                                        checkParticipantLists()
+                                    }
                                 }
                             }
                         }
                     }
                 }
         }
+    }
+
+    /**
+     * Monitor group snackbar notifications when several users raise their hands at the same time
+     */
+    private fun monitorGroupHandRaisedSnackbar() {
+        if (!state.value.isWaitingForGroupHandRaisedSnackbars) {
+            _state.update { state ->
+                state.copy(
+                    isWaitingForGroupHandRaisedSnackbars = true
+                )
+            }
+
+            runDelay(DEFAULT_GROUP_SNACKBARS_TIMEOUT_MILLISECONDS) {
+                _state.update { state ->
+                    state.copy(
+                        isWaitingForGroupHandRaisedSnackbars = false
+                    )
+                }
+                checkShowHandRaisedSnackbar()
+            }
+        }
+    }
 
     /**
      * Get chat session updates
@@ -914,6 +1087,14 @@ class MeetingActivityViewModel @Inject constructor(
             Timber.d("Error on logout $it")
         }
     }
+
+    /**
+     * Show participants list
+     *
+     * @param shouldBeShown True, should be shown. False, should be hidden.
+     */
+    fun showParticipantsList(shouldBeShown: Boolean) =
+        _state.update { state -> state.copy(shouldParticipantInCallListBeShown = shouldBeShown) }
 
     /**
      * Check concurrent calls to see if the call should be switched or ended
@@ -988,6 +1169,7 @@ class MeetingActivityViewModel @Inject constructor(
                     chatId = chatId
                 )
             }
+
             getChatAndCall()
         }
     }
@@ -1234,6 +1416,8 @@ class MeetingActivityViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+
+        composite.clear()
 
         LiveEventBus.get(EVENT_AUDIO_OUTPUT_CHANGE, AppRTCAudioManager.AudioDevice::class.java)
             .removeObserver(audioOutputStateObserver)
@@ -1648,7 +1832,6 @@ class MeetingActivityViewModel @Inject constructor(
                     Timber.e(exception)
                 }
                 .collectLatest { list ->
-                    Timber.d("Updated list of participants: list ${list.size}")
                     _state.update { state ->
                         state.copy(
                             chatParticipantList = list
@@ -1692,9 +1875,7 @@ class MeetingActivityViewModel @Inject constructor(
 
             state.value.usersInCall.find { it.peerId == chatParticipant.handle }
                 ?.let { participant ->
-
                     participantAdded = true
-
                     chatParticipantsInCall.add(chatParticipantMapper(participant, chatParticipant))
                 }
 
@@ -1736,7 +1917,7 @@ class MeetingActivityViewModel @Inject constructor(
         state.value.chatParticipantSelected?.let { participant ->
             viewModelScope.launch {
                 runCatching {
-                    inviteContactUseCase(
+                    inviteContactWithHandleUseCase(
                         participant.email ?: "",
                         participant.handle ?: -1,
                         null
@@ -1771,6 +1952,41 @@ class MeetingActivityViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Initialise user to show in hand raised snackbar
+     *
+     * @param call  [ChatCall]
+     */
+    private fun initialiseUserToShowInHandRaisedSnackbar(call: ChatCall) {
+        val listToUpdate = buildMap {
+            call.raisedHandsList?.forEach { peerId ->
+                this[peerId] = false
+            }
+        }
+
+        updateUserToShowInHandRaisedSnackbar(listToUpdate)
+    }
+
+    /**
+     * Clear user ids with changes in raised hand list
+     */
+    private fun clearUserToShowInHandRaisedSnackbar() {
+        val listToUpdate = mutableMapOf<Long, Boolean>()
+        state.value.userToShowInHandRaisedSnackbar.forEach {
+            listToUpdate[it.key] = false
+        }
+
+        updateUserToShowInHandRaisedSnackbar(listToUpdate)
+    }
+
+    /**
+     * Update user ids with changes in raised hand list
+     *
+     * @param list  map with new values
+     */
+    private fun updateUserToShowInHandRaisedSnackbar(list: Map<Long, Boolean>) =
+        _state.update { state -> state.copy(userToShowInHandRaisedSnackbar = list) }
 
 
     /**
@@ -2070,5 +2286,7 @@ class MeetingActivityViewModel @Inject constructor(
         private const val INVALID_CHAT_HANDLE = -1L
         private const val INVALID_POSITION = -1
         private const val DEFAULT_RING_TIMEOUT_SECONDS = 40L
+        private const val DEFAULT_GROUP_SNACKBARS_TIMEOUT_MILLISECONDS = 500L
+
     }
 }

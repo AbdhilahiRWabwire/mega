@@ -10,6 +10,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
+import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.mediaplayer.AudioPlayerActivity
@@ -21,13 +24,12 @@ import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewMenu
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
 import mega.privacy.android.app.presentation.meeting.chat.view.message.attachment.NodeAttachmentMessageView
 import mega.privacy.android.app.presentation.meeting.chat.view.message.attachment.NodeAttachmentMessageViewModel
+import mega.privacy.android.app.presentation.meeting.chat.view.navigation.compose.sharedViewModel
 import mega.privacy.android.app.presentation.node.FileNodeContent
 import mega.privacy.android.app.presentation.pdfviewer.PdfViewerActivity
 import mega.privacy.android.app.textEditor.TextEditorActivity
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.app.zippreview.ui.ZipBrowserActivity
-import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
-import mega.privacy.android.core.ui.controls.layouts.LocalSnackBarHostState
+import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.domain.entity.AudioFileTypeInfo
 import mega.privacy.android.domain.entity.PdfFileTypeInfo
 import mega.privacy.android.domain.entity.VideoFileTypeInfo
@@ -36,6 +38,8 @@ import mega.privacy.android.domain.entity.chat.messages.NodeAttachmentMessage
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.NodeContentUri
 import mega.privacy.android.domain.entity.node.chat.ChatFile
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.reaction.model.UIReaction
+import mega.privacy.android.shared.original.core.ui.controls.layouts.LocalSnackBarHostState
 import timber.log.Timber
 import java.io.File
 
@@ -54,9 +58,12 @@ data class NodeAttachmentUiMessage(
         interactionEnabled: Boolean,
         onLongClick: () -> Unit,
         initialiseModifier: (onClick: () -> Unit) -> Modifier,
+        navHostController: NavHostController,
     ) {
         val viewModel: NodeAttachmentMessageViewModel = hiltViewModel()
-        val chatViewModel: ChatViewModel = hiltViewModel()
+        val chatViewModel: ChatViewModel =
+            navHostController.currentBackStackEntry?.sharedViewModel<ChatViewModel>(navController = navHostController)
+                ?: throw IllegalStateException("ChatViewModel not found in navigation graph")
         val uiState by viewModel.updateAndGetUiStateFlow(message).collectAsStateWithLifecycle()
         val coroutineScope = rememberCoroutineScope()
         val context = LocalContext.current
@@ -93,7 +100,8 @@ data class NodeAttachmentUiMessage(
                             message,
                             context,
                             snackbarHostState,
-                            chatViewModel
+                            chatViewModel,
+                            coroutineScope
                         )
 
                         is FileNodeContent.Pdf -> openPdfActivity(
@@ -110,7 +118,13 @@ data class NodeAttachmentUiMessage(
                             message.chatId
                         )
 
-                        else -> {}
+                        FileNodeContent.ImageForNode -> {
+                            Timber.i("FileNodeContent.ImageForNode is not handled in NodeAttachmentUiMessage")
+                        }
+
+                        is FileNodeContent.UrlContent -> {
+                            Timber.i("FileNodeContent.UrlContent is not handled in NodeAttachmentUiMessage")
+                        }
                     }
                 }.onFailure {
                     Timber.e(it, "Failed to handle file node")
@@ -207,7 +221,6 @@ data class NodeAttachmentUiMessage(
             imageSource = ImagePreviewFetcherSource.CHAT,
             menuOptionsSource = ImagePreviewMenuSource.CHAT,
             anchorImageNodeId = nodeId,
-            showScreenLabel = false,
             params = mapOf(
                 ChatImageNodeFetcher.CHAT_ROOM_ID to chatId,
                 ChatImageNodeFetcher.MESSAGE_IDS to messageIds
@@ -232,11 +245,18 @@ data class NodeAttachmentUiMessage(
         context: Context,
         snackbarHostState: SnackbarHostState?,
         chatViewModel: ChatViewModel,
+        coroutineScope: CoroutineScope,
     ) {
         val fileNode = message.fileNode
         if (localFile != null) {
             if (fileNode.type is ZipFileTypeInfo) {
-                openZipFile(context, localFile, fileNode, snackbarHostState)
+                openZipFile(
+                    context = context,
+                    localFile = localFile,
+                    fileNode = fileNode,
+                    snackbarHostState = snackbarHostState,
+                    coroutineScope = coroutineScope
+                )
             } else {
                 val intent = Intent(Intent.ACTION_VIEW).apply {
                     viewModel.applyNodeContentUri(
@@ -258,26 +278,25 @@ data class NodeAttachmentUiMessage(
         }
     }
 
-    private suspend fun openZipFile(
+    private fun openZipFile(
         context: Context,
         localFile: File,
         fileNode: ChatFile,
         snackbarHostState: SnackbarHostState?,
+        coroutineScope: CoroutineScope,
     ) {
         Timber.d("The file is zip, open in-app.")
-        if (ZipBrowserActivity.zipFileFormatCheck(context, localFile.absolutePath)) {
-            context.startActivity(
-                Intent(context, ZipBrowserActivity::class.java).apply {
-                    putExtra(
-                        ZipBrowserActivity.EXTRA_PATH_ZIP, localFile.absolutePath
-                    )
-                    putExtra(
-                        ZipBrowserActivity.EXTRA_HANDLE_ZIP, fileNode.id.longValue
-                    )
-                }
-            )
-        } else {
-            snackbarHostState?.showSnackbar(context.getString(R.string.message_zip_format_error))
+        EntryPointAccessors.fromApplication(
+            context,
+            MegaNodeUtil.MegaNavigatorEntryPoint::class.java
+        ).megaNavigator().openZipBrowserActivity(
+            context = context,
+            zipFilePath = localFile.absolutePath,
+            nodeHandle = fileNode.id.longValue
+        ) {
+            coroutineScope.launch {
+                snackbarHostState?.showSnackbar(context.getString(R.string.message_zip_format_error))
+            }
         }
     }
 

@@ -15,7 +15,10 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import mega.privacy.android.domain.entity.Feature
 import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsEnabledUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.feature.devicecenter.domain.usecase.GetDevicesUseCase
 import mega.privacy.android.feature.devicecenter.ui.mapper.DeviceUINodeListMapper
@@ -23,7 +26,9 @@ import mega.privacy.android.feature.devicecenter.ui.model.DeviceCenterUINode
 import mega.privacy.android.feature.devicecenter.ui.model.DeviceCenterUiState
 import mega.privacy.android.feature.devicecenter.ui.model.DeviceUINode
 import mega.privacy.android.feature.devicecenter.ui.model.NonBackupDeviceFolderUINode
+import mega.privacy.android.feature.devicecenter.ui.model.OwnDeviceUINode
 import mega.privacy.android.legacy.core.ui.model.SearchWidgetState
+import mega.privacy.android.shared.sync.featuretoggle.SyncFeatures
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -35,6 +40,7 @@ import javax.inject.Inject
  * @property isCameraUploadsEnabledUseCase [IsCameraUploadsEnabledUseCase]
  * @property deviceUINodeListMapper [DeviceUINodeListMapper]
  * @property monitorConnectivityUseCase [MonitorConnectivityUseCase]
+ * @property getFeatureFlagValueUseCase [GetFeatureFlagValueUseCase]
  */
 @HiltViewModel
 internal class DeviceCenterViewModel @Inject constructor(
@@ -42,6 +48,7 @@ internal class DeviceCenterViewModel @Inject constructor(
     private val isCameraUploadsEnabledUseCase: IsCameraUploadsEnabledUseCase,
     private val deviceUINodeListMapper: DeviceUINodeListMapper,
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
+    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DeviceCenterUiState())
@@ -55,6 +62,7 @@ internal class DeviceCenterViewModel @Inject constructor(
 
     init {
         monitorNetworkConnectivity()
+        loadFeatureFlags()
     }
 
     private fun monitorNetworkConnectivity() {
@@ -86,8 +94,15 @@ internal class DeviceCenterViewModel @Inject constructor(
     fun getBackupInfo() = viewModelScope.launch {
         runCatching {
             val isCameraUploadsEnabled = isCameraUploadsEnabledUseCase()
+            val isSyncFeatureFlagEnabled = runBlocking {
+                getEnabledFeatures().contains(SyncFeatures.AndroidSync)
+            }
             val devices = deviceUINodeListMapper(
-                getDevicesUseCase(isCameraUploadsEnabled = isCameraUploadsEnabled)
+                deviceNodes = getDevicesUseCase(
+                    isCameraUploadsEnabled = isCameraUploadsEnabled,
+                    isSyncFeatureFlagEnabled = isSyncFeatureFlagEnabled,
+                ),
+                isSyncFeatureFlagEnabled = isSyncFeatureFlagEnabled,
             )
             val selectedDevice = getSelectedDevice(devices)
             _state.update {
@@ -131,6 +146,9 @@ internal class DeviceCenterViewModel @Inject constructor(
             filteredUiItems = null
         )
     }
+
+    fun shouldNavigateToSyncs(deviceUINode: DeviceUINode) =
+        _state.value.enabledFlags.contains(SyncFeatures.AndroidSync) && deviceUINode is OwnDeviceUINode
 
     /**
      * Handles specific Back Press behavior
@@ -246,6 +264,22 @@ internal class DeviceCenterViewModel @Inject constructor(
 
     fun onInfoBackPressHandle() =
         _state.update { it.copy(infoSelectedItem = null) }
+
+    private fun loadFeatureFlags() {
+        runCatching {
+            viewModelScope.launch {
+                _state.update { it.copy(enabledFlags = getEnabledFeatures()) }
+            }
+        }.onFailure {
+            Timber.e(it)
+        }
+    }
+
+    private suspend fun getEnabledFeatures(): Set<Feature> {
+        return setOfNotNull(
+            SyncFeatures.AndroidSync.takeIf { getFeatureFlagValueUseCase(it) },
+        )
+    }
 
     companion object {
         /**

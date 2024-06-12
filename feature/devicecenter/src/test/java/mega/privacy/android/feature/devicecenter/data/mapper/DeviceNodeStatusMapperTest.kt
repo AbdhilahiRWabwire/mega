@@ -31,9 +31,22 @@ internal class DeviceNodeStatusMapperTest {
             underTest(
                 folders = listOf(mock(), mock()),
                 isCameraUploadsEnabled = false,
-                isCurrentDevice = true
+                isCurrentDevice = true,
+                isSyncFeatureFlagEnabled = false,
             )
         ).isEqualTo(DeviceCenterNodeStatus.NoCameraUploads)
+    }
+
+    @Test
+    fun `test that a nothing set up device status is returned if nothing has been set up yet`() {
+        assertThat(
+            underTest(
+                folders = emptyList(),
+                isCameraUploadsEnabled = false,
+                isCurrentDevice = true,
+                isSyncFeatureFlagEnabled = true,
+            )
+        ).isEqualTo(DeviceCenterNodeStatus.NothingSetUp)
     }
 
     @ParameterizedTest(name = "expected current device status: {1}")
@@ -47,6 +60,7 @@ internal class DeviceNodeStatusMapperTest {
                 folders = folders,
                 isCameraUploadsEnabled = true,
                 isCurrentDevice = true,
+                isSyncFeatureFlagEnabled = false,
             )
         ).isEqualTo(expectedDeviceStatus)
     }
@@ -62,6 +76,7 @@ internal class DeviceNodeStatusMapperTest {
                 folders = folders,
                 isCameraUploadsEnabled = false,
                 isCurrentDevice = false,
+                isSyncFeatureFlagEnabled = false,
             )
         ).isEqualTo(expectedDeviceStatus)
     }

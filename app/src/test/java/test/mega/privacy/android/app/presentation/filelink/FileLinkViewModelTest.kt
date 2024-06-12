@@ -9,9 +9,9 @@ import de.palm.composestateevents.consumed
 import de.palm.composestateevents.triggered
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.clouddrive.FileLinkViewModel
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
+import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.domain.entity.StaticImageFileTypeInfo
 import mega.privacy.android.domain.entity.node.NodeNameCollision
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
@@ -21,7 +21,6 @@ import mega.privacy.android.domain.entity.node.publiclink.PublicNodeNameCollisio
 import mega.privacy.android.domain.exception.PublicNodeException
 import mega.privacy.android.domain.usecase.HasCredentialsUseCase
 import mega.privacy.android.domain.usecase.RootNodeExistsUseCase
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.filelink.GetFileUrlByPublicLinkUseCase
 import mega.privacy.android.domain.usecase.filelink.GetPublicNodeUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunningUseCase
@@ -30,7 +29,6 @@ import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.node.publiclink.CheckPublicNodesNameCollisionUseCase
 import mega.privacy.android.domain.usecase.node.publiclink.CopyPublicNodeUseCase
 import mega.privacy.android.domain.usecase.node.publiclink.MapNodeToPublicLinkUseCase
-import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -57,7 +55,6 @@ class FileLinkViewModelTest {
     private val httpServerStart = mock<MegaApiHttpServerStartUseCase>()
     private val httpServerIsRunning = mock<MegaApiHttpServerIsRunningUseCase>()
     private val getFileUrlByPublicLinkUseCase = mock<GetFileUrlByPublicLinkUseCase>()
-    private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase>()
     private val mapNodeToPublicLinkUseCase = mock<MapNodeToPublicLinkUseCase>()
     private val fileTypeIconMapper: FileTypeIconMapper = mock()
 
@@ -80,7 +77,6 @@ class FileLinkViewModelTest {
             httpServerStart,
             httpServerIsRunning,
             getFileUrlByPublicLinkUseCase,
-            getFeatureFlagValueUseCase,
             mapNodeToPublicLinkUseCase
         )
         initViewModel()
@@ -97,7 +93,6 @@ class FileLinkViewModelTest {
             httpServerStart = httpServerStart,
             httpServerIsRunning = httpServerIsRunning,
             getFileUrlByPublicLinkUseCase = getFileUrlByPublicLinkUseCase,
-            getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             mapNodeToPublicLinkUseCase = mapNodeToPublicLinkUseCase,
             fileTypeIconMapper = fileTypeIconMapper
         )
@@ -120,7 +115,6 @@ class FileLinkViewModelTest {
             assertThat(initial.collision).isNull()
             assertThat(initial.copySuccess).isFalse()
             assertThat(initial.openFile).isInstanceOf(consumed().javaClass)
-            assertThat(initial.downloadFile).isInstanceOf(consumed().javaClass)
         }
     }
 
@@ -239,7 +233,7 @@ class FileLinkViewModelTest {
 
     @Test
     fun `test that collision value is not null on importing node with same name `() = runTest {
-        val nodeNameCollision = mock<NodeNameCollision> {
+        val nodeNameCollision = mock<NodeNameCollision.Default> {
             on { collisionHandle }.thenReturn(123)
             on { nodeHandle }.thenReturn(1234)
             on { name }.thenReturn("name")
@@ -320,16 +314,6 @@ class FileLinkViewModelTest {
     }
 
     @Test
-    fun `test that downloadFile should be reset to consumed when resetDownloadFile is invoked`() =
-        runTest {
-            underTest.state.test {
-                underTest.resetDownloadFile()
-                val newValue = expectMostRecentItem()
-                assertThat(newValue.downloadFile).isInstanceOf(consumed().javaClass)
-            }
-        }
-
-    @Test
     fun `test that overQuotaError should be reset to consumed when resetDownloadFile is invoked`() =
         runTest {
             underTest.state.test {
@@ -396,7 +380,6 @@ class FileLinkViewModelTest {
             val fileNode = mockFileNode()
             val publicNode = mock<PublicLinkFile>()
             whenever(getPublicNodeUseCase(any())).thenReturn(fileNode)
-            whenever(getFeatureFlagValueUseCase(AppFeatures.DownloadWorker)).thenReturn(true)
             whenever(mapNodeToPublicLinkUseCase(any(), anyOrNull())).thenReturn(publicNode)
             underTest.state.test {
                 underTest.getPublicNode(url)

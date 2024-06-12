@@ -17,9 +17,9 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.meeting.managechathistory.model.ChatHistoryRetentionOption
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.core.ui.controls.dialogs.ConfirmationDialogWithRadioButtons
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.controls.dialogs.ConfirmationDialogWithRadioButtons
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * A [Composable] to display the chat history retention time options in a dialog
@@ -105,7 +105,7 @@ private fun getOptionFromRetentionTime(period: Long): ChatHistoryRetentionOption
 @CombinedThemePreviews
 @Composable
 private fun ChatHistoryRetentionOptionsDialogPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         ChatHistoryRetentionConfirmationDialog(
             currentRetentionTime = 0L,
             onConfirmClick = {},

@@ -80,11 +80,11 @@ import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_FROM_DOWNLOAD_S
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_HANDLE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_HANDLES_NODES_SEARCH
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_IS_PLAYLIST
+import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_MEDIA_QUEUE_TITLE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_NEED_STOP_HTTP_SERVER
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_OFFLINE_PATH_DIRECTORY
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ORDER_GET_CHILDREN
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_PARENT_NODE_HANDLE
-import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_MEDIA_QUEUE_TITLE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_REBUILD_PLAYLIST
 import mega.privacy.android.app.utils.Constants.INVALID_SIZE
 import mega.privacy.android.app.utils.Constants.INVALID_VALUE
@@ -118,7 +118,6 @@ import mega.privacy.android.domain.exception.BlockedMegaException
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.QuotaExceededMegaException
 import mega.privacy.android.domain.qualifier.IoDispatcher
-import mega.privacy.android.domain.usecase.AreCredentialsNullUseCase
 import mega.privacy.android.domain.usecase.GetBackupsNodeUseCase
 import mega.privacy.android.domain.usecase.GetLocalFilePathUseCase
 import mega.privacy.android.domain.usecase.GetLocalFolderLinkFromMegaApiFolderUseCase
@@ -129,6 +128,7 @@ import mega.privacy.android.domain.usecase.GetRootNodeFromMegaApiFolderUseCase
 import mega.privacy.android.domain.usecase.GetRootNodeUseCase
 import mega.privacy.android.domain.usecase.GetRubbishNodeUseCase
 import mega.privacy.android.domain.usecase.GetUserNameByEmailUseCase
+import mega.privacy.android.domain.usecase.HasCredentialsUseCase
 import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.MonitorPlaybackTimesUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
@@ -195,7 +195,7 @@ class VideoPlayerViewModel @Inject constructor(
     private val megaApiHttpServerIsRunningUseCase: MegaApiHttpServerIsRunningUseCase,
     private val megaApiHttpServerStartUseCase: MegaApiHttpServerStartUseCase,
     private val megaApiHttpServerStop: MegaApiHttpServerStopUseCase,
-    private val areCredentialsNullUseCase: AreCredentialsNullUseCase,
+    private val hasCredentialsUseCase: HasCredentialsUseCase,
     private val getLocalFilePathUseCase: GetLocalFilePathUseCase,
     private val getLocalFolderLinkFromMegaApiFolderUseCase: GetLocalFolderLinkFromMegaApiFolderUseCase,
     private val getLocalFolderLinkFromMegaApiUseCase: GetLocalFolderLinkFromMegaApiUseCase,
@@ -248,8 +248,8 @@ class VideoPlayerViewModel @Inject constructor(
         MutableStateFlow(MediaPlaySources(emptyList(), INVALID_VALUE, null))
     internal val playerSourcesState: StateFlow<MediaPlaySources> = _playerSourcesState
 
-    private val _mediaItemToRemoveState = MutableStateFlow<Int?>(null)
-    internal val mediaItemToRemoveState: StateFlow<Int?> = _mediaItemToRemoveState
+    private val _mediaItemToRemoveState = MutableStateFlow<Pair<Int, Long>>(Pair(-1, -1))
+    internal val mediaItemToRemoveState: StateFlow<Pair<Int, Long>> = _mediaItemToRemoveState
 
     private val _playlistItemsState =
         MutableStateFlow<Pair<List<PlaylistItem>, Int>>(Pair(emptyList(), 0))
@@ -1217,7 +1217,7 @@ class VideoPlayerViewModel @Inject constructor(
 
         mediaPlayerGateway.buildPlaySources(mediaPlaySources)
 
-        if (_mediaPlaybackState.value) {
+        if (_mediaPlaybackState.value && mediaPlaySources.isRestartPlaying) {
             mediaPlayerGateway.setPlayWhenReady(true)
         }
 
@@ -1525,7 +1525,7 @@ class VideoPlayerViewModel @Inject constructor(
             }.takeIf { index ->
                 index in playlistItems.indices
             }?.let { index ->
-                _mediaItemToRemoveState.update { index }
+                _mediaItemToRemoveState.update { Pair(index, handle) }
                 newItems.removeIf { (nodeHandle) ->
                     nodeHandle == handle
                 }
@@ -1544,6 +1544,7 @@ class VideoPlayerViewModel @Inject constructor(
      */
     internal fun removeAllSelectedItems() {
         if (itemsSelectedMap.isNotEmpty()) {
+            initPlayerSourceChanged()
             itemsSelectedMap.forEach {
                 removeSingleItem(it.value.nodeHandle).let { newItems ->
                     _playlistItemsState.update { flow ->
@@ -1551,6 +1552,7 @@ class VideoPlayerViewModel @Inject constructor(
                     }
                 }
             }
+            updatePlaySource()
             itemsSelectedMap.clear()
             _itemsSelectedCountState.update { itemsSelectedMap.size }
             _actionModeState.update { false }
@@ -1726,7 +1728,7 @@ class VideoPlayerViewModel @Inject constructor(
     }
 
     private suspend fun isMegaApiFolder(type: Int) =
-        type == FOLDER_LINK_ADAPTER && areCredentialsNullUseCase()
+        type == FOLDER_LINK_ADAPTER && !hasCredentialsUseCase()
 
     /**
      * Swap the items
@@ -1734,18 +1736,21 @@ class VideoPlayerViewModel @Inject constructor(
      * @param target the position of to item
      */
     internal fun swapItems(current: Int, target: Int) {
-        if (playlistItemsChanged.isEmpty()) {
-            playlistItemsChanged.addAll(_playlistItemsState.value.first)
-        }
-        Collections.swap(playlistItemsChanged, current, target)
-        val index = playlistItemsChanged[current].index
-        playlistItemsChanged[current] =
-            playlistItemsChanged[current].copy(index = playlistItemsChanged[target].index)
-        playlistItemsChanged[target] = playlistItemsChanged[target].copy(index = index)
+        val indicesOfItems = playlistItemsState.value.first.indices
+        if (target in indicesOfItems && current in indicesOfItems) {
+            if (playlistItemsChanged.isEmpty()) {
+                playlistItemsChanged.addAll(playlistItemsState.value.first)
+            }
+            Collections.swap(playlistItemsChanged, current, target)
+            val index = playlistItemsChanged[current].index
+            playlistItemsChanged[current] =
+                playlistItemsChanged[current].copy(index = playlistItemsChanged[target].index)
+            playlistItemsChanged[target] = playlistItemsChanged[target].copy(index = index)
 
-        initPlayerSourceChanged()
-        // Swap the items of play source
-        Collections.swap(playSourceChanged, current, target)
+            initPlayerSourceChanged()
+            // Swap the items of play source
+            Collections.swap(playSourceChanged, current, target)
+        }
     }
 
     /**
@@ -1762,21 +1767,31 @@ class VideoPlayerViewModel @Inject constructor(
             index in playlistItems.indices
         }
 
+    internal fun getIndexFromPlaylistItems(handle: Long): Int? =
+        playlistItems.indexOfFirst {
+            it.nodeHandle == handle
+        }.takeIf { index ->
+            index in playlistItems.indices
+        }
+
     /**
      * Updated the play source of exoplayer after reordered.
      */
-    internal fun updatePlaySource() {
-        _playlistItemsState.update {
-            it.copy(playlistItemsChanged.toList())
+    internal fun updatePlaySource(isRestartPlaying: Boolean = true) {
+        if (playlistItemsChanged.isNotEmpty() && playSourceChanged.isNotEmpty()) {
+            _playlistItemsState.update {
+                it.copy(playlistItemsChanged.toList())
+            }
+            _playerSourcesState.update {
+                it.copy(
+                    mediaItems = playSourceChanged.toList(),
+                    newIndexForCurrentItem = playingPosition,
+                    isRestartPlaying = isRestartPlaying
+                )
+            }
+            playSourceChanged.clear()
+            playlistItemsChanged.clear()
         }
-        _playerSourcesState.update {
-            it.copy(
-                mediaItems = playSourceChanged.toList(),
-                newIndexForCurrentItem = playingPosition
-            )
-        }
-        playSourceChanged.clear()
-        playlistItemsChanged.clear()
     }
 
     /**

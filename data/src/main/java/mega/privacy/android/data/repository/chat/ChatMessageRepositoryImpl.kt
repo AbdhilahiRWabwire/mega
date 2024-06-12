@@ -1,8 +1,11 @@
 package mega.privacy.android.data.repository.chat
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import mega.privacy.android.data.cache.Cache
@@ -18,6 +21,9 @@ import mega.privacy.android.data.mapper.chat.messages.PendingMessageMapper
 import mega.privacy.android.data.mapper.chat.paging.TypedMessagePagingSourceMapper
 import mega.privacy.android.data.mapper.handles.HandleListMapper
 import mega.privacy.android.data.mapper.handles.MegaHandleListMapper
+import mega.privacy.android.data.qualifier.OriginalPathForNodeCache
+import mega.privacy.android.data.qualifier.OriginalPathForPendingMessageCache
+import mega.privacy.android.domain.entity.Progress
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ChatMessageType
 import mega.privacy.android.domain.entity.chat.PendingMessage
@@ -30,7 +36,9 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.repository.chat.ChatMessageRepository
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 internal class ChatMessageRepositoryImpl @Inject constructor(
     private val megaChatApiGateway: MegaChatApiGateway,
     private val megaApiGateway: MegaApiGateway,
@@ -43,9 +51,12 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
     private val pendingMessageEntityMapper: PendingMessageEntityMapper,
     private val pendingMessageMapper: PendingMessageMapper,
     private val typedMessageEntityConverters: TypedMessageEntityConverters,
-    private val originalPathCache: Cache<Map<NodeId, String>>,
+    @OriginalPathForNodeCache private val originalPathCache: Cache<Map<NodeId, String>>,
+    @OriginalPathForPendingMessageCache private val originalPathForPendingMessageCache: Cache<Map<Long, String>>,
     private val typedMessagePagingSourceMapper: TypedMessagePagingSourceMapper,
 ) : ChatMessageRepository {
+
+    private val compressionProgressFlow = MutableStateFlow<Map<Long, Progress>>(emptyMap())
     override suspend fun setMessageSeen(chatId: Long, messageId: Long) = withContext(ioDispatcher) {
         megaChatApiGateway.setMessageSeen(chatId, messageId)
     }
@@ -154,15 +165,20 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
     })
 
     override suspend fun updatePendingMessage(
-        updatePendingMessageRequest: UpdatePendingMessageRequest,
+        vararg updatePendingMessageRequests: UpdatePendingMessageRequest,
     ) {
         return withContext(ioDispatcher) {
-            chatStorageGateway.updatePendingMessage(updatePendingMessageRequest)
+            chatStorageGateway.updatePendingMessage(updatePendingMessageRequest = updatePendingMessageRequests)
         }
     }
 
     override fun monitorPendingMessages(chatId: Long) =
         chatStorageGateway.fetchPendingMessages(chatId)
+            .map { list -> list.map { pendingMessageMapper(it) } }
+            .flowOn(ioDispatcher)
+
+    override fun monitorPendingMessagesByState(vararg states: PendingMessageState) =
+        chatStorageGateway.fetchPendingMessages(states = states)
             .map { list -> list.map { pendingMessageMapper(it) } }
             .flowOn(ioDispatcher)
 
@@ -296,6 +312,19 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
         originalPathCache.set(updated)
     }
 
+    override fun getCachedOriginalPathForPendingMessage(pendingMessageId: Long) =
+        originalPathForPendingMessageCache.get()?.get(pendingMessageId)
+
+    override fun cacheOriginalPathForPendingMessage(pendingMessageId: Long, path: String) {
+        val updated = buildMap {
+            originalPathForPendingMessageCache.get()?.let {
+                putAll(it)
+            }
+            put(pendingMessageId, path)
+        }
+        originalPathForPendingMessageCache.set(updated)
+    }
+
     override fun getPagedMessages(chatId: Long) =
         typedMessagePagingSourceMapper(chatStorageGateway.getTypedMessageRequestPagingSource(chatId))
 
@@ -331,5 +360,26 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
 
     override suspend fun clearAllData() = withContext(ioDispatcher) {
         chatStorageGateway.clearAllData()
+    }
+
+    override fun updatePendingMessagesCompressionProgress(
+        progress: Progress,
+        pendingMessages: List<PendingMessage>,
+    ) {
+        val newValues = pendingMessages
+            .mapNotNull { it.takeIf { it.state == PendingMessageState.COMPRESSING.value }?.id }
+            .associateWith { progress }
+        compressionProgressFlow.update {
+            mutableMapOf<Long, Progress>().apply {
+                putAll(compressionProgressFlow.value)
+                putAll(newValues)
+            }
+        }
+    }
+
+    override fun monitorPendingMessagesCompressionProgress() = compressionProgressFlow.asStateFlow()
+
+    override fun clearPendingMessagesCompressionProgress() {
+        compressionProgressFlow.value = emptyMap()
     }
 }

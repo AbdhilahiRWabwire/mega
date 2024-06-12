@@ -3,7 +3,7 @@ package mega.privacy.android.app.di.chat
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.components.FragmentComponent
+import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatViewModel
 import mega.privacy.android.app.presentation.meeting.chat.view.actions.AvailableOfflineMessageAction
@@ -17,6 +17,7 @@ import mega.privacy.android.app.presentation.meeting.chat.view.actions.ImportMes
 import mega.privacy.android.app.presentation.meeting.chat.view.actions.InviteMessageAction
 import mega.privacy.android.app.presentation.meeting.chat.view.actions.MessageAction
 import mega.privacy.android.app.presentation.meeting.chat.view.actions.OpenWithMessageAction
+import mega.privacy.android.app.presentation.meeting.chat.view.actions.ResumeTransfersMessageAction
 import mega.privacy.android.app.presentation.meeting.chat.view.actions.RetryMessageAction
 import mega.privacy.android.app.presentation.meeting.chat.view.actions.SaveToDeviceMessageAction
 import mega.privacy.android.app.presentation.meeting.chat.view.actions.SelectMessageAction
@@ -24,7 +25,7 @@ import mega.privacy.android.app.presentation.meeting.chat.view.actions.SendMessa
 import mega.privacy.android.app.presentation.meeting.chat.view.actions.ShareMessageAction
 
 @Module
-@InstallIn(FragmentComponent::class)
+@InstallIn(SingletonComponent::class)
 internal class MessageActionModule {
 
     /**
@@ -125,6 +126,11 @@ internal class MessageActionModule {
     @IntoSet
     fun provideRetryActionFactory(): (ChatViewModel) -> MessageAction =
         { RetryMessageAction() }
+
+    @Provides
+    @IntoSet
+    fun provideResumeTransfersMessageActionFactory(): (ChatViewModel) -> MessageAction =
+        { vm -> ResumeTransfersMessageAction(vm) }
 
     /**
      * MessageActionGroup.Delete

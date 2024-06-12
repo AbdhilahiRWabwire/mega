@@ -7,11 +7,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
 import mega.privacy.android.app.presentation.meeting.chat.view.ChatAvatar
 import mega.privacy.android.app.presentation.meeting.chat.view.LastItemAvatarPosition
-import mega.privacy.android.core.ui.controls.chat.ChatMessageContainer
-import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
-import mega.privacy.android.core.ui.theme.extensions.conditional
+import mega.privacy.android.shared.original.core.ui.controls.chat.ChatMessageContainer
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.reaction.model.UIReaction
+import mega.privacy.android.shared.original.core.ui.theme.extensions.conditional
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 
 /**
@@ -31,6 +32,7 @@ abstract class AvatarMessage : UiChatMessage {
         interactionEnabled: Boolean,
         onLongClick: () -> Unit,
         initialiseModifier: (onClick: () -> Unit) -> Modifier,
+        navHostController: NavHostController,
     )
 
     abstract override val message: TypedMessage
@@ -72,6 +74,7 @@ abstract class AvatarMessage : UiChatMessage {
         onForwardClicked: (TypedMessage) -> Unit,
         onSelectedChanged: (Boolean) -> Unit,
         onNotSentClick: (TypedMessage) -> Unit,
+        navHostController: NavHostController,
     ) {
         ChatMessageContainer(
             isMine = displayAsMine,
@@ -113,7 +116,8 @@ abstract class AvatarMessage : UiChatMessage {
                         onLongClick = onLongClick,
                         interactionEnabled = interactionEnabled
                     )
-                }
+                },
+                navHostController = navHostController,
             )
         }
     }
@@ -123,7 +127,7 @@ abstract class AvatarMessage : UiChatMessage {
         onClick: () -> Unit,
         onLongClick: (TypedMessage) -> Unit,
         interactionEnabled: Boolean,
-    ) = if (message.isNotSent()) {
+    ) = if (message.isNotSent() && interactionEnabled) {
         forNotSent(
             onNotSentClick = { onNotSentClick(message) }
         )
@@ -152,6 +156,4 @@ abstract class AvatarMessage : UiChatMessage {
     }
 
     override val isSelectable = true
-
-    override fun key() = super.key()
 }

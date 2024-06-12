@@ -57,20 +57,29 @@ class FavouriteActionModeCallback(
 
     private fun handleHiddenNodes(menu: Menu) {
         mainActivity.lifecycleScope.launch {
-            val isHiddenNodesEnabled =
-                mainActivity.getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)
-            if (isHiddenNodesEnabled) {
-                val isPaid =
-                    viewModel.getIsPaidAccount()
+            runCatching {
+                val isHiddenNodesEnabled =
+                    mainActivity.getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)
+                val selectedNode = viewModel.getItemsSelected().mapNotNull { it.value.typedNode }
+                val isHidingActionAllowed = selectedNode.all {
+                    viewModel.isHidingActionAllowed(it.id)
+                }
+                if (isHiddenNodesEnabled && isHidingActionAllowed) {
+                    val isPaid =
+                        viewModel.getIsPaidAccount()
 
-                val hasNonSensitiveNode =
-                    viewModel.getItemsSelected().mapNotNull { it.value.typedNode }
-                        .any { !it.isMarkedSensitive }
-                menu.findItem(R.id.cab_menu_hide)?.isVisible =
-                    hasNonSensitiveNode || !isPaid
+                    val hasNonSensitiveNode = selectedNode.any { !it.isMarkedSensitive }
+                    menu.findItem(R.id.cab_menu_hide)?.isVisible =
+                        hasNonSensitiveNode || !isPaid
 
-                menu.findItem(R.id.cab_menu_unhide)?.isVisible =
-                    !hasNonSensitiveNode && isPaid
+                    menu.findItem(R.id.cab_menu_unhide)?.isVisible =
+                        !hasNonSensitiveNode && isPaid
+                } else {
+                    menu.findItem(R.id.cab_menu_hide)?.isVisible = false
+                    menu.findItem(R.id.cab_menu_unhide)?.isVisible = false
+                }
+            }.onFailure {
+                Timber.e(it)
             }
         }
     }
@@ -91,7 +100,7 @@ class FavouriteActionModeCallback(
 
             when (itemId) {
                 R.id.cab_menu_download -> {
-                    mainActivity.saveNodesToDevice(selectedNodes, false, false, false, false)
+                    mainActivity.saveNodesToDevice(selectedNodes, false, false, false)
                 }
 
                 R.id.cab_menu_copy -> {

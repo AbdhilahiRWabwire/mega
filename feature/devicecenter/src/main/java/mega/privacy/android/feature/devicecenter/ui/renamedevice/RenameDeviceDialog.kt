@@ -15,11 +15,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.palm.composestateevents.EventEffect
 import mega.privacy.android.analytics.Analytics
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.feature.devicecenter.R
 import mega.privacy.android.feature.devicecenter.ui.renamedevice.model.RenameDeviceState
 import mega.privacy.android.legacy.core.ui.controls.dialogs.InputDialog
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.mobile.analytics.event.DeviceCenterSaveNewDeviceNameButtonEvent
 
 /**
@@ -121,7 +121,7 @@ private fun RenameDeviceDialogBody(
 private fun PreviewRenameDeviceDialogBody(
     @PreviewParameter(RenameDeviceDialogBodyPreviewProvider::class) renameDeviceState: RenameDeviceState,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         RenameDeviceDialogBody(
             uiState = renameDeviceState,
             oldDeviceName = "Samsung Galaxy S21 FE",

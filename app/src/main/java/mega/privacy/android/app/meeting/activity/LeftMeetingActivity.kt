@@ -3,6 +3,7 @@ package mega.privacy.android.app.meeting.activity
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.view.isVisible
@@ -18,7 +19,7 @@ import mega.privacy.android.app.presentation.meeting.LeftMeetingViewModel
 import mega.privacy.android.app.presentation.meeting.view.dialog.FreePlanLimitParticipantsDialog
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Util
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import nz.mega.sdk.MegaChatCall
 
 class LeftMeetingActivity : BaseActivity() {
@@ -58,10 +59,9 @@ class LeftMeetingActivity : BaseActivity() {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
 
             setContent {
-                val isDark = Util.isDarkMode(this@LeftMeetingActivity)
                 val state by viewModel.state.collectAsStateWithLifecycle()
-                if (state.callEndedDueToFreePlanLimits && state.isCallUnlimitedProPlanFeatureFlagEnabled) {
-                    MegaAppTheme(isDark = isDark) {
+                if (state.callEndedDueToFreePlanLimits) {
+                    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
                         FreePlanLimitParticipantsDialog(
                             onConfirm = {
                                 viewModel.onConsumeShowFreePlanParticipantsLimitDialogEvent()

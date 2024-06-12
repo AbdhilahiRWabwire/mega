@@ -18,14 +18,14 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import mega.privacy.android.shared.theme.MegaAppTheme
-import mega.privacy.android.core.ui.controls.progressindicator.MegaLinearProgressIndicator
-import mega.privacy.android.core.ui.preview.BooleanProvider
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.body3
-import mega.privacy.android.core.ui.theme.extensions.grey_alpha_054_white_alpha_054
-import mega.privacy.android.core.ui.theme.teal_200
-import mega.privacy.android.core.ui.theme.teal_300
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaLinearProgressIndicator
+import mega.privacy.android.shared.original.core.ui.preview.BooleanProvider
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.extensions.body3
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_alpha_054_white_alpha_054
+import mega.privacy.android.shared.original.core.ui.theme.teal_200
+import mega.privacy.android.shared.original.core.ui.theme.teal_300
 
 /**
  * Dialog to show cancellable progress
@@ -108,7 +108,7 @@ internal const val PROGRESS_CANCEL_TAG = "progress_dialog:button_cancel"
 private fun PreviewProgressDialog(
     @PreviewParameter(BooleanProvider::class) hasSubtitle: Boolean,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         ProgressDialog(
             title = "Title goes here",
             subTitle = "Subtitle goes here".takeIf { hasSubtitle },

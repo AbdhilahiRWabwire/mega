@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.clouddrive.OptionItems
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.mapper.HandleOptionClickMapper
@@ -27,7 +26,6 @@ import mega.privacy.android.domain.entity.node.publiclink.PublicLinkFolder
 import mega.privacy.android.domain.entity.node.publiclink.PublicLinkNode
 import mega.privacy.android.domain.usecase.GetCloudSortOrder
 import mega.privacy.android.domain.usecase.GetLinksSortOrder
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.node.MonitorFolderNodeDeleteUpdatesUseCase
@@ -61,7 +59,6 @@ internal class LinksViewModelTest {
     private val getLinksSortOrder: GetLinksSortOrder = mock()
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase = mock()
     private val handleOptionClickMapper: HandleOptionClickMapper = mock()
-    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase = mock()
     private val monitorFolderNodeDeleteUpdatesUseCase: MonitorFolderNodeDeleteUpdatesUseCase =
         mock()
     private val isNodeInRubbishBinUseCase: IsNodeInRubbishBinUseCase = mock()
@@ -82,7 +79,6 @@ internal class LinksViewModelTest {
             getLinksSortOrder = getLinksSortOrder,
             monitorConnectivityUseCase = monitorConnectivityUseCase,
             handleOptionClickMapper = handleOptionClickMapper,
-            getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             isNodeInRubbishBinUseCase = isNodeInRubbishBinUseCase,
         )
     }
@@ -92,7 +88,6 @@ internal class LinksViewModelTest {
         whenever(getCloudSortOrder()).thenReturn(SortOrder.ORDER_NONE)
         whenever(monitorConnectivityUseCase()).thenReturn(emptyFlow())
         whenever(monitorFolderNodeDeleteUpdatesUseCase()).thenReturn(emptyFlow())
-        whenever(getFeatureFlagValueUseCase(any())).thenReturn(true)
         whenever(isNodeInRubbishBinUseCase(NodeId(any()))).thenReturn(false)
     }
 
@@ -105,7 +100,6 @@ internal class LinksViewModelTest {
             getLinksSortOrder,
             monitorConnectivityUseCase,
             handleOptionClickMapper,
-            getFeatureFlagValueUseCase,
             isNodeInRubbishBinUseCase,
         )
     }
@@ -382,7 +376,6 @@ internal class LinksViewModelTest {
         val optionsItemInfo =
             OptionsItemInfo(OptionItems.DOWNLOAD_CLICKED, emptyList(), emptyList())
         whenever(handleOptionClickMapper(eq(menuItem), any())).thenReturn(optionsItemInfo)
-        whenever(getFeatureFlagValueUseCase(AppFeatures.DownloadWorker)).thenReturn(true)
         underTest.onOptionItemClicked(menuItem)
     }
 

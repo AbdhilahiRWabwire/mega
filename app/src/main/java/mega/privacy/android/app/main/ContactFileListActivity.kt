@@ -53,7 +53,6 @@ import mega.privacy.android.app.presentation.extensions.uploadFolderManually
 import mega.privacy.android.app.presentation.movenode.mapper.MoveRequestMessageMapper
 import mega.privacy.android.app.presentation.transfers.starttransfer.StartDownloadViewModel
 import mega.privacy.android.app.usecase.GetNodeUseCase
-import mega.privacy.android.app.usecase.LegacyCopyNodeUseCase
 import mega.privacy.android.app.usecase.UploadUseCase
 import mega.privacy.android.app.usecase.exception.MegaNodeException.ChildDoesNotExistsException
 import mega.privacy.android.app.usecase.exception.MegaNodeException.ParentDoesNotExistException
@@ -118,9 +117,6 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
 
     @Inject
     lateinit var uploadUseCase: UploadUseCase
-
-    @Inject
-    lateinit var legacyCopyNodeUseCase: LegacyCopyNodeUseCase
 
     @Inject
     lateinit var copyRequestMessageMapper: CopyRequestMessageMapper
@@ -525,23 +521,10 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
     }
 
     fun downloadFile(nodes: List<MegaNode>) {
-        lifecycleScope.launch {
-            if (startDownloadViewModel.shouldDownloadWithDownloadWorker()) {
-                startDownloadViewModel.onDownloadClicked(
-                    nodes.map { NodeId(it.handle) },
-                    true
-                )
-            } else {
-                checkNotificationsPermission(this@ContactFileListActivity)
-                nodeSaver.saveNodes(
-                    nodes = nodes,
-                    highPriority = true,
-                    isFolderLink = false,
-                    fromMediaViewer = false,
-                    needSerialize = false
-                )
-            }
-        }
+            startDownloadViewModel.onDownloadClicked(
+                nodeIds = nodes.map { NodeId(it.handle) },
+                isHighPriority = true
+            )
     }
 
     private fun moveToTrash(handleList: ArrayList<Long>) {

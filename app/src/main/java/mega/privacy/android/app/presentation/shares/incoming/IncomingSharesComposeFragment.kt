@@ -38,7 +38,6 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.WebViewActivity
 import mega.privacy.android.app.arch.extensions.collectFlow
-import mega.privacy.android.app.fragments.homepage.EventObserver
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.interfaces.ActionBackupListener
 import mega.privacy.android.app.interfaces.SnackbarShower
@@ -73,7 +72,7 @@ import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.shares.ShareNode
 import mega.privacy.android.domain.entity.shares.AccessPermission
 import mega.privacy.android.domain.usecase.GetThemeMode
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -120,7 +119,7 @@ class IncomingSharesComposeFragment : Fragment() {
 
     private val viewModel: IncomingSharesComposeViewModel by activityViewModels()
     private val nodeActionsViewModel: NodeActionsViewModel by viewModels()
-    private val sortByHeaderViewModel: SortByHeaderViewModel by viewModels()
+    private val sortByHeaderViewModel: SortByHeaderViewModel by activityViewModels()
 
     /**
      * Flag to restore elevation when checkScroll() is called
@@ -171,7 +170,7 @@ class IncomingSharesComposeFragment : Fragment() {
                 var clickedFile: TypedFileNode? by remember {
                     mutableStateOf(null)
                 }
-                MegaAppTheme(isDark = themeMode.isDarkMode()) {
+                OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                     IncomingSharesView(
                         uiState = uiState,
                         emptyState = getEmptyFolderDrawable(uiState.isIncomingSharesEmpty),
@@ -271,7 +270,8 @@ class IncomingSharesComposeFragment : Fragment() {
                         onActionHandled = {
                             clickedFile = null
                         },
-                        nodeActionsViewModel = nodeActionsViewModel
+                        nodeActionsViewModel = nodeActionsViewModel,
+                        coroutineScope = coroutineScope
                     )
                 }
                 ToolbarTitleUpdateEffect(uiState.updateToolbarTitleEvent) {
@@ -396,9 +396,22 @@ class IncomingSharesComposeFragment : Fragment() {
             }
         }
 
-        sortByHeaderViewModel.orderChangeEvent.observe(viewLifecycleOwner, EventObserver {
+        viewLifecycleOwner.collectFlow(sortByHeaderViewModel.orderChangeState) {
             viewModel.onSortOrderChanged()
-        })
+        }
+    }
+
+    /**
+     * Handle back press
+     */
+    fun onBackPressed() {
+        with(requireActivity() as ManagerActivity) {
+            if (comesFromNotifications && comesFromNotificationHandle == incomingSharesViewModel.getCurrentNodeHandle()) {
+                restoreSharesAfterComingFromNotifications()
+                return
+            }
+        }
+        viewModel.performBackNavigation()
     }
 
     /**
@@ -474,6 +487,8 @@ class IncomingSharesComposeFragment : Fragment() {
                     totalNodes = viewModel.state.value.nodesList.size
                 )
                 // Slight customization for incoming shares page
+                control.hide().isVisible = false
+                control.unhide().isVisible = false
                 control.shareFolder().isVisible = false
                 control.shareOut().isVisible = false
                 if (selected.size == 1 && selected.first().shareData?.access == AccessPermission.FULL) {
@@ -534,7 +549,6 @@ class IncomingSharesComposeFragment : Fragment() {
                         nodes = it.selectedMegaNode,
                         highPriority = false,
                         isFolderLink = false,
-                        fromMediaViewer = false,
                         fromChat = false,
                     )
                     disableSelectMode()

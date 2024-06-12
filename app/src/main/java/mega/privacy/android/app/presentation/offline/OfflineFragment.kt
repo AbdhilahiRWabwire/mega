@@ -24,6 +24,7 @@ import androidx.appcompat.view.ActionMode
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -48,12 +49,10 @@ import mega.privacy.android.app.components.SimpleDividerItemDecoration
 import mega.privacy.android.app.components.dragger.DragToExitSupport.Companion.observeDragSupportEvents
 import mega.privacy.android.app.components.dragger.DragToExitSupport.Companion.putThumbnailLocation
 import mega.privacy.android.app.databinding.FragmentOfflineBinding
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.fragments.homepage.EventObserver
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.fragments.homepage.disableRecyclerViewAnimator
 import mega.privacy.android.app.fragments.homepage.main.HomepageFragmentDirections
-import mega.privacy.android.app.imageviewer.ImageViewerActivity
 import mega.privacy.android.app.interfaces.Scrollable
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.modalbottomsheet.OfflineOptionsBottomSheetDialogFragment
@@ -89,15 +88,16 @@ import mega.privacy.android.app.utils.MegaApiUtils
 import mega.privacy.android.app.utils.OfflineUtils
 import mega.privacy.android.app.utils.OfflineUtils.getOfflineFile
 import mega.privacy.android.app.utils.StringUtils.toSpannedHtmlText
+import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.Util.dp2px
 import mega.privacy.android.app.utils.Util.getMediaIntent
 import mega.privacy.android.app.utils.Util.noChangeRecyclerViewItemAnimator
 import mega.privacy.android.app.utils.Util.scaleHeightPx
 import mega.privacy.android.app.utils.autoCleared
 import mega.privacy.android.app.utils.callManager
-import mega.privacy.android.app.zippreview.ui.ZipBrowserActivity
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.navigation.MegaNavigator
 import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import nz.mega.sdk.MegaChatApiJava.MEGACHAT_INVALID_HANDLE
 import timber.log.Timber
@@ -128,10 +128,13 @@ class OfflineFragment : Fragment(), OfflineNodeListener, ActionMode.Callback, Sc
     @Inject
     lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
 
+    @Inject
+    lateinit var megaNavigator: MegaNavigator
+
     private val args: OfflineFragmentArgs by navArgs()
     private var binding by autoCleared<FragmentOfflineBinding>()
     private val viewModel: OfflineViewModel by viewModels()
-    private val sortByHeaderViewModel by viewModels<SortByHeaderViewModel>()
+    private val sortByHeaderViewModel by activityViewModels<SortByHeaderViewModel>()
 
     private var recyclerView: RecyclerView? = null
     private var listDivider: PositionDividerItemDecoration? = null
@@ -620,10 +623,10 @@ class OfflineFragment : Fragment(), OfflineNodeListener, ActionMode.Callback, Sc
             }
         })
 
-        sortByHeaderViewModel.orderChangeEvent.observe(viewLifecycleOwner, EventObserver {
-            viewModel.setOrder(it.third)
+        viewLifecycleOwner.collectFlow(sortByHeaderViewModel.orderChangeState) {
+            viewModel.setOrder(it.offlineSortOrder)
             adapter?.notifyItemChanged(0)
-        })
+        }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -777,29 +780,23 @@ class OfflineFragment : Fragment(), OfflineNodeListener, ActionMode.Callback, Sc
         when {
             mime.isZip -> {
                 Timber.d("MimeTypeList ZIP")
-                ZipBrowserActivity.start(requireActivity(), file.path)
+                megaNavigator.openZipBrowserActivity(requireContext(), file.path) {
+                    Util.showSnackbar(
+                        requireContext(),
+                        getString(R.string.message_zip_format_error)
+                    )
+                }
             }
 
             mime.isImage -> viewLifecycleOwner.lifecycleScope.launch {
-                val intent = if (!getFeatureFlagValueUseCase(AppFeatures.ImagePreview)) {
-                    val handles = (adapter ?: return@launch).getOfflineNodes().map {
-                        it.handle.toLong()
-                    }.toLongArray()
-                    ImageViewerActivity.getIntentForOfflineChildren(
-                        requireContext(),
-                        handles,
-                        node.node.handle.toLongOrNull()
-                    )
-                } else {
-                    val handle = node.node.handle.toLongOrNull() ?: return@launch
-                    ImagePreviewActivity.createIntent(
-                        context = requireContext(),
-                        imageSource = ImagePreviewFetcherSource.OFFLINE,
-                        menuOptionsSource = ImagePreviewMenuSource.OFFLINE,
-                        anchorImageNodeId = NodeId(handle),
-                        params = mapOf(OfflineImageNodeFetcher.PATH to node.node.path),
-                    )
-                }
+                val handle = node.node.handle.toLongOrNull() ?: return@launch
+                val intent = ImagePreviewActivity.createIntent(
+                    context = requireContext(),
+                    imageSource = ImagePreviewFetcherSource.OFFLINE,
+                    menuOptionsSource = ImagePreviewMenuSource.OFFLINE,
+                    anchorImageNodeId = NodeId(handle),
+                    params = mapOf(OfflineImageNodeFetcher.PATH to node.node.path),
+                )
 
                 putThumbnailLocation(
                     launchIntent = intent,

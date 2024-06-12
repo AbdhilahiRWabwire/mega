@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.extensions.updateItemAt
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.clouddrive.OptionItems
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.mapper.HandleOptionClickMapper
@@ -32,7 +31,6 @@ import mega.privacy.android.domain.entity.node.publiclink.PublicLinkFolder
 import mega.privacy.android.domain.entity.node.publiclink.PublicLinkNode
 import mega.privacy.android.domain.usecase.GetCloudSortOrder
 import mega.privacy.android.domain.usecase.GetLinksSortOrder
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.node.MonitorFolderNodeDeleteUpdatesUseCase
@@ -52,7 +50,6 @@ class LinksViewModel @Inject constructor(
     private val getLinksSortOrder: GetLinksSortOrder,
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
     private val handleOptionClickMapper: HandleOptionClickMapper,
-    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val isNodeInRubbishBinUseCase: IsNodeInRubbishBinUseCase,
 ) : ViewModel() {
 
@@ -221,7 +218,7 @@ class LinksViewModel @Inject constructor(
      * This will map list of [PublicLinkNode] to [NodeUIItem]
      */
     private fun getNodeUiItems(nodeList: List<PublicLinkNode>): List<NodeUIItem<PublicLinkNode>> {
-        return nodeList.mapIndexed { index, node ->
+        return nodeList.mapIndexed { _, node ->
             val isSelected = state.value.selectedNodeHandles.contains(node.id.longValue)
             NodeUIItem(
                 node = node,
@@ -264,8 +261,8 @@ class LinksViewModel @Inject constructor(
      * Handles Back Navigation events
      */
     fun performBackNavigation() {
-        _state.value.parentNode?.let {
-            closeFolder(it)
+        _state.value.parentNode?.let { parentNode ->
+            closeFolder(parentNode)
             _state.update { it.copy(updateToolbarTitleEvent = triggered) }
         } ?: run {
             _state.update { it.copy(exitLinksPageEvent = triggered) }
@@ -336,7 +333,7 @@ class LinksViewModel @Inject constructor(
                 item = item,
                 selectedNodeHandle = state.value.selectedNodeHandles
             )
-            if (getFeatureFlagValueUseCase(AppFeatures.DownloadWorker) && optionsItemInfo.optionClickedType == OptionItems.DOWNLOAD_CLICKED) {
+            if (optionsItemInfo.optionClickedType == OptionItems.DOWNLOAD_CLICKED) {
                 _state.update {
                     it.copy(
                         downloadEvent = triggered(

@@ -51,10 +51,10 @@ import de.palm.composestateevents.StateEvent
 import de.palm.composestateevents.consumed
 import mega.privacy.android.app.presentation.twofactorauthentication.extensions.getTwoFactorAuthentication
 import mega.privacy.android.app.presentation.twofactorauthentication.extensions.getUpdatedTwoFactorAuthentication
-import mega.privacy.android.shared.theme.MegaAppTheme
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.body2medium
-import mega.privacy.android.core.ui.theme.extensions.grey_alpha_012_white_alpha_038
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.extensions.body2medium
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_alpha_012_white_alpha_038
 
 /**
  * View for typing 2FA pin.
@@ -285,7 +285,7 @@ private fun PinTwoFactorAuthentication(
 private fun PreviewTwoFactorAuthenticationField() {
     var twoFAPin by remember { mutableStateOf(listOf("", "", "", "", "", "")) }
     var isError by remember { mutableStateOf(false) }
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         TwoFactorAuthenticationField(
             twoFAPin = twoFAPin,
             on2FAPinChanged = { pin, index ->

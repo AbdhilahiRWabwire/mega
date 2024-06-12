@@ -12,11 +12,11 @@ import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import mega.privacy.android.app.R
-import mega.privacy.android.core.ui.controls.chat.messages.LocationMessageView
-import mega.privacy.android.core.ui.controls.chat.messages.getMessageText
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.LocationMessageView
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.getMessageText
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.domain.entity.chat.messages.meta.LocationMessage
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -121,7 +121,7 @@ private fun EditedLocationMessagePreview() {
 
 @Composable
 private fun Preview(isMine: Boolean, isEdited: Boolean) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         ChatLocationMessageView(
             isMine = isMine,
             isEdited = isEdited,

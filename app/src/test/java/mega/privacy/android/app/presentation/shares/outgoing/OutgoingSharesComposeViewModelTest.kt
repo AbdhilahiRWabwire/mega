@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.clouddrive.OptionItems
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.mapper.HandleOptionClickMapper
@@ -40,7 +39,6 @@ import mega.privacy.android.domain.usecase.GetParentNodeUseCase
 import mega.privacy.android.domain.usecase.GetRootNodeUseCase
 import mega.privacy.android.domain.usecase.MonitorContactUpdates
 import mega.privacy.android.domain.usecase.account.MonitorRefreshSessionUseCase
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
@@ -81,7 +79,6 @@ class OutgoingSharesComposeViewModelTest {
     private val setViewType = mock<SetViewType>()
     private val monitorRefreshSessionUseCase = mock<MonitorRefreshSessionUseCase>()
     private val fileDurationMapper = mock<FileDurationMapper>()
-    private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase>()
     private val monitorOfflineNodeUpdatesUseCase = mock<MonitorOfflineNodeUpdatesUseCase>()
     private val monitorConnectivityUseCase = mock<MonitorConnectivityUseCase>()
     private val durationInSecondsTextMapper = mock<DurationInSecondsTextMapper>()
@@ -110,7 +107,6 @@ class OutgoingSharesComposeViewModelTest {
             monitorRefreshSessionUseCase = monitorRefreshSessionUseCase,
             fileDurationMapper = fileDurationMapper,
             monitorOfflineNodeUpdatesUseCase = monitorOfflineNodeUpdatesUseCase,
-            getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             monitorConnectivityUseCase = monitorConnectivityUseCase,
             durationInSecondsTextMapper = durationInSecondsTextMapper,
             monitorContactUpdatesUseCase = monitorContactUpdatesUseCase,
@@ -513,7 +509,6 @@ class OutgoingSharesComposeViewModelTest {
         val optionsItemInfo =
             OptionsItemInfo(OptionItems.DOWNLOAD_CLICKED, emptyList(), emptyList())
         whenever(handleOptionClickMapper(eq(menuItem), any())).thenReturn(optionsItemInfo)
-        whenever(getFeatureFlagValueUseCase(AppFeatures.DownloadWorker)).thenReturn(true)
         underTest.onOptionItemClicked(menuItem)
     }
 
@@ -530,7 +525,6 @@ class OutgoingSharesComposeViewModelTest {
         whenever(monitorOfflineNodeUpdatesUseCase()).thenReturn(emptyFlow())
         whenever(monitorContactUpdatesUseCase()).thenReturn(emptyFlow())
         whenever(monitorConnectivityUseCase()).thenReturn(emptyFlow())
-        whenever(getFeatureFlagValueUseCase(any())).thenReturn(true)
     }
 
     @AfterEach
@@ -547,7 +541,6 @@ class OutgoingSharesComposeViewModelTest {
             setViewType,
             monitorRefreshSessionUseCase,
             fileDurationMapper,
-            getFeatureFlagValueUseCase,
             monitorOfflineNodeUpdatesUseCase,
             monitorConnectivityUseCase,
         )

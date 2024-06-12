@@ -6,8 +6,8 @@ import kotlinx.coroutines.CoroutineScope
 import mega.privacy.android.app.getLink.GetLinkActivity
 import mega.privacy.android.app.presentation.node.model.menuaction.GetLinkMenuAction
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.core.ui.model.MenuAction
-import mega.privacy.android.core.ui.model.MenuActionWithIcon
+import mega.privacy.android.shared.original.core.ui.model.MenuAction
+import mega.privacy.android.shared.original.core.ui.model.MenuActionWithIcon
 import mega.privacy.android.domain.entity.node.TypedNode
 import javax.inject.Inject
 
@@ -20,7 +20,7 @@ class GetLinkToolbarMenuItem @Inject constructor(
     override val menuAction: GetLinkMenuAction,
 ) : NodeToolbarMenuItem<MenuActionWithIcon> {
 
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         hasNodeAccessPermission: Boolean,
         selectedNodes: List<TypedNode>,
         canBeMovedToTarget: Boolean,

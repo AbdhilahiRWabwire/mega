@@ -25,15 +25,15 @@ import mega.privacy.android.app.upgradeAccount.model.mapper.LocalisedPriceCurren
 import mega.privacy.android.app.upgradeAccount.model.mapper.LocalisedPriceStringMapper
 import mega.privacy.android.app.upgradeAccount.view.PRO_PLAN_TEXT
 import mega.privacy.android.app.upgradeAccount.view.PRO_PLAN_TITLE
-import mega.privacy.android.core.ui.controls.text.MegaText
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.grey_020_grey_900
-import mega.privacy.android.core.ui.theme.extensions.h6Medium
-import mega.privacy.android.core.ui.theme.tokens.TextColor
+import mega.privacy.android.shared.original.core.ui.controls.text.MegaText
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_020_grey_900
+import mega.privacy.android.shared.original.core.ui.theme.extensions.h6Medium
+import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.Currency
 import mega.privacy.android.domain.entity.account.CurrencyAmount
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import java.util.Locale
 
 /**
@@ -106,7 +106,7 @@ private fun GetProPlanColumnPreview() {
         localisedPriceCurrencyCode = localisedPriceCurrencyCodeStringMapper,
         formattedSize = formattedSizeMapper,
     )
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         GetProPlanColumn(
             state = ChooseAccountState(
                 cheapestSubscriptionAvailable = subscriptionProLite

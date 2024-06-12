@@ -4,17 +4,16 @@ import mega.privacy.android.build.shouldUsePrebuiltSdk
 plugins {
     alias(plugin.plugins.ksp) apply false
     id("org.jetbrains.kotlin.android") version "1.9.22" apply false
+    id("mega.android.release") version lib.versions.megagradle.get()
+    id("mega.android.cicd") version lib.versions.megagradle.get()
 }
+
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 buildscript {
     repositories {
         google()
         maven { url = uri("https://plugins.gradle.org/m2/") }
         jcenter()
-        maven {
-            url =
-                uri("${System.getenv("ARTIFACTORY_BASE_URL")}/artifactory/mega-gradle/megagradle")
-        }
     }
     dependencies {
         classpath(plugin.build.tools)
@@ -31,7 +30,6 @@ buildscript {
         classpath(plugin.junit5)
         classpath(plugin.kotlin.gradle)
         classpath("androidx.benchmark:benchmark-baseline-profile-gradle-plugin:1.2.3")
-        classpath(tools.mega.gradle)
     }
 }
 
@@ -53,6 +51,10 @@ allprojects {
         }
         maven {
             url =
+                uri("${System.getenv("ARTIFACTORY_BASE_URL")}/artifactory/mega-gradle/core-ui")
+        }
+        maven {
+            url =
                 uri("${System.getenv("ARTIFACTORY_BASE_URL")}/artifactory/mega-gradle/dev-tools")
         }
         maven {
@@ -68,13 +70,13 @@ allprojects {
 }
 
 tasks.register("clean", Delete::class) {
-    delete(rootProject.buildDir)
+    delete(rootProject.layout.buildDirectory.get())
 }
 
 
 // Define versions in a single place
 // App
-extra["appVersion"] = "13.1.1"
+extra["appVersion"] = "13.3"
 
 // Sdk and tools
 extra["compileSdkVersion"] = 34
@@ -83,7 +85,7 @@ extra["targetSdkVersion"] = 34
 extra["buildTools"] = "34.0.0"
 
 // Prebuilt MEGA SDK version
-extra["megaSdkVersion"] = "20240501.070524-rel"
+extra["megaSdkVersion"] = "20240604.113356-rel"
 
 //JDK and Java Version
 extra["jdk"] = "17"
@@ -99,9 +101,3 @@ val shouldSuppressWarnings by extra(
 if (!shouldUsePrebuiltSdk() || isServerBuild()) {
     apply(from = "${project.rootDir}/tools/prebuilt-sdk.gradle")
 }
-
-tasks.register<mega.privacy.megagradle.PreReleaseTask>("preRelease")
-tasks.register<mega.privacy.megagradle.ReleaseTask>("release")
-tasks.register<mega.privacy.megagradle.PostReleaseTask>("postRelease")
-tasks.register<mega.privacy.megagradle.CreateJiraVersionTask>("createJiraVersion")
-

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,7 +18,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
+import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
+import mega.privacy.android.app.featuretoggle.ApiFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.main.dialog.shares.RemoveShareResultMapper
@@ -26,6 +29,7 @@ import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.extensions.getState
 import mega.privacy.android.app.presentation.manager.model.ManagerState
 import mega.privacy.android.app.presentation.manager.model.SharesTab
+import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
@@ -35,6 +39,7 @@ import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRestartMode
 import mega.privacy.android.domain.entity.chat.ChatCall
 import mega.privacy.android.domain.entity.contacts.ContactRequest
 import mega.privacy.android.domain.entity.contacts.ContactRequestStatus
+import mega.privacy.android.domain.entity.environment.DevicePowerConnectionState
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
 import mega.privacy.android.domain.entity.meeting.ScheduledMeetingStatus
@@ -50,13 +55,11 @@ import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.GetNumUnreadUserAlertsUseCase
 import mega.privacy.android.domain.usecase.GetRootNodeUseCase
 import mega.privacy.android.domain.usecase.MonitorBackupFolder
-import mega.privacy.android.domain.usecase.MonitorContactRequestUpdates
 import mega.privacy.android.domain.usecase.MonitorContactUpdates
 import mega.privacy.android.domain.usecase.MonitorOfflineFileAvailabilityUseCase
 import mega.privacy.android.domain.usecase.MonitorUserAlertUpdates
 import mega.privacy.android.domain.usecase.MonitorUserUpdates
 import mega.privacy.android.domain.usecase.account.GetFullAccountInfoUseCase
-import mega.privacy.android.domain.usecase.account.GetIncomingContactRequestsUseCase
 import mega.privacy.android.domain.usecase.account.MonitorMyAccountUpdateUseCase
 import mega.privacy.android.domain.usecase.account.MonitorSecurityUpgradeInApp
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
@@ -64,12 +67,15 @@ import mega.privacy.android.domain.usecase.account.RenameRecoveryKeyFileUseCase
 import mega.privacy.android.domain.usecase.account.RequireTwoFactorAuthenticationUseCase
 import mega.privacy.android.domain.usecase.account.SetCopyLatestTargetPathUseCase
 import mega.privacy.android.domain.usecase.account.SetMoveLatestTargetPathUseCase
+import mega.privacy.android.domain.usecase.account.contactrequest.GetIncomingContactRequestsUseCase
+import mega.privacy.android.domain.usecase.account.contactrequest.MonitorContactRequestUpdatesUseCase
 import mega.privacy.android.domain.usecase.camerauploads.EstablishCameraUploadsSyncHandlesUseCase
 import mega.privacy.android.domain.usecase.camerauploads.MonitorCameraUploadsFolderDestinationUseCase
 import mega.privacy.android.domain.usecase.chat.GetNumUnreadChatsUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatArchivedUseCase
 import mega.privacy.android.domain.usecase.chat.link.GetChatLinkContentUseCase
 import mega.privacy.android.domain.usecase.contact.SaveContactByEmailUseCase
+import mega.privacy.android.domain.usecase.environment.MonitorDevicePowerConnectionStateUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.login.MonitorFinishActivityUseCase
 import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
@@ -177,7 +183,7 @@ class ManagerViewModel @Inject constructor(
     monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase,
     monitorContactUpdates: MonitorContactUpdates,
     private val monitorUserAlertUpdates: MonitorUserAlertUpdates,
-    monitorContactRequestUpdates: MonitorContactRequestUpdates,
+    monitorContactRequestUpdatesUseCase: MonitorContactRequestUpdatesUseCase,
     private val getNumUnreadUserAlertsUseCase: GetNumUnreadUserAlertsUseCase,
     private val getNumUnreadPromoNotificationsUseCase: GetNumUnreadPromoNotificationsUseCase,
     private val sendStatisticsMediaDiscoveryUseCase: SendStatisticsMediaDiscoveryUseCase,
@@ -243,6 +249,7 @@ class ManagerViewModel @Inject constructor(
     private val getUsersCallLimitRemindersUseCase: GetUsersCallLimitRemindersUseCase,
     private val broadcastHomeBadgeCountUseCase: BroadcastHomeBadgeCountUseCase,
     private val monitorUpgradeDialogClosedUseCase: MonitorUpgradeDialogClosedUseCase,
+    private val monitorDevicePowerConnectionStateUseCase: MonitorDevicePowerConnectionStateUseCase,
 ) : ViewModel() {
 
     /**
@@ -294,11 +301,6 @@ class ManagerViewModel @Inject constructor(
 
     private val _stalledIssuesCount = MutableStateFlow(0)
 
-    /**
-     * Sync stalled issues count
-     */
-    val stalledIssuesCount = _stalledIssuesCount.asStateFlow()
-
     private val _numUnreadUserAlerts = MutableStateFlow(
         Pair(
             UnreadUserAlertsCheckType.NOTIFICATIONS_TITLE,
@@ -313,6 +315,8 @@ class ManagerViewModel @Inject constructor(
      */
     val numUnreadUserAlerts = _numUnreadUserAlerts.asStateFlow()
 
+    private var monitorCallInChatJob: Job? = null
+
     /**
      * Is network connected
      */
@@ -320,12 +324,13 @@ class ManagerViewModel @Inject constructor(
         get() = isConnectedToInternetUseCase()
 
     private val isFirstLogin = savedStateHandle.getStateFlow(
-        key = isFirstLoginKey,
+        key = IS_FIRST_LOGIN_KEY,
         initialValue = false
     )
 
     init {
         checkUsersCallLimitReminders()
+        getApiFeatureFlag()
 
         viewModelScope.launch {
             val order = getCloudSortOrder()
@@ -396,7 +401,8 @@ class ManagerViewModel @Inject constructor(
             }
         }
 
-        viewModelScope.launch {
+        monitorCallInChatJob?.cancel()
+        monitorCallInChatJob = viewModelScope.launch {
             monitorChatCallUpdatesUseCase()
                 .collect {
                     it.apply {
@@ -405,6 +411,7 @@ class ManagerViewModel @Inject constructor(
                                 if (termCode == ChatCallTermCodeType.CallUsersLimit
                                     && _state.value.isCallUnlimitedProPlanFeatureFlagEnabled
                                 ) {
+                                    setUsersCallLimitReminder(true)
                                     _state.update { state -> state.copy(callEndedDueToFreePlanLimits = true) }
                                 } else if (termCode == ChatCallTermCodeType.CallDurationLimit && _state.value.isCallUnlimitedProPlanFeatureFlagEnabled) {
                                     if (it.isOwnClientCaller) {
@@ -413,6 +420,14 @@ class ManagerViewModel @Inject constructor(
                                                 shouldUpgradeToProPlan = true
                                             )
                                         }
+                                    }
+                                } else if (termCode == ChatCallTermCodeType.TooManyParticipants) {
+                                    _state.update { state ->
+                                        state.copy(
+                                            message = InfoToShow.SimpleString(
+                                                R.string.call_error_too_many_participants
+                                            )
+                                        )
                                     }
                                 }
 
@@ -436,7 +451,7 @@ class ManagerViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            monitorContactRequestUpdates()
+            monitorContactRequestUpdatesUseCase()
                 .collect {
                     Timber.d("Contact Request Updates")
                     updateIncomingContactRequests()
@@ -463,18 +478,17 @@ class ManagerViewModel @Inject constructor(
             val androidSyncEnabled =
                 getFeatureFlagValueUseCase(SyncFeatures.AndroidSync)
 
-            _state.update {
-                it.copy(
-                    isCallUnlimitedProPlanFeatureFlagEnabled = getFeatureFlagValueUseCase(
-                        AppFeatures.CallUnlimitedProPlan
-                    )
-                )
-            }
-
             if (androidSyncEnabled) {
                 monitorSyncsUseCase().catch { Timber.e(it) }.collect { syncFolders ->
                     val isServiceEnabled = syncFolders.isNotEmpty()
-                    _state.update { it.copy(androidSyncServiceEnabled = isServiceEnabled) }
+                    _state.update {
+                        it.copy(
+                            androidSyncServiceEnabled = isServiceEnabled,
+                            isSyncFeatureFlagEnabled = getFeatureFlagValueUseCase(
+                                SyncFeatures.AndroidSync
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -494,6 +508,41 @@ class ManagerViewModel @Inject constructor(
                 Timber.e(it)
             }.collect {
                 _state.update { it.copy(shouldUpgradeToProPlan = false) }
+            }
+        }
+
+        viewModelScope.launch {
+            monitorDevicePowerConnectionStateUseCase().catch {
+                Timber.e(
+                    "An error occurred while monitoring the Device Power Connection State",
+                    it,
+                )
+            }.collect { state ->
+                Timber.d("The Device Power Connection State is $state")
+                if (state == DevicePowerConnectionState.Connected &&
+                    getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)
+                ) {
+                    startCameraUploadUseCase()
+                }
+            }
+        }
+    }
+
+    /**
+     * Get call unlimited pro plan api feature flag
+     */
+    private fun getApiFeatureFlag() {
+        viewModelScope.launch {
+            runCatching {
+                getFeatureFlagValueUseCase(ApiFeatures.CallUnlimitedProPlan)
+            }.onFailure { exception ->
+                Timber.e(exception)
+            }.onSuccess { flag ->
+                _state.update { state ->
+                    state.copy(
+                        isCallUnlimitedProPlanFeatureFlagEnabled = flag,
+                    )
+                }
             }
         }
     }
@@ -605,7 +654,7 @@ class ManagerViewModel @Inject constructor(
      * Set first login status
      */
     fun setIsFirstLogin(newIsFirstLogin: Boolean) {
-        savedStateHandle[isFirstLoginKey] = newIsFirstLogin
+        savedStateHandle[IS_FIRST_LOGIN_KEY] = newIsFirstLogin
     }
 
     /**
@@ -1000,7 +1049,7 @@ class ManagerViewModel @Inject constructor(
                 val message = removeShareResultMapper(result)
                 _state.update { state ->
                     state.copy(
-                        message = message,
+                        message = InfoToShow.RawString(message),
                     )
                 }
             }
@@ -1021,7 +1070,7 @@ class ManagerViewModel @Inject constructor(
                 val message = removePublicLinkResultMapper(result)
                 _state.update { state ->
                     state.copy(
-                        message = message,
+                        message = InfoToShow.RawString(message),
                     )
                 }
             }
@@ -1229,8 +1278,17 @@ class ManagerViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Update search query
+     *
+     * @param query Search query
+     */
+    fun updateSearchQuery(query: String) {
+        _state.update { it.copy(searchQuery = query) }
+    }
+
     internal companion object {
-        internal const val isFirstLoginKey = "EXTRA_FIRST_LOGIN"
+        internal const val IS_FIRST_LOGIN_KEY = "EXTRA_FIRST_LOGIN"
         private const val INVALID_HANDLE = -1L
     }
 }

@@ -17,6 +17,7 @@ import mega.privacy.android.domain.entity.chat.ChatMessageType
 import mega.privacy.android.domain.entity.chat.PendingMessageState
 import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageRequest
 import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateAndNodeHandleRequest
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateAndPathRequest
 import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateRequest
 import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageTransferTagRequest
 import javax.inject.Inject
@@ -120,16 +121,23 @@ internal class ChatStorageFacade @Inject constructor(
         pendingMessageEntities: List<PendingMessageEntity>,
     ) = database.pendingMessageDao().insert(pendingMessageEntities)
 
-    override suspend fun updatePendingMessage(updatePendingMessageRequest: UpdatePendingMessageRequest) {
-        when (updatePendingMessageRequest) {
-            is UpdatePendingMessageStateRequest ->
-                database.pendingMessageDao().update(updatePendingMessageRequest)
+    override suspend fun updatePendingMessage(vararg updatePendingMessageRequests: UpdatePendingMessageRequest) {
+        updatePendingMessageRequests.singleOrNull()?.let { updatePendingMessageRequest ->
+            when (updatePendingMessageRequest) {
+                is UpdatePendingMessageStateRequest ->
+                    database.pendingMessageDao().update(updatePendingMessageRequest)
 
-            is UpdatePendingMessageStateAndNodeHandleRequest ->
-                database.pendingMessageDao().update(updatePendingMessageRequest)
+                is UpdatePendingMessageStateAndNodeHandleRequest ->
+                    database.pendingMessageDao().update(updatePendingMessageRequest)
 
-            is UpdatePendingMessageTransferTagRequest ->
-                database.pendingMessageDao().update(updatePendingMessageRequest)
+                is UpdatePendingMessageTransferTagRequest ->
+                    database.pendingMessageDao().update(updatePendingMessageRequest)
+
+                is UpdatePendingMessageStateAndPathRequest ->
+                    database.pendingMessageDao().update(updatePendingMessageRequest)
+            }
+        } ?: run {
+            database.pendingMessageDao().updateMultiple(updatePendingMessageRequests.toList())
         }
     }
 
@@ -139,6 +147,9 @@ internal class ChatStorageFacade @Inject constructor(
 
     override fun fetchPendingMessages(chatId: Long): Flow<List<PendingMessageEntity>> =
         database.pendingMessageDao().fetchPendingMessagesForChat(chatId)
+
+    override fun fetchPendingMessages(vararg states: PendingMessageState): Flow<List<PendingMessageEntity>> =
+        database.pendingMessageDao().fetchPendingMessagesByState(states.toList())
 
     override suspend fun getPendingMessage(pendingMessageId: Long): PendingMessageEntity? =
         database.pendingMessageDao().get(pendingMessageId)

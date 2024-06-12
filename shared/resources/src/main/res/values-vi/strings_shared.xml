@@ -91,7 +91,7 @@
     <!-- Title for Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
     <string name="dialog_onboarding_feature_title_backup_rewind">Không bao&#160;giờ mất dữ&#160;liệu nữa</string>
     <!-- Description about Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_feature_description_backup_rewind">Sao lưu và đồng&#160;bộ hóa dữ&#160;liệu để bạn hoàn&#160;toàn tự&#160;tin. Ngoài ra, sử dụng Tua&#160;lại để khôi&#160;phục các thư&#160;mục về bất&#160;kỳ ngày nào trong phạm&#160;vi 180 ngày.</string>
+    <string name="dialog_onboarding_feature_description_backup_rewind">Tua lại để khôi&#160;phục lại các tệp&#160;tin và thư&#160;mục về bất kỳ ngày nào trong phạm&#160;vi lên đến 180 ngày, vì vậy dữ&#160;liệu của bạn không bị tai&#160;nạn và chống giả&#160;mạo.</string>
     <!-- Title for MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
     <string name="dialog_onboarding_feature_title_vpn">MEGA&#160;VPN</string>
     <!-- Description about MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
@@ -171,7 +171,7 @@
     <!-- Error message when the playlist name already exists -->
     <string name="video_section_playlists_error_message_playlist_name_exists">Đã có một danh&#160;sách phát với tên này rồi. Nhập một tên khác.</string>
     <!-- Delete playlist dialog title of the video section playlists tab -->
-    <string name="video_section_playlists_delete_playlist_dialog_title">Xóa danh&#160;sách phát\?</string>
+    <string name="video_section_playlists_delete_playlist_dialog_title">Xóa danh&#160;sách phát?</string>
     <!-- Delete button title of the video section playlists tab delete playlist dialog -->
     <string name="video_section_playlists_delete_playlist_dialog_delete_button">Xóa</string>
     <!-- Text that indicates that there’s no playlist to show. -->
@@ -179,7 +179,7 @@
     <!-- Delete option title of the video section playlist bottom sheet -->
     <string name="video_section_playlist_bottom_sheet_option_title_delete">Xóa danh&#160;sách phát</string>
     <!-- Remove videos dialog title of the video section playlist detail -->
-    <string name="video_section_playlist_detail_remove_videos_dialog_title">Loại khỏi danh&#160;sách phát\?</string>
+    <string name="video_section_playlist_detail_remove_videos_dialog_title">Loại khỏi danh&#160;sách phát?</string>
     <!-- Remove button title of the video section playlist detail remove videos dialog -->
     <string name="video_section_playlist_detail_remove_videos_dialog_remove_button">Loại bỏ</string>
     <!-- Play all button title of the video section playlist detail -->
@@ -247,7 +247,7 @@
         <item quantity="other">Chia&#160;sẻ đường liên&#160;kết</item>
     </plurals>
     <!-- Title of the dialog to ask the user to use the selected location as default location for next downloads-->
-    <string name="transfers_dialog_save_download_location_title">Tải xuống vào vị&#160;trí này\?</string>
+    <string name="transfers_dialog_save_download_location_title">Tải xuống vào vị&#160;trí này?</string>
     <!-- Option to don't use the selected location as default location for next downloads-->
     <string name="transfers_dialog_save_download_location_only_this_time_option">Chỉ lần này</string>
     <!-- Option to use the selected location as default location for next downloads-->
@@ -271,9 +271,117 @@
     <!-- Hint text explaining that you can change the email and resend the create account link to the new email address. This appears on the confirmation email screen under the email address text input field. -->
     <string name="account_confirm_email_misspelled_email_description">Nếu địa chỉ email bị viết sai, sửa lại cho đúng và chạm vào [A]Gửi lại[/A].</string>
     <!-- Title of the insufficient storage error banner -->
-    <string name="sync_error_storage_over_quota_banner_title">Đồng&#160;bộ hóa tạm dừng, gói MEGA của bạn đã hết dung&#160;lượng lưu&#160;trữ.</string>
+    <string name="sync_error_storage_over_quota_banner_title">Đồng&#160;bộ hóa tạm dừng, gói MEGA của bạn đã hết dung&#160;lượng lưu&#160;trữ</string>
     <!-- Title of the insufficient storage error action -->
     <string name="sync_error_storage_over_quota_banner_action">Nâng cấp</string>
     <!-- The warning message shown when the User enables the Device Charging requirement in Settings Camera Uploads, enables Camera Uploads, begins uploading content and the Device is not charged -->
-    <string name="camera_uploads_phone_not_charging_message">Upload paused, phone is not charging</string>
+    <string name="camera_uploads_phone_not_charging_message">Tải lên tạm dừng, thiết&#160;bị không có sạc</string>
+    <!-- Label of the Device Status informing the user that Nothing is set up for the Current Device -->
+    <string name="device_center_list_view_item_status_nothing_setup">Không có đồng&#160;bộ nào đã lập</string>
+    <!-- The title of the warning dialog shown to a suspended Pro Flexi Account User -->
+    <string name="account_pro_flexi_account_deactivated_dialog_title">Tài khoản đã bị vô hiệu hóa</string>
+    <!-- The body of the warning dialog shown to a suspended Pro Flexi Account User -->
+    <string name="account_pro_flexi_account_deactivated_dialog_body">Tài&#160;khoản Pro&#160;Flexi của bạn đã bị vô&#160;hiệu hóa do việc thanh&#160;toán đã không thành&#160;công hoặc bạn đã hủy gói đăng&#160;ký dịch&#160;vụ. Bạn sẽ không thể truy&#160;cập vào dữ&#160;liệu đã được lưu&#160;trữ trong tài&#160;khoản của mình. \nĐể thanh&#160;toán và kích&#160;hoạt lại gói đăng&#160;ký của bạn, hãy đăng&#160;nhập vào MEGA bằng trình&#160;duyệt web.</string>
+    <!-- Label for new low-tier plan Starter. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_starter_label">Starter</string>
+    <!-- Label for new low-tier plan Basic. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_basic_label">Basic</string>
+    <!-- Label for new low-tier plan Essential. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_essential_label">Essential</string>
+    <!-- The Body Text of a Settings Camera Uploads Option that decides whether or not the Device must be charged for Camera Uploads to start uploading content -->
+    <string name="settings_camera_uploads_upload_only_while_charging_option_body">Cá phiên tải lên sẽ bị tạm dừng cho đến khi bạn sạc thiết&#160;bị của mình. Việc tải lên sẽ vẫn tạm dừng nếu pin của bạn dưới mức 20%.</string>
+    <!-- Title of the synced folder list empty state -->
+    <string name="device_center_sync_list_empty_state_title">Không có đồng&#160;bộ nào đã lập</string>
+    <!-- Message of the synced folder list empty state -->
+    <string name="device_center_sync_list_empty_state_message">Đồng&#160;bộ một thư&#160;mục cục&#160;bộ trong thiết&#160;bị của bạn với một thư&#160;mục trên MEGA.</string>
+    <!-- Label for the button or menu option to add a new sync -->
+    <string name="device_center_sync_add_new_syn_button_option">Thêm đồng&#160;bộ mới</string>
+    <!-- Text for the Sync solved issues chip -->
+    <string name="device_center_sync_solved_issues_chip_text">Đã giải&#160;quyết</string>
+    <!-- Warning message to indicate that cannot select a currently synced folder -->
+    <string name="device_center_new_sync_select_local_device_folder_currently_synced_message">Không thể đồng&#160;bộ hóa thư&#160;mục này. Thiết&#160;lập thư&#160;mục này để đồng&#160;bộ hóa với MEGA bằng cách sử&#160;dụng Đăng&#160;tải camêra.</string>
+    <!-- Label for the file info information screen description field -->
+    <string name="file_info_information_description_label">Chi tiết</string>
+    <!-- Placeholder for the file info information screen description field -->
+    <string name="file_info_information_description_placeholder">Thêm miêu&#160;tả</string>
+    <!-- Description added snack bar for the file info information screen-->
+    <string name="file_info_information_snackbar_description_added">Mô tả đã được thêm</string>
+    <!-- Description updated snack bar for the file info information screen-->
+    <string name="file_info_information_snackbar_description_updated">Mô tả được cập nhật</string>
+    <!-- Title to mention other features of Pro plans on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_title_additional_features">Cộng với quyền truy&#160;cập vào những lợi&#160;ích tuyệt&#160;vời sau:</string>
+    <!-- Description to mention other features of Pro plans (e.g. Mega VPN, chats and meetings, Android Sync and no ads) on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_description_additional_features_with_ads">&#8226;&#160;MEGA&#160; VPN \n&#8226;&#160;Cuộc gọi và họp không bị hạn&#160;chế \n&#8226;&#160;Tự động đồng&#160;bộ các thư&#160;mục trong thiết&#160;bị di&#160;động của bạn \n&#8226;&#160;Không có quảng&#160;cáo</string>
+    <!-- Description to mention other features of Pro plans (e.g. Mega VPN, chats and meetings, Android Sync and no ads) on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_description_additional_features_without_ads">&#8226;&#160;MEGA&#160; VPN \n&#8226;&#160;Cuộc gọi và họp không bị hạn&#160;chế \n&#8226;&#160;Tự động đồng&#160;bộ các thư&#160;mục trong thiết&#160;bị di&#160;động của bạn</string>
+    <!-- Text for the Sync solved issues list empty state -->
+    <string name="device_center_sync_solved_issues_empty_state_text">Không có vấn&#160;đề đã giải&#160;quyết nào</string>
+    <!-- Title of first tour screen -->
+    <string name="cloud_drive_tour_first_title">Chính bạn là người giữ chìa khóa</string>
+    <!-- Title of second tour screen -->
+    <string name="cloud_drive_tour_second_title">Cuộc chát được mã hóa</string>
+    <!-- Title of third tour screen -->
+    <string name="cloud_drive_tour_third_title">Tạo kết nối</string>
+    <!-- Title of fourth tour screen -->
+    <string name="cloud_drive_tour_fourth_title">Hình Ảnh được gửi lên mây</string>
+    <!-- Title of fifth tour screen -->
+    <string name="cloud_drive_tour_fifth_title">MEGA họp mặt</string>
+    <!-- First subtitle of the tour screen -->
+    <string name="cloud_drive_tour_first_subtitle">Bảo mật là lý do chúng tôi tạo ra MEGA, các tệp tin của bạn được bảo vệ an toàn với chúng tôi với bộ máy mã hóa được hoạt động trơn tru, nơi chỉ bạn mới có thể truy cập các tệp tin của mình.</string>
+    <!-- Second subtitle of the tour screen -->
+    <string name="cloud_drive_tour_second_subtitle">Toàn bộ chát, tin nhắn, thoại hay video đều được mã hóa hoàn toàn và hoạt động với khả năng chia sẻ thông qua Ổ Mây.</string>
+    <!-- Third subtitle of the tour screen -->
+    <string name="cloud_drive_tour_third_subtitle">Thêm tên liên&#160;lạc, tạo kết&#160;nối, cộng&#160;tác với nhau, trao&#160;đổi qua gọi thoại và video mà không cần phải rời khỏi MEGA.</string>
+    <!-- Fourth subtitle of the tour screen -->
+    <string name="cloud_drive_tour_fourth_subtitle">Đăng Tải Camêra là tính năng thiết yếu cho mọi thiết bị di động, và MEGA có cung cấp cho mọi người dùng. Tạo tài khoản ngay.</string>
+    <!-- Fifth subtitle of the tour screen -->
+    <string name="cloud_drive_tour_fifth_subtitle">Gọi họp video an&#160;toàn với mã&#160;hóa vô&#160;kiến&#160;thức.</string>
+    <!-- Titles of the tour screen to onboard users with the MEGA application -->
+    <string-array name="cloud_drive_tour_titles">
+        <item>@string/cloud_drive_tour_first_title</item>
+        <item>@string/cloud_drive_tour_second_title</item>
+        <item>@string/cloud_drive_tour_third_title</item>
+        <item>@string/cloud_drive_tour_fourth_title</item>
+        <item>@string/cloud_drive_tour_fifth_title</item>
+    </string-array>
+    <!-- Subtitles of the tour screen to onboard users with the MEGA application -->
+    <string-array name="cloud_drive_tour_subtitles">
+        <item>@string/cloud_drive_tour_first_subtitle</item>
+        <item>@string/cloud_drive_tour_second_subtitle</item>
+        <item>@string/cloud_drive_tour_third_subtitle</item>
+        <item>@string/cloud_drive_tour_fourth_subtitle</item>
+        <item>@string/cloud_drive_tour_fifth_subtitle</item>
+    </string-array>
+    <!-- Title of the Raise to Hand Feature Introduction Tooltip -->
+    <string name="meetings_raised_hand_tooltip_title">[A]Tính&#160;năng mới: Giơ tay[/A]</string>
+    <!-- Message of the synced folder list empty state for free accounts -->
+    <string name="device_center_sync_list_empty_state_message_free_account">Giữ cho thông&#160;tin của bạn được đồng&#160;bộ hóa và cập&#160;nhật bằng cách nâng&#160;cấp lên một trong các gói Pro của chúng&#160;tôi.</string>
+    <!-- "Upgrade now" label for a button, menu entry, etc -->
+    <string name="general_upgrade_now_label">Nâng&#160;cấp ngay</string>
+    <!-- Title of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_title">Nâng cấp lên Pro</string>
+    <!-- Message of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_message">Mở khóa sức&#160;mạnh để đồng&#160;bộ thiết&#160;bị di&#160;động của bạn lên đám mây với các gói Pro của chúng&#160;tôi.</string>
+    <!-- Confirm button text of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_confirm_button">Nâng cấp</string>
+    <!-- Cancel button text of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_cancel_button">Không phải lúc này</string>
+    <!-- Title of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_title">Xung&#160;đột thư&#160;mục tải lên</string>
+    <!-- Body of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_body">Thư&#160;mục Đăng&#160;tải camêra và thư&#160;mục Đăng&#160;tải phương&#160;tiện phụ của bạn không thể liên&#160;kết với nhau. Hãy chọn một thư&#160;mục khác.</string>
+    <!-- The confirmation Button text of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_confirm_button">OK, hiểu rồi</string>
+    <!-- Warning message shown when trying to select a local folder but there isn’t any app to do that. -->
+    <string name="general_no_picker_warning">Thiết&#160;bị này không có ứng&#160;dụng nào để chọn thư&#160;mục</string>
+    <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to sync folders. Keep the bullet point, as this string is part of the bullet point list. -->
+    <string name="account_upgrade_account_description_feature_sync">&#8226;&#160;Tự động đồng&#160;bộ các thư&#160;mục trên thiết&#160;bị di&#160;động của bạn</string>
+    <!-- The error dialog text displayed when user opens Android Sync while having previously established syncs -->
+    <string name="sync_error_dialog_free_user">Your syncs have been paused. Syncing is a Pro plan feature.</string>
+    <!-- The error dialog confirm action text -->
+    <string name="sync_error_dialog_free_user_confirm_action">Ok</string>
+    <!-- The error banner text displayed when user opens Android Sync while having previously established syncs -->
+    <string name="sync_error_banner_free_user">Syncing is paused because your MEGA Pro plan was cancelled. Upgrade to continue syncing.</string>
+    <!-- Hidden items -->
+    <string name="hidden_items">Các mục ẩn</string>
 </resources>

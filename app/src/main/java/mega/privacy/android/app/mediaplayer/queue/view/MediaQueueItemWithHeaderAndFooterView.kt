@@ -19,11 +19,11 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Visibility
 import mega.privacy.android.app.R
 import mega.privacy.android.app.mediaplayer.queue.model.MediaQueueItemType
-import mega.privacy.android.core.ui.controls.lists.MediaQueueItemView
-import mega.privacy.android.core.ui.controls.text.MegaText
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.tokens.TextColor
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.legacy.core.ui.controls.lists.MediaQueueItemView
+import mega.privacy.android.shared.original.core.ui.controls.text.MegaText
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 @Composable
 internal fun MediaQueueItemWithHeaderAndFooterView(
@@ -32,6 +32,7 @@ internal fun MediaQueueItemWithHeaderAndFooterView(
     currentPlayingPosition: String,
     duration: String,
     thumbnailData: Any?,
+    isSearchMode: Boolean,
     isHeaderVisible: Boolean,
     isFooterVisible: Boolean,
     queueItemType: MediaQueueItemType,
@@ -46,10 +47,18 @@ internal fun MediaQueueItemWithHeaderAndFooterView(
             .fillMaxWidth()
             .background(
                 colorResource(
-                    id = if (queueItemType == MediaQueueItemType.Next) {
-                        R.color.grey_020_grey_800
+                    id = if (!isSearchMode && queueItemType == MediaQueueItemType.Next) {
+                        if (isAudio) {
+                            R.color.grey_020_grey_800
+                        } else {
+                            R.color.grey_800
+                        }
                     } else {
-                        R.color.white_dark_grey
+                        if (isAudio) {
+                            R.color.white_dark_grey
+                        } else {
+                            R.color.dark_grey
+                        }
                     }
                 )
             )
@@ -99,7 +108,7 @@ internal fun MediaQueueItemWithHeaderAndFooterView(
             thumbnailData = thumbnailData,
             isPaused = isPaused,
             isItemPlaying = queueItemType == MediaQueueItemType.Playing,
-            isReorderEnabled = queueItemType == MediaQueueItemType.Next,
+            isReorderEnabled = !isSearchMode && queueItemType == MediaQueueItemType.Next,
             isSelected = isSelected,
             onClick = onClick
         )
@@ -113,20 +122,22 @@ internal fun MediaQueueItemWithHeaderAndFooterView(
                 } else {
                     Visibility.Gone
                 }
-            }
+            },
+            isAudio = isAudio
         )
 
         MediaQueueItemDivider(
             modifier = Modifier.constrainAs(divider) {
                 top.linkTo(footer.bottom)
                 start.linkTo(parent.start)
-                visibility = if (queueItemType != MediaQueueItemType.Playing) {
+                visibility = if (isSearchMode || queueItemType != MediaQueueItemType.Playing) {
                     Visibility.Visible
                 } else {
                     Visibility.Gone
                 }
             },
-            queueItemType = queueItemType
+            isAudio = isAudio,
+            isLightColor = queueItemType == MediaQueueItemType.Previous || isSearchMode
         )
     }
 }
@@ -134,11 +145,20 @@ internal fun MediaQueueItemWithHeaderAndFooterView(
 @Composable
 private fun MediaQueueFooter(
     modifier: Modifier,
+    isAudio: Boolean = true,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(colorResource(id = R.color.grey_020_grey_800))
+            .background(
+                colorResource(
+                    id = if (isAudio) {
+                        R.color.grey_020_grey_800
+                    } else {
+                        R.color.grey_800
+                    }
+                )
+            )
             .testTag(MEDIA_QUEUE_ITEM_FOOTER_LAYOUT_VIEW_TEST_TAG)
     ) {
         MegaText(
@@ -155,16 +175,29 @@ private fun MediaQueueFooter(
 @Composable
 private fun MediaQueueItemDivider(
     modifier: Modifier,
-    queueItemType: MediaQueueItemType,
+    isLightColor: Boolean,
+    isAudio: Boolean = true,
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
             .background(
-                if (queueItemType == MediaQueueItemType.Previous)
-                    colorResource(id = R.color.white_dark_grey)
+                if (isLightColor)
+                    colorResource(
+                        id = if (isAudio) {
+                            R.color.white_dark_grey
+                        } else {
+                            R.color.dark_grey
+                        }
+                    )
                 else
-                    colorResource(id = R.color.grey_020_grey_800)
+                    colorResource(
+                        id = if (isAudio) {
+                            R.color.grey_020_grey_800
+                        } else {
+                            R.color.grey_800
+                        }
+                    )
             )
             .testTag(MEDIA_QUEUE_ITEM_DIVIDER_LAYOUT_TEST_TAG)
     ) {
@@ -173,11 +206,13 @@ private fun MediaQueueItemDivider(
                 .fillMaxWidth()
                 .padding(start = 72.dp)
                 .testTag(MEDIA_QUEUE_ITEM_DIVIDER_TEST_TAG),
-            color = if (queueItemType == MediaQueueItemType.Previous) {
-                colorResource(id = R.color.grey_012_white_012)
-            } else {
-                colorResource(id = R.color.grey_012_white_012)
-            },
+            color = colorResource(
+                id = if (isAudio) {
+                    R.color.grey_012_white_012
+                } else {
+                    R.color.white_alpha_012
+                }
+            ),
             thickness = 1.dp
         )
     }
@@ -186,7 +221,7 @@ private fun MediaQueueItemDivider(
 @CombinedThemePreviews
 @Composable
 private fun PlayingMediaQueueItemPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         MediaQueueItemWithHeaderAndFooterView(
             icon = iconPackR.drawable.ic_audio_medium_solid,
             name = "Media Name",
@@ -197,9 +232,10 @@ private fun PlayingMediaQueueItemPreview() {
             isHeaderVisible = true,
             isFooterVisible = true,
             queueItemType = MediaQueueItemType.Playing,
-            isAudio = true,
+            isAudio = false,
             isPaused = false,
-            isSelected = false
+            isSelected = false,
+            isSearchMode = false
         )
     }
 }
@@ -207,7 +243,7 @@ private fun PlayingMediaQueueItemPreview() {
 @CombinedThemePreviews
 @Composable
 private fun PausedPlayingMediaQueueItemPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         MediaQueueItemWithHeaderAndFooterView(
             icon = iconPackR.drawable.ic_audio_medium_solid,
             name = "Media Name",
@@ -220,7 +256,8 @@ private fun PausedPlayingMediaQueueItemPreview() {
             queueItemType = MediaQueueItemType.Playing,
             isAudio = true,
             isPaused = true,
-            isSelected = true
+            isSelected = true,
+            isSearchMode = false
         )
     }
 }
@@ -228,7 +265,7 @@ private fun PausedPlayingMediaQueueItemPreview() {
 @CombinedThemePreviews
 @Composable
 private fun FirstMediaQueueItemPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         MediaQueueItemWithHeaderAndFooterView(
             icon = iconPackR.drawable.ic_audio_medium_solid,
             name = "Media Name",
@@ -241,7 +278,8 @@ private fun FirstMediaQueueItemPreview() {
             queueItemType = MediaQueueItemType.Previous,
             isAudio = true,
             isPaused = false,
-            isSelected = false
+            isSelected = false,
+            isSearchMode = false
         )
     }
 }
@@ -249,7 +287,7 @@ private fun FirstMediaQueueItemPreview() {
 @CombinedThemePreviews
 @Composable
 private fun NextMediaQueueItemPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         MediaQueueItemWithHeaderAndFooterView(
             icon = iconPackR.drawable.ic_audio_medium_solid,
             name = "Media Name",
@@ -262,7 +300,8 @@ private fun NextMediaQueueItemPreview() {
             queueItemType = MediaQueueItemType.Next,
             isAudio = true,
             isPaused = false,
-            isSelected = false
+            isSelected = false,
+            isSearchMode = false
         )
     }
 }

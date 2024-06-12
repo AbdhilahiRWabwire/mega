@@ -10,13 +10,17 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.recentactions.mapper.RecentActionBucketUiEntityMapper
 import mega.privacy.android.app.presentation.recentactions.model.RecentActionsUiState
 import mega.privacy.android.domain.entity.RecentActionBucket
+import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.recentactions.GetRecentActionsUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorHideRecentActivityUseCase
+import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
 import mega.privacy.android.domain.usecase.setting.SetHideRecentActivityUseCase
 import timber.log.Timber
 import javax.inject.Inject
@@ -32,6 +36,9 @@ class RecentActionsComposeViewModel @Inject constructor(
     monitorConnectivityUseCase: MonitorConnectivityUseCase,
     monitorHideRecentActivityUseCase: MonitorHideRecentActivityUseCase,
     monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase,
+    getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
+    monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
+    monitorShowHiddenItemsUseCase: MonitorShowHiddenItemsUseCase,
 ) : ViewModel() {
 
     /** private mutable UI state */
@@ -75,6 +82,26 @@ class RecentActionsComposeViewModel @Inject constructor(
             monitorConnectivityUseCase().collect {
                 _uiState.update { state -> state.copy(isConnected = it) }
             }
+        }
+
+        viewModelScope.launch {
+            if (getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)) {
+                monitorAccountDetailUseCase()
+                    .collectLatest {
+                        _uiState.update { state ->
+                            state.copy(accountType = it.levelDetail?.accountType)
+                        }
+                    }
+            }
+        }
+
+        viewModelScope.launch {
+            monitorShowHiddenItemsUseCase()
+                .collectLatest {
+                    _uiState.update { state ->
+                        state.copy(showHiddenItems = it)
+                    }
+                }
         }
     }
 

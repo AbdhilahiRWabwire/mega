@@ -36,11 +36,11 @@ import mega.privacy.android.data.mapper.node.MegaNodeMapper
 import mega.privacy.android.data.mapper.node.NodeMapper
 import mega.privacy.android.data.mapper.node.NodeShareKeyResultMapper
 import mega.privacy.android.data.mapper.node.label.NodeLabelIntMapper
+import mega.privacy.android.data.mapper.search.MegaSearchFilterMapper
 import mega.privacy.android.data.mapper.shares.AccessPermissionIntMapper
 import mega.privacy.android.data.mapper.shares.AccessPermissionMapper
 import mega.privacy.android.data.mapper.shares.ShareDataMapper
 import mega.privacy.android.data.model.GlobalUpdate
-import mega.privacy.android.domain.entity.FileTypeInfo
 import mega.privacy.android.domain.entity.FolderTreeInfo
 import mega.privacy.android.domain.entity.NodeLabel
 import mega.privacy.android.domain.entity.Offline
@@ -63,6 +63,7 @@ import mega.privacy.android.domain.exception.node.ForeignNodeException
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.repository.NodeRepository
 import nz.mega.sdk.MegaApiJava
+import nz.mega.sdk.MegaChatRoom
 import nz.mega.sdk.MegaError
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
@@ -114,12 +115,9 @@ internal class NodeRepositoryImpl @Inject constructor(
     private val megaLocalRoomGateway: MegaLocalRoomGateway,
     private val megaNodeMapper: MegaNodeMapper,
     private val nodeLabelIntMapper: NodeLabelIntMapper,
+    private val megaSearchFilterMapper: MegaSearchFilterMapper,
+    private val cancelTokenProvider: CancelTokenProvider,
 ) : NodeRepository {
-    override suspend fun getOutgoingSharesNode(order: SortOrder) =
-        withContext(ioDispatcher) {
-            megaApiGateway.getOutgoingSharesNode(sortOrderIntMapper(order))
-                .map { shareDataMapper(it) }
-        }
 
     override suspend fun getNodeOutgoingShares(nodeId: NodeId) =
         withContext(ioDispatcher) {
@@ -178,13 +176,6 @@ internal class NodeRepositoryImpl @Inject constructor(
             .filter { it.user != null }
             .map { shareDataMapper(it, 1) }
     }
-
-    override suspend fun getVerifiedIncomingShares(order: SortOrder) =
-        withContext(ioDispatcher) {
-            megaApiGateway.getVerifiedIncomingShares(sortOrderIntMapper(order)).map {
-                shareDataMapper(it)
-            }
-        }
 
     override suspend fun isNodeInRubbishBin(nodeId: NodeId) = withContext(ioDispatcher) {
         megaApiGateway.getMegaNodeByHandle(nodeId.longValue)?.let { megaApiGateway.isInRubbish(it) }
@@ -260,43 +251,23 @@ internal class NodeRepositoryImpl @Inject constructor(
         } ?: ""
     }
 
-    override suspend fun getNodeChildren(folderNode: FolderNode): List<UnTypedNode> {
-        return withContext(ioDispatcher) {
-            val offlineNodes = getAllOfflineNodeHandle()
-            megaApiGateway.getMegaNodeByHandle(folderNode.id.longValue)?.let { parent ->
-                megaApiGateway.getChildrenByNode(parent)
-                    .map {
-                        convertToUnTypedNode(
-                            node = it,
-                            offline = offlineNodes?.get(it.handle.toString())
-                        )
-                    }
-            } ?: throw SynchronisationException("Non null node found be null when fetched from api")
-        }
-    }
-
     override suspend fun getNodeChildren(
         nodeId: NodeId,
         order: SortOrder?,
-    ): List<UnTypedNode> {
-        return withContext(ioDispatcher) {
-            return@withContext megaApiGateway.getMegaNodeByHandle(nodeId.longValue)?.let { parent ->
-                val offlineItems = async { getAllOfflineNodeHandle() }
-                val childList = async {
-                    order?.let { sortOrder ->
-                        megaApiGateway.getChildrenByNode(
-                            parent,
-                            sortOrderIntMapper(sortOrder)
-                        )
-                    } ?: run {
-                        megaApiGateway.getChildrenByNode(parent)
-                    }
-                }
-                mapMegaNodesToUnTypedNodes(childList.await(), offlineItems.await())
-            } ?: run {
-                emptyList()
-            }
+    ): List<UnTypedNode> = withContext(ioDispatcher) {
+        val token = cancelTokenProvider.getOrCreateCancelToken()
+        val filter = megaSearchFilterMapper(
+            parentHandle = nodeId,
+        )
+        val offlineItems = async { getAllOfflineNodeHandle() }
+        val childList = async {
+            megaApiGateway.getChildren(
+                filter,
+                sortOrderIntMapper(order ?: SortOrder.ORDER_NONE),
+                token
+            )
         }
+        mapMegaNodesToUnTypedNodes(childList.await(), offlineItems.await())
     }
 
     private suspend fun mapMegaNodesToUnTypedNodes(
@@ -311,12 +282,6 @@ internal class NodeRepositoryImpl @Inject constructor(
                 )
             }
         }.awaitAll()
-    }
-
-    override suspend fun getNumVersions(handle: Long): Int = withContext(ioDispatcher) {
-        megaApiGateway.getMegaNodeByHandle(handle)?.let {
-            megaApiGateway.getNumVersions(it)
-        } ?: 0
     }
 
     override suspend fun getNodeHistoryVersions(handle: NodeId) = withContext(ioDispatcher) {
@@ -497,15 +462,6 @@ internal class NodeRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun loadOfflineNodes(
-        path: String,
-        searchQuery: String?,
-    ): List<OfflineNodeInformation> = withContext(ioDispatcher) {
-        megaLocalStorageGateway.loadOfflineNodes(path, searchQuery).map {
-            offlineNodeInformationMapper(it)
-        }
-    }
-
     override suspend fun getInvalidHandle(): Long = megaApiGateway.getInvalidHandle()
 
     override suspend fun isValidNode(nodeId: NodeId) = withContext(ioDispatcher) {
@@ -539,14 +495,6 @@ internal class NodeRepositoryImpl @Inject constructor(
         }.getOrNull() ?: emptyList()
     }
 
-
-    override suspend fun getFileTypeInfo(nodeId: NodeId): FileTypeInfo? =
-        withContext(ioDispatcher) {
-            megaApiGateway.getMegaNodeByHandle(nodeHandle = nodeId.longValue)?.let { megaNode ->
-                return@withContext fileTypeInfoMapper(megaNode)
-            }
-        }
-
     override suspend fun getDefaultNodeHandle(folderName: String) = withContext(ioDispatcher) {
         megaApiGateway.getNodeByPath(folderName, megaApiGateway.getRootNode())
             ?.takeIf { it.isFolder }?.let { NodeId(it.handle) }
@@ -573,10 +521,12 @@ internal class NodeRepositoryImpl @Inject constructor(
 
     override suspend fun copyNode(
         nodeToCopy: NodeId,
+        nodeToCopySerializedData: String?,
         newNodeParent: NodeId,
         newNodeName: String?,
     ): NodeId = withContext(ioDispatcher) {
         val node = getMegaNodeByHandle(nodeToCopy, true)
+            ?: nodeToCopySerializedData?.let { MegaNode.unserialize(it) }
         val parent = getMegaNodeByHandle(newNodeParent, true)
         requireNotNull(node) { "Node to copy with handle $nodeToCopy not found" }
         requireNotNull(parent) { "Destination node with handle $newNodeParent not found" }
@@ -794,31 +744,40 @@ internal class NodeRepositoryImpl @Inject constructor(
         withContext(ioDispatcher) {
             (megaChatApiGateway.getMessage(chatId, messageId)
                 ?: megaChatApiGateway.getMessageFromNodeHistory(chatId, messageId))
-                ?.let { messageChat ->
-                    val node = messageChat.megaNodeList.get(messageIndex)
-                    val chat = megaChatApiGateway.getChatRoom(chatId)
-
-                    if (chat?.isPreview == true) {
-                        megaApiGateway.authorizeChatNode(node, chat.authorizationToken)
-                    } else {
-                        node
-                    }
-                }
-                ?.let {
-                    fileNodeMapper(
-                        megaNode = it,
-                        requireSerializedData = false,
-                        offline = null,
+                ?.let { message ->
+                    getChatFile(
+                        megaNode = message.megaNodeList.get(messageIndex),
+                        chat = megaChatApiGateway.getChatRoom(chatId)
                     )
                 }
         }
 
-    override suspend fun getNodesByHandles(handles: List<Long>): List<UnTypedNode> {
-        val offlineMap = getAllOfflineNodeHandle()
-        return handles.mapNotNull { handle ->
-            megaApiGateway.getMegaNodeByHandle(handle)
-        }.map { node ->
-            convertToUnTypedNode(node = node, offline = offlineMap?.get(node.handle.toString()))
+    override suspend fun getNodesFromChatMessage(chatId: Long, messageId: Long) =
+        withContext(ioDispatcher) {
+            (megaChatApiGateway.getMessage(chatId, messageId)
+                ?: megaChatApiGateway.getMessageFromNodeHistory(chatId, messageId))
+                ?.let { message ->
+                    val nodes = message.megaNodeList
+                    val chat = megaChatApiGateway.getChatRoom(chatId)
+                    (0 until nodes.size()).mapNotNull { index ->
+                        nodes.get(index)?.let {
+                            getChatFile(megaNode = it, chat = chat)
+                        }
+                    }
+                } ?: emptyList()
+        }
+
+    private suspend fun getChatFile(megaNode: MegaNode, chat: MegaChatRoom?): FileNode? {
+        return if (chat?.isPreview == true) {
+            megaApiGateway.authorizeChatNode(megaNode, chat.authorizationToken)
+        } else {
+            megaNode
+        }?.let {
+            fileNodeMapper(
+                megaNode = it,
+                requireSerializedData = false,
+                offline = null
+            )
         }
     }
 
@@ -929,10 +888,6 @@ internal class NodeRepositoryImpl @Inject constructor(
         getMegaNodeByHandle(nodeId, true)?.let {
             megaApiGateway.checkAccessErrorExtended(it, accessLevel).errorCode == MegaError.API_OK
         } ?: false
-    }
-
-    override suspend fun removeOfflineNode(nodeId: String) {
-        megaLocalRoomGateway.removeOfflineInformation(nodeId)
     }
 
     override suspend fun getOfflineNodeByParentId(parentId: Int): List<OfflineNodeInformation>? =
@@ -1113,7 +1068,11 @@ internal class NodeRepositoryImpl @Inject constructor(
     }
 
     private suspend fun isChildrenEmpty(parent: MegaNode): Boolean {
-        megaApiGateway.getChildrenByNode(parent).let {
+        val token = cancelTokenProvider.getOrCreateCancelToken()
+        val filter = megaSearchFilterMapper(
+            parentHandle = NodeId(parent.handle),
+        )
+        megaApiGateway.getChildren(filter, sortOrderIntMapper(SortOrder.ORDER_NONE), token).let {
             if (it.isNotEmpty()) {
                 it.forEach { childNode ->
                     if (childNode.isFolder.not() || isChildrenEmpty(childNode).not()) {
@@ -1135,4 +1094,41 @@ internal class NodeRepositoryImpl @Inject constructor(
                 continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
             }
         }
+
+    override suspend fun getOfflineByQuery(query: String): List<OfflineNodeInformation>? =
+        withContext(ioDispatcher) {
+            megaLocalRoomGateway.getOfflineNodesByQuery(query)?.map {
+                offlineNodeInformationMapper(it)
+            }
+        }
+
+    override suspend fun addNodeTag(nodeHandle: NodeId, tag: String) {
+        val node = megaApiGateway.getMegaNodeByHandle(nodeHandle.longValue)
+        requireNotNull(node) { "Node not found" }
+        suspendCancellableCoroutine { continuation ->
+            val listener = continuation.getRequestListener("addNodeTag") {}
+            megaApiGateway.addNodeTag(node, tag, listener)
+            continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
+        }
+    }
+
+    override suspend fun removeNodeTag(nodeHandle: NodeId, tag: String) {
+        val node = megaApiGateway.getMegaNodeByHandle(nodeHandle.longValue)
+        requireNotNull(node) { "Node not found" }
+        suspendCancellableCoroutine { continuation ->
+            val listener = continuation.getRequestListener("removeNodeTag") {}
+            megaApiGateway.removeNodeTag(node, tag, listener)
+            continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
+        }
+    }
+
+    override suspend fun updateNodeTag(nodeHandle: NodeId, oldTag: String, newTag: String) {
+        val node = megaApiGateway.getMegaNodeByHandle(nodeHandle.longValue)
+        requireNotNull(node) { "Node not found" }
+        suspendCancellableCoroutine { continuation ->
+            val listener = continuation.getRequestListener("updateNodeTag") {}
+            megaApiGateway.updateNodeTag(node, oldTag, newTag, listener)
+            continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
+        }
+    }
 }

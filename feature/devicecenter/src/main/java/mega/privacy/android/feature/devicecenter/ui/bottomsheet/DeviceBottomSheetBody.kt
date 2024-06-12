@@ -10,12 +10,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
-import mega.privacy.android.core.ui.controls.dividers.DividerType
-import mega.privacy.android.core.ui.controls.dividers.MegaDivider
-import mega.privacy.android.core.ui.controls.status.getStatusIconColor
-import mega.privacy.android.core.ui.controls.status.getStatusTextColor
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.textColorSecondary
+import mega.privacy.android.shared.original.core.ui.controls.dividers.DividerType
+import mega.privacy.android.shared.original.core.ui.controls.dividers.MegaDivider
+import mega.privacy.android.shared.original.core.ui.controls.status.getStatusIconColor
+import mega.privacy.android.shared.original.core.ui.controls.status.getStatusTextColor
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorSecondary
 import mega.privacy.android.feature.devicecenter.R
 import mega.privacy.android.feature.devicecenter.ui.bottomsheet.body.OtherDeviceBottomSheetBody
 import mega.privacy.android.feature.devicecenter.ui.bottomsheet.body.OwnDeviceBottomSheetBody
@@ -26,7 +26,7 @@ import mega.privacy.android.feature.devicecenter.ui.model.icon.DeviceCenterUINod
 import mega.privacy.android.feature.devicecenter.ui.model.icon.DeviceIconType
 import mega.privacy.android.feature.devicecenter.ui.model.status.DeviceCenterUINodeStatus
 import mega.privacy.android.legacy.core.ui.controls.lists.MenuActionNodeHeaderWithBody
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * Test Tags for the Device Bottom Sheet
@@ -46,6 +46,7 @@ internal const val BOTTOM_SHEET_HEADER =
  * @param onRenameDeviceClicked Lambda that is executed when the "Rename" Tile is selected
  * @param onInfoClicked Lambda that is executed when the "Info" Tile is selected
  * @param onBottomSheetDismissed Lambda that is executed when the bottom sheet is dismissed
+ * @param isSyncFeatureFlagEnabled True if Sync feature flag is enabled. False otherwise
  */
 @Composable
 internal fun DeviceBottomSheetBody(
@@ -55,6 +56,7 @@ internal fun DeviceBottomSheetBody(
     onRenameDeviceClicked: (DeviceUINode) -> Unit,
     onInfoClicked: (DeviceUINode) -> Unit,
     onBottomSheetDismissed: () -> Unit,
+    isSyncFeatureFlagEnabled: Boolean = false,
 ) {
     Column(Modifier.testTag(BOTTOM_SHEET_CONTAINER)) {
         MenuActionNodeHeaderWithBody(
@@ -73,6 +75,7 @@ internal fun DeviceBottomSheetBody(
             is OwnDeviceUINode -> {
                 OwnDeviceBottomSheetBody(
                     isCameraUploadsEnabled = isCameraUploadsEnabled,
+                    hasSyncedFolders = device.folders.isNotEmpty(),
                     onCameraUploadsClicked = {
                         onBottomSheetDismissed()
                         onCameraUploadsClicked.invoke()
@@ -85,6 +88,7 @@ internal fun DeviceBottomSheetBody(
                         onBottomSheetDismissed()
                         onInfoClicked(device)
                     },
+                    isSyncFeatureFlagEnabled = isSyncFeatureFlagEnabled,
                 )
             }
 
@@ -152,7 +156,7 @@ private fun getNodeIconColor(uiNodeIcon: DeviceCenterUINodeIcon) =
 private fun DeviceBottomSheetBodyPreview(
     @PreviewParameter(DeviceBottomSheetBodyPreviewProvider::class) device: DeviceUINode,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DeviceBottomSheetBody(
             device = device,
             isCameraUploadsEnabled = true,

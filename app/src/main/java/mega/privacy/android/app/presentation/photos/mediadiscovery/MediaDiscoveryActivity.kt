@@ -40,14 +40,11 @@ import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.MegaProgressDialogUtil
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.Util.showSnackbar
-import mega.privacy.android.app.utils.permission.PermissionUtils
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.photos.Photo
 import mega.privacy.android.domain.usecase.GetThemeMode
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
-import mega.privacy.android.shared.theme.MegaAppTheme
-import nz.mega.sdk.MegaNode
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -60,9 +57,6 @@ class MediaDiscoveryActivity : BaseActivity(), PermissionRequester, SnackbarShow
 
     @Inject
     lateinit var getThemeMode: GetThemeMode
-
-    @Inject
-    lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
 
     private val mediaDiscoveryGlobalStateViewModel: MediaDiscoveryGlobalStateViewModel by viewModels()
     private val mediaDiscoveryViewModel: MediaDiscoveryViewModel by viewModels()
@@ -91,7 +85,7 @@ class MediaDiscoveryActivity : BaseActivity(), PermissionRequester, SnackbarShow
         checkLoginStatus()
         setContent {
             val themeMode by getThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.System)
-            MegaAppTheme(isDark = themeMode.isDarkMode()) {
+            OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                 MediaDiscoveryScreen(
                     mediaDiscoveryGlobalStateViewModel = mediaDiscoveryGlobalStateViewModel,
                     viewModel = mediaDiscoveryViewModel,
@@ -100,7 +94,6 @@ class MediaDiscoveryActivity : BaseActivity(), PermissionRequester, SnackbarShow
                     onPhotoClicked = this::onClick,
                     onPhotoLongPressed = this::onLongPress,
                     onImportClicked = this::importNode,
-                    legacyOnSaveToDeviceClicked = this::saveToDevice,
                 )
             }
         }
@@ -262,7 +255,6 @@ class MediaDiscoveryActivity : BaseActivity(), PermissionRequester, SnackbarShow
                 params = mapOf(
                     FolderLinkMediaDiscoveryImageNodeFetcher.PARENT_ID to mediaHandle,
                 ),
-                showScreenLabel = false,
             ).run {
                 startActivity(this)
             }
@@ -351,29 +343,6 @@ class MediaDiscoveryActivity : BaseActivity(), PermissionRequester, SnackbarShow
         val intent = Intent(this, FileExplorerActivity::class.java)
         intent.action = FileExplorerActivity.ACTION_PICK_IMPORT_FOLDER
         selectImportFolderLauncher.launch(intent)
-    }
-
-    /**
-     * Handle download option
-     */
-    @Deprecated("This will be removed once [AppFeatures.DownloadWorker] is stable")
-    private fun saveToDevice() {
-        lifecycleScope.launch {
-            val nodes = mediaDiscoveryViewModel.getNodes()
-            downloadNodes(nodes)
-            mediaDiscoveryViewModel.clearSelectedPhotos()
-        }
-    }
-
-    private fun downloadNodes(nodes: List<MegaNode>) {
-        PermissionUtils.checkNotificationsPermission(this)
-        nodeSaver.saveNodes(
-            nodes,
-            highPriority = false,
-            isFolderLink = true,
-            fromMediaViewer = false,
-            needSerialize = false
-        )
     }
 
     @SuppressLint("CheckResult")

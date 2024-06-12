@@ -194,6 +194,7 @@ class VideoPlayerActivity : MediaPlayerActivity() {
     private val dragToExit by lazy {
         DragToExitSupport(
             context = this,
+            coroutineScope = lifecycleScope,
             dragActivated = this::onDragActivated
         ) {
             finish()
@@ -743,9 +744,9 @@ class VideoPlayerActivity : MediaPlayerActivity() {
                 }
             }
 
-            collectFlow(mediaItemToRemoveState) { index ->
-                index?.let {
-                    mediaPlayerGateway.mediaItemRemoved(it)?.let { handle ->
+            collectFlow(mediaItemToRemoveState) { (index, _) ->
+                if (index != -1) {
+                    mediaPlayerGateway.mediaItemRemoved(index)?.let { handle ->
                         val nodeName = getPlaylistItem(handle)?.nodeName ?: ""
                         videoViewModel.updateMetadataState(Metadata(null, null, null, nodeName))
                     }
@@ -770,7 +771,8 @@ class VideoPlayerActivity : MediaPlayerActivity() {
                 }
 
                 dragToExit.nodeChanged(
-                    getCurrentPlayingHandle()
+                    lifecycleOwner = this@VideoPlayerActivity,
+                    handle = getCurrentPlayingHandle()
                 )
             }
 
@@ -967,6 +969,7 @@ class VideoPlayerActivity : MediaPlayerActivity() {
                 }
 
                 R.id.video_playlist,
+                R.id.video_queue,
                 -> {
                     // Pause the video when the playlist page is opened, and allow the video to
                     // revert to playing after back to the video player page.
@@ -1186,13 +1189,14 @@ class VideoPlayerActivity : MediaPlayerActivity() {
                                 isHiddenNodesEnabled
                                         && !isInSharedItems
                                         && !megaApi.getRootParentNode(node).isInShare
-                                        && !node.isMarkedSensitive
+                                        && (!node.isMarkedSensitive || viewModel.state.value.accountType?.isPaid == false)
 
                             val shouldShowUnhideNode =
                                 isHiddenNodesEnabled
                                         && !isInSharedItems
                                         && !megaApi.getRootParentNode(node).isInShare
                                         && node.isMarkedSensitive
+                                        && viewModel.state.value.accountType?.isPaid == true
 
                             menu.findItem(R.id.hide).isVisible = shouldShowHideNode
                             menu.findItem(R.id.hide).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
@@ -1227,13 +1231,14 @@ class VideoPlayerActivity : MediaPlayerActivity() {
                                 isHiddenNodesEnabled
                                         && !isInSharedItems
                                         && !megaApi.getRootParentNode(node).isInShare
-                                        && !node.isMarkedSensitive
+                                        && (!node.isMarkedSensitive || viewModel.state.value.accountType?.isPaid == false)
 
                             val shouldShowUnhideNode =
                                 isHiddenNodesEnabled
                                         && !isInSharedItems
                                         && !megaApi.getRootParentNode(node).isInShare
                                         && node.isMarkedSensitive
+                                        && viewModel.state.value.accountType?.isPaid == true
 
                             menu.findItem(R.id.hide).isVisible = shouldShowHideNode
 
@@ -1365,6 +1370,10 @@ class VideoPlayerActivity : MediaPlayerActivity() {
         showSystemUI()
     }
 
+    internal fun hideToolbar() {
+        toolbarDisplayedAnimation(false, -binding.toolbar.measuredHeight.toFloat())
+    }
+
     private fun toolbarDisplayedAnimation(animate: Boolean, translationY: Float) {
         binding.toolbar.let { toolbar ->
             if (animate) {
@@ -1413,7 +1422,8 @@ class VideoPlayerActivity : MediaPlayerActivity() {
     override fun setupToolbarColors(showElevation: Boolean) {
         val isDarkMode = isDarkMode(this)
         val isMainPlayer = navController.currentDestination?.id == R.id.video_main_player
-        val isPlaylist = navController.currentDestination?.id == R.id.video_playlist
+        val isPlaylist = navController.currentDestination?.id == R.id.video_playlist ||
+                navController.currentDestination?.id == R.id.video_queue
         @ColorRes val toolbarBackgroundColor: Int
         @ColorInt val statusBarColor: Int
         val toolbarElevation: Float
@@ -1435,7 +1445,7 @@ class VideoPlayerActivity : MediaPlayerActivity() {
 
         WindowCompat.setDecorFitsSystemWindows(window, !isMainPlayer || !isPlaylist)
 
-        updatePaddingForSystemUI(isMainPlayer, isPlaylist)
+        updatePaddingForSystemUI()
 
         binding.rootLayout.setBackgroundColor(getColor(R.color.black))
 
@@ -1493,12 +1503,13 @@ class VideoPlayerActivity : MediaPlayerActivity() {
         window.navigationBarColor = getColor(android.R.color.transparent)
     }
 
-    private fun updatePaddingForSystemUI(
-        isVideoPlayerMainView: Boolean,
-        isVideoPlaylist: Boolean,
-    ) {
+    private fun updatePaddingForSystemUI() {
         binding.rootLayout.post {
             ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { _, windowInsets ->
+                val isVideoPlayerMainView =
+                    navController.currentDestination?.id == R.id.video_main_player
+                val isVideoPlaylist = navController.currentDestination?.id == R.id.video_playlist ||
+                        navController.currentDestination?.id == R.id.video_queue
                 if (isVideoPlayerMainView || isVideoPlaylist) {
                     windowInsets.getInsets(WindowInsetsCompat.Type.systemBars()).let { insets ->
                         val horizontalInsets: Pair<Int, Int> =

@@ -1,10 +1,10 @@
 package mega.privacy.android.feature.sync.ui.synclist
 
+import mega.privacy.android.shared.resources.R as sharedR
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.ExperimentalMaterialApi
@@ -14,6 +14,7 @@ import androidx.compose.material.Scaffold
 import androidx.compose.material.Snackbar
 import androidx.compose.material.SnackbarHost
 import androidx.compose.material.SnackbarHostState
+import androidx.compose.material.Text
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -34,12 +35,17 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
-import mega.privacy.android.core.ui.controls.appbar.AppBarType
-import mega.privacy.android.core.ui.controls.appbar.MegaAppBar
-import mega.privacy.android.core.ui.controls.banners.WarningBanner
-import mega.privacy.android.core.ui.controls.sheets.BottomSheet
-import mega.privacy.android.core.ui.model.MenuAction
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.controls.appbar.AppBarType
+import mega.privacy.android.shared.original.core.ui.controls.appbar.MegaAppBar
+import mega.privacy.android.shared.original.core.ui.controls.banners.ActionBanner
+import mega.privacy.android.shared.original.core.ui.controls.banners.WarningBanner
+import mega.privacy.android.shared.original.core.ui.controls.chip.Chip
+import mega.privacy.android.shared.original.core.ui.controls.chip.ChipBar
+import mega.privacy.android.shared.original.core.ui.controls.dividers.DividerType
+import mega.privacy.android.shared.original.core.ui.controls.dividers.MegaDivider
+import mega.privacy.android.shared.original.core.ui.controls.sheets.BottomSheet
+import mega.privacy.android.shared.original.core.ui.model.MenuAction
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.feature.sync.R
 import mega.privacy.android.feature.sync.domain.entity.StalledIssueResolutionAction
 import mega.privacy.android.feature.sync.ui.model.StalledIssueUiItem
@@ -58,8 +64,7 @@ import mega.privacy.android.feature.sync.ui.synclist.stalledissues.SyncStalledIs
 import mega.privacy.android.feature.sync.ui.views.ConflictDetailsDialog
 import mega.privacy.android.feature.sync.ui.views.IssuesResolutionDialog
 import mega.privacy.android.feature.sync.ui.views.SyncPermissionWarningBanner
-import mega.privacy.android.legacy.core.ui.controls.chips.PhotoChip
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -71,6 +76,8 @@ internal fun SyncListScreen(
     syncPermissionsManager: SyncPermissionsManager,
     actions: List<MenuAction>,
     onActionPressed: (MenuAction) -> Unit,
+    onOpenUpgradeAccountClicked: () -> Unit,
+    title: String? = null,
 ) {
     val onBackPressedDispatcher =
         LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
@@ -120,7 +127,7 @@ internal fun SyncListScreen(
         Scaffold(
             topBar = {
                 MegaAppBar(
-                    title = stringResource(R.string.sync_toolbar_title),
+                    title = title ?: stringResource(R.string.sync_toolbar_title),
                     appBarType = AppBarType.BACK_NAVIGATION,
                     elevation = 0.dp,
                     onNavigationPressed = {
@@ -147,7 +154,8 @@ internal fun SyncListScreen(
                         }
                     },
                     addFolderClicked = addFolderClicked,
-                    syncPermissionsManager = syncPermissionsManager
+                    syncPermissionsManager = syncPermissionsManager,
+                    onOpenUpgradeAccountClicked = onOpenUpgradeAccountClicked
                 )
             },
             snackbarHost = {
@@ -176,13 +184,16 @@ private fun SyncListScreenContent(
     moreClicked: (StalledIssueUiItem) -> Unit,
     addFolderClicked: () -> Unit,
     syncPermissionsManager: SyncPermissionsManager,
+    onOpenUpgradeAccountClicked: () -> Unit,
     syncFoldersViewModel: SyncFoldersViewModel = hiltViewModel(),
     syncStalledIssuesViewModel: SyncStalledIssuesViewModel = hiltViewModel(),
     syncSolvedIssuesViewModel: SyncSolvedIssuesViewModel = hiltViewModel(),
 ) {
     var checkedChip by rememberSaveable { mutableStateOf(SYNC_FOLDERS) }
 
-    val syncFoldersState by syncFoldersViewModel.state.collectAsStateWithLifecycle()
+    val syncFoldersState by syncFoldersViewModel.uiState.collectAsStateWithLifecycle()
+    val syncStalledIssuesState by syncStalledIssuesViewModel.state.collectAsStateWithLifecycle()
+    val syncSolvedIssuesState by syncSolvedIssuesViewModel.state.collectAsStateWithLifecycle()
 
     val pullToRefreshState = rememberPullRefreshState(
         refreshing = syncFoldersState.isRefreshing,
@@ -194,16 +205,33 @@ private fun SyncListScreenContent(
         SyncPermissionWarningBanner(
             syncPermissionsManager = syncPermissionsManager
         )
-        if (syncFoldersState.syncUiItems.isNotEmpty() && syncFoldersState.isLowBatteryLevel) {
+        if (syncFoldersState.isStorageOverQuota) {
+            ActionBanner(
+                mainText = stringResource(sharedR.string.sync_error_storage_over_quota_banner_title),
+                leftActionText = stringResource(sharedR.string.sync_error_storage_over_quota_banner_action),
+                leftActionClicked = onOpenUpgradeAccountClicked,
+                modifier = Modifier.padding(top = 20.dp)
+            )
+            MegaDivider(
+                dividerType = DividerType.FullSize,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        } else if (syncFoldersState.syncUiItems.isNotEmpty() && syncFoldersState.isLowBatteryLevel) {
             WarningBanner(
                 textString = stringResource(id = mega.privacy.android.shared.resources.R.string.general_message_sync_paused_low_battery_level),
                 onCloseClick = null
             )
         }
-        HeaderChips(
-            selectedChip = checkedChip,
-            stalledIssuesCount = stalledIssuesCount,
-            onChipSelected = { checkedChip = it })
+
+        if (syncStalledIssuesState.stalledIssues.isNotEmpty() || syncSolvedIssuesState.solvedIssues.isNotEmpty()) {
+            HeaderChips(
+                selectedChip = checkedChip,
+                stalledIssuesCount = stalledIssuesCount,
+                onChipSelected = { checkedChip = it })
+        } else {
+            checkedChip = SYNC_FOLDERS
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -211,6 +239,7 @@ private fun SyncListScreenContent(
         ) {
             SelectedChipScreen(
                 addFolderClicked = addFolderClicked,
+                upgradeAccountClicked = onOpenUpgradeAccountClicked,
                 stalledIssueDetailsClicked = stalledIssuesDetailsClicked,
                 moreClicked = moreClicked,
                 issuesInfoClicked = {
@@ -238,32 +267,41 @@ private fun HeaderChips(
     onChipSelected: (SyncChip) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier.padding(16.dp)) {
-        PhotoChip(
-            text = stringResource(id = R.string.sync_folders),
+    ChipBar(modifier = modifier.padding(vertical = 8.dp)) {
+        Chip(
+            selected = selectedChip == SYNC_FOLDERS,
+            contentDescription = stringResource(id = R.string.sync_folders),
             onClick = { onChipSelected(SYNC_FOLDERS) },
-            isChecked = selectedChip == SYNC_FOLDERS
-        )
-        PhotoChip(
-            text = if (stalledIssuesCount > 0) stringResource(
-                R.string.sync_stalled_issues,
-                stalledIssuesCount
-            ) else stringResource(id = R.string.sync_stalled_issue_zero),
+        ) {
+            Text(text = stringResource(id = R.string.sync_folders))
+        }
+        Chip(
+            selected = selectedChip == STALLED_ISSUES,
+            contentDescription = stringResource(id = R.string.sync_stalled_issue_zero),
             onClick = { onChipSelected(STALLED_ISSUES) },
-            Modifier.padding(horizontal = 8.dp),
-            isChecked = selectedChip == STALLED_ISSUES,
-        )
-        PhotoChip(
-            text = stringResource(id = R.string.sync_solved_issues),
+        ) {
+            Text(
+                text = if (stalledIssuesCount > 0) {
+                    stringResource(R.string.sync_stalled_issues, stalledIssuesCount)
+                } else {
+                    stringResource(id = R.string.sync_stalled_issue_zero)
+                }
+            )
+        }
+        Chip(
+            selected = selectedChip == SOLVED_ISSUES,
+            contentDescription = stringResource(id = sharedR.string.device_center_sync_solved_issues_chip_text),
             onClick = { onChipSelected(SOLVED_ISSUES) },
-            isChecked = selectedChip == SOLVED_ISSUES,
-        )
+        ) {
+            Text(text = stringResource(id = sharedR.string.device_center_sync_solved_issues_chip_text))
+        }
     }
 }
 
 @Composable
 private fun SelectedChipScreen(
     addFolderClicked: () -> Unit,
+    upgradeAccountClicked: () -> Unit,
     stalledIssueDetailsClicked: (StalledIssueUiItem) -> Unit,
     moreClicked: (StalledIssueUiItem) -> Unit,
     issuesInfoClicked: () -> Unit,
@@ -277,6 +315,7 @@ private fun SelectedChipScreen(
         SYNC_FOLDERS -> {
             SyncFoldersRoute(
                 addFolderClicked = addFolderClicked,
+                upgradeAccountClicked = upgradeAccountClicked,
                 issuesInfoClicked = issuesInfoClicked,
                 viewModel = syncFoldersViewModel,
                 state = syncFoldersState
@@ -300,7 +339,7 @@ private fun SelectedChipScreen(
 @CombinedThemePreviews
 @Composable
 private fun SyncListScreenPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         SyncListScreen(
             stalledIssuesCount = 3,
             addFolderClicked = {},
@@ -308,8 +347,8 @@ private fun SyncListScreenPreview() {
             snackBarHostState = SnackbarHostState(),
             syncPermissionsManager = SyncPermissionsManager(LocalContext.current),
             actions = listOf(),
-            onActionPressed = {
-            }
+            onActionPressed = {},
+            onOpenUpgradeAccountClicked = {}
         )
     }
 }

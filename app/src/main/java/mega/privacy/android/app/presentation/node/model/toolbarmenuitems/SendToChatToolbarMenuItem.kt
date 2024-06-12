@@ -7,11 +7,11 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mega.privacy.android.app.presentation.node.model.menuaction.SendToChatMenuAction
-import mega.privacy.android.core.ui.model.MenuAction
-import mega.privacy.android.core.ui.model.MenuActionWithIcon
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.usecase.chat.GetNodeToAttachUseCase
+import mega.privacy.android.shared.original.core.ui.model.MenuAction
+import mega.privacy.android.shared.original.core.ui.model.MenuActionWithIcon
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -23,7 +23,7 @@ class SendToChatToolbarMenuItem @Inject constructor(
     private val getNodeToAttachUseCase: GetNodeToAttachUseCase,
 ) : NodeToolbarMenuItem<MenuActionWithIcon> {
 
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         hasNodeAccessPermission: Boolean,
         selectedNodes: List<TypedNode>,
         canBeMovedToTarget: Boolean,
@@ -42,8 +42,8 @@ class SendToChatToolbarMenuItem @Inject constructor(
     ): () -> Unit = {
         onDismiss()
         parentScope.launch {
-            runCatching {
-                withContext(NonCancellable) {
+            withContext(NonCancellable) {
+                runCatching {
                     val attachableNodes = selectedNodes.mapNotNull {
                         if (it is TypedFileNode) {
                             getNodeToAttachUseCase(it)
@@ -51,9 +51,9 @@ class SendToChatToolbarMenuItem @Inject constructor(
                     }
                     parentScope.ensureActive()
                     actionHandler(menuAction, attachableNodes)
+                }.onFailure {
+                    Timber.e(it, "Error getting node to attach")
                 }
-            }.onFailure {
-                Timber.e(it, "Error getting node to attach")
             }
         }
     }

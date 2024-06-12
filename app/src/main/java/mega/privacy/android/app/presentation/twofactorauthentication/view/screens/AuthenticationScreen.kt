@@ -22,10 +22,10 @@ import mega.privacy.android.app.presentation.login.view.TWO_FA_PROGRESS_TEST_TAG
 import mega.privacy.android.app.presentation.twofactorauthentication.model.AuthenticationState
 import mega.privacy.android.app.presentation.twofactorauthentication.model.TwoFactorAuthenticationUIState
 import mega.privacy.android.app.presentation.twofactorauthentication.view.TwoFactorAuthenticationField
-import mega.privacy.android.shared.theme.MegaAppTheme
-import mega.privacy.android.core.ui.controls.progressindicator.MegaCircularProgressIndicator
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.textColorSecondary
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaCircularProgressIndicator
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorSecondary
 
 @Composable
 internal fun AuthenticationScreen(
@@ -82,7 +82,7 @@ internal fun AuthenticationScreen(
 @CombinedThemePreviews
 @Composable
 private fun PreviewAuthenticationScreen() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         AuthenticationScreen(
             uiState = TwoFactorAuthenticationUIState(),
             on2FAPinChanged = { _, _ -> },

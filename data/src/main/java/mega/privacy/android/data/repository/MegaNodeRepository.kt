@@ -3,8 +3,11 @@ package mega.privacy.android.data.repository
 import mega.privacy.android.domain.entity.FolderVersionInfo
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.domain.entity.node.UnTypedNode
+import mega.privacy.android.domain.entity.search.DateFilterOption
+import mega.privacy.android.domain.entity.search.SearchCategory
+import mega.privacy.android.domain.entity.search.SearchTarget
 import mega.privacy.android.domain.exception.MegaException
-import nz.mega.sdk.MegaApiAndroid
 import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaShare
 import nz.mega.sdk.MegaUser
@@ -185,25 +188,6 @@ interface MegaNodeRepository {
     suspend fun checkAccessErrorExtended(node: MegaNode, level: Int): MegaException
 
     /**
-     * Provides searched nodes InShares from query
-     * @param query String to be searched
-     */
-    suspend fun searchInShares(
-        query: String,
-        order: SortOrder,
-    ): List<MegaNode>
-
-    /**
-     * Provides searched nodes from OutShares from query
-     * @param query String to be searched
-     */
-    suspend fun searchOutShares(
-        query: String,
-        order: SortOrder,
-    ): List<MegaNode>
-
-
-    /**
      * Get a list with the active and pending outbound sharings for a MegaNode
      * @param nodeId the [NodeId] of the node to get the outbound sharings
      * @return a list of [MegaShare] of the outbound sharings of the node
@@ -211,28 +195,57 @@ interface MegaNodeRepository {
     suspend fun getOutShares(nodeId: NodeId): List<MegaShare>?
 
     /**
-     * Provides searched nodes from Link from query
-     * @param query String to be searched
+     * Search node and return list of [UnTypedNode]
+     * @param nodeId [NodeId] place where needed to be searched
+     * @param searchCategory Search Category for search
+     * @param query string to be search
+     * @param order oder in which result should be there
+     * @param modificationDate modified date filter if set [DateFilterOption]
+     * @param creationDate added date filter if set [DateFilterOption]
      */
-    suspend fun searchLinkShares(
+    suspend fun search(
+        nodeId: NodeId?,
         query: String,
         order: SortOrder,
-        isFirstLevelNavigation: Boolean,
+        searchTarget: SearchTarget = SearchTarget.ROOT_NODES,
+        searchCategory: SearchCategory = SearchCategory.ALL,
+        modificationDate: DateFilterOption? = null,
+        creationDate: DateFilterOption? = null,
     ): List<MegaNode>
 
     /**
-     * Search node in parent Node
-     * @param parentNode [MegaNode]
-     * @param query Query string
-     * @param order [SortOrder]
-     * @param searchType filter type
+     * Get children of a node and return list of [UnTypedNode]
+     * @param nodeId [NodeId] place where needed to be searched
+     * @param query string to be search
+     * @param searchCategory Search Category for search
+     * @param order oder in which result should be there
+     * @param modificationDate modified date filter if set [DateFilterOption]
+     * @param creationDate added date filter if set [DateFilterOption]
      */
-    suspend fun search(
-        parentNode: MegaNode,
+    suspend fun getChildren(
+        nodeId: NodeId?,
         query: String,
         order: SortOrder,
-        searchType: Int = MegaApiAndroid.FILE_TYPE_DEFAULT,
+        searchTarget: SearchTarget = SearchTarget.ROOT_NODES,
+        searchCategory: SearchCategory = SearchCategory.ALL,
+        modificationDate: DateFilterOption? = null,
+        creationDate: DateFilterOption? = null,
     ): List<MegaNode>
+
+    /**
+     * get incoming shares node list
+     */
+    suspend fun getInShares(): List<MegaNode>
+
+    /**
+     * get outgoing shares node list
+     */
+    suspend fun getOutShares(): List<MegaNode>
+
+    /**
+     * get links node list
+     */
+    suspend fun getPublicLinks(): List<MegaNode>
 
     /**
      * Creates a new share key for the node if there is no share key already created.

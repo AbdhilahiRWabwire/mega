@@ -4,14 +4,14 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.feature.devicecenter.ui.model.BackupDeviceFolderUINode
 import mega.privacy.android.feature.devicecenter.ui.model.OwnDeviceUINode
 import mega.privacy.android.feature.devicecenter.ui.model.icon.DeviceCenterUINodeIcon
 import mega.privacy.android.feature.devicecenter.ui.model.icon.DeviceIconType
 import mega.privacy.android.feature.devicecenter.ui.model.icon.FolderIconType
 import mega.privacy.android.feature.devicecenter.ui.model.status.DeviceCenterUINodeStatus
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * A Preview Composable that displays all possible Device and Device Folder Icons
@@ -23,7 +23,7 @@ import mega.privacy.android.shared.theme.MegaAppTheme
 private fun PreviewDeviceCenterUINodeIconDevice(
     @PreviewParameter(DeviceCenterUINodeDeviceIconProvider::class) icon: DeviceCenterUINodeIcon,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterListViewItem(
             uiNode = OwnDeviceUINode(
                 id = "1234-5678",
@@ -46,7 +46,7 @@ private fun PreviewDeviceCenterUINodeIconDevice(
 private fun PreviewDeviceCenterUINodeIconFolder(
     @PreviewParameter(DeviceCenterUINodeFolderIconProvider::class) icon: DeviceCenterUINodeIcon,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterListViewItem(
             uiNode = BackupDeviceFolderUINode(
                 id = "1234-5678",

@@ -8,7 +8,11 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -26,7 +30,7 @@ import mega.privacy.android.app.upgradeAccount.view.ChooseAccountView
 import mega.privacy.android.app.upgradeAccount.view.VariantAOnboardingDialogView
 import mega.privacy.android.app.upgradeAccount.view.VariantBOnboardingDialogView
 import mega.privacy.android.app.utils.billing.PaymentUtils
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.android.data.qualifier.MegaApi
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.ThemeMode
@@ -87,13 +91,14 @@ class ChooseAccountFragment : Fragment() {
     }
 
 
+    @OptIn(ExperimentalComposeUiApi::class)
     @SuppressLint("ProduceStateDoesNotAssignValue")
     @Composable
     fun ChooseAccountBody() {
         val uiState by chooseAccountViewModel.state.collectAsStateWithLifecycle()
         val mode by getThemeMode()
             .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
-        MegaAppTheme(isDark = mode.isDarkMode()) {
+        OriginalTempTheme(isDark = mode.isDarkMode()) {
             if (uiState.enableVariantAUI) {
                 VariantAOnboardingDialogView(
                     state = uiState,
@@ -103,6 +108,9 @@ class ChooseAccountFragment : Fragment() {
                             OnboardingUpsellingDialogVariantAViewProPlansButtonEvent
                         )
                         chooseAccountActivity.onPlanClicked(AccountType.PRO_I)
+                    },
+                    modifier = Modifier.semantics {
+                        testTagsAsResourceId = true
                     },
                 )
             } else if (uiState.enableVariantBUI) {
@@ -129,13 +137,19 @@ class ChooseAccountFragment : Fragment() {
                         Analytics.tracker.trackEvent(
                             OnboardingUpsellingDialogVariantBProPlanIIIDisplayedEvent
                         )
-                    }
+                    },
+                    modifier = Modifier.semantics {
+                        testTagsAsResourceId = true
+                    },
                 )
             } else {
                 ChooseAccountView(
                     state = uiState,
                     onBackPressed = chooseAccountActivity::onFreeClick,
-                    onPlanClicked = chooseAccountActivity::onPlanClicked
+                    onPlanClicked = chooseAccountActivity::onPlanClicked,
+                    modifier = Modifier.semantics {
+                        testTagsAsResourceId = true
+                    },
                 )
             }
         }

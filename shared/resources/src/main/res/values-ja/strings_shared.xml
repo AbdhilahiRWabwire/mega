@@ -91,7 +91,7 @@
     <!-- Title for Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
     <string name="dialog_onboarding_feature_title_backup_rewind">二度とデータを失わない</string>
     <!-- Description about Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_feature_description_backup_rewind">データをバックアップして同期すると、完全に自信が持てます。さらに、巻き戻しを使用すると、フォルダを最大180日以内の任意の日付に復元できます。</string>
+    <string name="dialog_onboarding_feature_description_backup_rewind">巻き戻してファイルとフォルダを最大180日までの任意の日付に復元できるため、データの事故や改ざんが防止されます。</string>
     <!-- Title for MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
     <string name="dialog_onboarding_feature_title_vpn">MEGA&#160;VPN</string>
     <!-- Description about MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
@@ -271,9 +271,117 @@
     <!-- Hint text explaining that you can change the email and resend the create account link to the new email address. This appears on the confirmation email screen under the email address text input field. -->
     <string name="account_confirm_email_misspelled_email_description">メールアドレスのスペルを間違った場合、それを修正して[A]再送信[/A]をタップしてください。</string>
     <!-- Title of the insufficient storage error banner -->
-    <string name="sync_error_storage_over_quota_banner_title">同期が一時停止されました。MEGAプランのストレージが不足しています。</string>
+    <string name="sync_error_storage_over_quota_banner_title">同期が一時停止されました。MEGAプランのストレージが不足しています</string>
     <!-- Title of the insufficient storage error action -->
     <string name="sync_error_storage_over_quota_banner_action">アップグレード</string>
     <!-- The warning message shown when the User enables the Device Charging requirement in Settings Camera Uploads, enables Camera Uploads, begins uploading content and the Device is not charged -->
-    <string name="camera_uploads_phone_not_charging_message">アップロードが一時停止されました、携帯電話は充電されていません</string>
+    <string name="camera_uploads_phone_not_charging_message">アップロードが一時停止されました、デバイスは充電されていません</string>
+    <!-- Label of the Device Status informing the user that Nothing is set up for the Current Device -->
+    <string name="device_center_list_view_item_status_nothing_setup">同期が設定されていません</string>
+    <!-- The title of the warning dialog shown to a suspended Pro Flexi Account User -->
+    <string name="account_pro_flexi_account_deactivated_dialog_title">アカウントが無効になっています</string>
+    <!-- The body of the warning dialog shown to a suspended Pro Flexi Account User -->
+    <string name="account_pro_flexi_account_deactivated_dialog_body">お支払いが失敗したか、サブスクリプションをキャンセルされたため、お客様のPro&#160;Flexiアカウントが無効化されました。そのため、アカウントに保存されているデータにアクセスできなくなります。\nお支払いを行ってサブスクリプションを再開するには、ブラウザからMEGAにログインしてください。</string>
+    <!-- Label for new low-tier plan Starter. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_starter_label">Starter</string>
+    <!-- Label for new low-tier plan Basic. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_basic_label">Basic</string>
+    <!-- Label for new low-tier plan Essential. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_essential_label">Essential</string>
+    <!-- The Body Text of a Settings Camera Uploads Option that decides whether or not the Device must be charged for Camera Uploads to start uploading content -->
+    <string name="settings_camera_uploads_upload_only_while_charging_option_body">デバイスの充電を開始するまで、アップロードは一時停止されます。バッテリー残量が20&#160;%未満の場合も、アップロードは一時停止されたままになります。</string>
+    <!-- Title of the synced folder list empty state -->
+    <string name="device_center_sync_list_empty_state_title">同期が設定されていません</string>
+    <!-- Message of the synced folder list empty state -->
+    <string name="device_center_sync_list_empty_state_message">デバイス上のローカルフォルダをMEGA上のフォルダと同期します。</string>
+    <!-- Label for the button or menu option to add a new sync -->
+    <string name="device_center_sync_add_new_syn_button_option">新しい同期を追加する</string>
+    <!-- Text for the Sync solved issues chip -->
+    <string name="device_center_sync_solved_issues_chip_text">解決済みの問題</string>
+    <!-- Warning message to indicate that cannot select a currently synced folder -->
+    <string name="device_center_new_sync_select_local_device_folder_currently_synced_message">このフォルダは同期できません。カメラアップロードを使用してMEGAに同期するように設定します。</string>
+    <!-- Label for the file info information screen description field -->
+    <string name="file_info_information_description_label">説明</string>
+    <!-- Placeholder for the file info information screen description field -->
+    <string name="file_info_information_description_placeholder">説明を追加</string>
+    <!-- Description added snack bar for the file info information screen-->
+    <string name="file_info_information_snackbar_description_added">説明が追加されました</string>
+    <!-- Description updated snack bar for the file info information screen-->
+    <string name="file_info_information_snackbar_description_updated">説明が更新されました</string>
+    <!-- Title to mention other features of Pro plans on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_title_additional_features">さらに、以下の素晴らしい特典もご利用いただけます：</string>
+    <!-- Description to mention other features of Pro plans (e.g. Mega VPN, chats and meetings, Android Sync and no ads) on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_description_additional_features_with_ads">&#8226;&#160;MEGA&#160;VPN \n&#8226;&#160;無制限の通話とミーティング \n&#8226;&#160;モバイルデバイス上のフォルダを自動的に同期 \n&#8226;&#160;広告なし</string>
+    <!-- Description to mention other features of Pro plans (e.g. Mega VPN, chats and meetings, Android Sync and no ads) on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_description_additional_features_without_ads">&#8226;&#160;MEGA&#160;VPN \n&#8226;&#160;無制限の通話とミーティング \n&#8226;&#160;モバイルデバイス上のフォルダを自動的に同期</string>
+    <!-- Text for the Sync solved issues list empty state -->
+    <string name="device_center_sync_solved_issues_empty_state_text">解決済みの問題はありません</string>
+    <!-- Title of first tour screen -->
+    <string name="cloud_drive_tour_first_title">あなたがキーを持っています</string>
+    <!-- Title of second tour screen -->
+    <string name="cloud_drive_tour_second_title">暗号化されたチャット</string>
+    <!-- Title of third tour screen -->
+    <string name="cloud_drive_tour_third_title">ネットワークの作成</string>
+    <!-- Title of fourth tour screen -->
+    <string name="cloud_drive_tour_fourth_title">クラウド内のあなたの写真</string>
+    <!-- Title of fifth tour screen -->
+    <string name="cloud_drive_tour_fifth_title">MEGAミーティング</string>
+    <!-- First subtitle of the tour screen -->
+    <string name="cloud_drive_tour_first_subtitle">セキュリティこそが私たちの存在理由です。あなたのファイルは、非常に効果的な暗号化マシンの裏側にあり、安全です。そこで、あなたのファイルにアクセスできるのは、あなただけです。</string>
+    <!-- Second subtitle of the tour screen -->
+    <string name="cloud_drive_tour_second_subtitle">音声＆ビデオ通話、グループメッセージング、クラウドドライブとのファイル共有統合による完全に暗号化されたチャット。</string>
+    <!-- Third subtitle of the tour screen -->
+    <string name="cloud_drive_tour_third_subtitle">連絡先の追加、ネットワークの作成、コラボレーション、MEGAを一切離れずに音声通話とビデオ通話を行えます。</string>
+    <!-- Fourth subtitle of the tour screen -->
+    <string name="cloud_drive_tour_fourth_subtitle">カメラアップロードは、あらゆるモバイル端末にとって不可欠な機能で、あなたにもご利用いただけます。今すぐアカウントを作成してください。</string>
+    <!-- Fifth subtitle of the tour screen -->
+    <string name="cloud_drive_tour_fifth_subtitle">ゼロ知識暗号化によるビデオミーティングが可能です。</string>
+    <!-- Titles of the tour screen to onboard users with the MEGA application -->
+    <string-array name="cloud_drive_tour_titles">
+        <item>@string/cloud_drive_tour_first_title</item>
+        <item>@string/cloud_drive_tour_second_title</item>
+        <item>@string/cloud_drive_tour_third_title</item>
+        <item>@string/cloud_drive_tour_fourth_title</item>
+        <item>@string/cloud_drive_tour_fifth_title</item>
+    </string-array>
+    <!-- Subtitles of the tour screen to onboard users with the MEGA application -->
+    <string-array name="cloud_drive_tour_subtitles">
+        <item>@string/cloud_drive_tour_first_subtitle</item>
+        <item>@string/cloud_drive_tour_second_subtitle</item>
+        <item>@string/cloud_drive_tour_third_subtitle</item>
+        <item>@string/cloud_drive_tour_fourth_subtitle</item>
+        <item>@string/cloud_drive_tour_fifth_subtitle</item>
+    </string-array>
+    <!-- Title of the Raise to Hand Feature Introduction Tooltip -->
+    <string name="meetings_raised_hand_tooltip_title">[A]新機能：挙手[/A]</string>
+    <!-- Message of the synced folder list empty state for free accounts -->
+    <string name="device_center_sync_list_empty_state_message_free_account">Proプランのいずれかにアップグレードしていただくと、情報を常に同期して最新の状態に保つことができます。</string>
+    <!-- "Upgrade now" label for a button, menu entry, etc -->
+    <string name="general_upgrade_now_label">今すぐアップグレード</string>
+    <!-- Title of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_title">Proにアップグレード</string>
+    <!-- Message of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_message">当社のProプランをご利用いただくと、モバイルデバイスをクラウドに同期する機能をご利用いただけるようになります。</string>
+    <!-- Confirm button text of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_confirm_button">アップグレード</string>
+    <!-- Cancel button text of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_cancel_button">今はやめます</string>
+    <!-- Title of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_title">アップロードフォルダの競合</string>
+    <!-- Body of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_body">カメラアップロードフォルダとセカンダリメディアアップロードフォルダを相互に関連付けることはできません。別のフォルダを選択してください。</string>
+    <!-- The confirmation Button text of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_confirm_button">はい、わかりました</string>
+    <!-- Warning message shown when trying to select a local folder but there isn’t any app to do that. -->
+    <string name="general_no_picker_warning">この端末には、フォルダを選択するアプリがありません</string>
+    <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to sync folders. Keep the bullet point, as this string is part of the bullet point list. -->
+    <string name="account_upgrade_account_description_feature_sync">&#8226;&#160;モバイルデバイス上のフォルダを自動的に同期します</string>
+    <!-- The error dialog text displayed when user opens Android Sync while having previously established syncs -->
+    <string name="sync_error_dialog_free_user">同期が一時停止されました。同期はProプランの機能です。</string>
+    <!-- The error dialog confirm action text -->
+    <string name="sync_error_dialog_free_user_confirm_action">OK</string>
+    <!-- The error banner text displayed when user opens Android Sync while having previously established syncs -->
+    <string name="sync_error_banner_free_user">MEGA Proプランをキャンセルされたため、同期が一時停止されています。アップグレードしていただくと、同期を継続できます。</string>
+    <!-- Hidden items -->
+    <string name="hidden_items">非表示項目</string>
 </resources>

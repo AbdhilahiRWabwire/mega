@@ -47,11 +47,9 @@ import mega.privacy.android.app.textEditor.TextEditorActivity
 import mega.privacy.android.app.utils.AlertsAndWarnings
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.MegaNodeUtil
-import mega.privacy.android.app.utils.permission.PermissionUtils.checkNotificationsPermission
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
-import mega.privacy.android.shared.theme.MegaAppTheme
-import nz.mega.sdk.MegaNode
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -110,14 +108,8 @@ class FileLinkComposeActivity : TransfersManagementActivity(),
                 action = ::onOpenFile
             )
 
-            EventEffect(
-                event = uiState.downloadFile,
-                onConsumed = viewModel::resetDownloadFile,
-                action = ::downloadFile
-            )
-
             val snackBarHostState = remember { SnackbarHostState() }
-            MegaAppTheme(isDark = themeMode.isDarkMode()) {
+            OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                 FileLinkView(
                     viewState = uiState,
                     snackBarHostState = snackBarHostState,
@@ -234,20 +226,6 @@ class FileLinkComposeActivity : TransfersManagementActivity(),
     }
 
     /**
-     * Download the file
-     */
-    private fun downloadFile(node: MegaNode) {
-        checkNotificationsPermission(this)
-        nodeSaver.saveNode(
-            node = node,
-            highPriority = false,
-            isFolderLink = false,
-            fromMediaViewer = false,
-            needSerialize = true
-        )
-    }
-
-    /**
      * Open folder selection for importing the node
      */
     private fun onImportClicked() {
@@ -300,7 +278,6 @@ class FileLinkComposeActivity : TransfersManagementActivity(),
                         imageSource = ImagePreviewFetcherSource.PUBLIC_FILE,
                         menuOptionsSource = ImagePreviewMenuSource.PUBLIC_FILE,
                         params = mapOf(PublicFileImageNodeFetcher.URL to url),
-                        showScreenLabel = false,
                     )
                     viewModel.updateImageIntent(intent)
                 }

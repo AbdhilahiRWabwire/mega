@@ -7,11 +7,18 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
+import androidx.compose.material.SnackbarHost
+import androidx.compose.material.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.res.stringResource
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -19,12 +26,18 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.databinding.FragmentConfirmEmailBinding
 import mega.privacy.android.app.presentation.extensions.getFormattedStringOrDefault
+import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.login.LoginActivity
-import mega.privacy.android.app.presentation.login.LoginViewModel
+import mega.privacy.android.app.presentation.login.confirmemail.ConfirmEmailFragmentV2.Companion.TEMPORARY_EMAIL_ARG
+import mega.privacy.android.app.presentation.login.confirmemail.ConfirmEmailFragmentV2.Companion.TEMPORARY_FIRST_NAME_ARG
 import mega.privacy.android.app.utils.Constants.EMAIL_ADDRESS
 import mega.privacy.android.app.utils.Util
+import mega.privacy.android.domain.entity.ThemeMode
+import mega.privacy.android.domain.usecase.GetThemeMode
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import nz.mega.sdk.MegaApiAndroid
 import timber.log.Timber
+import javax.inject.Inject
 
 /**
  * Confirm email fragment.
@@ -36,16 +49,33 @@ import timber.log.Timber
 @AndroidEntryPoint
 class ConfirmEmailFragment : Fragment() {
 
+    /**
+     * Current theme
+     */
+    @Inject
+    lateinit var getThemeMode: GetThemeMode
+
     private val viewModel: ConfirmEmailViewModel by viewModels()
-    private val loginViewModel: LoginViewModel by activityViewModels()
 
     private var _binding: FragmentConfirmEmailBinding? = null
 
     private val binding get() = _binding!!
 
-    var emailTemp: String? = null
-    var firstNameTemp: String? = null
+    private var emailTemp: String? = null
+    private var firstNameTemp: String? = null
 
+    /**
+     * Called to do initial creation of a fragment.
+     */
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        emailTemp = arguments?.getString(TEMPORARY_EMAIL_ARG)
+        firstNameTemp = arguments?.getString(TEMPORARY_FIRST_NAME_ARG)
+    }
+
+    /**
+     * Called to have the fragment instantiate its user interface view.
+     */
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -53,6 +83,40 @@ class ConfirmEmailFragment : Fragment() {
     ): View {
         Timber.d("onCreateView")
         _binding = FragmentConfirmEmailBinding.inflate(inflater, container, false)
+
+        binding.snackBarComposeView.apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                val themeMode by getThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.System)
+                val snackBarHostState = remember { SnackbarHostState() }
+                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+                OriginalTempTheme(isDark = themeMode.isDarkMode()) {
+                    val successMessage =
+                        stringResource(id = R.string.confirm_email_misspelled_email_sent)
+                    LaunchedEffect(uiState.shouldShowSuccessMessage) {
+                        if (uiState.shouldShowSuccessMessage) {
+                            snackBarHostState.showSnackbar(
+                                message = successMessage
+                            )
+                            viewModel.onSuccessMessageDisplayed()
+                        }
+                    }
+
+                    LaunchedEffect(uiState.errorMessage) {
+                        uiState.errorMessage?.let {
+                            snackBarHostState.showSnackbar(
+                                message = it
+                            )
+                            viewModel.onErrorMessageDisplayed()
+                        }
+                    }
+
+                    SnackbarHost(hostState = snackBarHostState)
+                }
+            }
+        }
+
         return binding.root
     }
 
@@ -77,7 +141,7 @@ class ConfirmEmailFragment : Fragment() {
         ) { registeredEmail ->
             registeredEmail?.let {
                 (requireActivity() as LoginActivity).setTemporalEmail(it)
-                loginViewModel.saveLastRegisteredEmail(it)
+                viewModel.saveLastRegisteredEmail(it)
             }
         }
     }
@@ -175,5 +239,25 @@ class ConfirmEmailFragment : Fragment() {
             setHintTextAppearance(com.google.android.material.R.style.TextAppearance_Design_Hint)
         }
         confirmEmailNewEmailErrorIcon.isVisible = false
+    }
+
+    companion object {
+
+        /**
+         * Use this factory method to create a new instance of
+         * this fragment using the provided parameters.
+         *
+         * @param tempEmail The temporary email.
+         * @param tempFirstName The temporary first name.
+         * @return A new instance of fragment ConfirmEmailFragment.
+         */
+        @JvmStatic
+        fun newInstance(tempEmail: String?, tempFirstName: String?) =
+            ConfirmEmailFragment().apply {
+                arguments = Bundle().apply {
+                    putString(TEMPORARY_EMAIL_ARG, tempEmail)
+                    putString(TEMPORARY_FIRST_NAME_ARG, tempFirstName)
+                }
+            }
     }
 }

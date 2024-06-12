@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.domain.entity.chat.PendingMessage
+import mega.privacy.android.domain.entity.chat.PendingMessageState
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateRequest
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.transfer.MultiTransferEvent
 import mega.privacy.android.domain.entity.transfer.Transfer
@@ -19,6 +21,7 @@ import mega.privacy.android.domain.entity.transfer.TransferEvent
 import mega.privacy.android.domain.repository.FileSystemRepository
 import mega.privacy.android.domain.repository.chat.ChatMessageRepository
 import mega.privacy.android.domain.usecase.canceltoken.CancelCancelTokenUseCase
+import mega.privacy.android.domain.usecase.chat.message.UpdatePendingMessageUseCase
 import mega.privacy.android.domain.usecase.transfers.uploads.UploadFilesUseCase
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -42,23 +45,24 @@ class StartChatUploadsWithWorkerUseCaseTest {
 
     private val uploadFilesUseCase = mock<UploadFilesUseCase>()
     private val cancelCancelTokenUseCase = mock<CancelCancelTokenUseCase>()
-    private val startChatUploadsWorkerUseCase = mock<StartChatUploadsWorkerUseCase>()
-    private val isChatUploadsWorkerStartedUseCase = mock<IsChatUploadsWorkerStartedUseCase>()
-    private val compressFileForChatUseCase = mock<CompressFileForChatUseCase>()
+    private val startChatUploadsWorkerAndWaitUntilIsStartedUseCase = mock<StartChatUploadsWorkerAndWaitUntilIsStartedUseCase>()
     private val chatMessageRepository = mock<ChatMessageRepository>()
     private val fileSystemRepository = mock<FileSystemRepository>()
     private val handleChatUploadTransferEventUseCase = mock<HandleChatUploadTransferEventUseCase>()
+    private val chatAttachmentNeedsCompressionUseCase =
+        mock<ChatAttachmentNeedsCompressionUseCase>()
+    private val updatePendingMessageUseCase = mock<UpdatePendingMessageUseCase>()
 
     @BeforeAll
     fun setup() {
         underTest = StartChatUploadsWithWorkerUseCase(
             uploadFilesUseCase,
-            startChatUploadsWorkerUseCase,
-            isChatUploadsWorkerStartedUseCase,
-            compressFileForChatUseCase,
+            startChatUploadsWorkerAndWaitUntilIsStartedUseCase,
+            chatAttachmentNeedsCompressionUseCase,
             chatMessageRepository,
             fileSystemRepository,
             handleChatUploadTransferEventUseCase,
+            updatePendingMessageUseCase,
             cancelCancelTokenUseCase,
         )
     }
@@ -67,12 +71,12 @@ class StartChatUploadsWithWorkerUseCaseTest {
     fun resetMocks() = runTest {
         reset(
             uploadFilesUseCase,
-            startChatUploadsWorkerUseCase,
-            isChatUploadsWorkerStartedUseCase,
-            compressFileForChatUseCase,
+            startChatUploadsWorkerAndWaitUntilIsStartedUseCase,
+            chatAttachmentNeedsCompressionUseCase,
             chatMessageRepository,
             fileSystemRepository,
             handleChatUploadTransferEventUseCase,
+            updatePendingMessageUseCase,
             cancelCancelTokenUseCase,
         )
         commonStub()
@@ -80,6 +84,7 @@ class StartChatUploadsWithWorkerUseCaseTest {
 
     private suspend fun commonStub() {
         whenever(fileSystemRepository.isFilePath(any())) doReturn true
+        whenever(chatAttachmentNeedsCompressionUseCase(any())) doReturn false
     }
 
     @Test
@@ -163,7 +168,7 @@ class StartChatUploadsWithWorkerUseCaseTest {
             }
         )
         underTest(mockFile(), NodeId(11L), 1L).collect()
-        verify(startChatUploadsWorkerUseCase).invoke()
+        verify(startChatUploadsWorkerAndWaitUntilIsStartedUseCase).invoke()
     }
 
     @Test
@@ -177,7 +182,7 @@ class StartChatUploadsWithWorkerUseCaseTest {
                 awaitCancellation()
             }
         )
-        whenever(isChatUploadsWorkerStartedUseCase()).then(
+        whenever(startChatUploadsWorkerAndWaitUntilIsStartedUseCase()).then(
             AdditionalAnswers.answersWithDelay(
                 10
             ) {
@@ -188,18 +193,23 @@ class StartChatUploadsWithWorkerUseCaseTest {
             awaitComplete()
             assertThat(workerStarted).isTrue()
         }
-        verify(isChatUploadsWorkerStartedUseCase).invoke()
+        verify(startChatUploadsWorkerAndWaitUntilIsStartedUseCase).invoke()
     }
 
     @Test
     fun `test that files returned by CompressFileForChatUseCase are send to upload files use case`() =
         runTest {
             val file = mockFile()
-            val compressed = mockFile()
-            whenever(compressFileForChatUseCase(file)).thenReturn(compressed)
-            underTest(file, NodeId(11L), 1L).test {
-                verify(uploadFilesUseCase)
-                    .invoke(eq(mapOf(compressed to null)), NodeId(any()), any(), any(), any())
+            val pendingMessageId = 1L
+            whenever(chatAttachmentNeedsCompressionUseCase(file)) doReturn true
+            underTest(file, NodeId(11L), pendingMessageId).test {
+                verify(updatePendingMessageUseCase)
+                    .invoke(
+                        UpdatePendingMessageStateRequest(
+                            pendingMessageId,
+                            PendingMessageState.COMPRESSING
+                        )
+                    )
                 cancelAndIgnoreRemainingEvents()
             }
         }

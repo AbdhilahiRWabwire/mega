@@ -30,13 +30,12 @@ import mega.privacy.android.app.presentation.photos.albums.photosselection.Album
 import mega.privacy.android.app.presentation.photos.albums.photosselection.AlbumPhotosSelectionScreen
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.utils.AlertsAndWarnings
-import mega.privacy.android.app.utils.permission.PermissionUtils.checkNotificationsPermission
-import mega.privacy.android.shared.theme.MegaAppTheme
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.photos.AlbumId
 import mega.privacy.android.domain.entity.photos.AlbumLink
 import mega.privacy.android.domain.usecase.GetThemeMode
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -70,7 +69,7 @@ class AlbumScreenWrapperActivity : BaseActivity() {
 
         setContent {
             val themeMode by getThemeMode().collectAsState(initial = ThemeMode.System)
-            MegaAppTheme(isDark = themeMode.isDarkMode()) {
+            OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                 when (albumScreen) {
                     AlbumScreen.AlbumPhotosSelectionScreen -> {
                         AlbumPhotosSelectionScreen(
@@ -175,17 +174,6 @@ class AlbumScreenWrapperActivity : BaseActivity() {
                                     action = FileExplorerActivity.ACTION_IMPORT_ALBUM
                                 }
                                 selectFolderLauncher.launch(intent)
-                            },
-                            onSaveToDevice = { nodes ->
-                                checkNotificationsPermission(this)
-
-                                nodeSaver.saveNodes(
-                                    nodes = nodes,
-                                    highPriority = false,
-                                    isFolderLink = false,
-                                    fromMediaViewer = false,
-                                    needSerialize = true,
-                                )
                             },
                             onUpgradeAccount = {
                                 val intent = Intent(this, UpgradeAccountActivity::class.java)

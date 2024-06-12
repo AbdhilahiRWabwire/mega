@@ -108,11 +108,11 @@
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:gwpAsanMode="always"
-        android:icon="@mipmap/ic_launcher_mega"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
         android:requestLegacyExternalStorage="true"
-        android:roundIcon="@mipmap/ic_launcher_mega_round"
         android:screenOrientation="fullUser"
         android:supportsRtl="true"
         android:theme="@style/Theme.Mega"
@@ -256,7 +256,7 @@
                 <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
-        <activity android:name=".main.megachat.ChatExplorerActivity" />
+        <activity android:name=".main.megachat.chat.explorer.ChatExplorerActivity" />
         <activity android:name=".main.megachat.NodeAttachmentHistoryActivity" />
         <activity android:name=".main.CountryCodePickerActivity" />
         <activity android:name=".providers.PasscodeFileProviderActivity" />
@@ -333,15 +333,15 @@
             android:configChanges="orientation|screenSize"
             android:label="@string/zip_browser_activity" />
         <activity
+            android:name=".presentation.zipbrowser.ZipBrowserComposeActivity"
+            android:configChanges="orientation|screenSize"
+            android:label="@string/zip_browser_activity" />
+        <activity
             android:name=".main.AddContactActivity"
             android:windowSoftInputMode="adjustNothing" />
         <activity
-            android:name=".main.InviteContactActivity"
+            android:name=".presentation.contact.invite.contact.InviteContactActivity"
             android:windowSoftInputMode="adjustNothing" />
-        <activity
-            android:name=".main.megachat.ChatActivity"
-            android:launchMode="singleTask"
-            android:windowSoftInputMode="stateHidden|adjustResize" />
         <activity
             android:name=".presentation.meeting.chat.ChatHostActivity"
             android:launchMode="singleTask"
@@ -417,11 +417,7 @@
         <activity android:name=".presentation.verification.SMSVerificationActivity" />
         <activity android:name=".presentation.verification.SMSVerificationTextActivity" />
         <activity
-            android:name=".activities.settingsActivities.LegacyCameraUploadsPreferencesActivity"
-            android:label="@string/section_photo_sync"
-            android:launchMode="singleTop" />
-        <activity
-            android:name=".presentation.settings.camerauploads.SettingsCameraUploadsComposeActivity"
+            android:name=".presentation.settings.camerauploads.SettingsCameraUploadsActivity"
             android:label="@string/section_photo_sync"
             android:launchMode="singleTop" />
         <activity
@@ -503,17 +499,9 @@
             android:launchMode="singleTop" />
 
         <service
-            android:name=".main.megachat.ChatUploadService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
-        <service
             android:name=".meeting.CallService"
             android:exported="false"
             android:foregroundServiceType="phoneCall" />
-        <service
-            android:name=".DownloadService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
         <service
             android:name=".meeting.CallNotificationIntentService"
             android:exported="false" />
@@ -722,7 +710,8 @@
             android:launchMode="singleTop" />
         <activity
             android:name="mega.privacy.android.app.camera.CameraActivity"
-            android:launchMode="singleTop" />
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait" />
     </application>
 
 </manifest>

@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.colorResource
@@ -16,22 +17,24 @@ import mega.privacy.android.app.presentation.documentsection.model.DocumentUiEnt
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.core.formatter.formatFileSize
 import mega.privacy.android.core.formatter.formatModifiedDate
-import mega.privacy.android.core.ui.controls.dividers.DividerType
-import mega.privacy.android.core.ui.controls.dividers.MegaDivider
-import mega.privacy.android.core.ui.controls.lists.NodeListViewItem
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.controls.dividers.DividerType
+import mega.privacy.android.shared.original.core.ui.controls.dividers.MegaDivider
+import mega.privacy.android.shared.original.core.ui.controls.lists.NodeListViewItem
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.PdfFileTypeInfo
 import mega.privacy.android.domain.entity.TextFileTypeInfo
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
 import mega.privacy.android.icon.pack.R
 import mega.privacy.android.legacy.core.ui.controls.lists.HeaderViewItem
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import nz.mega.sdk.MegaNode
 
 @Composable
 internal fun DocumentListView(
     items: List<DocumentUiEntity>,
+    accountType: AccountType?,
     lazyListState: LazyListState,
     sortOrder: String,
     modifier: Modifier,
@@ -62,7 +65,11 @@ internal fun DocumentListView(
         items(count = items.size, key = { items[it].id.longValue }) {
             val documentItem = items[it]
             NodeListViewItem(
-                modifier = Modifier.testTag("$DOCUMENT_SECTION_ITEM_VIEW_TEST_TAG$it"),
+                modifier = Modifier
+                    .testTag("$DOCUMENT_SECTION_ITEM_VIEW_TEST_TAG$it")
+                    .alpha(0.5f.takeIf {
+                        accountType?.isPaid == true && (documentItem.isMarkedSensitive || documentItem.isSensitiveInherited)
+                    } ?: 1f),
                 isSelected = documentItem.isSelected,
                 icon = documentItem.icon,
                 showVersion = documentItem.hasVersions,
@@ -103,9 +110,10 @@ internal fun DocumentListView(
 @CombinedThemePreviews
 @Composable
 private fun DocumentListViewPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DocumentListView(
             items = getPreviewItems(),
+            accountType = AccountType.FREE,
             lazyListState = rememberLazyListState(),
             sortOrder = "Size",
             modifier = Modifier,

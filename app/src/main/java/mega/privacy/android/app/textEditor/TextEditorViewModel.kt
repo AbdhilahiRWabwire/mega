@@ -29,7 +29,6 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.UploadService
 import mega.privacy.android.app.components.saver.NodeSaver
 import mega.privacy.android.app.domain.usecase.CheckNameCollision
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.listeners.ExportListener
 import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.namecollision.data.NameCollisionType
@@ -76,7 +75,6 @@ import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.filelink.GetPublicNodeFromSerializedDataUseCase
 import mega.privacy.android.domain.usecase.folderlink.GetPublicChildNodeFromIdUseCase
 import mega.privacy.android.domain.usecase.node.CopyChatNodeUseCase
@@ -114,7 +112,6 @@ import javax.inject.Inject
  * @property copyNodeUseCase            UseCase required to copy nodes.
  * @property downloadBackgroundFile     Use case for downloading the file in background if required.
  * @property ioDispatcher
- * @property getFeatureFlagValueUseCase
  * @property getNodeByIdUseCase
  * @property getChatFileUseCase
  * @property getPublicChildNodeFromIdUseCase
@@ -131,7 +128,6 @@ class TextEditorViewModel @Inject constructor(
     private val copyNodeUseCase: CopyNodeUseCase,
     private val downloadBackgroundFile: DownloadBackgroundFile,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val getNodeByIdUseCase: GetNodeByIdUseCase,
     private val getChatFileUseCase: GetChatFileUseCase,
     private val copyChatNodeUseCase: CopyChatNodeUseCase,
@@ -897,59 +893,42 @@ class TextEditorViewModel @Inject constructor(
 
             else -> {
                 viewModelScope.launch {
-                    if (getFeatureFlagValueUseCase(AppFeatures.DownloadWorker)) {
-                        when (getAdapterType()) {
-                            FROM_CHAT -> {
-                                val chatId =
-                                    textEditorData.value?.chatRoom?.chatId ?: INVALID_HANDLE
-                                val msgId = textEditorData.value?.msgChat?.msgId ?: INVALID_HANDLE
-                                val nodes = listOfNotNull(getChatFileUseCase(chatId, msgId))
-                                updateDownloadEvent(
-                                    TransferTriggerEvent.StartDownloadNode(nodes)
-                                )
-                            }
-
-                            FOLDER_LINK_ADAPTER -> {
-                                val nodeId = NodeId(getNode()?.handle ?: INVALID_HANDLE)
-                                val nodes = listOfNotNull(getPublicChildNodeFromIdUseCase(nodeId))
-                                updateDownloadEvent(
-                                    TransferTriggerEvent.StartDownloadNode(nodes)
-                                )
-                            }
-
-                            FILE_LINK_ADAPTER -> {
-                                val node = getNode()?.serialize()?.let {
-                                    getPublicNodeFromSerializedDataUseCase(it)
-                                }
-                                val nodes = listOfNotNull(node)
-                                updateDownloadEvent(
-                                    TransferTriggerEvent.StartDownloadNode(nodes)
-                                )
-                            }
-
-                            else -> {
-                                val node = getNode()?.handle?.let {
-                                    getNodeByIdUseCase(NodeId(it))
-                                }
-                                val nodes = listOfNotNull(node)
-                                updateDownloadEvent(
-                                    TransferTriggerEvent.StartDownloadNode(nodes)
-                                )
-                            }
-                        }
-                    } else {
-                        when (getAdapterType()) {
-                            FROM_CHAT -> nodeSaver.saveNode(
-                                getNode()!!,
-                                highPriority = true,
-                                isFolderLink = true,
-                                fromMediaViewer = true
+                    when (getAdapterType()) {
+                        FROM_CHAT -> {
+                            val chatId =
+                                textEditorData.value?.chatRoom?.chatId ?: INVALID_HANDLE
+                            val msgId = textEditorData.value?.msgChat?.msgId ?: INVALID_HANDLE
+                            val nodes = listOfNotNull(getChatFileUseCase(chatId, msgId))
+                            updateDownloadEvent(
+                                TransferTriggerEvent.StartDownloadNode(nodes)
                             )
+                        }
 
-                            else -> nodeSaver.saveHandle(
-                                getNode()!!.handle,
-                                isFolderLink = getAdapterType() == FOLDER_LINK_ADAPTER,
-                                fromMediaViewer = true
+                        FOLDER_LINK_ADAPTER -> {
+                            val nodeId = NodeId(getNode()?.handle ?: INVALID_HANDLE)
+                            val nodes = listOfNotNull(getPublicChildNodeFromIdUseCase(nodeId))
+                            updateDownloadEvent(
+                                TransferTriggerEvent.StartDownloadNode(nodes)
+                            )
+                        }
+
+                        FILE_LINK_ADAPTER -> {
+                            val node = getNode()?.serialize()?.let {
+                                getPublicNodeFromSerializedDataUseCase(it)
+                            }
+                            val nodes = listOfNotNull(node)
+                            updateDownloadEvent(
+                                TransferTriggerEvent.StartDownloadNode(nodes)
+                            )
+                        }
+
+                        else -> {
+                            val node = getNode()?.handle?.let {
+                                getNodeByIdUseCase(NodeId(it))
+                            }
+                            val nodes = listOfNotNull(node)
+                            updateDownloadEvent(
+                                TransferTriggerEvent.StartDownloadNode(nodes)
                             )
                         }
                     }

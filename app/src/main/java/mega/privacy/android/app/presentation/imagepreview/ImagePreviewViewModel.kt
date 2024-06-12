@@ -1,6 +1,5 @@
 package mega.privacy.android.app.presentation.imagepreview
 
-import android.app.Activity
 import android.content.Context
 import android.os.Bundle
 import androidx.lifecycle.SavedStateHandle
@@ -23,9 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mega.privacy.android.app.R
-import mega.privacy.android.app.components.saver.NodeSaver
 import mega.privacy.android.app.domain.usecase.CheckNameCollision
-import mega.privacy.android.app.domain.usecase.offline.SetNodeAvailableOffline
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.namecollision.data.NameCollisionType
@@ -44,12 +41,9 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.node.chat.ChatImageFile
 import mega.privacy.android.domain.qualifier.DefaultDispatcher
-import mega.privacy.android.domain.usecase.GetParentNodeUseCase
 import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
-import mega.privacy.android.domain.usecase.camerauploads.GetPrimarySyncHandleUseCase
-import mega.privacy.android.domain.usecase.camerauploads.GetSecondarySyncHandleUseCase
 import mega.privacy.android.domain.usecase.favourites.AddFavouritesUseCase
 import mega.privacy.android.domain.usecase.favourites.IsAvailableOfflineUseCase
 import mega.privacy.android.domain.usecase.favourites.RemoveFavouritesUseCase
@@ -69,14 +63,12 @@ import mega.privacy.android.domain.usecase.node.MoveNodesToRubbishUseCase
 import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.offline.RemoveOfflineNodeUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
-import mega.privacy.android.domain.usecase.transfers.chatuploads.GetMyChatsFilesFolderIdUseCase
-import mega.privacy.android.domain.usecase.transfers.downloads.ResetTotalDownloadsUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
 import java.io.File
-import java.lang.ref.WeakReference
 import javax.inject.Inject
+
 @HiltViewModel
 class ImagePreviewViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
@@ -93,7 +85,6 @@ class ImagePreviewViewModel @Inject constructor(
     private val moveNodeUseCase: MoveNodeUseCase,
     private val addFavouritesUseCase: AddFavouritesUseCase,
     private val removeFavouritesUseCase: RemoveFavouritesUseCase,
-    private val setNodeAvailableOffline: SetNodeAvailableOffline,
     private val removeOfflineNodeUseCase: RemoveOfflineNodeUseCase,
     private val monitorOfflineNodeUpdatesUseCase: MonitorOfflineNodeUpdatesUseCase,
     private val isAvailableOfflineUseCase: IsAvailableOfflineUseCase,
@@ -105,17 +96,12 @@ class ImagePreviewViewModel @Inject constructor(
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val getPublicChildNodeFromIdUseCase: GetPublicChildNodeFromIdUseCase,
     private val getPublicNodeFromSerializedDataUseCase: GetPublicNodeFromSerializedDataUseCase,
-    private val resetTotalDownloadsUseCase: ResetTotalDownloadsUseCase,
     private val deleteNodesUseCase: DeleteNodesUseCase,
     private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase,
     private val imagePreviewVideoLauncher: ImagePreviewVideoLauncher,
     private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
     private val isHiddenNodesOnboardedUseCase: IsHiddenNodesOnboardedUseCase,
     private val monitorShowHiddenItemsUseCase: MonitorShowHiddenItemsUseCase,
-    private val getPrimarySyncHandleUseCase: GetPrimarySyncHandleUseCase,
-    private val getSecondarySyncHandleUseCase: GetSecondarySyncHandleUseCase,
-    private val getMyChatsFilesFolderIdUseCase: GetMyChatsFilesFolderIdUseCase,
-    private val getParentNodeUseCase: GetParentNodeUseCase,
     @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
     private val imagePreviewFetcherSource: ImagePreviewFetcherSource
@@ -136,8 +122,6 @@ class ImagePreviewViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(ImagePreviewState())
 
-    private var isHidingActionAllowed: Boolean = false
-
     val state: StateFlow<ImagePreviewState> = _state
 
     private val menu: ImagePreviewMenu?
@@ -151,7 +135,6 @@ class ImagePreviewViewModel @Inject constructor(
                 monitorImageNodes()
             }
             monitorOfflineNodeUpdates()
-            isHidingActionAllowed = isHidingActionAllowed()
         }
     }
 
@@ -336,11 +319,17 @@ class ImagePreviewViewModel @Inject constructor(
     }
 
     suspend fun isHideMenuVisible(imageNode: ImageNode): Boolean {
-        return menu?.isHideMenuVisible(imageNode) ?: false && isHidingActionAllowed
+        return menu?.isHideMenuVisible(imageNode) ?: false
     }
 
     suspend fun isUnhideMenuVisible(imageNode: ImageNode): Boolean {
-        return menu?.isUnhideMenuVisible(imageNode) ?: false && isHidingActionAllowed
+        return menu?.isUnhideMenuVisible(imageNode) ?: false
+    }
+
+    // When ImageNode from ShareItems, then we always hide the hidden menus (Hide/Unhide) in Bottom Sheet
+    fun forceHideHiddenMenus(): Boolean {
+        return imagePreviewMenuSource == ImagePreviewMenuSource.SHARED_ITEMS
+                || imagePreviewMenuSource == ImagePreviewMenuSource.LINKS
     }
 
     suspend fun isMoveMenuVisible(imageNode: ImageNode): Boolean {
@@ -439,19 +428,19 @@ class ImagePreviewViewModel @Inject constructor(
     /**
      * Check if transfers are paused.
      */
-    fun executeTransfer(transferMessage: String, legacyTransferAction: () -> Unit) {
+    fun executeTransfer(transferMessage: String, downloadForPreview: Boolean = false) {
         viewModelScope.launch {
             if (areTransfersPausedUseCase()) {
                 setTransferMessage(transferMessage)
             } else {
-                if (getFeatureFlagValueUseCase(AppFeatures.DownloadWorker)) {
-                    triggerDownloadEvent(
-                        imageNode = _state.value.currentImageNode,
-                    ) {
+                triggerDownloadEvent(
+                    imageNode = _state.value.currentImageNode,
+                ) {
+                    if (downloadForPreview) {
+                        TransferTriggerEvent.StartDownloadForPreview(it)
+                    } else {
                         TransferTriggerEvent.StartDownloadNode(listOf(it))
                     }
-                } else {
-                    legacyTransferAction()
                 }
             }
         }
@@ -468,24 +457,15 @@ class ImagePreviewViewModel @Inject constructor(
     }
 
     fun setNodeAvailableOffline(
-        activity: WeakReference<Activity>,
         setOffline: Boolean,
         imageNode: ImageNode,
     ) {
         viewModelScope.launch {
             if (setOffline) {
-                if (getFeatureFlagValueUseCase(AppFeatures.DownloadWorker)) {
-                    triggerDownloadEvent(
-                        imageNode,
-                    ) {
-                        TransferTriggerEvent.StartDownloadForOffline(it)
-                    }
-                } else {
-                    setNodeAvailableOffline(
-                        nodeId = imageNode.id,
-                        availableOffline = true,
-                        activity = activity
-                    )
+                triggerDownloadEvent(
+                    imageNode,
+                ) {
+                    TransferTriggerEvent.StartDownloadForOffline(it)
                 }
             } else {
                 removeOfflineNodeUseCase(imageNode.id)
@@ -806,19 +786,6 @@ class ImagePreviewViewModel @Inject constructor(
         }
     }
 
-    fun saveToDevice(nodeSaver: NodeSaver, node: MegaNode, isForeign: Boolean) {
-        viewModelScope.launch {
-            resetTotalDownloadsUseCase()
-            nodeSaver.saveNode(
-                node,
-                highPriority = false,
-                isFolderLink = isForeign,
-                fromMediaViewer = false,
-                needSerialize = true,
-            )
-        }
-    }
-
     fun deleteNode(nodeId: NodeId) {
         viewModelScope.launch {
             runCatching {
@@ -871,13 +838,6 @@ class ImagePreviewViewModel @Inject constructor(
         )
     }
 
-    private suspend fun isHidingActionAllowed(): Boolean = runCatching {
-        (getParentNodeUseCase(NodeId(currentImageNodeIdValue))?.id?.longValue ?: 0) !in listOf(
-            getPrimarySyncHandleUseCase(),
-            getSecondarySyncHandleUseCase(),
-            getMyChatsFilesFolderIdUseCase(),
-        )
-    }.getOrElse { false }
 
     companion object {
         const val IMAGE_NODE_FETCHER_SOURCE = "image_node_fetcher_source"
@@ -887,4 +847,3 @@ class ImagePreviewViewModel @Inject constructor(
         const val IMAGE_PREVIEW_IS_FOREIGN = "image_preview_is_foreign"
     }
 }
-

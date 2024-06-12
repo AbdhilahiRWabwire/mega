@@ -2,22 +2,20 @@ package mega.privacy.android.legacy.core.ui.controls.tooltips
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.skydoves.balloon.ArrowOrientationRules
 import com.skydoves.balloon.ArrowPositionRules
@@ -28,10 +26,10 @@ import com.skydoves.balloon.compose.BalloonWindow
 import com.skydoves.balloon.compose.rememberBalloonBuilder
 import com.skydoves.balloon.compose.setBackgroundColor
 import mega.privacy.android.legacy.core.ui.controls.text.MegaSpannedText
-import mega.privacy.android.core.ui.model.SpanIndicator
-import mega.privacy.android.core.ui.theme.extensions.body2medium
-import mega.privacy.android.core.ui.theme.extensions.dark_blue_tooltip_white
-import mega.privacy.android.core.ui.theme.extensions.white_black
+import mega.privacy.android.shared.original.core.ui.model.SpanIndicator
+import mega.privacy.android.shared.original.core.ui.theme.extensions.body2medium
+import mega.privacy.android.shared.original.core.ui.theme.extensions.dark_blue_tooltip_white
+import mega.privacy.android.shared.original.core.ui.theme.extensions.white_black
 
 /**
  * Mega tooltip Balloon
@@ -46,19 +44,26 @@ import mega.privacy.android.core.ui.theme.extensions.white_black
  */
 @Composable
 fun LegacyMegaTooltip(
-    modifier: Modifier = Modifier,
-    titleText: String,
     descriptionText: String,
     actionText: String,
     showOnTop: Boolean,
     onDismissed: () -> Unit,
+    modifier: Modifier = Modifier,
+    key: Any? = null,
+    setDismissWhenTouchOutside: Boolean = false,
+    titleText: String? = null,
     content: @Composable () -> Unit,
 ) {
     var window: BalloonWindow? by remember { mutableStateOf(null) }
+    LaunchedEffect(key1 = key) {
+        window?.awaitAlignTop()
+        window?.updateAlignTop()
+    }
+
     val bgColor = MaterialTheme.colors.dark_blue_tooltip_white
     val builder = rememberBalloonBuilder {
         setIsVisibleOverlay(false)
-        setDismissWhenTouchOutside(false)
+        setDismissWhenTouchOutside(setDismissWhenTouchOutside)
         setDismissWhenOverlayClicked(false)
         setDismissWhenLifecycleOnPause(false)
         setWidth(BalloonSizeSpec.WRAP)
@@ -71,26 +76,29 @@ fun LegacyMegaTooltip(
         setArrowOrientationRules(ArrowOrientationRules.ALIGN_ANCHOR)
         setArrowPositionRules(ArrowPositionRules.ALIGN_ANCHOR)
         setBalloonAnimation(BalloonAnimation.FADE)
-        passTouchEventToAnchor = true
         setBackgroundColor(bgColor)
     }
 
     Balloon(
         modifier = modifier,
         builder = builder,
+        onBalloonWindowInitialized = { window = it },
+        onComposedAnchor = {
+            if (showOnTop) {
+                window?.showAlignTop()
+            } else {
+                window?.showAtCenter()
+            }
+        },
         balloonContent = {
-            Column(
-                modifier = if (LocalLayoutDirection.current == LayoutDirection.Rtl) {
-                    Modifier.fillMaxWidth()
-                } else {
-                    Modifier.width(216.dp)
+            Column(modifier = Modifier.wrapContentWidth()) {
+                if (titleText != null) {
+                    Text(
+                        text = titleText,
+                        color = MaterialTheme.colors.white_black,
+                        style = MaterialTheme.typography.body2medium,
+                    )
                 }
-            ) {
-                Text(
-                    text = titleText,
-                    color = MaterialTheme.colors.white_black,
-                    style = MaterialTheme.typography.body2medium,
-                )
                 MegaSpannedText(
                     value = descriptionText,
                     baseStyle = MaterialTheme.typography.caption.copy(
@@ -115,13 +123,7 @@ fun LegacyMegaTooltip(
                 )
             }
         }
-    ) { balloonWindow ->
-        window = balloonWindow
+    ) {
         content()
-        if (showOnTop) {
-            balloonWindow.showAlignTop()
-        } else {
-            balloonWindow.showAtCenter()
-        }
     }
 }

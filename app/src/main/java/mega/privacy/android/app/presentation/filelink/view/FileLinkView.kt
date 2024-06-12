@@ -43,16 +43,16 @@ import mega.privacy.android.app.presentation.filelink.model.FileLinkState
 import mega.privacy.android.app.presentation.transfers.TransferManagementUiState
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.utils.AlertsAndWarnings
-import mega.privacy.android.core.ui.controls.buttons.TextMegaButton
-import mega.privacy.android.core.ui.controls.dialogs.ConfirmationDialog
-import mega.privacy.android.core.ui.controls.dialogs.MegaAlertDialog
-import mega.privacy.android.core.ui.controls.layouts.ScaffoldWithCollapsibleHeader
-import mega.privacy.android.core.ui.controls.snackbars.MegaSnackbar
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.grey_020_grey_700
+import mega.privacy.android.shared.original.core.ui.controls.buttons.TextMegaButton
+import mega.privacy.android.shared.original.core.ui.controls.dialogs.ConfirmationDialog
+import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDialog
+import mega.privacy.android.shared.original.core.ui.controls.layouts.ScaffoldWithCollapsibleHeader
+import mega.privacy.android.shared.original.core.ui.controls.snackbars.MegaSnackbar
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_020_grey_700
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.legacy.core.ui.controls.dialogs.LoadingDialog
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * View to render the File Link Screen, including toolbar, content, etc.
@@ -163,6 +163,7 @@ internal fun FileLinkView(
                 )
             }
         },
+        headerSpacerHeight = if (viewState.iconResource != null) (MAX_HEADER_HEIGHT + APP_BAR_HEIGHT).dp else MAX_HEADER_HEIGHT.dp,
         modifier = modifier,
     ) {
         FileLinkContent(
@@ -253,7 +254,7 @@ internal fun ImportDownloadView(
 @CombinedThemePreviews
 @Composable
 private fun PreviewImportDownloadView() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         ImportDownloadView(
             modifier = Modifier
                 .fillMaxWidth()
@@ -269,7 +270,7 @@ private fun PreviewImportDownloadView() {
 @CombinedThemePreviews
 @Composable
 private fun PreviewFileLinkView() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         val viewState =
             FileLinkState(hasDbCredentials = true, title = "Title", sizeInBytes = 10000L)
         FileLinkView(
@@ -296,3 +297,5 @@ private fun PreviewFileLinkView() {
 internal const val animationDuration = 300
 internal const val animationScale = 0.2f
 internal val animationSpecs = TweenSpec<Float>(durationMillis = animationDuration)
+private const val MAX_HEADER_HEIGHT = 96
+private const val APP_BAR_HEIGHT = 56

@@ -1,6 +1,7 @@
 plugins {
     alias(convention.plugins.mega.android.library)
     alias(convention.plugins.mega.android.test)
+    alias(convention.plugins.mega.android.library.jacoco)
     id("kotlin-android")
     id("kotlin-kapt")
 }
@@ -20,19 +21,6 @@ android {
         consumerProguardFiles("consumer-rules.pro")
     }
 
-    kotlin {
-        val jdk: String by rootProject.extra
-        jvmToolchain(jdk.toInt())
-    }
-
-    kotlinOptions {
-        val jdk: String by rootProject.extra
-        jvmTarget = jdk
-        val shouldSuppressWarnings: Boolean by rootProject.extra
-        suppressWarnings = shouldSuppressWarnings
-        freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
-    }
-
     lint {
         abortOnError = false
         xmlOutput = file("build/reports/lint-results.xml")
@@ -44,8 +32,7 @@ dependencies {
     lintChecks(project(":lint"))
 
     implementation(project(":icon-pack"))
-    implementation(project(":core-ui"))
-    implementation(project(":shared:theme"))
+    implementation(project(":shared:original-core-ui"))
     testImplementation(project(":core-ui-test"))
 
     implementation(platform(androidx.compose.bom))

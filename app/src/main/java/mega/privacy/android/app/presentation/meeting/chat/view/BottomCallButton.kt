@@ -14,11 +14,11 @@ import androidx.compose.ui.unit.dp
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.meeting.chat.model.ChatUiState
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.startMeetingActivity
-import mega.privacy.android.core.ui.controls.buttons.OutlinedMegaButton
-import mega.privacy.android.core.ui.preview.BooleanProvider
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.controls.buttons.OutlinedMegaButton
+import mega.privacy.android.shared.original.core.ui.preview.BooleanProvider
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 @Composable
 internal fun BottomCallButton(
@@ -81,7 +81,7 @@ private fun BottomCallButton(
 @CombinedThemePreviews
 @Composable
 private fun CallOnHoldButtonPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         Box {
             BottomCallButton(
                 textId = R.string.call_on_hold,
@@ -97,7 +97,7 @@ private fun CallOnHoldButtonPreview() {
 private fun JoinAnswerCallButtonPreview(
     @PreviewParameter(BooleanProvider::class) isGroup: Boolean,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         Box {
             BottomCallButton(
                 textId = if (isGroup) R.string.title_join_call else R.string.title_join_one_to_one_call,

@@ -18,7 +18,6 @@ import mega.privacy.android.app.usecase.GetNodeUseCase
 import mega.privacy.android.app.usecase.chat.GetChatMessageUseCase
 import mega.privacy.android.app.usecase.exception.MegaNodeException
 import mega.privacy.android.app.utils.MegaApiUtils.getMegaNodeFolderInfo
-import mega.privacy.android.app.utils.RxUtil.blockingGetOrNull
 import mega.privacy.android.data.qualifier.MegaApi
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.usecase.thumbnailpreview.GetThumbnailUseCase
@@ -185,14 +184,15 @@ class GetNameCollisionResultUseCase @Inject constructor(
     fun get(collisions: List<NameCollision>): Flowable<MutableList<NameCollisionResult>> =
         Flowable.create({ emitter ->
             val collisionsResult = mutableListOf<NameCollisionResult>()
-
             for ((i, collision) in collisions.withIndex()) {
                 get(collision).blockingSubscribeBy(
                     onNext = { nameCollisionResult ->
-                        collisionsResult.add(
-                            i,
-                            nameCollisionResult
-                        )
+                        // Replace with latest value if exists, add otherwise
+                        if (i >= collisionsResult.size) {
+                            collisionsResult.add(nameCollisionResult)
+                        } else {
+                            collisionsResult[i] = nameCollisionResult
+                        }
                     },
                     onError = { error -> Timber.w(error, "NameCollisionResult error") },
                     onComplete = { emitter.onNext(collisionsResult) }
@@ -356,9 +356,17 @@ class GetNameCollisionResultUseCase @Inject constructor(
                 val firstIndex = lastIndexOf('(')
                 name.substring(0, firstIndex + 1).plus("$newNumber)")
             }
+
             else -> name.plus(" (1)")
         }
 
         return renameName.plus(extension)
     }
+
+    private fun <T : Any> Single<T>.blockingGetOrNull(): T? =
+        try {
+            blockingGet()
+        } catch (ignore: Exception) {
+            null
+        }
 }

@@ -31,9 +31,39 @@ gradlePlugin {
         }
     }
     plugins {
+        register("androidApplication") {
+            id = "mega.android.app"
+            implementationClass = "AndroidApplicationConventionPlugin"
+        }
+    }
+    plugins {
         register("jvmTest") {
             id = "mega.jvm.test"
             implementationClass = "JvmTestConventionPlugin"
+        }
+    }
+    plugins {
+        register("jvmLibrary") {
+            id = "mega.jvm.library"
+            implementationClass = "JvmLibraryConventionPlugin"
+        }
+    }
+    plugins {
+        register("androidLibraryJacoco") {
+            id = "mega.android.library.jacoco"
+            implementationClass = "AndroidLibraryJacocoConventionPlugin"
+        }
+    }
+    plugins {
+        register("jvmLibraryJacoco") {
+            id = "mega.jvm.jacoco"
+            implementationClass = "JvmLibraryJacocoConventionPlugin"
+        }
+    }
+    plugins {
+        register("androidApplicationJacoco") {
+            id = "mega.android.application.jacoco"
+            implementationClass = "AndroidApplicationJacocoConventionPlugin"
         }
     }
 }

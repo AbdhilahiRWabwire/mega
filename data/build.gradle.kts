@@ -5,15 +5,12 @@ plugins {
     alias(convention.plugins.mega.android.library)
     alias(convention.plugins.mega.android.room)
     alias(convention.plugins.mega.android.test)
+    alias(convention.plugins.mega.android.library.jacoco)
     id("kotlin-android")
     id("kotlin-kapt")
     id("de.mannodermaus.android-junit5")
-
     kotlin("plugin.serialization") version "1.9.21"
 }
-
-apply(plugin = "jacoco")
-apply(from = "${project.rootDir}/tools/jacoco.gradle")
 
 android {
 
@@ -25,36 +22,9 @@ android {
         consumerProguardFiles("consumer-rules.pro")
     }
 
-    kotlin {
-        val jdk: String by rootProject.extra
-        jvmToolchain(jdk.toInt())
-    }
-
-    kotlinOptions {
-        val jdk: String by rootProject.extra
-        jvmTarget = jdk
-        val shouldSuppressWarnings: Boolean by rootProject.extra
-        suppressWarnings = shouldSuppressWarnings
-        freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
-    }
-
     lint {
         abortOnError = false
         xmlOutput = file("build/reports/lint-results.xml")
-    }
-
-    tasks.withType<Test> {
-        configure<JacocoTaskExtension> {
-            isIncludeNoLocationClasses = true
-            excludes = listOf("jdk.internal.*")
-        }
-    }
-
-    flavorDimensions += "service"
-    productFlavors {
-        create("gms") {
-            dimension = "service"
-        }
     }
 
     sourceSets {
@@ -100,7 +70,7 @@ dependencies {
     }
     implementation(google.autovalue.annotations)
 
-    "gmsImplementation"(lib.billing.client.ktx)
+    implementation(lib.billing.client.ktx)
 
     implementation(platform(google.firebase.bom))
     implementation(google.firebase.perf.ktx)

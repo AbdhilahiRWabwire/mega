@@ -7,11 +7,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import mega.privacy.android.app.R
-import mega.privacy.android.core.ui.controls.dividers.DividerType
-import mega.privacy.android.core.ui.controls.dividers.MegaDivider
-import mega.privacy.android.core.ui.controls.lists.GenericTwoLineListItem
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.controls.dividers.DividerType
+import mega.privacy.android.shared.original.core.ui.controls.dividers.MegaDivider
+import mega.privacy.android.shared.original.core.ui.controls.lists.GenericTwoLineListItem
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * A [Composable] that displays the maximum aggregate Video Size that must be exceeded in order to
@@ -51,7 +51,7 @@ internal fun VideoCompressionTile(
 @CombinedThemePreviews
 @Composable
 private fun VideoCompressionTilePreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VideoCompressionTile(
             maximumNonChargingVideoCompressionSize = 500,
             onItemClicked = {},

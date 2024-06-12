@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -34,6 +35,7 @@ import mega.privacy.android.data.gateway.preferences.AccountPreferencesGateway
 import mega.privacy.android.data.gateway.preferences.CallsPreferencesGateway
 import mega.privacy.android.data.gateway.preferences.CameraUploadsSettingsPreferenceGateway
 import mega.privacy.android.data.gateway.preferences.ChatPreferencesGateway
+import mega.privacy.android.data.gateway.preferences.CredentialsPreferencesGateway
 import mega.privacy.android.data.gateway.preferences.EphemeralCredentialsGateway
 import mega.privacy.android.data.listener.OptionalMegaChatRequestListenerInterface
 import mega.privacy.android.data.listener.OptionalMegaRequestListenerInterface
@@ -65,6 +67,7 @@ import mega.privacy.android.domain.entity.achievement.AchievementsOverview
 import mega.privacy.android.domain.entity.achievement.MegaAchievement
 import mega.privacy.android.domain.entity.login.EphemeralCredentials
 import mega.privacy.android.domain.entity.settings.cookie.CookieType
+import mega.privacy.android.domain.entity.user.UserCredentials
 import mega.privacy.android.domain.entity.user.UserId
 import mega.privacy.android.domain.exception.ChangeEmailException
 import mega.privacy.android.domain.exception.ChatNotInitializedErrorStatus
@@ -162,6 +165,7 @@ internal class DefaultAccountRepository @Inject constructor(
     private val cameraUploadsSettingsPreferenceGateway: CameraUploadsSettingsPreferenceGateway,
     private val cookieSettingsMapper: CookieSettingsMapper,
     private val cookieSettingsIntMapper: CookieSettingsIntMapper,
+    private val credentialsPreferencesGateway: CredentialsPreferencesGateway,
 ) : AccountRepository {
     override suspend fun getUserAccount(): UserAccount = withContext(ioDispatcher) {
         val user = megaApiGateway.getLoggedInUser()
@@ -278,7 +282,7 @@ internal class DefaultAccountRepository @Inject constructor(
     }
 
     override suspend fun getSession(): String? = withContext(ioDispatcher) {
-        localStorageGateway.getUserCredentials()?.session
+        getAccountCredentials()?.session
     }
 
     override suspend fun retryChatPendingConnections(disconnect: Boolean) =
@@ -321,7 +325,7 @@ internal class DefaultAccountRepository @Inject constructor(
                         if (error.errorCode == MegaError.API_OK) {
                             continuation.resumeWith(
                                 Result.success(
-                                    subscriptionOptionListMapper(request, currencyMapper)
+                                    subscriptionOptionListMapper(request)
                                 )
                             )
                         } else {
@@ -527,12 +531,12 @@ internal class DefaultAccountRepository @Inject constructor(
             if (forceRefresh) {
                 return@withContext megaApiGateway.accountEmail
                     .also {
-                        if (it.isNullOrBlank().not()) {
-                            dbHandler.saveMyEmail(it)
+                        if (!it.isNullOrBlank()) {
+                            credentialsPreferencesGateway.saveEmail(it)
                         }
                     }
             }
-            return@withContext dbHandler.myEmail
+            return@withContext getAccountCredentials()?.email
         }
     }
 
@@ -580,14 +584,14 @@ internal class DefaultAccountRepository @Inject constructor(
 
         val session = megaApiGateway.dumpSession
         val credentials = userCredentialsMapper(email, session, null, null, myUserHandle.toString())
-        localStorageGateway.saveCredentials(credentials)
+        credentialsPreferencesGateway.save(credentials)
         ephemeralCredentialsGateway.clear()
 
         accountSessionMapper(email, session, myUserHandle)
     }
 
     override suspend fun getAccountCredentials() = withContext(ioDispatcher) {
-        localStorageGateway.getUserCredentials()
+        credentialsPreferencesGateway.monitorCredentials().firstOrNull()
     }
 
     override suspend fun changeEmail(email: String): String = withContext(ioDispatcher) {
@@ -659,7 +663,6 @@ internal class DefaultAccountRepository @Inject constructor(
 
     override suspend fun clearAccountPreferences() = withContext(ioDispatcher) {
         with(localStorageGateway) {
-            clearCredentials()
             clearPreferences()
             setFirstTime(false)
             clearContacts()
@@ -668,6 +671,7 @@ internal class DefaultAccountRepository @Inject constructor(
             clearAttributes()
             clearChatSettings()
         }
+        credentialsPreferencesGateway.clear()
         megaLocalRoomGateway.deleteAllBackups()
         megaLocalRoomGateway.deleteAllCompletedTransfers()
         megaLocalRoomGateway.clearOffline()
@@ -1334,7 +1338,7 @@ internal class DefaultAccountRepository @Inject constructor(
         }
     }
 
-    override suspend fun getUsedStorage(): Long {
+    override suspend fun getUsedStorage(): Long = withContext(ioDispatcher) {
         val request = suspendCancellableCoroutine { continuation ->
             val listener = OptionalMegaRequestListenerInterface(
                 onRequestFinish = { request, error ->
@@ -1351,10 +1355,10 @@ internal class DefaultAccountRepository @Inject constructor(
             }
         }
         val accountDetails = request.megaAccountDetails
-        return accountDetails.storageUsed
+        return@withContext accountDetails.storageUsed
     }
 
-    override suspend fun getMaxStorage(): Long {
+    override suspend fun getMaxStorage(): Long = withContext(ioDispatcher) {
         val request = suspendCancellableCoroutine { continuation ->
             val listener = OptionalMegaRequestListenerInterface(
                 onRequestFinish = { request, error ->
@@ -1371,7 +1375,19 @@ internal class DefaultAccountRepository @Inject constructor(
             }
         }
         val accountDetails = request.megaAccountDetails
-        return accountDetails.storageMax
+        return@withContext accountDetails.storageMax
+    }
+
+    override suspend fun setCredentials(credentials: UserCredentials) = withContext(ioDispatcher) {
+        credentialsPreferencesGateway.save(credentials)
+    }
+
+    override fun monitorCredentials(): Flow<UserCredentials?> =
+        credentialsPreferencesGateway.monitorCredentials()
+            .flowOn(ioDispatcher)
+
+    override suspend fun clearCredentials() = withContext(ioDispatcher) {
+        credentialsPreferencesGateway.clear()
     }
 
     companion object {

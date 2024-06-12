@@ -37,7 +37,8 @@ import mega.privacy.android.feature.devicecenter.navigation.deviceCenterRoute
 import mega.privacy.android.feature.devicecenter.ui.model.DeviceCenterUINode
 import mega.privacy.android.feature.devicecenter.ui.model.DeviceMenuAction
 import mega.privacy.android.navigation.MegaNavigator
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.mobile.analytics.event.AndroidSyncNavigationItemEvent
 import mega.privacy.mobile.analytics.event.DeviceCenterDeviceOptionsButtonEvent
 import mega.privacy.mobile.analytics.event.DeviceCenterItemClicked
 import mega.privacy.mobile.analytics.event.DeviceCenterItemClickedEvent
@@ -99,17 +100,26 @@ class DeviceCenterFragment : Fragment() {
                     }
                 }
 
-                MegaAppTheme(isDark = themeMode.isDarkMode()) {
+                OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                     DeviceCenterScreen(
                         uiState = uiState,
                         snackbarHostState = snackbarHostState,
-                        onDeviceClicked = {
+                        onDeviceClicked = { device ->
                             Analytics.tracker.trackEvent(
                                 DeviceCenterItemClickedEvent(
                                     DeviceCenterItemClicked.ItemType.Device
                                 )
                             )
-                            viewModel.showDeviceFolders(it)
+                            if (viewModel.shouldNavigateToSyncs(device)) {
+                                Analytics.tracker.trackEvent(AndroidSyncNavigationItemEvent)
+                                megaNavigator.openSyncs(
+                                    activity = this@DeviceCenterFragment.activity
+                                        ?: return@DeviceCenterScreen,
+                                    deviceName = device.name,
+                                )
+                            } else {
+                                viewModel.showDeviceFolders(device)
+                            }
                         },
                         onDeviceMenuClicked = {
                             Analytics.tracker.trackEvent(

@@ -247,7 +247,6 @@ class BackupsFragment : RotatableFragment() {
                         nodes = selectedNodes,
                         highPriority = false,
                         isFolderLink = false,
-                        fromMediaViewer = false,
                         fromChat = false,
                     )
                     clearSelections()
@@ -441,9 +440,10 @@ class BackupsFragment : RotatableFragment() {
         sortByHeaderViewModel.showDialogEvent.observe(viewLifecycleOwner,
             EventObserver { showSortByPanel() }
         )
-        sortByHeaderViewModel.orderChangeEvent.observe(viewLifecycleOwner, EventObserver {
+
+        viewLifecycleOwner.collectFlow(sortByHeaderViewModel.orderChangeState) {
             viewModel.onSortOrderChanged()
-        })
+        }
     }
 
     /**
@@ -544,7 +544,6 @@ class BackupsFragment : RotatableFragment() {
                     imageSource = ImagePreviewFetcherSource.BACKUPS,
                     menuOptionsSource = ImagePreviewMenuSource.BACKUPS,
                     anchorImageNodeId = NodeId(node.handle),
-                    showScreenLabel = false,
                     params = mapOf(
                         BackupsImageNodeFetcher.PARENT_ID to parentNodeLongValue,
                     ),
@@ -650,7 +649,6 @@ class BackupsFragment : RotatableFragment() {
                         nodes = listOf(node),
                         highPriority = true,
                         isFolderLink = false,
-                        fromMediaViewer = false,
                         fromChat = false,
                     )
                 }
@@ -711,7 +709,6 @@ class BackupsFragment : RotatableFragment() {
                     nodes = listOf(node),
                     highPriority = true,
                     isFolderLink = false,
-                    fromMediaViewer = false,
                     fromChat = false,
                 )
             }

@@ -529,7 +529,7 @@ internal class DefaultSettingsRepository @Inject constructor(
                 ?.getJSONObject(JSON_SENSITIVES.value)
                 ?.getBoolean(JSON_VAL_SHOW_HIDDEN_NODES.value)
                 ?: false
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             false
         }
     }
@@ -606,5 +606,13 @@ internal class DefaultSettingsRepository @Inject constructor(
         }
 
         request?.megaStringMap
+    }
+
+    override suspend fun isRaiseToHandSuggestionShown() = withContext(ioDispatcher) {
+        callsPreferencesGateway.getRaiseToHandSuggestionPreference()
+    }
+
+    override suspend fun setRaiseToHandSuggestionShown() = withContext(ioDispatcher) {
+        callsPreferencesGateway.setRaiseToHandSuggestionPreference()
     }
 }

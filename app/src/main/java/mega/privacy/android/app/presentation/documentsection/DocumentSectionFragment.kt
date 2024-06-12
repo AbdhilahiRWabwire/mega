@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
-import mega.privacy.android.app.fragments.homepage.EventObserver
 import mega.privacy.android.app.fragments.homepage.HomepageSearchable
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.main.ManagerActivity
@@ -59,7 +58,7 @@ import mega.privacy.android.domain.entity.TextFileTypeInfo
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.GetThemeMode
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import nz.mega.sdk.MegaChatApiJava
 import timber.log.Timber
 import java.io.File
@@ -102,7 +101,7 @@ class DocumentSectionFragment : Fragment(), HomepageSearchable {
             val themeMode by getThemeMode()
                 .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
             val uiState by documentSectionViewModel.uiState.collectAsStateWithLifecycle()
-            MegaAppTheme(isDark = themeMode.isDarkMode()) {
+            OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                 ConstraintLayout(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -304,9 +303,9 @@ class DocumentSectionFragment : Fragment(), HomepageSearchable {
      * onViewCreated
      */
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        sortByHeaderViewModel.orderChangeEvent.observe(
-            viewLifecycleOwner, EventObserver { documentSectionViewModel.refreshWhenOrderChanged() }
-        )
+        viewLifecycleOwner.collectFlow(sortByHeaderViewModel.orderChangeState) {
+            documentSectionViewModel.refreshWhenOrderChanged()
+        }
 
         viewLifecycleOwner.collectFlow(
             documentSectionViewModel.uiState.map { it.allDocuments }.distinctUntilChanged()

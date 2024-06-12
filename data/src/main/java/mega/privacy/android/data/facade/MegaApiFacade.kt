@@ -25,6 +25,7 @@ import nz.mega.sdk.MegaCancelToken
 import nz.mega.sdk.MegaContactRequest
 import nz.mega.sdk.MegaError
 import nz.mega.sdk.MegaEvent
+import nz.mega.sdk.MegaFlag
 import nz.mega.sdk.MegaGlobalListenerInterface
 import nz.mega.sdk.MegaHandleList
 import nz.mega.sdk.MegaLoggerInterface
@@ -32,7 +33,8 @@ import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaNodeList
 import nz.mega.sdk.MegaPushNotificationSettings
 import nz.mega.sdk.MegaPushNotificationSettingsAndroid
-import nz.mega.sdk.MegaRecentActionBucket
+import nz.mega.sdk.MegaRecentActionBucketList
+import nz.mega.sdk.MegaRecentActionBucketListAndroid
 import nz.mega.sdk.MegaRequest
 import nz.mega.sdk.MegaRequestListenerInterface
 import nz.mega.sdk.MegaSearchFilter
@@ -355,12 +357,6 @@ internal class MegaApiFacade @Inject constructor(
     override suspend fun getChildNode(parentNode: MegaNode?, name: String?): MegaNode? =
         megaApi.getChildNode(parentNode, name)
 
-    override suspend fun getChildrenByNode(parentNode: MegaNode, order: Int?): List<MegaNode> =
-        if (order == null)
-            megaApi.getChildren(parentNode)
-        else
-            megaApi.getChildren(parentNode, order)
-
     override suspend fun getIncomingSharesNode(order: Int?): List<MegaNode> =
         if (order == null)
             megaApi.inShares
@@ -562,22 +558,21 @@ internal class MegaApiFacade @Inject constructor(
     override suspend fun getIncomingContactRequests(): ArrayList<MegaContactRequest> =
         megaApi.incomingContactRequests
 
-    override suspend fun searchByType(
-        cancelToken: MegaCancelToken,
-        order: Int,
-        type: Int,
-        target: Int,
-    ): List<MegaNode> = megaApi.searchByType(cancelToken, order, type, target)
+    override suspend fun getContactRequestByHandle(requestHandle: Long): MegaContactRequest? =
+        megaApi.getContactRequestByHandle(requestHandle)
 
-    override suspend fun searchByType(
-        parentNode: MegaNode,
-        searchString: String,
-        cancelToken: MegaCancelToken,
-        recursive: Boolean,
-        order: Int,
-        type: Int,
-    ): List<MegaNode> =
-        megaApi.searchByType(parentNode, searchString, cancelToken, recursive, order, type)
+    override fun replyReceivedContactRequest(
+        contactRequest: MegaContactRequest,
+        action: Int,
+        listener: MegaRequestListenerInterface,
+    ) = megaApi.replyContactRequest(contactRequest, action, listener)
+
+    override fun sendInvitedContactRequest(
+        email: String,
+        message: String,
+        action: Int,
+        listener: MegaRequestListenerInterface,
+    ) = megaApi.inviteContact(email, message, action, listener)
 
     override suspend fun getPublicLinks(): List<MegaNode> = megaApi.publicLinks
 
@@ -611,12 +606,6 @@ internal class MegaApiFacade @Inject constructor(
     override suspend fun isInBackups(node: MegaNode): Boolean = megaApi.isInInbox(node)
 
     override suspend fun isInCloudDrive(node: MegaNode): Boolean = megaApi.isInCloud(node)
-
-    override suspend fun getChildren(parentNodes: MegaNodeList, order: Int): List<MegaNode> =
-        megaApi.getChildren(parentNodes, order)
-
-    override suspend fun getChildren(parent: MegaNode, order: Int): List<MegaNode> =
-        megaApi.getChildren(parent, order)
 
     override suspend fun moveTransferToLast(
         transfer: MegaTransfer,
@@ -752,8 +741,8 @@ internal class MegaApiFacade @Inject constructor(
         }
     }
 
-    override fun copyBucket(bucket: MegaRecentActionBucket): MegaRecentActionBucket =
-        megaApi.copyBucket(bucket)
+    override fun copyBucketList(bucketList: MegaRecentActionBucketList): MegaRecentActionBucketList =
+        MegaRecentActionBucketListAndroid.copy(bucketList)
 
     override fun checkAccessErrorExtended(node: MegaNode, level: Int): MegaError =
         megaApi.checkAccessErrorExtended(node, level)
@@ -1152,56 +1141,6 @@ internal class MegaApiFacade @Inject constructor(
         megaApi.checkSMSVerificationCode(pin, listener)
 
     override fun localLogout(listener: MegaRequestListenerInterface) = megaApi.localLogout(listener)
-    override suspend fun searchOnInShares(
-        query: String,
-        megaCancelToken: MegaCancelToken,
-        order: Int,
-    ): List<MegaNode> {
-        return megaApi.searchOnInShares(
-            query,
-            megaCancelToken,
-            order
-        )
-    }
-
-    override suspend fun searchOnOutShares(
-        query: String,
-        megaCancelToken: MegaCancelToken,
-        order: Int,
-    ): List<MegaNode> {
-        return megaApi.searchOnOutShares(
-            query,
-            megaCancelToken,
-            order
-        )
-    }
-
-    override suspend fun searchOnLinkShares(
-        query: String,
-        megaCancelToken: MegaCancelToken,
-        order: Int,
-    ): List<MegaNode> {
-        return megaApi.searchOnPublicLinks(
-            query,
-            megaCancelToken,
-            order
-        )
-    }
-
-    override suspend fun search(
-        parent: MegaNode,
-        query: String,
-        megaCancelToken: MegaCancelToken,
-        order: Int,
-    ): List<MegaNode> {
-        return megaApi.search(
-            parent,
-            query,
-            megaCancelToken,
-            true,
-            order
-        )
-    }
 
     override suspend fun searchWithFilter(
         filter: MegaSearchFilter,
@@ -1216,7 +1155,7 @@ internal class MegaApiFacade @Inject constructor(
     override suspend fun getChildren(
         filter: MegaSearchFilter,
         order: Int,
-        megaCancelToken: MegaCancelToken
+        megaCancelToken: MegaCancelToken,
     ): List<MegaNode> = megaApi.getChildren(filter, order, megaCancelToken, null)
 
     override fun openShareDialog(
@@ -1579,8 +1518,36 @@ internal class MegaApiFacade @Inject constructor(
     override fun setNodeDescription(
         node: MegaNode,
         description: String?,
-        listener: MegaRequestListenerInterface
+        listener: MegaRequestListenerInterface,
     ) {
         megaApi.setNodeDescription(node, description, listener)
     }
+
+    override fun addNodeTag(node: MegaNode, tag: String, listener: MegaRequestListenerInterface) {
+        megaApi.addNodeTag(node, tag, listener)
+    }
+
+    override fun removeNodeTag(
+        node: MegaNode,
+        tag: String,
+        listener: MegaRequestListenerInterface,
+    ) {
+        megaApi.removeNodeTag(node, tag, listener)
+    }
+
+    override fun updateNodeTag(
+        node: MegaNode,
+        newTag: String,
+        oldTag: String,
+        listener: MegaRequestListenerInterface,
+    ) {
+        megaApi.updateNodeTag(node, newTag, oldTag, listener)
+    }
+
+    override fun getFlag(
+        flagName: String,
+        commit: Boolean,
+        listener: MegaRequestListenerInterface?,
+    ): MegaFlag? =
+        megaApi.getFlag(flagName, commit, listener)
 }

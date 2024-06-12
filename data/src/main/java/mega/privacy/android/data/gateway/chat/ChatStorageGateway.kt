@@ -85,7 +85,7 @@ interface ChatStorageGateway {
      *
      * @param updatePendingMessageRequest
      */
-    suspend fun updatePendingMessage(updatePendingMessageRequest: UpdatePendingMessageRequest)
+    suspend fun updatePendingMessage(vararg updatePendingMessageRequest: UpdatePendingMessageRequest)
 
     /**
      * Delete pending message by id
@@ -95,12 +95,20 @@ interface ChatStorageGateway {
     suspend fun deletePendingMessage(pendingMessageId: Long)
 
     /**
-     * Fetch pending messages
+     * Fetch pending messages for a chat
      *
      * @param chatId
      * @return flow of pending messages for the chat
      */
     fun fetchPendingMessages(chatId: Long): Flow<List<PendingMessageEntity>>
+
+    /**
+     * Fetch pending messages of a specific state
+     *
+     * @param states
+     * @return flow of pending messages of the specific state
+     */
+    fun fetchPendingMessages(vararg states: PendingMessageState): Flow<List<PendingMessageEntity>>
 
     /**
      * Fetch pending messages by id

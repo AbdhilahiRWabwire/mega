@@ -68,20 +68,20 @@ import mega.privacy.android.app.presentation.photos.albums.view.DynamicView
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.StartTransferComponent
 import mega.privacy.android.app.utils.StringUtils.formatColorTag
 import mega.privacy.android.app.utils.StringUtils.toSpannedHtmlText
-import mega.privacy.android.core.ui.controls.progressindicator.MegaCircularProgressIndicator
-import mega.privacy.android.core.ui.controls.textfields.GenericTextField
-import mega.privacy.android.core.ui.theme.dark_grey
-import mega.privacy.android.core.ui.theme.grey_020
-import mega.privacy.android.core.ui.theme.grey_alpha_012
-import mega.privacy.android.core.ui.theme.grey_alpha_038
-import mega.privacy.android.core.ui.theme.grey_alpha_054
-import mega.privacy.android.core.ui.theme.grey_alpha_087
-import mega.privacy.android.core.ui.theme.teal_300
-import mega.privacy.android.core.ui.theme.white
-import mega.privacy.android.core.ui.theme.white_alpha_012
-import mega.privacy.android.core.ui.theme.white_alpha_038
-import mega.privacy.android.core.ui.theme.white_alpha_054
-import mega.privacy.android.core.ui.theme.white_alpha_087
+import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaCircularProgressIndicator
+import mega.privacy.android.shared.original.core.ui.controls.textfields.GenericTextField
+import mega.privacy.android.shared.original.core.ui.theme.dark_grey
+import mega.privacy.android.shared.original.core.ui.theme.grey_020
+import mega.privacy.android.shared.original.core.ui.theme.grey_alpha_012
+import mega.privacy.android.shared.original.core.ui.theme.grey_alpha_038
+import mega.privacy.android.shared.original.core.ui.theme.grey_alpha_054
+import mega.privacy.android.shared.original.core.ui.theme.grey_alpha_087
+import mega.privacy.android.shared.original.core.ui.theme.teal_300
+import mega.privacy.android.shared.original.core.ui.theme.white
+import mega.privacy.android.shared.original.core.ui.theme.white_alpha_012
+import mega.privacy.android.shared.original.core.ui.theme.white_alpha_038
+import mega.privacy.android.shared.original.core.ui.theme.white_alpha_054
+import mega.privacy.android.shared.original.core.ui.theme.white_alpha_087
 import mega.privacy.android.domain.entity.photos.Album
 import mega.privacy.android.domain.entity.photos.Photo
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
@@ -95,7 +95,6 @@ import mega.privacy.mobile.analytics.event.AlbumsStorageOverQuotaUpgradeAccountB
 import mega.privacy.mobile.analytics.event.ImportAlbumContentLoadedEvent
 import mega.privacy.mobile.analytics.event.PhotoItemSelected
 import mega.privacy.mobile.analytics.event.PhotoItemSelectedEvent
-import nz.mega.sdk.MegaNode
 
 private typealias ImageDownloader = (
     isPreview: Boolean,
@@ -108,7 +107,6 @@ internal fun AlbumImportScreen(
     albumImportViewModel: AlbumImportViewModel = viewModel(),
     onShareLink: (String) -> Unit,
     onPreviewPhoto: (Photo) -> Unit,
-    onSaveToDevice: (List<MegaNode>) -> Unit,
     onNavigateFileExplorer: () -> Unit,
     onUpgradeAccount: () -> Unit,
     onBack: (isBackToHome: Boolean) -> Unit,
@@ -248,20 +246,7 @@ internal fun AlbumImportScreen(
                         }
                     },
                     onSaveToDevice = {
-                        albumImportViewModel.startDownload(
-                            legacyDownload = { nodes ->
-                                if (state.isNetworkConnected) {
-                                    onSaveToDevice(nodes)
-                                    albumImportViewModel.clearSelection()
-                                } else {
-                                    coroutineScope.launch {
-                                        scaffoldState.snackbarHostState.showSnackbar(
-                                            message = context.resources.getString(R.string.error_server_connection_problem),
-                                        )
-                                    }
-                                }
-                            },
-                        )
+                        albumImportViewModel.startDownload()
                     }
                 )
             }

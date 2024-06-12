@@ -3,6 +3,7 @@ package mega.privacy.android.app.presentation.meeting.chat.model
 import android.content.Intent
 import android.net.Uri
 import android.util.Base64
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -24,6 +25,7 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
+import mega.privacy.android.app.featuretoggle.ApiFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.megachat.MapsActivity
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
@@ -35,13 +37,16 @@ import mega.privacy.android.app.presentation.meeting.chat.extension.isJoined
 import mega.privacy.android.app.presentation.meeting.chat.mapper.ForwardMessagesResultMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.InviteParticipantResultMapper
 import mega.privacy.android.app.presentation.meeting.chat.mapper.ParticipantNameMapper
+import mega.privacy.android.app.presentation.meeting.chat.model.messages.actions.MessageBottomSheetAction
+import mega.privacy.android.app.presentation.meeting.chat.view.actions.MessageAction
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.INVALID_LOCATION_MESSAGE_ID
+import mega.privacy.android.app.presentation.meeting.chat.view.navigation.compose.ChatArgs
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.app.utils.CacheFolderManager
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.core.ui.controls.chat.VoiceClipRecordEvent
-import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
-import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReactionUser
+import mega.privacy.android.shared.original.core.ui.controls.chat.VoiceClipRecordEvent
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.reaction.model.UIReaction
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.reaction.model.UIReactionUser
 import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.chat.ChatCall
 import mega.privacy.android.domain.entity.chat.ChatConnectionStatus
@@ -77,7 +82,6 @@ import mega.privacy.android.domain.usecase.chat.CloseChatPreviewUseCase
 import mega.privacy.android.domain.usecase.chat.EnableGeolocationUseCase
 import mega.privacy.android.domain.usecase.chat.EndCallUseCase
 import mega.privacy.android.domain.usecase.chat.GetChatMessageUseCase
-import mega.privacy.android.domain.usecase.chat.GetChatMuteOptionListUseCase
 import mega.privacy.android.domain.usecase.chat.GetCustomSubtitleListUseCase
 import mega.privacy.android.domain.usecase.chat.HoldChatCallUseCase
 import mega.privacy.android.domain.usecase.chat.InviteToChatUseCase
@@ -136,6 +140,8 @@ import mega.privacy.android.domain.usecase.meeting.StartChatCallNoRingingUseCase
 import mega.privacy.android.domain.usecase.meeting.StartMeetingInWaitingRoomChatUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorUpdatePushNotificationSettingsUseCase
+import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
+import mega.privacy.android.domain.usecase.transfers.paused.PauseAllTransfersUseCase
 import mega.privacy.mobile.analytics.event.ChatConversationUnmuteMenuToolbarEvent
 import timber.log.Timber
 import java.io.File
@@ -204,7 +210,6 @@ class ChatViewModel @Inject constructor(
     private val sendStatisticsMeetingsUseCase: SendStatisticsMeetingsUseCase,
     private val startCallUseCase: StartCallUseCase,
     private val chatManagement: ChatManagement,
-    private val getChatMuteOptionListUseCase: GetChatMuteOptionListUseCase,
     private val muteChatNotificationForChatRoomsUseCase: MuteChatNotificationForChatRoomsUseCase,
     private val startChatCallNoRingingUseCase: StartChatCallNoRingingUseCase,
     private val answerChatCallUseCase: AnswerChatCallUseCase,
@@ -252,18 +257,22 @@ class ChatViewModel @Inject constructor(
     private val setUsersCallLimitRemindersUseCase: SetUsersCallLimitRemindersUseCase,
     private val getUsersCallLimitRemindersUseCase: GetUsersCallLimitRemindersUseCase,
     private val broadcastUpgradeDialogClosedUseCase: BroadcastUpgradeDialogClosedUseCase,
+    private val areTransfersPausedUseCase: AreTransfersPausedUseCase,
+    private val pauseAllTransfersUseCase: PauseAllTransfersUseCase,
+    actionFactories: Set<@JvmSuppressWildcards (ChatViewModel) -> MessageAction>,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ChatUiState())
     val state = _state.asStateFlow()
 
-    private val chatId: Long = savedStateHandle[Constants.CHAT_ID]
-        ?: throw IllegalStateException("Chat screen must have a chat room id")
-
-    private val chatLink: String
-        get() = savedStateHandle.get<String>(EXTRA_LINK).orEmpty()
+    private val conversationArgs = ChatArgs(savedStateHandle)
+    private val chatId = conversationArgs.chatId
+    private val launchAction = conversationArgs.action
+    private val chatLink = conversationArgs.link.orEmpty()
 
     private val usersTyping = Collections.synchronizedMap(mutableMapOf<Long, String?>())
     private val jobs = mutableMapOf<Long, Job>()
+
+    private val actions = actionFactories.map { it(this) }
 
     private val ChatRoom.haveAtLeastReadPermission: Boolean
         get() = ownPrivilege != ChatRoomPermission.Unknown
@@ -277,7 +286,7 @@ class ChatViewModel @Inject constructor(
     private var monitorConnectivityJob: Job? = null
 
     init {
-        checkFeatureFlag()
+        getApiFeatureFlag()
         checkUsersCallLimitReminders()
         getMyUserHandle()
         checkGeolocation()
@@ -292,9 +301,16 @@ class ChatViewModel @Inject constructor(
         monitorChatRoomPreference()
     }
 
-    private fun checkFeatureFlag() {
+    /**
+     * Get call unlimited pro plan api feature flag
+     */
+    private fun getApiFeatureFlag() {
         viewModelScope.launch {
-            getFeatureFlagValueUseCase(AppFeatures.CallUnlimitedProPlan).let { flag ->
+            runCatching {
+                getFeatureFlagValueUseCase(ApiFeatures.CallUnlimitedProPlan)
+            }.onFailure { exception ->
+                Timber.e(exception)
+            }.onSuccess { flag ->
                 _state.update { state ->
                     state.copy(
                         isCallUnlimitedProPlanFeatureFlagEnabled = flag,
@@ -341,9 +357,8 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun loadChatOrPreview() {
-        val action = savedStateHandle.get<String>(EXTRA_ACTION).orEmpty()
         if (chatLink.isNotEmpty()) {
-            val requireJoin = action == Constants.ACTION_JOIN_OPEN_CHAT_LINK
+            val requireJoin = launchAction == Constants.ACTION_JOIN_OPEN_CHAT_LINK
             viewModelScope.launch {
                 runCatching {
                     openChatLinkUseCase(
@@ -711,18 +726,41 @@ class ChatViewModel @Inject constructor(
                     it?.apply {
                         when (status) {
                             ChatCallStatus.TerminatingUserParticipation, ChatCallStatus.GenericNotification ->
-                                if ((termCode == ChatCallTermCodeType.CallUsersLimit || termCode == ChatCallTermCodeType.TooManyParticipants)
-                                    && _state.value.isCallUnlimitedProPlanFeatureFlagEnabled
-                                ) {
-                                    _state.update { state -> state.copy(callEndedDueToFreePlanLimits = true) }
-                                } else if (termCode == ChatCallTermCodeType.CallDurationLimit && _state.value.isCallUnlimitedProPlanFeatureFlagEnabled) {
-                                    if (it.isOwnClientCaller) {
+                                when (termCode) {
+                                    ChatCallTermCodeType.TooManyParticipants -> {
+                                        val infoToShow =
+                                            InfoToShow.SimpleString(stringId = R.string.call_error_too_many_participants)
                                         _state.update { state ->
                                             state.copy(
-                                                shouldUpgradeToProPlan = true
+                                                infoToShowEvent = triggered(
+                                                    infoToShow
+                                                )
                                             )
                                         }
                                     }
+
+                                    ChatCallTermCodeType.CallDurationLimit -> {
+                                        if (it.isOwnClientCaller && _state.value.isCallUnlimitedProPlanFeatureFlagEnabled) {
+                                            _state.update { state ->
+                                                state.copy(
+                                                    shouldUpgradeToProPlan = true
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    ChatCallTermCodeType.CallUsersLimit -> {
+                                        if (_state.value.isCallUnlimitedProPlanFeatureFlagEnabled) {
+                                            setUsersCallLimitReminder(true)
+                                            _state.update { state ->
+                                                state.copy(
+                                                    callEndedDueToFreePlanLimits = true
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    else -> {}
                                 }
 
                             else -> {}
@@ -791,25 +829,6 @@ class ChatViewModel @Inject constructor(
                 }
             }.onFailure { Timber.e(it) }
         }
-    }
-
-    /**
-     * Show the dialog of selecting chat mute options
-     */
-    fun showMutePushNotificationDialog() {
-        viewModelScope.launch {
-            val muteOptionList = getChatMuteOptionListUseCase(listOf(chatId))
-            _state.update {
-                it.copy(mutePushNotificationDialogEvent = triggered(muteOptionList))
-            }
-        }
-    }
-
-    /**
-     * Consume the event of showing the dialog of selecting chat mute options.
-     */
-    fun onShowMutePushNotificationDialogConsumed() {
-        _state.update { state -> state.copy(mutePushNotificationDialogEvent = consumed()) }
     }
 
     /**
@@ -1176,7 +1195,7 @@ class ChatViewModel @Inject constructor(
      * Sets pending link to join.
      */
     fun onSetPendingJoinLink() {
-        chatManagement.pendingJoinLink = savedStateHandle[EXTRA_LINK]
+        chatManagement.pendingJoinLink = chatLink
     }
 
     /**
@@ -1680,6 +1699,71 @@ class ChatViewModel @Inject constructor(
             runCatching {
                 broadcastUpgradeDialogClosedUseCase()
             }
+        }
+    }
+
+    fun selectMessages(messages: Set<TypedMessage>) {
+        _state.update { state -> state.copy(selectedMessages = messages) }
+    }
+
+    fun setSelectMode(enabled: Boolean) {
+        _state.update { state ->
+            if (!enabled) {
+                state.copy(
+                    selectedMessages = emptySet(),
+                    isSelectMode = false
+                )
+            } else {
+                state.copy(isSelectMode = true)
+            }
+        }
+    }
+
+    fun setPendingAction(action: (@Composable () -> Unit)?) {
+        _state.update { state -> state.copy(pendingAction = action) }
+    }
+
+    fun setSelectedReaction(reaction: String) {
+        _state.update { state -> state.copy(selectedReaction = reaction) }
+    }
+
+    fun setReactionList(reactions: List<UIReaction>) {
+        _state.update { state -> state.copy(reactionList = reactions) }
+    }
+
+    fun setAddingReactionTo(id: Long?) {
+        _state.update { state -> state.copy(addingReactionTo = id) }
+    }
+
+    fun getApplicableBotomsheetActions(hideBottomSheet: () -> Unit): List<MessageBottomSheetAction> =
+        getApplicableActions().map { action ->
+            MessageBottomSheetAction(
+                action.bottomSheetMenuItem(
+                    messages = _state.value.selectedMessages,
+                    hideBottomSheet = hideBottomSheet,
+                    setAction = this::setPendingAction
+                ), action.group
+            )
+        }
+
+    fun getApplicableActions(): List<MessageAction> =
+        if (_state.value.selectedMessages.isEmpty()) emptyList()
+        else actions.filter { action ->
+            action.appliesTo(_state.value.selectedMessages)
+        }
+
+    /**
+     * Checks if transfers are paused.
+     */
+    fun areTransfersPaused() = areTransfersPausedUseCase()
+
+    /**
+     * Pause transfers.
+     */
+    fun resumeTransfers() {
+        viewModelScope.launch {
+            runCatching { pauseAllTransfersUseCase(false) }
+                .onFailure { Timber.e(it) }
         }
     }
 

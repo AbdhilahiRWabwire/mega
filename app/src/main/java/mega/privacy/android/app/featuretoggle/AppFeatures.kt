@@ -14,13 +14,36 @@ import mega.privacy.android.domain.featuretoggle.FeatureFlagValueProvider
  */
 enum class AppFeatures(override val description: String, private val defaultValue: Boolean) :
     Feature {
+    /**
+     * Enables new video queue
+     */
+    NewZipBrowser(
+        "Enable new zip browser",
+        false,
+    ),
+
+    /**
+     * Enables new video queue
+     */
+    NewVideoQueue(
+        "Enable new video queue",
+        true,
+    ),
+
+    /**
+     * Enables report issue via email in login screen
+     */
+    ReportIssueViaEmail(
+        "Enable report issue via email in login screen",
+        true,
+    ),
 
     /**
      * Enables new audio queue
      */
     NewAudioQueue(
         "Enable new audio queue",
-        false,
+        true,
     ),
 
     /**
@@ -40,14 +63,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     ),
 
     /**
-     * Enables new document section flag
-     */
-    NewDocumentSection(
-        "Enable new document section flag",
-        true,
-    ),
-
-    /**
      * Enables the Hidden Nodes feature
      */
     HiddenNodes(
@@ -56,21 +71,12 @@ enum class AppFeatures(override val description: String, private val defaultValu
     ),
 
     /**
-     * Enables the Settings Camera Uploads page in Jetpack Compose
-     */
-    SettingsCameraUploadsCompose(
-        "Enables the Settings Camera Uploads in Jetpack Compose. This requires an app " +
-                "restart for the changes to take effect.",
-        true,
-    ),
-
-    /**
      * Shows the "Upload only while charging" Option in the refactored Settings Camera Uploads screen
      */
     SettingsCameraUploadsUploadWhileCharging(
         description = "Shows the Upload only while charging Option in the refactored Settings Camera " +
                 "Uploads screen.",
-        defaultValue = false,
+        defaultValue = true,
     ),
 
     /**
@@ -79,14 +85,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     NewVideoSection(
         "Enable new video section flag",
         false
-    ),
-
-    /**
-     * Enables new Image Preview flag
-     */
-    ImagePreview(
-        "Enables new Image Preview flag",
-        false,
     ),
 
     /**
@@ -166,11 +164,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     MeetingNotificationSettings("Enable Meeting notification settings", false),
 
     /**
-     * Clean refactored search implementation
-     */
-    SearchWithChips("Advanced search implementation in clean architecture", true),
-
-    /**
      * Search implementation with dropdown chips
      */
     DropdownChips("Search implementation with dropdown chips and bottom sheet", true),
@@ -179,17 +172,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
      * To enable showing promo notifications in Notifications screen
      */
     PromoNotifications("Enable promotional notifications", true),
-
-    /**
-     * To switch into new chat activity
-     * Enabled version 11.10
-     */
-    NewChatActivity("Enable new chat activity", true),
-
-    /**
-     * Call unlimited for pro users
-     */
-    CallUnlimitedProPlan("Call to stay unlimited when host with pro plan leaves", false),
 
     /**
      * To show strings for new features (meetings and VPN), strings should be hidden until the features are released
@@ -204,7 +186,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     NodeWithDescription(
         "Enable node with description",
-        false
+        true
     ),
 
     /**
@@ -220,7 +202,36 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     NewManageChatHistoryActivity(
         "Enable new manage chat history activity",
-        false
+        true
+    ),
+
+    /**
+     * Raise to speak in a call
+     */
+    RaiseToSpeak("Raise to speak in a call or a meeting", false),
+
+    /**
+     * Enables UploadWorker for upload files, instead of UploadService. This is a work in progress feature.
+     */
+    UploadWorker(
+        "Enables UploadWorker for download files, instead of UploadService. This is a work in progress feature.",
+        false,
+    ),
+
+    /**
+     * Enables new confirm email fragment compose page
+     */
+    NewConfirmEmailFragment(
+        "Enable new confirm email fragment",
+        true
+    ),
+
+    /**
+     * Enables new tour fragment compose page
+     */
+    NewTourFragment(
+        "Enable new tour fragment",
+        true
     );
 
     companion object : FeatureFlagValueProvider {

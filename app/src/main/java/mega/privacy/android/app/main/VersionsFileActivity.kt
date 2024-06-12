@@ -30,8 +30,6 @@ import mega.privacy.android.app.components.SimpleDividerItemDecoration
 import mega.privacy.android.app.components.dragger.DragToExitSupport.Companion.putThumbnailLocation
 import mega.privacy.android.app.components.saver.NodeSaver
 import mega.privacy.android.app.databinding.ActivityVersionsFileBinding
-import mega.privacy.android.app.featuretoggle.AppFeatures
-import mega.privacy.android.app.imageviewer.ImageViewerActivity.Companion.getIntentForSingleNode
 import mega.privacy.android.app.interfaces.SnackbarShower
 import mega.privacy.android.app.main.adapters.VersionsFileAdapter
 import mega.privacy.android.app.modalbottomsheet.ModalBottomSheetUtil.isBottomSheetDialogShown
@@ -41,6 +39,8 @@ import mega.privacy.android.app.presentation.imagepreview.fetcher.DefaultImageNo
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewFetcherSource
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewMenuSource
 import mega.privacy.android.app.presentation.pdfviewer.PdfViewerActivity
+import mega.privacy.android.app.presentation.transfers.starttransfer.StartDownloadViewModel
+import mega.privacy.android.app.presentation.transfers.starttransfer.view.createStartTransferView
 import mega.privacy.android.app.presentation.versions.VersionsFileViewModel
 import mega.privacy.android.app.utils.AlertsAndWarnings.showSaveToDeviceConfirmDialog
 import mega.privacy.android.app.utils.Constants
@@ -50,7 +50,6 @@ import mega.privacy.android.app.utils.MegaNodeUtil.manageTextFileIntent
 import mega.privacy.android.app.utils.MegaNodeUtil.manageURLNode
 import mega.privacy.android.app.utils.MegaNodeUtil.setupStreamingServer
 import mega.privacy.android.app.utils.Util
-import mega.privacy.android.app.utils.permission.PermissionUtils.checkNotificationsPermission
 import mega.privacy.android.data.facade.INTENT_EXTRA_NODE_HANDLE
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
@@ -75,11 +74,13 @@ import javax.inject.Inject
  * File Version list activity
  */
 @AndroidEntryPoint
-class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface, MegaGlobalListenerInterface, SnackbarShower {
+class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface,
+    MegaGlobalListenerInterface, SnackbarShower {
 
     private lateinit var binding: ActivityVersionsFileBinding
 
     private val viewModel by viewModels<VersionsFileViewModel>()
+    private val startDownloadViewModel by viewModels<StartDownloadViewModel>()
 
     var aB: ActionBar? = null
     var selectedNode: MegaNode? = null
@@ -193,6 +194,17 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface, M
 
         // Initialize the ViewModel
         viewModel.init(nodeHandle = nodeHandle)
+        addStartDownloadTransferView()
+    }
+
+    private fun addStartDownloadTransferView() {
+        binding.root.addView(
+            createStartTransferView(
+                this,
+                startDownloadViewModel.state,
+                startDownloadViewModel::consumeDownloadEvent
+            )
+        )
     }
 
 
@@ -208,9 +220,11 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface, M
                 R.id.cab_menu_select_all -> {
                     selectAllClicked()
                 }
+
                 R.id.cab_menu_unselect_all -> {
                     clearSelections()
                 }
+
                 R.id.action_download_versions -> {
                     if (nodes?.size == 1) {
                         downloadNodes(nodes)
@@ -218,11 +232,13 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface, M
                         actionMode!!.invalidate()
                     }
                 }
+
                 R.id.action_delete_versions -> {
                     nodes?.let {
                         showConfirmationRemoveVersions(it)
                     }
                 }
+
                 R.id.action_revert_version -> {
                     if (nodes?.size == 1) {
                         selectedNode = nodes[0]
@@ -341,21 +357,23 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface, M
                     VersionsBottomSheetDialogFragment.ACTION_REVERT_VERSION -> {
                         checkRevertVersion()
                     }
+
                     VersionsBottomSheetDialogFragment.ACTION_DELETE_VERSION -> {
                         showConfirmationRemoveVersion()
                     }
+
                     VersionsBottomSheetDialogFragment.ACTION_DOWNLOAD_VERSION -> {
                         selectedNode?.let { nonNullNode -> downloadNodes(listOf(nonNullNode)) }
                     }
+
                     else -> Unit
                 }
             }
     }
 
-    fun downloadNodes(nodes: List<MegaNode>?) {
-        checkNotificationsPermission(this)
-        nodes?.let {
-            nodeSaver.saveNodes(it, false, false, false, false)
+    private fun downloadNodes(nodes: List<MegaNode>?) {
+        nodes?.map { NodeId(it.handle) }?.let {
+            startDownloadViewModel.onDownloadClicked(it)
         }
     }
 
@@ -408,6 +426,7 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface, M
                     unSelectMenuItem?.isVisible = false
                     deleteVersionsMenuItem?.isVisible = true
                 }
+
                 else -> {
                     selectMenuItem?.isVisible = false
                     unSelectMenuItem?.isVisible = false
@@ -425,14 +444,17 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface, M
                 onBackPressedDispatcher.onBackPressed()
                 true
             }
+
             R.id.action_select -> {
                 selectAllClicked()
                 true
             }
+
             R.id.action_delete_version_history -> {
                 showDeleteVersionHistoryDialog()
                 true
             }
+
             else -> {
                 super.onOptionsItemSelected(item)
             }
@@ -576,18 +598,15 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface, M
                     adapter!!.toggleSelection(position)
                     updateActionModeTitle()
                 }
+
                 mimetype.isImage -> lifecycleScope.launch {
-                    val intent = if (getFeatureFlagValueUseCase(AppFeatures.ImagePreview)) {
-                        ImagePreviewActivity.createIntent(
-                            context = this@VersionsFileActivity,
-                            imageSource = ImagePreviewFetcherSource.DEFAULT,
-                            menuOptionsSource = ImagePreviewMenuSource.FILE,
-                            anchorImageNodeId = NodeId(vNode.handle),
-                            params = mapOf(DefaultImageNodeFetcher.NODE_IDS to longArrayOf(vNode.handle)),
-                        )
-                    } else {
-                        getIntentForSingleNode(this@VersionsFileActivity, vNode.handle, true)
-                    }
+                    val intent = ImagePreviewActivity.createIntent(
+                        context = this@VersionsFileActivity,
+                        imageSource = ImagePreviewFetcherSource.DEFAULT,
+                        menuOptionsSource = ImagePreviewMenuSource.FILE,
+                        anchorImageNodeId = NodeId(vNode.handle),
+                        params = mapOf(DefaultImageNodeFetcher.NODE_IDS to longArrayOf(vNode.handle)),
+                    )
                     putThumbnailLocation(
                         intent,
                         binding.recyclerViewVersionsFile,
@@ -598,6 +617,7 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface, M
                     startActivity(intent)
                     overridePendingTransition(0, 0)
                 }
+
                 mimetype.isVideoMimeType || mimetype.isAudio -> {
                     val mediaIntent: Intent
                     val internalIntent: Boolean
@@ -704,9 +724,11 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface, M
                     }
                     overridePendingTransition(0, 0)
                 }
+
                 mimetype.isURL -> {
                     manageURLNode(this, megaApi, vNode)
                 }
+
                 mimetype.isPdf -> {
                     val pdfIntent = Intent(this, PdfViewerActivity::class.java)
                     pdfIntent.putExtra(Constants.INTENT_EXTRA_KEY_INSIDE, true)
@@ -774,9 +796,11 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface, M
                     }
                     overridePendingTransition(0, 0)
                 }
+
                 mimetype.isOpenableTextFile(vNode.size) -> {
                     manageTextFileIntent(this, vNode, Constants.VERSIONS_ADAPTER)
                 }
+
                 else -> {
                     showVersionsBottomSheetDialog(vNode, position)
                 }

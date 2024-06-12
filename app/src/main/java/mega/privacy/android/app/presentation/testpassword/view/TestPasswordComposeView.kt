@@ -107,16 +107,16 @@ import mega.privacy.android.app.presentation.testpassword.view.Constants.SEE_PAS
 import mega.privacy.android.app.presentation.testpassword.view.Constants.TEST_PASSWORD_APP_BAR_TAG
 import mega.privacy.android.app.presentation.testpassword.view.Constants.TEST_PASSWORD_BUTTON_TAG
 import mega.privacy.android.app.presentation.testpassword.view.Constants.TEST_PASSWORD_LAYOUT_TAG
-import mega.privacy.android.shared.theme.MegaAppTheme
-import mega.privacy.android.core.ui.controls.dialogs.MegaAlertDialog
-import mega.privacy.android.core.ui.controls.progressindicator.MegaCircularProgressIndicator
-import mega.privacy.android.core.ui.theme.black
-import mega.privacy.android.core.ui.theme.extensions.autofill
-import mega.privacy.android.core.ui.theme.extensions.green_500_green_400
-import mega.privacy.android.core.ui.theme.extensions.grey_alpha_012_white_alpha_038
-import mega.privacy.android.core.ui.theme.extensions.red_600_red_300
-import mega.privacy.android.core.ui.theme.extensions.textColorSecondary
-import mega.privacy.android.core.ui.theme.white
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDialog
+import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaCircularProgressIndicator
+import mega.privacy.android.shared.original.core.ui.theme.black
+import mega.privacy.android.shared.original.core.ui.theme.extensions.autofill
+import mega.privacy.android.shared.original.core.ui.theme.extensions.green_500_green_400
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_alpha_012_white_alpha_038
+import mega.privacy.android.shared.original.core.ui.theme.extensions.red_600_red_300
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorSecondary
+import mega.privacy.android.shared.original.core.ui.theme.white
 import mega.privacy.android.legacy.core.ui.controls.appbar.SimpleTopAppBar
 import mega.privacy.android.legacy.core.ui.controls.textfields.MegaTextField
 import java.io.File
@@ -990,7 +990,7 @@ private fun printRecoveryKey(
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, name = "DarkMode")
 @Composable
 private fun TestPasswordComposeViewPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         TestPasswordComposeView(
             uiState = TestPasswordUIState(
                 isUITestPasswordMode = false,

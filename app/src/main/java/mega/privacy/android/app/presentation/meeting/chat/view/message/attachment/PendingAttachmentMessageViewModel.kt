@@ -3,17 +3,16 @@ package mega.privacy.android.app.presentation.meeting.chat.view.message.attachme
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.presentation.mapper.file.FileSizeStringMapper
 import mega.privacy.android.app.presentation.time.mapper.DurationInSecondsTextMapper
 import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.domain.entity.chat.messages.PendingAttachmentMessage
-import mega.privacy.android.domain.entity.transfer.TransferEvent
-import mega.privacy.android.domain.entity.transfer.pendingMessageIds
-import mega.privacy.android.domain.usecase.transfers.MonitorTransferEventsUseCase
+import mega.privacy.android.domain.usecase.transfers.chatuploads.MonitorPendingMessageTransferEventsUseCase
+import mega.privacy.android.domain.usecase.transfers.chatuploads.MonitorPendingMessagesCompressionProgressUseCase
+import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
+import mega.privacy.android.domain.usecase.transfers.paused.MonitorPausedTransfersUseCase
 import javax.inject.Inject
 
 /**
@@ -21,10 +20,13 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class PendingAttachmentMessageViewModel @Inject constructor(
-    private val monitorTransferEventsUseCase: MonitorTransferEventsUseCase,
+    private val monitorPendingMessageTransferEventsUseCase: MonitorPendingMessageTransferEventsUseCase,
+    private val monitorPausedTransfersUseCase: MonitorPausedTransfersUseCase,
+    private val areTransfersPausedUseCase: AreTransfersPausedUseCase,
+    private val monitorPendingMessagesCompressionProgressUseCase: MonitorPendingMessagesCompressionProgressUseCase,
     fileSizeStringMapper: FileSizeStringMapper,
     durationInSecondsTextMapper: DurationInSecondsTextMapper,
-    fileTypeIconMapper: FileTypeIconMapper
+    fileTypeIconMapper: FileTypeIconMapper,
 ) : AbstractAttachmentMessageViewModel<PendingAttachmentMessage>(
     fileSizeStringMapper,
     durationInSecondsTextMapper,
@@ -32,30 +34,54 @@ class PendingAttachmentMessageViewModel @Inject constructor(
 ) {
     init {
         monitorUploads()
+        monitorCompression()
+        monitorPausedTransfers()
     }
 
     private fun monitorUploads() {
         viewModelScope.launch {
-            monitorTransferEventsUseCase()
-                .filterIsInstance<TransferEvent.TransferUpdateEvent>()
-                .mapNotNull { event ->
-                    event.transfer.pendingMessageIds()
-                        ?.let { it to event.transfer }
-                }
+            monitorPendingMessageTransferEventsUseCase()
                 .collectLatest { (pendingMessageIds, transfer) ->
+                    val areTransfersPaused = areTransfersPausedUseCase()
                     pendingMessageIds.forEach { pendingMessageId ->
                         getUiStateFlow(pendingMessageId)?.update {
-                            it.copy(loadProgress = transfer.progress)
+                            it.copy(
+                                loadProgress = transfer.progress,
+                                areTransfersPaused = areTransfersPaused
+                            )
                         }
                     }
                 }
         }
     }
 
+    private fun monitorCompression() {
+        viewModelScope.launch {
+            monitorPendingMessagesCompressionProgressUseCase()
+                .collect { idProgressMap ->
+                    idProgressMap.forEach { (pendingMessageId, compressionProgress) ->
+                        getUiStateFlow(pendingMessageId)?.update {
+                            it.copy(
+                                compressionProgress = compressionProgress,
+                            )
+                        }
+                    }
+                }
+        }
+    }
+
+    private fun monitorPausedTransfers() {
+        viewModelScope.launch {
+            monitorPausedTransfersUseCase().collectLatest { areTransfersPaused ->
+                updatePausedTransfers(areTransfersPaused)
+            }
+        }
+    }
+
     override fun createFirstUiState(attachmentMessage: PendingAttachmentMessage): AttachmentMessageUiState {
         return super.createFirstUiState(attachmentMessage)
             .copy(
-                previewUri = attachmentMessage.file?.absolutePath,
+                previewUri = attachmentMessage.filePath,
             )
     }
 }

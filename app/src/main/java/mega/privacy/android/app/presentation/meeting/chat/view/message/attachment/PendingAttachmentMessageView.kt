@@ -6,8 +6,8 @@ import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import mega.privacy.android.core.ui.controls.chat.messages.file.FileMessageView
 import mega.privacy.android.domain.entity.chat.messages.PendingFileAttachmentMessage
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.file.FileMessageView
 
 /**
  * View for pending messages (not send to SDK yet)
@@ -23,10 +23,11 @@ fun PendingAttachmentMessageView(
         isMe = message.isMine,
         fileTypeResId = uiState.fileTypeResId,
         previewUri = uiState.previewUri?.toUri(),
-        loadProgress = uiState.loadProgress?.floatValue,
+        loadProgress = uiState.progress?.floatValue ?: 0f,
         fileName = uiState.fileName,
         fileSize = uiState.fileSize,
         duration = uiState.duration,
+        showPausedTransfersWarning = uiState.areTransfersPaused,
         modifier = modifier,
     )
 }

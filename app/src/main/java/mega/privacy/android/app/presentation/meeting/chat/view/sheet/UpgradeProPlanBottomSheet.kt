@@ -26,12 +26,12 @@ import androidx.compose.ui.unit.dp
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.twofactorauthentication.extensions.drawableId
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
-import mega.privacy.android.core.ui.controls.buttons.RaisedDefaultMegaButton
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.subtitle1medium
-import mega.privacy.android.core.ui.theme.extensions.textColorPrimary
-import mega.privacy.android.core.ui.theme.extensions.textColorSecondary
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.controls.buttons.RaisedDefaultMegaButton
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.extensions.subtitle1medium
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorPrimary
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorSecondary
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * Composable function to show the bottom sheet to upgrade to Pro plan.
@@ -39,7 +39,7 @@ import mega.privacy.android.shared.theme.MegaAppTheme
 @Composable
 fun UpgradeProPlanBottomSheet(
     modifier: Modifier = Modifier,
-    onUpgrade: () -> Unit = {},
+    hideSheet: () -> Unit = {},
 ) {
     val context = LocalContext.current
     Column(
@@ -94,7 +94,7 @@ fun UpgradeProPlanBottomSheet(
                         UpgradeAccountActivity::class.java
                     )
                 )
-                onUpgrade()
+                hideSheet()
             }
         )
         Spacer(modifier = Modifier.padding(top = 24.dp))
@@ -105,7 +105,7 @@ fun UpgradeProPlanBottomSheet(
 @CombinedThemePreviews
 @Composable
 private fun UpgradeProPlanBottomSheetPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         UpgradeProPlanBottomSheet()
     }
 }

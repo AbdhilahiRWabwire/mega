@@ -13,10 +13,10 @@ import kotlinx.coroutines.test.setMain
 import mega.privacy.android.data.database.DatabaseHandler
 import mega.privacy.android.data.gateway.CacheGateway
 import mega.privacy.android.data.gateway.MegaLocalRoomGateway
-import mega.privacy.android.data.gateway.MegaLocalStorageGateway
 import mega.privacy.android.data.gateway.api.MegaApiGateway
 import mega.privacy.android.data.gateway.api.MegaChatApiGateway
 import mega.privacy.android.data.gateway.contact.ContactGateway
+import mega.privacy.android.data.gateway.preferences.CredentialsPreferencesGateway
 import mega.privacy.android.data.listener.OptionalMegaRequestListenerInterface
 import mega.privacy.android.data.mapper.ContactRequestMapper
 import mega.privacy.android.data.mapper.InviteContactRequestMapper
@@ -28,11 +28,13 @@ import mega.privacy.android.data.mapper.chat.UserLastGreenMapper
 import mega.privacy.android.data.mapper.contact.ContactCredentialsMapper
 import mega.privacy.android.data.mapper.contact.ContactDataMapper
 import mega.privacy.android.data.mapper.contact.ContactItemMapper
+import mega.privacy.android.data.mapper.contact.ContactRequestActionMapper
 import mega.privacy.android.data.mapper.contact.UserChatStatusMapper
 import mega.privacy.android.data.mapper.contact.UserMapper
 import mega.privacy.android.data.model.ChatUpdate
 import mega.privacy.android.data.model.GlobalUpdate
 import mega.privacy.android.data.wrapper.ContactWrapper
+import mega.privacy.android.domain.entity.Contact
 import mega.privacy.android.domain.entity.chat.ChatConnectionStatus
 import mega.privacy.android.domain.entity.contacts.ContactItem
 import mega.privacy.android.domain.entity.contacts.ContactLink
@@ -89,9 +91,10 @@ class DefaultContactsRepositoryTest {
     private val contactDataMapper = mock<ContactDataMapper>()
     private val contactCredentialsMapper = mock<ContactCredentialsMapper>()
     private val inviteContactRequestMapper = mock<InviteContactRequestMapper>()
+    private val contactRequestActionMapper = mock<ContactRequestActionMapper>()
     private val chatConnectionStateMapper =
         ChatConnectionStateMapper(chatConnectionStatusMapper = ChatConnectionStatusMapper())
-    private val localStorageGateway = mock<MegaLocalStorageGateway>()
+    private val credentialsPreferencesGateway = mock<CredentialsPreferencesGateway>()
     private val contactWrapper: ContactWrapper = mock()
     private val databaseHandler: DatabaseHandler = mock()
     private val megaLocalRoomGateway: MegaLocalRoomGateway = mock()
@@ -141,7 +144,8 @@ class DefaultContactsRepositoryTest {
             contactDataMapper = contactDataMapper,
             contactCredentialsMapper = contactCredentialsMapper,
             inviteContactRequestMapper = inviteContactRequestMapper,
-            localStorageGateway = localStorageGateway,
+            credentialsPreferencesGateway = credentialsPreferencesGateway,
+            contactRequestActionMapper = contactRequestActionMapper,
             contactWrapper = contactWrapper,
             databaseHandler = databaseHandler,
             chatConnectionStateMapper = chatConnectionStateMapper,
@@ -426,7 +430,11 @@ class DefaultContactsRepositoryTest {
                 lastName = null,
                 myHandle = null,
             )
-            whenever(localStorageGateway.getUserCredentials()).thenReturn(credentials)
+            whenever(credentialsPreferencesGateway.monitorCredentials()).thenReturn(
+                flowOf(
+                    credentials
+                )
+            )
             assertThat(underTest.getCurrentUserFirstName(forceRefresh = false)).isEqualTo(
                 expectedFirstName
             )
@@ -443,7 +451,11 @@ class DefaultContactsRepositoryTest {
                 lastName = null,
                 myHandle = null,
             )
-            whenever(localStorageGateway.getUserCredentials()).thenReturn(credentials)
+            whenever(credentialsPreferencesGateway.monitorCredentials()).thenReturn(
+                flowOf(
+                    credentials
+                )
+            )
 
             val request = mock<MegaRequest> {
                 on { text }.thenReturn(expectedFirstName)
@@ -467,7 +479,11 @@ class DefaultContactsRepositoryTest {
                 lastName = null,
                 myHandle = null,
             )
-            whenever(localStorageGateway.getUserCredentials()).thenReturn(credentials)
+            whenever(credentialsPreferencesGateway.monitorCredentials()).thenReturn(
+                flowOf(
+                    credentials
+                )
+            )
 
             val request = mock<MegaRequest> {
                 on { text }.thenReturn(expectedFirstName)
@@ -478,7 +494,7 @@ class DefaultContactsRepositoryTest {
                 )
             }
             underTest.getCurrentUserFirstName(forceRefresh = false)
-            verify(localStorageGateway).saveMyFirstName(expectedFirstName)
+            verify(credentialsPreferencesGateway).saveFirstName(expectedFirstName)
         }
 
     @Test
@@ -492,7 +508,11 @@ class DefaultContactsRepositoryTest {
                 lastName = expectedLastName,
                 myHandle = null,
             )
-            whenever(localStorageGateway.getUserCredentials()).thenReturn(credentials)
+            whenever(credentialsPreferencesGateway.monitorCredentials()).thenReturn(
+                flowOf(
+                    credentials
+                )
+            )
             assertThat(underTest.getCurrentUserLastName(forceRefresh = false)).isEqualTo(
                 expectedLastName
             )
@@ -509,7 +529,11 @@ class DefaultContactsRepositoryTest {
                 lastName = null,
                 myHandle = null,
             )
-            whenever(localStorageGateway.getUserCredentials()).thenReturn(credentials)
+            whenever(credentialsPreferencesGateway.monitorCredentials()).thenReturn(
+                flowOf(
+                    credentials
+                )
+            )
 
             val request = mock<MegaRequest> {
                 on { text }.thenReturn(expectedLastName)
@@ -533,7 +557,11 @@ class DefaultContactsRepositoryTest {
                 lastName = null,
                 myHandle = null,
             )
-            whenever(localStorageGateway.getUserCredentials()).thenReturn(credentials)
+            whenever(credentialsPreferencesGateway.monitorCredentials()).thenReturn(
+                flowOf(
+                    credentials
+                )
+            )
 
             val request = mock<MegaRequest> {
                 on { text }.thenReturn(expectedLastName)
@@ -544,7 +572,7 @@ class DefaultContactsRepositoryTest {
                 )
             }
             underTest.getCurrentUserLastName(forceRefresh = false)
-            verify(localStorageGateway).saveMyLastName(expectedLastName)
+            verify(credentialsPreferencesGateway).saveLastName(expectedLastName)
         }
 
     @Test
@@ -562,7 +590,7 @@ class DefaultContactsRepositoryTest {
             }
 
             underTest.getCurrentUserFirstName(forceRefresh = true)
-            verify(localStorageGateway, never()).getUserCredentials()
+            verify(credentialsPreferencesGateway, never()).monitorCredentials()
         }
 
     @Test
@@ -579,7 +607,7 @@ class DefaultContactsRepositoryTest {
         }
 
         underTest.getCurrentUserFirstName(forceRefresh = true)
-        verify(localStorageGateway).saveMyFirstName(expectedFirstName)
+        verify(credentialsPreferencesGateway).saveFirstName(expectedFirstName)
     }
 
     @Test
@@ -615,7 +643,7 @@ class DefaultContactsRepositoryTest {
         }
 
         underTest.getCurrentUserLastName(forceRefresh = true)
-        verify(localStorageGateway, never()).getUserCredentials()
+        verify(credentialsPreferencesGateway, never()).monitorCredentials()
     }
 
     @Test
@@ -632,7 +660,7 @@ class DefaultContactsRepositoryTest {
         }
 
         underTest.getCurrentUserLastName(forceRefresh = true)
-        verify(localStorageGateway).saveMyLastName(expectedLastName)
+        verify(credentialsPreferencesGateway).saveLastName(expectedLastName)
     }
 
     @Test
@@ -790,7 +818,7 @@ class DefaultContactsRepositoryTest {
                 underTest.updateCurrentUserFirstName(expectedNewFirstName)
             )
 
-            verify(localStorageGateway).saveMyFirstName(expectedNewFirstName)
+            verify(credentialsPreferencesGateway).saveFirstName(expectedNewFirstName)
         }
 
     @Test
@@ -818,7 +846,7 @@ class DefaultContactsRepositoryTest {
                 underTest.updateCurrentUserLastName(expectedNewLastName)
             )
 
-            verify(localStorageGateway).saveMyLastName(expectedNewLastName)
+            verify(credentialsPreferencesGateway).saveLastName(expectedNewLastName)
         }
 
     @Test
@@ -1486,5 +1514,26 @@ class DefaultContactsRepositoryTest {
             )
             assertThat(actual).isEqualTo(userUpdate)
         }
+    }
+
+    @Test
+    fun `test that the correct contact is returned when the local contact is not null`() = runTest {
+        val contactId = 123L
+        val contact = Contact(userId = contactId, email = "email@test.com")
+        whenever(megaLocalRoomGateway.getContactByHandle(contactId)) doReturn contact
+
+        val actual = underTest.getContactFromCacheByHandle(contactId)
+
+        assertThat(actual).isEqualTo(contact)
+    }
+
+    @Test
+    fun `test that NULL is returned when the local contact is null`() = runTest {
+        val contactId = 123L
+        whenever(megaLocalRoomGateway.getContactByHandle(contactId)) doReturn null
+
+        val actual = underTest.getContactFromCacheByHandle(contactId)
+
+        assertThat(actual).isNull()
     }
 }

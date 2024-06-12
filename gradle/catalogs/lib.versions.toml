@@ -27,6 +27,8 @@ sqlcipher = "4.5.4"
 kotlin-serialisation = "1.6.3"
 eclipse-jgit = "6.6.0.202305301015-r"
 json = "20230227"
+megagradle = "0.22.20240528013745"
+mega-core-ui = "2.6.20240527115645"
 
 [libraries]
 anko-commons = { module = "org.jetbrains.anko:anko-commons", version.ref = "anko" }
@@ -71,9 +73,9 @@ simplestorage = { module = "com.anggrayudi:storage", version.ref = "simplestorag
 stickyheader = 'com.brandongogetap:stickyheaders:0.6.1'
 vdurmont-emoji = 'com.vdurmont:emoji-java:4.0.0'
 compose-state-events = { module = "com.github.leonard-palm:compose-state-events", version.ref = "compose-state-events" }
-mega-analytics = "mega.privacy.mobile:analytics-events-android:20240430.075836"
+mega-analytics = "mega.privacy.mobile:analytics-events-android:20240527.031929"
 kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
-balloon = "com.github.skydoves:balloon-compose:1.5.4"
+balloon = "com.github.skydoves:balloon-compose:1.6.4"
 xray = { module = "mega.privacy.android.xray:xray", version.ref = "xray" }
 nocturn = { module = "mega.privacy.android.nocturn:nocturn", version.ref = "nocturn" }
 karma-annotation = { module = "com.mega.karma:annotation", version.ref = "karma" }
@@ -84,6 +86,8 @@ kotlin-serialisation = { module = "org.jetbrains.kotlinx:kotlinx-serialization-j
 eclipse-jgit = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "eclipse-jgit"}
 eclipse-jgit-ssh-jsch = { module = "org.eclipse.jgit:org.eclipse.jgit.ssh.jsch", version.ref = "eclipse-jgit"}
 json = { module = "org.json:json", version.ref = "json"}
+mega-core-ui = { module = "mega.android.core:ui", version.ref = "mega-core-ui" }
+mega-core-ui-tokens = { group = "mega.android.core", name  = "ui-tokens", version.ref = "mega-core-ui"}
 
 [bundles]
 fresco = ["fresco", "fresco-gif", "fresco-webp", "fresco-webpsupport"]

@@ -10,12 +10,13 @@ import mega.privacy.android.domain.entity.node.NodeId
 import nz.mega.sdk.MegaCancelToken
 import nz.mega.sdk.MegaContactRequest
 import nz.mega.sdk.MegaError
+import nz.mega.sdk.MegaFlag
 import nz.mega.sdk.MegaHandleList
 import nz.mega.sdk.MegaLoggerInterface
 import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaNodeList
 import nz.mega.sdk.MegaPushNotificationSettings
-import nz.mega.sdk.MegaRecentActionBucket
+import nz.mega.sdk.MegaRecentActionBucketList
 import nz.mega.sdk.MegaRequestListenerInterface
 import nz.mega.sdk.MegaSearchFilter
 import nz.mega.sdk.MegaSet
@@ -396,14 +397,6 @@ interface MegaApiGateway {
     )
 
     /**
-     * Get children nodes by node
-     * @param parentNode parent node
-     * @param order order for the returned list, if null the default order is applied
-     * @return children nodes list
-     */
-    suspend fun getChildrenByNode(parentNode: MegaNode, order: Int? = null): List<MegaNode>
-
-    /**
      * Get a list of all incoming shares
      *
      * @param order sort order, if null the default order is applied
@@ -777,6 +770,43 @@ interface MegaApiGateway {
     suspend fun getIncomingContactRequests(): ArrayList<MegaContactRequest>?
 
     /**
+     * Get contact request by request handle
+     *
+     * @param requestHandle identifier for contact request
+     *
+     * @return contact request if exists or null
+     */
+    suspend fun getContactRequestByHandle(requestHandle: Long): MegaContactRequest?
+
+    /**
+     * Reply action to a received contact request
+     *
+     * @param contactRequest
+     * @param action performed to reply
+     * @param listener
+     */
+    fun replyReceivedContactRequest(
+        contactRequest: MegaContactRequest,
+        action: Int,
+        listener: MegaRequestListenerInterface,
+    )
+
+    /**
+     * Send action to an invited contact request
+     *
+     * @param email
+     * @param message
+     * @param action performed to send
+     * @param listener
+     */
+    fun sendInvitedContactRequest(
+        email: String,
+        message: String,
+        action: Int,
+        listener: MegaRequestListenerInterface,
+    )
+
+    /**
      * Get the default color for the avatar
      *
      * @param megaUser
@@ -805,67 +835,6 @@ interface MegaApiGateway {
         listener: MegaRequestListenerInterface,
     )
 
-    /**
-     * Allow to search nodes with the specific options, [order] & [type] & [target]
-     *
-     * @param cancelToken
-     * @param order
-     * @param type
-     * @param target
-     * @return Mega list
-     */
-    suspend fun searchByType(
-        cancelToken: MegaCancelToken,
-        order: Int,
-        type: Int,
-        target: Int,
-    ): List<MegaNode>
-
-    /**
-     *
-     * Allow to search nodes with the following options:
-     * - Search given a parent node of the tree to explore
-     * - Search recursively
-     * - Containing a search string in their name
-     * - Filter by the type of the node
-     * - Order the returned list
-     *
-     * @param parentNode parentNode
-     * @param searchString containing a search string in their name
-     * @param cancelToken use for cancel search
-     * @param recursive is search recursively
-     * @param order
-     * @param type type of nodes requested in the search
-     *
-     * @return List of nodes that match with the search parameters
-     */
-    suspend fun searchByType(
-        parentNode: MegaNode,
-        searchString: String,
-        cancelToken: MegaCancelToken,
-        recursive: Boolean,
-        order: Int,
-        type: Int,
-    ): List<MegaNode>
-
-    /**
-     * Get children nodes by megaNodeList
-     * @param parentNodes parent nodes
-     * @param order order for the returned list
-     * @return children nodes list
-     */
-    suspend fun getChildren(
-        parentNodes: MegaNodeList,
-        order: Int,
-    ): List<MegaNode>
-
-    /**
-     * Get children nodes by megaNodeList
-     * @param parent parent node
-     * @param order order for the returned list
-     * @return children nodes list
-     */
-    suspend fun getChildren(parent: MegaNode, order: Int): List<MegaNode>
 
     /**
      * Get a list with all public links
@@ -1129,12 +1098,12 @@ interface MegaApiGateway {
     )
 
     /**
-     * Creates a copy of MegaRecentActionBucket required for its usage in the app.
+     * Creates a copy of MegaRecentActionBucketList required for its usage in the app.
      *
-     * @param bucket The MegaRecentActionBucket received.
-     * @return A copy of MegaRecentActionBucket.
+     * @param bucketList The MegaRecentActionBucketList received.
+     * @return A copy of MegaRecentActionBucketList.
      */
-    fun copyBucket(bucket: MegaRecentActionBucket): MegaRecentActionBucket
+    fun copyBucketList(bucketList: MegaRecentActionBucketList): MegaRecentActionBucketList
 
     /**
      * Check access error extended
@@ -2332,57 +2301,6 @@ interface MegaApiGateway {
     fun localLogout(listener: MegaRequestListenerInterface)
 
     /**
-     * Search query in inshares
-     * @param query Querry String
-     * @param megaCancelToken [MegaCancelToken]
-     * @param order [SortOrder]
-     */
-    suspend fun searchOnInShares(
-        query: String,
-        megaCancelToken: MegaCancelToken,
-        order: Int,
-    ): List<MegaNode>
-
-    /**
-     * Search query in Outshares
-     * @param query Querry String
-     * @param megaCancelToken [MegaCancelToken]
-     * @param order [SortOrder]
-     */
-    suspend fun searchOnOutShares(
-        query: String,
-        megaCancelToken: MegaCancelToken,
-        order: Int,
-    ): List<MegaNode>
-
-    /**
-     * Search query in Linkshares
-     * @param query Querry String
-     * @param megaCancelToken [MegaCancelToken]
-     * @param order [SortOrder]
-     */
-    suspend fun searchOnLinkShares(
-        query: String,
-        megaCancelToken: MegaCancelToken,
-        order: Int,
-    ): List<MegaNode>
-
-    /**
-     * Search query in node
-     *
-     * @param parent [MegaNode]
-     * @param query Query to be searched
-     * @param megaCancelToken [MegaCancelToken]
-     * @param order [SortOrder]
-     */
-    suspend fun search(
-        parent: MegaNode,
-        query: String,
-        megaCancelToken: MegaCancelToken,
-        order: Int,
-    ): List<MegaNode>
-
-    /**
      * Search query with search filter
      *
      * @param filter filter to apply [MegaSearchFilter]
@@ -3541,4 +3459,109 @@ interface MegaApiGateway {
         description: String?,
         listener: MegaRequestListenerInterface,
     )
+
+    /**
+     * Add new tag stored as node attribute
+     *
+     * The associated request type with this request is MegaRequest::TYPE_TAG_NODE
+     * Valid data in the MegaRequest object received on callbacks:
+     * - MegaRequest::getNodeHandle - Returns the handle of the node that received the tag
+     * - MegaRequest::getParamType - Returns operation type (0 - Add tag, 1 - Remove tag, 2 - Update tag)
+     * - MegaRequest::getText - Returns tag
+     *
+     * ',' is an invalid character to be used in a tag. If it is contained in the tag,
+     * onRequestFinish will be called with the error code MegaError::API_EARGS.
+     *
+     * If the length of all tags is higher than 3000 onRequestFinish will be called with
+     * the error code MegaError::API_EARGS
+     *
+     * If tag already exists, onRequestFinish will be called with the error code MegaError::API_EEXISTS
+     *
+     * If number of tags exceed the maximum number of tags (10),
+     * onRequestFinish will be called with the error code MegaError::API_ETOOMANY
+     *
+     * If the MEGA account is a business account and its status is expired, onRequestFinish will
+     * be called with the error code MegaError::API_EBUSINESSPASTDUE.
+     *
+     * @param node Node that will receive the information.
+     * @param tag New tag
+     * @param listener MegaRequestListener to track this request
+     */
+    fun addNodeTag(node: MegaNode, tag: String, listener: MegaRequestListenerInterface)
+
+    /**
+     * Remove a tag stored as a node attribute
+     *
+     * The associated request type with this request is MegaRequest::TYPE_TAG_NODE
+     * Valid data in the MegaRequest object received on callbacks:
+     * - MegaRequest::getNodeHandle - Returns the handle of the node that received the tag
+     * - MegaRequest::getParamType - Returns operation type (0 - Add tag, 1 - Temove tag, 2 - Update tag)
+     * - MegaRequest::getText - Returns tag
+     *
+     * If tag doesn't exist, onRequestFinish will be called with the error code MegaError::API_ENOENT
+     *
+     * If the MEGA account is a business account and its status is expired, onRequestFinish will
+     * be called with the error code MegaError::API_EBUSINESSPASTDUE.
+     *
+     * @param node Node that will receive the information.
+     * @param tag Tag to be removed
+     * @param listener MegaRequestListener to track this request
+     */
+    fun removeNodeTag(node: MegaNode, tag: String, listener: MegaRequestListenerInterface)
+
+    /**
+     * @brief Update a tag stored as a node attribute
+     *
+     * The associated request type with this request is MegaRequest::TYPE_TAG_NODE
+     * Valid data in the MegaRequest object received on callbacks:
+     * - MegaRequest::getNodeHandle - Returns the handle of the node that received the tag
+     * - MegaRequest::getParamType - Returns operation type (0 - Add tag, 1 - Temove tag, 2 - Update tag)
+     * - MegaRequest::getText - Returns new tag
+     * - MegaRequest::getName - Returns old tag
+     *
+     * ',' is an invalid character to be used in a tag. If it is contained in the tag,
+     * onRequestFinish will be called with the error code MegaError::API_EARGS.
+     *
+     * If the length of all tags is higher than 3000 characters onRequestFinish will be called with
+     * the error code MegaError::API_EARGS
+     *
+     * If newTag already exists, onRequestFinish will be called with the error code MegaError::API_EEXISTS
+     * If oldTag doesn't exist, onRequestFinish will be called with the error code MegaError::API_ENOENT
+     *
+     * If the MEGA account is a business account and its status is expired, onRequestFinish will
+     * be called with the error code MegaError::API_EBUSINESSPASTDUE.
+     *
+     * @param node Node that will receive the information.
+     * @param newTag New tag value
+     * @param oldTag Old tag value
+     * @param listener MegaRequestListener to track this request
+     */
+    fun updateNodeTag(
+        node: MegaNode,
+        newTag: String,
+        oldTag: String,
+        listener: MegaRequestListenerInterface,
+    )
+
+    /**
+     * Get the type and value for the flag with the given name,
+     * if present among either A/B Test or Feature flags.
+     *
+     * If found among A/B Test flags and commit was true, also inform the API
+     * that a user has become relevant for that A/B Test flag, in which case
+     * the associated request type with this request is MegaRequest::TYPE_AB_TEST_ACTIVE
+     * and valid data in the MegaRequest object received on all callbacks:
+     * - MegaRequest::getText - Returns the flag passed as parameter
+     *
+     * @param flagName Name or key of the value to be retrieved (and possibly be sent to API as active).
+     * @param commit Determine whether an A/B Test flag will be sent to API as active.
+     * @param listener MegaRequestListener to track this request, ignored if commit was false
+     *
+     * @return A MegaFlag instance with the type and value of the flag.
+     */
+    fun getFlag(
+        flagName: String,
+        commit: Boolean,
+        listener: MegaRequestListenerInterface?,
+    ): MegaFlag?
 }

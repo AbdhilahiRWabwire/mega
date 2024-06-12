@@ -69,16 +69,15 @@ import mega.privacy.android.app.presentation.folderlink.view.Constants.IMPORT_BU
 import mega.privacy.android.app.presentation.folderlink.view.Constants.SAVE_BUTTON_TAG
 import mega.privacy.android.app.presentation.folderlink.view.Constants.SNACKBAR_TAG
 import mega.privacy.android.app.presentation.view.NodesView
-import mega.privacy.android.core.ui.controls.buttons.TextMegaButton
-import mega.privacy.android.core.ui.theme.black
-import mega.privacy.android.core.ui.theme.extensions.grey_020_grey_700
-import mega.privacy.android.core.ui.theme.extensions.teal_300_teal_200
-import mega.privacy.android.core.ui.theme.white
+import mega.privacy.android.shared.original.core.ui.controls.buttons.TextMegaButton
+import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
+import mega.privacy.android.shared.original.core.ui.theme.black
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_020_grey_700
+import mega.privacy.android.shared.original.core.ui.theme.extensions.teal_300_teal_200
+import mega.privacy.android.shared.original.core.ui.theme.white
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
-import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
-import mega.privacy.android.shared.theme.MegaAppTheme
-import nz.mega.sdk.MegaNode
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 internal object Constants {
     /**
@@ -136,8 +135,6 @@ internal fun FolderLinkView(
     onImportClicked: (NodeUIItem<TypedNode>?) -> Unit,
     onOpenFile: (Intent) -> Unit,
     onResetOpenFile: () -> Unit,
-    onDownloadNode: (List<MegaNode>) -> Unit,
-    onResetDownloadNode: () -> Unit,
     onSelectImportLocation: () -> Unit,
     onResetSelectImportLocation: () -> Unit,
     onResetSnackbarMessage: () -> Unit,
@@ -184,12 +181,6 @@ internal fun FolderLinkView(
         event = state.openFile,
         onConsumed = onResetOpenFile,
         action = onOpenFile
-    )
-
-    EventEffect(
-        event = state.downloadNodes,
-        onConsumed = onResetDownloadNode,
-        action = onDownloadNode
     )
 
     EventEffect(
@@ -481,7 +472,7 @@ internal fun EmptyFolderLinkView(
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, name = "DarkSimpleAppBarPreview")
 @Composable
 private fun PreviewFolderLinkTopAppBar() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         FolderLinkTopAppBar(
             title = "Folder Name",
             elevation = false,
@@ -496,7 +487,7 @@ private fun PreviewFolderLinkTopAppBar() {
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, name = "DarkSimpleAppBarPreview")
 @Composable
 private fun PreviewEmptyFolderLinkView() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         EmptyFolderLinkView(
             modifier = Modifier
                 .fillMaxWidth()
@@ -512,7 +503,7 @@ private fun PreviewEmptyFolderLinkView() {
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, name = "DarkSimpleAppBarPreview")
 @Composable
 private fun PreviewFolderLinkSelectedTopAppBar() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         FolderLinkSelectedTopAppBar(
             title = "Folder Name",
             elevation = false,
@@ -528,7 +519,7 @@ private fun PreviewFolderLinkSelectedTopAppBar() {
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, name = "DarkSimpleAppBarPreview")
 @Composable
 private fun PreviewImportDownloadView() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         ImportDownloadView(
             modifier = Modifier
                 .fillMaxWidth()

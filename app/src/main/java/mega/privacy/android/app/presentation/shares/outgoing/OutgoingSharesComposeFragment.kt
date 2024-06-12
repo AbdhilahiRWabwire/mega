@@ -38,7 +38,6 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.WebViewActivity
 import mega.privacy.android.app.arch.extensions.collectFlow
-import mega.privacy.android.app.fragments.homepage.EventObserver
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.interfaces.ActionBackupListener
 import mega.privacy.android.app.interfaces.SnackbarShower
@@ -73,7 +72,7 @@ import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.shares.ShareNode
 import mega.privacy.android.domain.usecase.GetThemeMode
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -120,7 +119,7 @@ class OutgoingSharesComposeFragment : Fragment() {
 
     private val viewModel: OutgoingSharesComposeViewModel by activityViewModels()
     private val nodeActionsViewModel: NodeActionsViewModel by viewModels()
-    private val sortByHeaderViewModel: SortByHeaderViewModel by viewModels()
+    private val sortByHeaderViewModel: SortByHeaderViewModel by activityViewModels()
 
     /**
      * Flag to restore elevation when checkScroll() is called
@@ -171,7 +170,7 @@ class OutgoingSharesComposeFragment : Fragment() {
                 var clickedFile: TypedFileNode? by remember {
                     mutableStateOf(null)
                 }
-                MegaAppTheme(isDark = themeMode.isDarkMode()) {
+                OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                     OutgoingSharesView(
                         uiState = uiState,
                         emptyState = getEmptyFolderDrawable(uiState.isOutgoingSharesEmpty),
@@ -272,7 +271,8 @@ class OutgoingSharesComposeFragment : Fragment() {
                         onActionHandled = {
                             clickedFile = null
                         },
-                        nodeActionsViewModel = nodeActionsViewModel
+                        nodeActionsViewModel = nodeActionsViewModel,
+                        coroutineScope = coroutineScope
                     )
                 }
                 ToolbarTitleUpdateEffect(uiState.updateToolbarTitleEvent) {
@@ -402,9 +402,9 @@ class OutgoingSharesComposeFragment : Fragment() {
             }
         }
 
-        sortByHeaderViewModel.orderChangeEvent.observe(viewLifecycleOwner, EventObserver {
+        viewLifecycleOwner.collectFlow(sortByHeaderViewModel.orderChangeState) {
             viewModel.onSortOrderChanged()
-        })
+        }
     }
 
     /**
@@ -481,6 +481,8 @@ class OutgoingSharesComposeFragment : Fragment() {
                 )
                 // Slight customization for outgoing shares page
                 control.move().isVisible = false
+                control.hide().isVisible = false
+                control.unhide().isVisible = false
                 val areAllNotTakenDown = selected.any { it.isTakenDown.not() }
                 if (areAllNotTakenDown) {
                     if (viewModel.state.value.isInRootLevel) {
@@ -533,7 +535,6 @@ class OutgoingSharesComposeFragment : Fragment() {
                         nodes = it.selectedMegaNode,
                         highPriority = false,
                         isFolderLink = false,
-                        fromMediaViewer = false,
                         fromChat = false,
                     )
                     disableSelectMode()

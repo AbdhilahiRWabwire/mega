@@ -29,7 +29,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
@@ -46,7 +45,8 @@ import mega.privacy.android.app.mediaplayer.trackinfo.Constants.AUDIO_TITLE_TEST
 import mega.privacy.android.app.mediaplayer.trackinfo.Constants.OFFLINE_OPTION_TEST_TAG
 import mega.privacy.android.app.utils.LocationInfo
 import mega.privacy.android.app.utils.TimeUtils.formatLongDateTime
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import java.io.File
 
 /**
@@ -306,10 +306,30 @@ fun AudioNodeInfoView(
     }
 }
 
-@Preview
+@CombinedThemePreviews
 @Composable
-private fun PreviewAudioInfoView() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+private fun AudioTrackInfoViewPreview() {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
+        AudioTrackInfoView(
+            uiState = TrackInfoState(
+                durationString = "00:35"
+            ),
+            metadata = Metadata(
+                title = "Great song",
+                album = "Great album",
+                artist = "The best artist",
+                nodeName = "Node name"
+            ),
+            {},
+            {}
+        )
+    }
+}
+
+@CombinedThemePreviews
+@Composable
+private fun AudioInfoViewPreview() {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         AudioInfoView(
             thumbnail = null,
             titleString = "Vengeance Rhythm",
@@ -320,10 +340,10 @@ private fun PreviewAudioInfoView() {
     }
 }
 
-@Preview
+@CombinedThemePreviews
 @Composable
-private fun PreviewAudioNodeInfoView() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+private fun AudioNodeInfoViewPreview() {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         AudioNodeInfoView(
             onCheckedChange = {},
             isEnabled = false,

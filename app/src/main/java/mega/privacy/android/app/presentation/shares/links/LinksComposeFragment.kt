@@ -37,7 +37,6 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.WebViewActivity
 import mega.privacy.android.app.arch.extensions.collectFlow
-import mega.privacy.android.app.fragments.homepage.EventObserver
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.interfaces.ActionBackupListener
 import mega.privacy.android.app.interfaces.SnackbarShower
@@ -73,7 +72,7 @@ import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.publiclink.PublicLinkFile
 import mega.privacy.android.domain.entity.node.publiclink.PublicLinkNode
 import mega.privacy.android.domain.usecase.GetThemeMode
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -85,7 +84,7 @@ class LinksComposeFragment : Fragment() {
 
     private val viewModel: LinksViewModel by activityViewModels()
     private val nodeActionsViewModel: NodeActionsViewModel by viewModels()
-    private val sortByHeaderViewModel: SortByHeaderViewModel by viewModels()
+    private val sortByHeaderViewModel: SortByHeaderViewModel by activityViewModels()
 
     /**
      * Mapper to get options for Action Bar
@@ -137,7 +136,7 @@ class LinksComposeFragment : Fragment() {
                     mutableStateOf(null)
                 }
 
-                MegaAppTheme(isDark = isDarkMode) {
+                OriginalTempTheme(isDark = isDarkMode) {
                     LinksView(
                         uiState = uiState,
                         emptyState = getEmptyFolderDrawable(uiState.isLinksEmpty),
@@ -226,7 +225,8 @@ class LinksComposeFragment : Fragment() {
                         onActionHandled = {
                             currentFileNode = null
                         },
-                        nodeActionsViewModel = nodeActionsViewModel
+                        nodeActionsViewModel = nodeActionsViewModel,
+                        coroutineScope = coroutineScope
                     )
                 } ?: run {
                     linksActionListener?.updateSharesPageToolbarTitleAndFAB(
@@ -325,9 +325,10 @@ class LinksComposeFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        sortByHeaderViewModel.orderChangeEvent.observe(viewLifecycleOwner, EventObserver {
+        sortByHeaderViewModel.refreshData(isUpdatedOrderChangeState = true)
+        viewLifecycleOwner.collectFlow(sortByHeaderViewModel.orderChangeState) {
             viewModel.refreshLinkNodes(false)
-        })
+        }
 
         viewLifecycleOwner.collectFlow(viewModel.state
             .map { it.nodesList.isEmpty() }
@@ -427,7 +428,6 @@ class LinksComposeFragment : Fragment() {
                         nodes = it.selectedMegaNode,
                         highPriority = false,
                         isFolderLink = false,
-                        fromMediaViewer = false,
                         fromChat = false,
                     )
                     disableSelectMode()
@@ -575,6 +575,8 @@ class LinksComposeFragment : Fragment() {
                 )
 
                 // Slight customization for links page
+                control.hide().isVisible = false
+                control.unhide().isVisible = false
                 control.move().isVisible = false
                 control.removeShare().isVisible = false
                 control.shareFolder().isVisible = false

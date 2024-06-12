@@ -21,15 +21,15 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.core.content.withStyledAttributes
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.core.R
-import mega.privacy.android.core.ui.controls.banners.WarningBanner
-import mega.privacy.android.core.ui.controls.text.MegaSpannedClickableText
-import mega.privacy.android.core.ui.model.MegaSpanStyle
-import mega.privacy.android.core.ui.model.MegaSpanStyleWithAnnotation
-import mega.privacy.android.core.ui.model.SpanIndicator
-import mega.privacy.android.core.ui.preview.BooleanProvider
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.tokens.TextColor
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.controls.banners.WarningBanner
+import mega.privacy.android.shared.original.core.ui.controls.text.MegaSpannedClickableText
+import mega.privacy.android.shared.original.core.ui.model.MegaSpanStyle
+import mega.privacy.android.shared.original.core.ui.model.MegaSpanStyleWithAnnotation
+import mega.privacy.android.shared.original.core.ui.model.SpanIndicator
+import mega.privacy.android.shared.original.core.ui.preview.BooleanProvider
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * Participants limit warning view
@@ -54,7 +54,7 @@ class ParticipantsLimitWarningView : AbstractComposeView {
 
     @Composable
     override fun Content() {
-        MegaAppTheme(isDark = isSystemInDarkTheme()) {
+        OriginalTempTheme(isDark = isSystemInDarkTheme()) {
             ParticipantsLimitWarningComposeView(
                 isModerator = isModerator,
             )
@@ -131,7 +131,7 @@ internal const val TEST_TAG_PARTICIPANTS_LIMIT_WARNING_VIEW = "participants_limi
 private fun ParticipantsLimitWarningComposeViewPreview(
     @PreviewParameter(BooleanProvider::class) isModerator: Boolean,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         ParticipantsLimitWarningComposeView(
             isModerator = isModerator,
         )

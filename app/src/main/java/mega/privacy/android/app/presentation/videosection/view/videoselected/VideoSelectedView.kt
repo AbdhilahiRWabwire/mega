@@ -40,18 +40,18 @@ import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.fileinfo.model.FileInfoMenuAction
 import mega.privacy.android.app.presentation.videosection.model.VideoSelectedState
 import mega.privacy.android.app.presentation.view.NodeGridView
-import mega.privacy.android.core.ui.controls.progressindicator.MegaCircularProgressIndicator
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.white_black
-import mega.privacy.android.core.ui.utils.ListGridStateMap
-import mega.privacy.android.core.ui.utils.getState
-import mega.privacy.android.core.ui.utils.sync
+import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaCircularProgressIndicator
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.extensions.white_black
+import mega.privacy.android.shared.original.core.ui.utils.ListGridStateMap
+import mega.privacy.android.shared.original.core.ui.utils.getState
+import mega.privacy.android.shared.original.core.ui.utils.sync
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
 import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -238,7 +238,7 @@ private fun <T : TypedNode> rememberNodeListForGrid(
 @CombinedThemePreviews
 @Composable
 private fun VideoSelectedViewWithProgressBarPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VideoSelectedView(
             uiState = VideoSelectedState(
                 isLoading = true,
@@ -261,7 +261,7 @@ private fun VideoSelectedViewWithProgressBarPreview() {
 @CombinedThemePreviews
 @Composable
 private fun VideoSelectedViewWithEmptyViewPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VideoSelectedView(
             uiState = VideoSelectedState(
                 isLoading = false,

@@ -47,6 +47,8 @@ internal class SampleRecentActionDataProvider :
             override val originalFingerprint = "abc"
             override val hasThumbnail = false
             override val hasPreview = false
+            override val description: String = "Sample node description"
+            override val tags: List<String> = listOf("tag1", "tag2")
         }
     )
 
@@ -69,7 +71,7 @@ internal class SampleRecentActionDataProvider :
                 firstLineText = "First line text",
                 updatedByText = "[A]Updated by[/A] [B]John Doe[/B]",
                 isFavourite = true,
-                labelColor = R.color.red_200,
+                labelColorId = R.color.red_200,
                 shareIcon = IconPackR.drawable.ic_folder_incoming_medium_solid,
                 time = "12:00 PM",
                 date = "Today",
@@ -83,7 +85,7 @@ internal class SampleRecentActionDataProvider :
                 firstLineText = "First line text",
                 updatedByText = null,
                 isFavourite = true,
-                labelColor = null,
+                labelColorId = null,
                 shareIcon = IconPackR.drawable.ic_folder_incoming_medium_solid,
                 date = "Today",
                 time = "10:00 PM",
@@ -97,7 +99,7 @@ internal class SampleRecentActionDataProvider :
                 firstLineText = "2 Videos and 2 Photos",
                 updatedByText = null,
                 isFavourite = false,
-                labelColor = null,
+                labelColorId = null,
                 shareIcon = null,
                 date = "24th March, 2024",
                 time = "08:00 PM",

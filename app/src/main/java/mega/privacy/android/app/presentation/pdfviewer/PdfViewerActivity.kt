@@ -42,6 +42,7 @@ import com.shockwave.pdfium.PdfDocument.Bookmark
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import mega.privacy.android.app.BaseActivity
 import mega.privacy.android.app.LegacyDatabaseHandler
 import mega.privacy.android.app.MegaApplication.Companion.getInstance
@@ -55,7 +56,6 @@ import mega.privacy.android.app.databinding.ActivityPdfviewerBinding
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.interfaces.ActionNodeCallback
 import mega.privacy.android.app.interfaces.SnackbarShower
-import mega.privacy.android.app.listeners.OptionalMegaRequestListenerInterface
 import mega.privacy.android.app.main.FileExplorerActivity
 import mega.privacy.android.app.main.controllers.ChatController
 import mega.privacy.android.app.main.controllers.NodeController
@@ -83,7 +83,6 @@ import mega.privacy.android.app.utils.RunOnUIThreadUtils
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.permission.PermissionUtils.checkNotificationsPermission
 import mega.privacy.android.domain.entity.node.NodeId
-import mega.privacy.android.domain.entity.user.UserCredentials
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import nz.mega.sdk.MegaApiAndroid
@@ -147,8 +146,6 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
     val progressBar
         get() = binding.pdfViewerProgressBar
 
-    private var credentials: UserCredentials? = null
-    private var lastEmail: String? = null
     private var isUrl = false
     private var defaultScrollHandle: DefaultScrollHandle? = null
     private var uri: Uri? = null
@@ -168,7 +165,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
     )
 
     // it's only used for enter animation
-    private val dragToExit = DragToExitSupport(this, null, null)
+    private val dragToExit = DragToExitSupport(this, lifecycleScope,null, null)
     private var nC: NodeController? = null
     private var handler: Handler? = null
     private var fromChat = false
@@ -208,6 +205,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
             finish()
             return
         }
+        val credentials = runBlocking { runBlocking { getAccountCredentialsUseCase() } }
 
         binding = ActivityPdfviewerBinding.inflate(layoutInflater)
 
@@ -295,7 +293,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
             megaApi.addGlobalListener(this)
             if (uri.toString().contains("http://")) {
                 when {
-                    dbH.credentials != null -> megaApi
+                    credentials != null -> megaApi
                     isFolderLink -> megaApiFolder
                     else -> null
                 }?.apply { initStreaming() }
@@ -329,7 +327,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
                     )
                 } else {
                     Timber.d("CurrentDocumentAuth is not null")
-                    val url: String? = if (dbH.credentials != null) {
+                    val url: String? = if (credentials != null) {
                         megaApi.httpServerGetLocalLink(node)
                     } else {
                         megaApiFolder.httpServerGetLocalLink(node)
@@ -724,45 +722,19 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
     }
 
     private fun download() {
-        lifecycleScope.launch {
-            if (startDownloadViewModel.shouldDownloadWithDownloadWorker()) {
-                if (fromChat) {
-                    startDownloadViewModel.onDownloadClicked(chatId, msgId)
-                } else if (type == Constants.FILE_LINK_ADAPTER) {
-                    node?.serialize()?.let {
-                        startDownloadViewModel.onDownloadClicked(it)
-                    }
-                } else if (isFolderLink) {
-                    node?.handle?.let {
-                        startDownloadViewModel.onFolderLinkChildNodeDownloadClicked(NodeId(it))
-                    }
-                } else {
-                    node?.handle?.let {
-                        startDownloadViewModel.onDownloadClicked(NodeId(it))
-                    }
-                }
-            } else {
-                legacyDownload()
+        if (fromChat) {
+            startDownloadViewModel.onDownloadClicked(chatId, msgId)
+        } else if (type == Constants.FILE_LINK_ADAPTER) {
+            node?.serialize()?.let {
+                startDownloadViewModel.onDownloadClicked(it)
             }
-        }
-    }
-
-    private fun legacyDownload() {
-        checkNotificationsPermission(this)
-        if (type == Constants.OFFLINE_ADAPTER) {
-            val node = dbH.findByHandle(handle)
-            if (node != null) {
-                nodeSaver.saveOfflineNode(node, true)
+        } else if (isFolderLink) {
+            node?.handle?.let {
+                startDownloadViewModel.onFolderLinkChildNodeDownloadClicked(NodeId(it))
             }
         } else {
-            node?.let {
-                nodeSaver.saveNode(
-                    it,
-                    fromChat,
-                    isFolderLink,
-                    true,
-                    type == Constants.FILE_LINK_ADAPTER || fromChat
-                )
+            node?.handle?.let {
+                startDownloadViewModel.onDownloadClicked(NodeId(it))
             }
         }
     }
@@ -1217,11 +1189,14 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
                     && !isInSharedItems
                     && parentNode?.isInShare == false
                     && node?.isMarkedSensitive == false
+                    || viewModel.uiState.value.accountType?.isPaid == false
+
         val shouldShowUnhideNode =
             isHiddenNodesEnabled
                     && !isInSharedItems
                     && parentNode?.isInShare == false
                     && node?.isMarkedSensitive == true
+                    && viewModel.uiState.value.accountType?.isPaid == true
 
         hideMenuItem.isVisible = shouldShowHideNode
         unhideMenuItem.isVisible = shouldShowUnhideNode
@@ -1661,16 +1636,17 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
 
     override fun onRequestFinish(api: MegaApiJava, request: MegaRequest, e: MegaError) {
         Timber.d("onRequestFinish")
-        val gSession: String?
         if (request.type == MegaRequest.TYPE_LOGIN) {
             if (e.errorCode != MegaError.API_OK) {
                 Timber.w("Login failed with error code: ${e.errorCode}")
             } else {
                 //LOGIN OK
-                gSession = megaApi.dumpSession()
-                UserCredentials(lastEmail, gSession, "", "", "").apply {
-                    credentials = this
-                    dbH.saveCredentials(this)
+                lifecycleScope.launch {
+                    runCatching {
+                        saveAccountCredentialsUseCase()
+                    }.onFailure {
+                        Timber.e(it)
+                    }
                 }
                 Timber.d("Logged in with session")
                 Timber.d("Setting account auth token for folder links.")
@@ -1682,16 +1658,12 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
             }
         } else if (request.type == MegaRequest.TYPE_FETCH_NODES) {
             if (e.errorCode == MegaError.API_OK) {
-                gSession = megaApi.dumpSession()
-                val myUser = megaApi.myUser
-                var myUserHandle = ""
-                if (myUser != null) {
-                    lastEmail = megaApi.myUser?.email
-                    myUserHandle = megaApi.myUser?.handle.toString() + ""
-                }
-                UserCredentials(lastEmail, gSession, "", "", myUserHandle).apply {
-                    credentials = this
-                    dbH.saveCredentials(this)
+                lifecycleScope.launch {
+                    runCatching {
+                        saveAccountCredentialsUseCase()
+                    }.onFailure {
+                        Timber.e(it)
+                    }
                 }
                 download()
             }
@@ -1715,6 +1687,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
 
     override fun onDestroy() {
         Timber.d("onDestroy()")
+        binding.pdfView.recycle()
         val needStopHttpServer =
             intent.getBooleanExtra(Constants.INTENT_EXTRA_KEY_NEED_STOP_HTTP_SERVER, false)
         megaApi.removeTransferListener(this)

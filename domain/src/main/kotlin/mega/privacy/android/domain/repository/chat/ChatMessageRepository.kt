@@ -2,6 +2,7 @@ package mega.privacy.android.domain.repository.chat
 
 import androidx.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
+import mega.privacy.android.domain.entity.Progress
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ChatMessageType
 import mega.privacy.android.domain.entity.chat.PendingMessage
@@ -220,19 +221,27 @@ interface ChatMessageRepository {
     /**
      * Update pending message
      *
-     * @param updatePendingMessageRequest
+     * @param updatePendingMessageRequests
      */
     suspend fun updatePendingMessage(
-        updatePendingMessageRequest: UpdatePendingMessageRequest,
+        vararg updatePendingMessageRequests: UpdatePendingMessageRequest,
     )
 
     /**
-     * Monitor pending messages
+     * Monitor pending messages for a chat
      *
      * @param chatId
      * @return flow of pending messages for the chat
      */
     fun monitorPendingMessages(chatId: Long): Flow<List<PendingMessage>>
+
+    /**
+     * Monitor pending messages of a specific state
+     *
+     * @param states
+     * @return flow of pending messages for specific state
+     */
+    fun monitorPendingMessagesByState(vararg states: PendingMessageState): Flow<List<PendingMessage>>
 
     /**
      * Forward a message with attach contact
@@ -496,6 +505,22 @@ interface ChatMessageRepository {
     fun cacheOriginalPathForNode(nodeId: NodeId, path: String)
 
     /**
+     * Gets the original path of this pending message if it has been cached during the creation of the pending message.
+     *
+     * @param pendingMessageId The id of the node.
+     * @return The cached original path or uri, or null if not cached.
+     */
+    fun getCachedOriginalPathForPendingMessage(pendingMessageId: Long): String?
+
+    /**
+     * Caches the original path of the pending message once the pending message is created, before it is copied to cache folder and/or scaled/compressed.
+     *
+     * @param pendingMessageId The id of the pending message.
+     * @param path The original path or uri to be cached.
+     */
+    fun cacheOriginalPathForPendingMessage(pendingMessageId: Long, path: String)
+
+    /**
      * Get paged messages
      *
      * @param chatId
@@ -546,4 +571,14 @@ interface ChatMessageRepository {
      * Clear all data from chat database
      */
     suspend fun clearAllData()
+
+    fun updatePendingMessagesCompressionProgress(
+        progress: Progress,
+        pendingMessages: List<PendingMessage>,
+    )
+
+    fun monitorPendingMessagesCompressionProgress(): Flow<Map<Long, Progress>>
+
+    fun clearPendingMessagesCompressionProgress()
+
 }

@@ -121,7 +121,7 @@
     <!-- Dialog option that permits user do not show it again -->
     <string name="checkbox_not_show_again">不再显示</string>
     <!-- Press back while login to cancel current login process. -->
-    <string name="confirm_cancel_login">您确定要取消当前登录吗？</string>
+    <string name="confirm_cancel_login">您确定要取消当前的登入吗？</string>
     <!-- Login button -->
     <string name="login_text">登&#160;入</string>
     <!-- email label -->
@@ -568,16 +568,6 @@
     <string name="verify_account_error_invalid_code">验证码错误。请再试一次或重新发送。</string>
     <!-- verify phone number successfully -->
     <string name="verify_account_successfully">您的电话号码已经通过验证</string>
-    <!-- If the user has an internal storage and an external SD card, it has to be set on the settings screen, external storage option -->
-    <string-array name="settings_storage_download_location_array">
-        <item>内部存储</item>
-        <item>外部存储</item>
-    </string-array>
-    <!-- choose the way the new user’s email is inserted, import from phone option -->
-    <string-array name="add_contact_array">
-        <item>请填写用户的电子邮件地址</item>
-        <item>从设备导入</item>
-    </string-array>
     <!-- settings option -->
     <string name="settings_camera_upload_on">启用相机上传</string>
     <!-- settings option. How to upload the camera images: via Wi-Fi only or via Wi-Fi and data plan -->
@@ -588,19 +578,8 @@
     <string name="settings_secondary_upload_off">关闭辅助媒体上传</string>
     <!-- Title of shared folder explorer to choose a folder to perform an action -->
     <string name="settings_empty_folder">选择文件夹</string>
-    <!-- the options of how to upload, but in an array. needed for the settings, how to upload the camera images. only when Wi-Fi connected -->
-    <string-array name="settings_camera_upload_how_to_entries">
-        <item>Wi-Fi或移动数据</item>
-        <item>仅限Wi-Fi</item>
-    </string-array>
     <!-- What kind of files are going to be uploaded: images, videos or both -->
     <string name="settings_camera_upload_what_to_upload">上传文件</string>
-    <!-- what kind of file are going to be uploaded. Needed for the settings summary -->
-    <string-array name="settings_camera_upload_file_upload_entries">
-        <item>仅照片</item>
-        <item>仅视频</item>
-        <item>照片和视频</item>
-    </string-array>
     <!-- Title of ‘Include location tags’ setting option. Once enabled, Camera Uploads will include the location info from pictures those are being uploaded -->
     <string name="settings_camera_upload_include_gps">包含位置标签</string>
     <!-- Option to choose that the video compression will only be enable when the device is charging -->
@@ -834,7 +813,7 @@
     <!-- Error message when to many attempts to login. -->
     <string name="too_many_attempts_login">尝试登录次数过多，请一小时后再试。</string>
     <!-- Error message when trying to login to an account not validated. -->
-    <string name="account_not_validated_login">查看您的电子邮件收件箱并跟随链接确认您的帐户。</string>
+    <string name="account_not_validated_login">检查您的电子邮件收件箱并点击链接以确认您的帐户。</string>
     <!-- Error message shown when opening a folder link which doesn’t exist -->
     <string name="general_error_folder_not_found">文件夹链接不可用</string>
     <!-- Error message shown when opening a folder link which has been removed due to ToS/AUP violation -->
@@ -848,7 +827,7 @@
     <!-- Title of the screen after creating the account. That screen asks the user to confirm the account by checking the email -->
     <string name="confirm_email_text">正在等待电子邮件确认</string>
     <!-- Text below the title that explains the user should check the email and click the link to confirm the account -->
-    <string name="confirm_email_explanation">查看您的电子邮件收件箱并跟随链接确认您的帐户。</string>
+    <string name="confirm_email_explanation">检查您的电子邮件收件箱并跟随链接确认您的帐户。</string>
     <!-- Plural of items which contains a folder. 2 items -->
     <plurals name="general_num_items">
         <item quantity="other">%1$d个项目</item>
@@ -1075,7 +1054,7 @@
     <string name="no_conversation_history">无聊天记录</string>
     <!-- Text to indicate that one participant is typing or multiple participants are typing at the same time in a chat room. The "%1$s" placeholder is to put the name(s) of the participant(s). The [A][/A] format marks are to put the text in a different color. -->
     <plurals name="user_typing">
-        <item quantity="other">%1$s[A]正在输入...[/A]</item>
+        <item quantity="other">%1$s[A]正在输入&#8230;[/A]</item>
     </plurals>
     <!-- text that appear when there are more than 2 people writing at that time in a chat. For example User1, user2 and more are typing… -->
     <string name="more_users_typing">%1$s [A]和其他人正在输入&#8230;[/A]</string>
@@ -1593,7 +1572,7 @@
     <!-- Size in bytes. The placeholder is for the size value, please adjust the position based on linguistics -->
     <string name="label_file_size_byte">%s&#160;B</string>
     <!-- Size in kilobytes. The placeholder is for the size value, please adjust the position based on linguistics -->
-    <string name="label_file_size_kilo_byte">%sKB</string>
+    <string name="label_file_size_kilo_byte">%s&#160;KB</string>
     <!-- Size in megabytes. The placeholder is for the size value, please adjust the position based on linguistics -->
     <string name="label_file_size_mega_byte">%s&#160;MB</string>
     <!-- Size in gigabytes. The placeholder is for the size value, please adjust the position based on linguistics -->
@@ -1640,8 +1619,6 @@
     <string name="settings_chat_upload_quality">视频质量</string>
     <!-- Label for the option on setting to set up the quality of video files to be uploaded -->
     <string name="settings_video_upload_quality">视频画质</string>
-    <!-- Text shown when the user refuses to permit the storage permission when enable camera upload -->
-    <string name="on_refuse_storage_permission">相机上传需要访问您设备上的照片和其他媒体内容。请转到设置页面开启权限。</string>
     <!-- Available options for the setting to set up the quality of multimedia files uploaded to the chat or the Camera Uploads -->
     <string-array name="settings_chat_upload_quality_entries">
         <item>较低</item>
@@ -3036,7 +3013,7 @@
     <!-- Action to change name -->
     <string name="change_name_action">更改名字</string>
     <!-- Action to add photo -->
-    <string name="add_photo_action">添加照片</string>
+    <string name="add_photo_action">更改个人资料图片</string>
     <!-- Action to add phone number -->
     <string name="add_phone_number_action">添加手机号</string>
     <!-- Warning indicating the app needs write permissions to do any action -->
@@ -3099,8 +3076,6 @@
     <string name="general_camera_enable">您的摄像头已开启。</string>
     <!-- General label for camera disable -->
     <string name="general_camera_disable">您的摄像头已关闭。</string>
-    <!-- Label for hold meeting -->
-    <string name="meeting_hold">通话保持</string>
     <!-- General label for speaker -->
     <string name="general_speaker">扬声器</string>
     <!-- General label for headphone-->
@@ -3170,7 +3145,7 @@
     <!-- the content of join without account on left meeting page-->
     <string name="left_meeting_join_content">加入全球最大的安全云存储和协作平台。</string>
     <!-- the bonus title of join without account on left meeting page-->
-    <string name="left_meeting_bonus_title">获得20&#160;GB免费存储空间</string>
+    <string name="left_meeting_bonus_title">免费获得20&#160;GB存储空间</string>
     <!-- the bonus content of join without account on left meeting page-->
     <string name="left_meeting_bonus_content">立即注册并免费享受全球领先的协作平台。</string>
     <!-- Content of ongoing call for MaterialAlertDialog-->
@@ -3714,7 +3689,7 @@
         <item quantity="other">已添加%1$d个项目到“%2$s”</item>
     </plurals>
     <!-- Text that indicates that there’s no photo to show in user album in Photos Section-->
-    <string name="photos_user_album_empty_album">[A]相册[/A]为[B]空[/B]</string>
+    <string name="photos_user_album_empty_album">[B]空[/B][A]相册[/A]</string>
     <!-- Albums sub-section for all system and user albums -->
     <string name="photos_album_subsection_my_albums">我的相册</string>
     <!-- Albums sub-section for all shared albums -->
@@ -3730,7 +3705,7 @@
     <!-- In Settings view the title of setting, which allows to use media discovery view automatically. -->
     <string name="settings_media_discovery_view_title">媒体发现视图</string>
     <!-- In Settings view the explanation of a setting, which allows to use media discovery view automatically. -->
-    <string name="settings_media_discovery_view_context">在媒体发现视图中自动打开只包含图片和视频的文件夹。这让您可以在图库模式下看到媒体，并按日期过滤。</string>
+    <string name="settings_media_discovery_view_context">在媒体发现视图中自动打开只包含图片和视频的文件夹。这让您可以在图库模式下看到媒体内容并按日期筛选。</string>
     <!-- Context of banner for media discovery view. When user opens a folder, which can be viewed in Media discovery view, the banner will be shown with this text to let user know, where the setting can be changed. -->
     <string name="cloud_drive_media_discovery_banner_context">由于此文件夹仅包含图像和视频，我们已自动在媒体发现视图中将其打开。您可以通过更身临其境的布局欣赏您的视觉内容。您可以在设置中禁用此功能。</string>
     <!-- Banner option for user to open settings, where he can disable the media discovery view setting. -->
@@ -3758,7 +3733,7 @@
     <!--Undecrypted folder label-->
     <string name="shared_items_verify_credentials_undecrypted_folder">[未解密的文件夹]</string>
     <!--Yellow banner message in Verification screen that will be shown to the receiver if the owner of the folder haven't verified them yet.-->
-    <string name="shared_items_verify_credentials_verify_person_banner_label">为了访问此共享文件夹，与您分享它的人应该也对您进行验证。</string>
+    <string name="shared_items_verify_credentials_verify_person_banner_label">为了访问此共享文件夹，与您共享它的人应该也对您进行验证。</string>
     <!--Name of the action on menu where %s will be replaced by the contact name that needs to be verified-->
     <string name="shared_items_bottom_sheet_menu_verify_user">验证%s</string>
     <!-- Context of snackbar when downloading the file that needs to be downloaded for previewing. -->
@@ -3779,7 +3754,7 @@
     <string name="settings_camera_uploads_grant_media_permissions_negative_button">不授予</string>
     <!--  -->
     <plurals name="photos_album_photos_removal_snackbar_message">
-        <item quantity="other">已从“%2$s”中移除了%1$d个项目</item>
+        <item quantity="other">已从“%2$s”中移除%1$d个项目</item>
     </plurals>
     <!-- Label to describe one off meetings -->
     <string name="meetings_list_one_off_meeting_label">单次会议</string>
@@ -3808,7 +3783,7 @@
     <!-- Title of the dialog when permission is denied and it's required to upload content -->
     <string name="dialog_title_media_permissions_denied">访问被拒绝</string>
     <!-- Content of the dialog when permission is denied and it's required to upload content -->
-    <string name="dialog_content_media_permissions_denied">您拒绝了MEGA对您设备的存储和媒体文件的访问。如果您想继续分享，请给予MEGA权限。</string>
+    <string name="dialog_content_media_permissions_denied">您已拒绝MEGA访问您设备的存储和媒体文件。如果您想继续共享，请授予MEGA权限。</string>
     <!-- Positive action button of the dialog when permission is denied and it's required to upload content. Clicking it will redirect to settings screen of device -->
     <string name="dialog_positive_button_allow_permission">允许权限</string>
     <!-- Negative action button of the dialog when permission is denied and it's required to upload content. Clicking it will close the dialog -->
@@ -3842,7 +3817,7 @@
     <!-- User Alert notification for canceled occurrences of a scheduled recurring meeting -->
     <string name="notification_subtitle_scheduled_recurring_meeting_occurrence_canceled">[A]%s取消了[/A][B]预定于以下时间的事件：[/B]</string>
     <!-- Error message for the alert shown when opening a change email verification link with an account that not corresponds to the link -->
-    <string name="account_change_email_error_not_logged_with_correct_account_message">这个链接还没有在您目前登录的账户中生成。请登录与此链接相关的账户，以验证您的电子邮件地址。</string>
+    <string name="account_change_email_error_not_logged_with_correct_account_message">此链接尚未在您目前登录的帐户中生成。请登入与此链接相关连的帐户，以验证您的电子邮件地址。</string>
     <!-- Title of the error message for the alert shown when opening a change email verification link with an account that not corresponds to the link -->
     <string name="account_change_email_error_not_logged_with_correct_account_title">无法更新电子邮件地址</string>
     <!-- Select album cover -->
@@ -4170,7 +4145,7 @@
     <!-- This is the title of upgrade security dialog -->
     <string name="shared_items_security_upgrade_dialog_title">账户安全升级</string>
     <!-- This is the body of upgrade security dialog -->
-    <string name="shared_items_security_upgrade_dialog_content">我们正在升级您帐户的安全性。您应该只会看到这条消息一次。如果您之前已经看过这条消息，请首先确认这是针对此帐户而非您拥有的其他MEGA帐户。\n\n如果您确定并且这是您第二次在这个帐户看到此消息，请停止使用此帐户。</string>
+    <string name="shared_items_security_upgrade_dialog_content">我们正在升级您帐户的安全性。您应该只会看到这条消息一次。如果您之前已经看到过，请首先确认这是针对此帐户而非您拥有的其它MEGA帐户。\n\n如果您确定并且这是您第二次在这个帐户看到此消息，请停止使用此帐户。</string>
     <!-- Undecrypted file title on Recent bucket in cloud drive. This will get displayed instead of the file name if users credentials are not verified-->
     <plurals name="cloud_drive_undecrypted_file">
         <item quantity="other">[文件未解密]</item>
@@ -4256,7 +4231,7 @@
     <!-- The Off option to disable subtitles in the enable subtitle dialog. When user taps on Subtitle icon to enable them this dialog will be shown. -->
     <string name="media_player_video_enable_subtitle_dialog_option_off">关闭</string>
     <!-- The Add subtitle option in the enable subtitle dialog. When user taps on Subtitle icon to enable them this dialog will be shown. -->
-    <string name="media_player_video_enable_subtitle_dialog_option_add_subtitle">添加字幕...</string>
+    <string name="media_player_video_enable_subtitle_dialog_option_add_subtitle">添加字幕&#8230;</string>
     <!-- Slideshow settings page title -->
     <string name="slideshow_settings_page_title">幻灯片选项</string>
     <!-- Slideshow speed preference -->
@@ -4442,9 +4417,9 @@
     <!-- Title of the dialog, shown for disputed or taken down file. The dialog will be shown, when user will try to open file, which was taken down  -->
     <string name="dialog_taken_down_file_title">无法打开文件</string>
     <!-- Description of the dialog, shown for disputed or taken down folder. The dialog will be shown, when user will try to open folder, which was taken down  -->
-    <string name="dialog_taken_down_folder_description">This folder has been taken down in accordance with our [A]Takedown Guidance Policy[/A]. You can dispute this takedown if you believe we’ve made a mistake.</string>
+    <string name="dialog_taken_down_folder_description">根据我们的[A]删除指导政策[/A]，此文件夹已被删除。如果您认为我们犯了一个错误，您可以对这次删除提出异议。</string>
     <!-- Description of the dialog, shown for disputed or taken down file. The dialog will be shown, when user will try to open file, which was taken down  -->
-    <string name="dialog_taken_down_file_description">This file has been taken down in accordance with our [A]Takedown Guidance Policy[/A]. You can dispute this takedown if you believe we’ve made a mistake.</string>
+    <string name="dialog_taken_down_file_description">根据我们的[A]删除指导政策[/A]，此文件已被删除。如果您认为我们犯了一个错误，您可以对这次删除提出异议。</string>
     <!-- Text of the button to show the dialog to update to pro -->
     <string name="general_pro_only">仅限Pro会员</string>
     <!-- Title of the link access section where information is displayed to the user about link access-->
@@ -4494,7 +4469,7 @@
     <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to recover accidentally changed or deleted files. Keep the bullet point, as this string is part of the bullet point list. -->
     <string name="account_upgrade_account_description_feature_rewind">&#8226;&#160;Pro&#160;Lite最多可还原90天已删除的数据，Pro&#160;I、II和III则最多可还原180天</string>
     <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to schedule when the rubbish bin will be cleared. Keep the bullet point, as this string is part of the bullet point list. -->
-    <string name="account_upgrade_account_description_feature_rubbish_bin">&#8226;&#160;安排垃圾桶清理工作7天至10年</string>
+    <string name="account_upgrade_account_description_feature_rubbish_bin">&#8226;&#160;定期清理回收站7天至10年</string>
     <!-- Button title, when user taps on Pro Lite plan on Upgrade account screen, where user can choose plan to buy. -->
     <string name="account_upgrade_account_buy_button_title_pro_lite">购买Pro&#160;Lite</string>
     <!-- Button title, when user taps on Pro I plan on Upgrade account screen, where user can choose plan to buy. -->
@@ -4969,8 +4944,6 @@
     <string name="meetings_muted_by_a_participant_snackbar_message">您已被%s静音</string>
     <!-- Title of subscription details section, which shows to the user to provide details about subscription. -->
     <string name="account_upgrade_account_description_subscription_title">订阅详情</string>
-    <!-- Details body for the subscription details section, which shows to the user to provide details about subscription. -->
-    <string name="account_upgrade_subscription_details">订阅将自动续订，续订周期与初始选择的周期相同，并且以相同的价格进行续订。您可以在下一次订阅付款到期前24小时以内，通过[A]Google Play[/A]订阅界面关闭MEGA&#160;Pro订阅的自动续订功能。</string>
     <!-- Text content for the chat bottom sheet when gallery permission is not granted -->
     <string name="chat_toolbar_bottom_sheet_allow_gallery_access_title">允许访问您的图库</string>
     <!-- Button text to grant permission in the chat bottom sheet -->
@@ -5151,4 +5124,36 @@
     <string name="camera_flash_mode_auto">闪光模式自动</string>
     <!--  -->
     <string name="camera_send_to">发送至%1$s</string>
+    <!-- Title of call button to show more options in call screen -->
+    <string name="meetings_more_call_option_button">更多</string>
+    <!-- Title of raise hand button in call screen -->
+    <string name="meetings_raise_hand_option_button">举手</string>
+    <!-- Title of lower hand button in call screen -->
+    <string name="meetings_lower_hand_option_button">放手</string>
+    <!-- Title of put call on hold button in call screen -->
+    <string name="meetings_put_call_on_hold_option_button">保留通话</string>
+    <!-- Title of swap calls button in call screen -->
+    <string name="meetings_swap_calls_option_button">切换通话</string>
+    <!-- Title of resume call button in call screen -->
+    <string name="meetings_resume_call_option_button">恢复通话</string>
+    <!-- Text of pop up informing about the Raise hand feature -->
+    <string name="meetings_new_feature_raise_hand_layout">新功能：举手</string>
+    <!-- The snackbar message of your hand is raised -->
+    <string name="meeting_your_hand_is_raised_message">您举起您的手</string>
+    <!-- The snackbar message of you and others raised your hands -->
+    <plurals name="meeting_you_and_others_raised_your_hands_message">
+        <item quantity="other">您和其他%1$d个人举起了手</item>
+    </plurals>
+    <!-- The snackbar message of another participant raised their hand -->
+    <string name="meetings_one_participant_raised_their_hand_message">%1$s举起手</string>
+    <!-- The snackbar message two or more participants raised their hands -->
+    <plurals name="meetings_other_participants_raised_their_hands_message">
+        <item quantity="other">%1$s和其他%2$d个人举起手</item>
+    </plurals>
+    <!-- Hidden nodes sharing album -->
+    <string name="hidden_nodes_sharing_album">There are hidden items in this album. Sharing the album will mean that the hidden items are visible to those you share with. The items will still be hidden in your Cloud drive.</string>
+    <!-- Hidden nodes items -->
+    <plurals name="hidden_nodes_items">
+        <item quantity="other"></item>
+    </plurals>
 </resources>

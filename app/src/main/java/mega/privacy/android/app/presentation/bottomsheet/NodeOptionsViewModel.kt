@@ -18,18 +18,15 @@ import mega.privacy.android.app.presentation.bottomsheet.model.NodeShareInformat
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
-import mega.privacy.android.domain.usecase.GetParentNodeUseCase
 import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
-import mega.privacy.android.domain.usecase.camerauploads.GetPrimarySyncHandleUseCase
-import mega.privacy.android.domain.usecase.camerauploads.GetSecondarySyncHandleUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsHidingActionAllowedUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactUserNameFromDatabaseUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeDeletedFromBackupsUseCase
 import mega.privacy.android.domain.usecase.offline.RemoveOfflineNodeUseCase
 import mega.privacy.android.domain.usecase.shares.CreateShareKeyUseCase
-import mega.privacy.android.domain.usecase.transfers.chatuploads.GetMyChatsFilesFolderIdUseCase
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
 import javax.inject.Inject
@@ -56,10 +53,7 @@ class NodeOptionsViewModel @Inject constructor(
     private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase,
     private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
     private val isHiddenNodesOnboardedUseCase: IsHiddenNodesOnboardedUseCase,
-    private val getPrimarySyncHandleUseCase: GetPrimarySyncHandleUseCase,
-    private val getSecondarySyncHandleUseCase: GetSecondarySyncHandleUseCase,
-    private val getMyChatsFilesFolderIdUseCase: GetMyChatsFilesFolderIdUseCase,
-    private val getParentNodeUseCase: GetParentNodeUseCase,
+    private val isHidingActionAllowedUseCase: IsHidingActionAllowedUseCase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -111,13 +105,18 @@ class NodeOptionsViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            val isHiddenNodesOnboarded = isHiddenNodesOnboardedUseCase()
-            val isHidingActionAllowed = isHidingActionAllowed(_state.value.node?.handle ?: 0)
-            _state.update {
-                it.copy(
-                    isHiddenNodesOnboarded = isHiddenNodesOnboarded,
-                    isHidingActionAllowed = isHidingActionAllowed,
-                )
+            runCatching {
+                val isHiddenNodesOnboarded = isHiddenNodesOnboardedUseCase()
+                val isHidingActionAllowed =
+                    isHidingActionAllowedUseCase(NodeId(_state.value.node?.handle ?: 0))
+                _state.update {
+                    it.copy(
+                        isHiddenNodesOnboarded = isHiddenNodesOnboarded,
+                        isHidingActionAllowed = isHidingActionAllowed,
+                    )
+                }
+            }.onFailure {
+                Timber.e(it)
             }
         }
     }
@@ -221,23 +220,6 @@ class NodeOptionsViewModel @Inject constructor(
                 }
         }
     }
-
-    /**
-     * Check if the current node can be hidden
-     */
-    private suspend fun isHidingActionAllowed(handle: Long): Boolean {
-        val restrictedHandles = listOf(
-            getPrimarySyncHandleUseCase(),
-            getSecondarySyncHandleUseCase(),
-            getMyChatsFilesFolderIdUseCase().longValue,
-        )
-
-        val parentNodeHandle =
-            getParentNodeUseCase(nodeId = NodeId(handle))?.id?.longValue ?: 0
-
-        return parentNodeHandle !in restrictedHandles && handle !in restrictedHandles
-    }
-
 
     /**
      * Retrieves the Node Information of the Unverified Node with the Contact Name

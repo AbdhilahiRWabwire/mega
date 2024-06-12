@@ -584,16 +584,6 @@
     <string name="verify_account_error_invalid_code">Código incorreto, tente novamente.</string>
     <!-- verify phone number successfully -->
     <string name="verify_account_successfully">O seu número de telefone foi verificado</string>
-    <!-- If the user has an internal storage and an external SD card, it has to be set on the settings screen, external storage option -->
-    <string-array name="settings_storage_download_location_array">
-        <item>Armazenamento interno</item>
-        <item>Armazenamento externo</item>
-    </string-array>
-    <!-- choose the way the new user’s email is inserted, import from phone option -->
-    <string-array name="add_contact_array">
-        <item>Digite o email do usuário</item>
-        <item>Importar do dispositivo</item>
-    </string-array>
     <!-- settings option -->
     <string name="settings_camera_upload_on">Ativar Uploads da câmera</string>
     <!-- settings option. How to upload the camera images: via Wi-Fi only or via Wi-Fi and data plan -->
@@ -604,19 +594,8 @@
     <string name="settings_secondary_upload_off">Desativar upload secundário de mídia</string>
     <!-- Title of shared folder explorer to choose a folder to perform an action -->
     <string name="settings_empty_folder">Escolher pasta</string>
-    <!-- the options of how to upload, but in an array. needed for the settings, how to upload the camera images. only when Wi-Fi connected -->
-    <string-array name="settings_camera_upload_how_to_entries">
-        <item>Wi-Fi ou dados móveis</item>
-        <item>Somente Wi-Fi</item>
-    </string-array>
     <!-- What kind of files are going to be uploaded: images, videos or both -->
     <string name="settings_camera_upload_what_to_upload">Upload de arquivo</string>
-    <!-- what kind of file are going to be uploaded. Needed for the settings summary -->
-    <string-array name="settings_camera_upload_file_upload_entries">
-        <item>Somente fotos</item>
-        <item>Somente vídeos</item>
-        <item>Fotos e vídeos</item>
-    </string-array>
     <!-- Title of ‘Include location tags’ setting option. Once enabled, Camera Uploads will include the location info from pictures those are being uploaded -->
     <string name="settings_camera_upload_include_gps">Incluir etiquetas de localização</string>
     <!-- Option to choose that the video compression will only be enable when the device is charging -->
@@ -1714,8 +1693,6 @@
     <string name="settings_chat_upload_quality">Qualidade dos vídeos</string>
     <!-- Label for the option on setting to set up the quality of video files to be uploaded -->
     <string name="settings_video_upload_quality">Qualidade dos vídeos</string>
-    <!-- Text shown when the user refuses to permit the storage permission when enable camera upload -->
-    <string name="on_refuse_storage_permission">A função Uploads da câmera precisa acessar as suas fotos e outras arquivos multimídia no seu dispositivo. Por favor, acesse as configurações do seu dispositivo e conceda permissão.</string>
     <!-- Available options for the setting to set up the quality of multimedia files uploaded to the chat or the Camera Uploads -->
     <string-array name="settings_chat_upload_quality_entries">
         <item>Baixa</item>
@@ -3212,7 +3189,7 @@
     <!-- Action to change name -->
     <string name="change_name_action">Alterar nome</string>
     <!-- Action to add photo -->
-    <string name="add_photo_action">Adicionar foto</string>
+    <string name="add_photo_action">Alterar a imagem de perfil</string>
     <!-- Action to add phone number -->
     <string name="add_phone_number_action">Adicionar número de telefone</string>
     <!-- Warning indicating the app needs write permissions to do any action -->
@@ -3281,8 +3258,6 @@
     <string name="general_camera_enable">A sua câmera está ativada.</string>
     <!-- General label for camera disable -->
     <string name="general_camera_disable">A sua câmera está desativada.</string>
-    <!-- Label for hold meeting -->
-    <string name="meeting_hold">Em espera</string>
     <!-- General label for speaker -->
     <string name="general_speaker">Som</string>
     <!-- General label for headphone-->
@@ -5433,8 +5408,6 @@
     <string name="meetings_muted_by_a_participant_snackbar_message">Você foi silenciado por %s</string>
     <!-- Title of subscription details section, which shows to the user to provide details about subscription. -->
     <string name="account_upgrade_account_description_subscription_title">Informações da assinatura</string>
-    <!-- Details body for the subscription details section, which shows to the user to provide details about subscription. -->
-    <string name="account_upgrade_subscription_details">As assinaturas serão renovadas automaticamente por períodos sucessivos com a mesma duração e pelo mesmo preço do período inicial. Você pode desativar a renovação automática da sua assinatura Pro&#160;do&#160;MEGA até 24 horas antes do vencimento do próximo pagamento nas Assinaturas da [A]Google Play[/A].</string>
     <!-- Text content for the chat bottom sheet when gallery permission is not granted -->
     <string name="chat_toolbar_bottom_sheet_allow_gallery_access_title">Permitir o acesso à sua Galeria</string>
     <!-- Button text to grant permission in the chat bottom sheet -->
@@ -5623,4 +5596,42 @@
     <string name="camera_flash_mode_auto">Flash automático</string>
     <!--  -->
     <string name="camera_send_to">Enviar a %1$s</string>
+    <!-- Title of call button to show more options in call screen -->
+    <string name="meetings_more_call_option_button">Mais</string>
+    <!-- Title of raise hand button in call screen -->
+    <string name="meetings_raise_hand_option_button">Levantar a mão</string>
+    <!-- Title of lower hand button in call screen -->
+    <string name="meetings_lower_hand_option_button">Baixar a mão</string>
+    <!-- Title of put call on hold button in call screen -->
+    <string name="meetings_put_call_on_hold_option_button">Colocar a chamada em espera</string>
+    <!-- Title of swap calls button in call screen -->
+    <string name="meetings_swap_calls_option_button">Alternar chamadas</string>
+    <!-- Title of resume call button in call screen -->
+    <string name="meetings_resume_call_option_button">Voltar para a chamada</string>
+    <!-- Text of pop up informing about the Raise hand feature -->
+    <string name="meetings_new_feature_raise_hand_layout">Novo recurso: Levantar a mão</string>
+    <!-- The snackbar message of your hand is raised -->
+    <string name="meeting_your_hand_is_raised_message">Você levantou a mão</string>
+    <!-- The snackbar message of you and others raised your hands -->
+    <plurals name="meeting_you_and_others_raised_your_hands_message">
+        <item quantity="one">Você e mais %1$d pessoa levantaram a mão</item>
+        <item quantity="many">Você e mais %1$d de pessoas levantaram a mão</item>
+        <item quantity="other">Você e mais %1$d pessoas levantaram a mão</item>
+    </plurals>
+    <!-- The snackbar message of another participant raised their hand -->
+    <string name="meetings_one_participant_raised_their_hand_message">%1$s levantou a mão</string>
+    <!-- The snackbar message two or more participants raised their hands -->
+    <plurals name="meetings_other_participants_raised_their_hands_message">
+        <item quantity="one">%1$s e mais %2$d pessoa levantaram a mão</item>
+        <item quantity="many">%1$s e mais %2$d de pessoas levantaram a mão</item>
+        <item quantity="other">%1$s e mais %2$d pessoas levantaram a mão</item>
+    </plurals>
+    <!-- Hidden nodes sharing album -->
+    <string name="hidden_nodes_sharing_album">Há itens ocultos neste álbum. Ao compartilhar o álbum, os itens ocultos ficarão visíveis para as pessoas com as quais você o compartilhar, mas vão permanecer ocultos na sua Nuvem de arquivos.</string>
+    <!-- Hidden nodes items -->
+    <plurals name="hidden_nodes_items">
+        <item quantity="one">Item oculto</item>
+        <item quantity="many">itens ocultos</item>
+        <item quantity="other">itens ocultos</item>
+    </plurals>
 </resources>

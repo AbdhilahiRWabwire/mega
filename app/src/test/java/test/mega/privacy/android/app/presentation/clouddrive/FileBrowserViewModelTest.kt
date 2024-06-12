@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.globalmanagement.TransfersManagement
 import mega.privacy.android.app.presentation.clouddrive.FileBrowserViewModel
 import mega.privacy.android.app.presentation.clouddrive.OptionItems
@@ -26,8 +25,11 @@ import mega.privacy.android.app.presentation.time.mapper.DurationInSecondsTextMa
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.data.mapper.FileDurationMapper
+import mega.privacy.android.domain.entity.AccountSubscriptionCycle
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.account.AccountDetail
+import mega.privacy.android.domain.entity.account.AccountLevelDetail
 import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeChanges
 import mega.privacy.android.domain.entity.node.NodeId
@@ -43,7 +45,7 @@ import mega.privacy.android.domain.usecase.MonitorMediaDiscoveryView
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.account.MonitorRefreshSessionUseCase
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsHidingActionAllowedUseCase
 import mega.privacy.android.domain.usecase.filebrowser.GetFileBrowserNodeChildrenUseCase
 import mega.privacy.android.domain.usecase.folderlink.ContainsMediaItemUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
@@ -51,6 +53,7 @@ import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.quota.GetBandwidthOverQuotaDelayUseCase
+import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
 import mega.privacy.android.domain.usecase.viewtype.MonitorViewType
 import mega.privacy.android.domain.usecase.viewtype.SetViewType
 import nz.mega.sdk.MegaApiJava
@@ -92,21 +95,23 @@ class FileBrowserViewModelTest {
     private val transfersManagement = mock<TransfersManagement>()
     private val containsMediaItemUseCase = mock<ContainsMediaItemUseCase>()
     private val fileDurationMapper = mock<FileDurationMapper>()
-    private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase>()
     private val monitorOfflineNodeUpdatesUseCase = mock<MonitorOfflineNodeUpdatesUseCase>()
     private val monitorConnectivityUseCase = mock<MonitorConnectivityUseCase>()
     private val durationInSecondsTextMapper = mock<DurationInSecondsTextMapper>()
     private val updateNodeSensitiveUseCase = mock<UpdateNodeSensitiveUseCase>()
-    private val monitorAccountDetailUseCase = mock<MonitorAccountDetailUseCase> {
-        on {
-            invoke()
-        }.thenReturn(flowOf(AccountDetail()))
-    }
+    private val monitorAccountDetailUseCase = mock<MonitorAccountDetailUseCase>()
     private val isHiddenNodesOnboardedUseCase = mock<IsHiddenNodesOnboardedUseCase> {
         on {
             runBlocking { invoke() }
         }.thenReturn(false)
     }
+    private val isHidingActionAllowedUseCase = mock<IsHidingActionAllowedUseCase>() {
+        on {
+            runBlocking { invoke(NodeId(any())) }
+        }.thenReturn(false)
+    }
+    private val monitorShowHiddenItemsUseCase = mock<MonitorShowHiddenItemsUseCase>()
+    private val accountDetailFakeFlow = MutableSharedFlow<AccountDetail>()
 
     @BeforeEach
     fun setUp() {
@@ -134,12 +139,13 @@ class FileBrowserViewModelTest {
             containsMediaItemUseCase = containsMediaItemUseCase,
             fileDurationMapper = fileDurationMapper,
             monitorOfflineNodeUpdatesUseCase = monitorOfflineNodeUpdatesUseCase,
-            getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             monitorConnectivityUseCase = monitorConnectivityUseCase,
             durationInSecondsTextMapper = durationInSecondsTextMapper,
             updateNodeSensitiveUseCase = updateNodeSensitiveUseCase,
             monitorAccountDetailUseCase = monitorAccountDetailUseCase,
             isHiddenNodesOnboardedUseCase = isHiddenNodesOnboardedUseCase,
+            isHidingActionAllowedUseCase = isHidingActionAllowedUseCase,
+            monitorShowHiddenItemsUseCase = monitorShowHiddenItemsUseCase,
         )
     }
 
@@ -515,7 +521,6 @@ class FileBrowserViewModelTest {
         val optionsItemInfo =
             OptionsItemInfo(OptionItems.DOWNLOAD_CLICKED, emptyList(), emptyList())
         whenever(handleOptionClickMapper(eq(menuItem), any())).thenReturn(optionsItemInfo)
-        whenever(getFeatureFlagValueUseCase(AppFeatures.DownloadWorker)).thenReturn(true)
         underTest.onOptionItemClicked(menuItem)
     }
 
@@ -525,6 +530,45 @@ class FileBrowserViewModelTest {
         underTest.onFolderItemClicked(handle)
         underTest.state.test {
             assertThat(awaitItem().isLoading).isFalse()
+        }
+    }
+
+    @Test
+    fun `test that sensitive nodes should be filtered based on account setting`() = runTest {
+        // given
+        val accountDetail = AccountDetail(
+            levelDetail = AccountLevelDetail(
+                accountType = AccountType.BUSINESS,
+                subscriptionStatus = null,
+                subscriptionRenewTime = 0L,
+                accountSubscriptionCycle = AccountSubscriptionCycle.UNKNOWN,
+                proExpirationTime = 0L,
+            )
+        )
+        accountDetailFakeFlow.emit(accountDetail)
+
+        val nodesListItem1 = mock<TypedFileNode>()
+        whenever(nodesListItem1.id.longValue).thenReturn(1L)
+        whenever(nodesListItem1.isMarkedSensitive).thenReturn(false)
+        whenever(nodesListItem1.isSensitiveInherited).thenReturn(false)
+
+        val nodesListItem2 = mock<TypedFolderNode>()
+        whenever(nodesListItem2.id.longValue).thenReturn(2L)
+        whenever(nodesListItem2.isMarkedSensitive).thenReturn(true)
+        whenever(nodesListItem2.isSensitiveInherited).thenReturn(true)
+
+        whenever(getFileBrowserNodeChildrenUseCase(underTest.state.value.fileBrowserHandle))
+            .thenReturn(listOf(nodesListItem1, nodesListItem2))
+        whenever(getCloudSortOrder()).thenReturn(SortOrder.ORDER_NONE)
+
+        // when
+        underTest.refreshNodes()
+
+        // then
+        underTest.state.test {
+            val state = awaitItem()
+            assertThat(state.sourceNodesList).hasSize(2)
+            assertThat(state.nodesList).hasSize(1)
         }
     }
 
@@ -539,7 +583,8 @@ class FileBrowserViewModelTest {
         whenever(fileDurationMapper(any())).thenReturn(1.seconds)
         whenever(monitorOfflineNodeUpdatesUseCase()).thenReturn(emptyFlow())
         whenever(monitorConnectivityUseCase()).thenReturn(emptyFlow())
-        whenever(getFeatureFlagValueUseCase(any())).thenReturn(true)
+        whenever(monitorShowHiddenItemsUseCase()).thenReturn(flowOf(false))
+        whenever(monitorAccountDetailUseCase()).thenReturn(accountDetailFakeFlow)
     }
 
     @AfterEach
@@ -557,7 +602,6 @@ class FileBrowserViewModelTest {
             transfersManagement,
             containsMediaItemUseCase,
             fileDurationMapper,
-            getFeatureFlagValueUseCase,
             monitorOfflineNodeUpdatesUseCase,
             monitorConnectivityUseCase,
         )

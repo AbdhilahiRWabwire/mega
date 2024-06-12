@@ -35,7 +35,6 @@ import java.io.File;
 import java.util.ArrayList;
 
 import mega.privacy.android.app.MegaApplication;
-import mega.privacy.android.app.MegaContactAdapter;
 import mega.privacy.android.app.R;
 import mega.privacy.android.app.components.MarqueeTextView;
 import mega.privacy.android.app.components.RoundedImageView;
@@ -43,11 +42,12 @@ import mega.privacy.android.app.components.scrollBar.SectionTitleProvider;
 import mega.privacy.android.app.components.twemoji.EmojiTextView;
 import mega.privacy.android.app.main.controllers.ChatController;
 import mega.privacy.android.app.main.listeners.ChatUserAvatarListener;
-import mega.privacy.android.app.main.megachat.ChatExplorerFragment;
-import mega.privacy.android.app.main.megachat.ChatExplorerListItem;
+import mega.privacy.android.app.main.megachat.chat.explorer.ChatExplorerFragment;
+import mega.privacy.android.app.main.megachat.chat.explorer.ChatExplorerListItem;
+import mega.privacy.android.app.main.megachat.chat.explorer.ContactItemUiState;
+import mega.privacy.android.domain.entity.chat.ChatListItem;
 import nz.mega.sdk.MegaApiAndroid;
 import nz.mega.sdk.MegaChatApiAndroid;
-import nz.mega.sdk.MegaChatListItem;
 import nz.mega.sdk.MegaChatRoom;
 import timber.log.Timber;
 
@@ -153,7 +153,7 @@ public class MegaListChatExplorerAdapter extends RecyclerView.Adapter<MegaListCh
     public void onBindViewHolder(MegaListChatExplorerAdapter.ViewHolderChatExplorerList holder, int position) {
 
         ChatExplorerListItem item = getItem(position);
-        MegaChatListItem chat = item.getChat();
+        ChatListItem chat = item.getChat();
 
         if (item.isHeader()) {
             holder.itemContainer.setVisibility(View.GONE);
@@ -186,19 +186,19 @@ public class MegaListChatExplorerAdapter extends RecyclerView.Adapter<MegaListCh
         } else {
 
             holder.participantsText.setVisibility(View.GONE);
-            MegaContactAdapter contact = item.getContact();
+            ContactItemUiState contact = item.getContactItem();
 
             long handle = -1;
 
             if (chat != null) {
                 holder.email = megaChatApi.getContactEmail(chat.getPeerHandle());
                 Timber.d("Email: %s", holder.email);
-            } else if (contact != null && contact.getMegaUser() != null) {
-                holder.email = contact.getMegaUser().getEmail();
+            } else if (contact != null && contact.getUser() != null) {
+                holder.email = contact.getUser().getEmail();
             }
 
-            if (contact != null && contact.getMegaUser() != null) {
-                handle = contact.getMegaUser().getHandle();
+            if (contact != null && contact.getUser() != null) {
+                handle = contact.getUser().getHandle();
             }
 
             String userHandleEncoded = MegaApiAndroid.userHandleToBase64(handle);

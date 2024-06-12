@@ -13,12 +13,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.meeting.view.getRecurringMeetingDateTime
-import mega.privacy.android.core.ui.controls.chat.messages.FirstMessageHeaderParagraph
-import mega.privacy.android.core.ui.controls.chat.messages.FirstMessageHeaderSubtitleWithIcon
-import mega.privacy.android.core.ui.controls.chat.messages.FirstMessageHeaderTitle
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.FirstMessageHeaderParagraph
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.FirstMessageHeaderSubtitleWithIcon
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.FirstMessageHeaderTitle
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 @Composable
 internal fun FirstMessageHeader(
@@ -71,7 +71,7 @@ internal fun FirstMessageHeader(
 @CombinedThemePreviews
 @Composable
 private fun FirstMessageHeaderPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         FirstMessageHeader(
             scheduledMeeting = null,
             title = "My name"

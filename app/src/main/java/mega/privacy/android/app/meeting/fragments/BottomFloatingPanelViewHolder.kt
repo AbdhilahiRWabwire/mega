@@ -15,14 +15,12 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupWindow
-import android.widget.TextView
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import mega.privacy.android.app.R
-import mega.privacy.android.app.components.OnOffFab
 import mega.privacy.android.app.components.PositionDividerItemDecoration
 import mega.privacy.android.app.databinding.InMeetingFragmentBinding
 import mega.privacy.android.app.main.megachat.AppRTCAudioManager
@@ -33,7 +31,7 @@ import mega.privacy.android.app.meeting.listeners.BottomFloatingPanelListener
 import mega.privacy.android.app.presentation.meeting.WaitingRoomManagementViewModel
 import mega.privacy.android.app.presentation.meeting.view.ParticipantsBottomPanelView
 import mega.privacy.android.app.utils.Util
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
 
 /**
@@ -53,6 +51,7 @@ class BottomFloatingPanelViewHolder(
 ) {
     private val context = binding.root.context
     private val floatingPanelView = binding.bottomFloatingPanel
+    private val meetingActionButtons = binding.bottomFloatingPanel.meetingActionButtons
 
     private val bottomSheetBehavior = BottomSheetBehavior.from(binding.bottomFloatingPanel.root)
     val propertyUpdaters = ArrayList<(Float) -> Unit>()
@@ -111,6 +110,8 @@ class BottomFloatingPanelViewHolder(
             currentHeight = binding.root.measuredHeight
             if (inMeetingViewModel.shouldShowTips()) {
                 initPopWindow(floatingPanelView.backgroundMask)
+            } else {
+                inMeetingViewModel.checkRaiseToHandFeatureTooltipIsShown()
             }
 
             val peekHeight =
@@ -134,7 +135,6 @@ class BottomFloatingPanelViewHolder(
      */
     fun dismissPopWindow() {
         popWindow?.dismiss()
-        inMeetingViewModel.updateShowTips()
     }
 
     /**
@@ -144,6 +144,7 @@ class BottomFloatingPanelViewHolder(
      */
     private fun initPopWindow(anchor: View) {
         if (inMeetingViewModel.isOneToOneCall()) {
+            inMeetingViewModel.checkRaiseToHandFeatureTooltipIsShown()
             return
         }
 
@@ -169,6 +170,8 @@ class BottomFloatingPanelViewHolder(
         val confirm = view.findViewById<Button>(R.id.bt_ok)
         confirm.setOnClickListener {
             dismissPopWindow()
+            inMeetingViewModel.updateShowTips()
+            inMeetingViewModel.checkRaiseToHandFeatureTooltipIsShown()
         }
 
         val location = intArrayOf(0, 0)
@@ -226,12 +229,23 @@ class BottomFloatingPanelViewHolder(
      */
     private fun initButtonsState() {
         disableEnableButtons(
-            inMeetingViewModel.isCallEstablished(),
-            inMeetingViewModel.isCallOnHold()
+            inMeetingViewModel.isCallEstablished()
         )
-        floatingPanelView.fabMic.isOn = savedMicState
-        floatingPanelView.fabCam.isOn = savedCamState
+        // compose implementation
+        meetingActionButtons.apply {
+            isMicOn = savedMicState
+            Timber.d("Mic Enabled $isMicOn")
+            isCameraOn = savedCamState
+            Timber.d("Camera Enabled $isMicOn")
+        }
         updateSpeakerIcon(savedSpeakerState)
+    }
+
+    /**
+     * Set the raise hand tooltip shown value
+     */
+    fun setRaiseHandToolTipShown(value: Boolean) {
+        meetingActionButtons.isRaiseHandToolTipShown = value
     }
 
     /**
@@ -294,6 +308,7 @@ class BottomFloatingPanelViewHolder(
                     onBottomFloatingPanelSlide(slideOffset)
                     if (slideOffset > 0.1f) {
                         dismissPopWindow()
+                        inMeetingViewModel.hideRaiseToHandPopup()
                     }
                 }
             }
@@ -306,16 +321,10 @@ class BottomFloatingPanelViewHolder(
      * Method that disables or enables buttons depending on whether the call is connected or not
      *
      * @param isCallEstablished True, if the call is connected. False, otherwise
-     * @param isHold True, if the call is on hold. False, otherwise
      */
-    fun disableEnableButtons(isCallEstablished: Boolean, isHold: Boolean) {
-        val shouldBeEnable = !(!isCallEstablished || isHold)
-        floatingPanelView.apply {
-            fabMic.enable = shouldBeEnable
-            fabCam.enable = shouldBeEnable
-            fabHold.enable = isCallEstablished
-            fabHold.isOn = !isHold
-            fabSpeaker.enable = shouldBeEnable
+    fun disableEnableButtons(isCallEstablished: Boolean) {
+        meetingActionButtons.apply {
+            buttonsEnabled = isCallEstablished
         }
     }
 
@@ -323,43 +332,31 @@ class BottomFloatingPanelViewHolder(
      * Init listener for all the button
      */
     private fun listenButtons() {
-        floatingPanelView.apply {
-            fabMic.setOnOffCallback {
+
+        meetingActionButtons.apply {
+            onMicClicked = {
                 savedMicState = it
-                listener.onChangeMicState(binding.bottomFloatingPanel.fabMic.isOn)
-            }
-
-            fabMic.setOnChangeCallback {
+                listener.onChangeMicState(it)
                 updateBottomFloatingPanelIfNeeded()
             }
-
-            fabCam.setOnOffCallback {
+            onCamClicked = {
                 savedCamState = it
-                listener.onChangeCamState(binding.bottomFloatingPanel.fabCam.isOn)
-            }
-
-            fabCam.setOnChangeCallback {
+                listener.onChangeCamState(it)
                 updateBottomFloatingPanelIfNeeded()
             }
-
-            fabSpeaker.setOnClickListener {
+            onMoreClicked = {
+                collapse()
+                inMeetingViewModel.onClickMoreCallOptions()
+            }
+            onSpeakerClicked = {
                 listener.onChangeSpeakerState()
-            }
-
-            fabSpeaker.setOnChangeCallback {
                 updateBottomFloatingPanelIfNeeded()
             }
-
-            fabHold.setOnOffCallback {
-                listener.onChangeHoldState(binding.bottomFloatingPanel.fabHold.isOn)
-            }
-
-            fabHold.setOnChangeCallback {
-                updateBottomFloatingPanelIfNeeded()
-            }
-
-            fabEnd.setOnClickListener {
+            onEndClicked = {
                 listener.onEndMeeting()
+            }
+            onRaiseToRandTooltipDismissed = {
+                inMeetingViewModel.setRaisedHandSuggestionShown()
             }
         }
     }
@@ -396,6 +393,8 @@ class BottomFloatingPanelViewHolder(
         for (updater in propertyUpdaters) {
             updater(ratio)
         }
+        // new compose implementation
+        meetingActionButtons.backgroundTintAlpha = ratio
     }
 
     /**
@@ -441,7 +440,7 @@ class BottomFloatingPanelViewHolder(
 
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                MegaAppTheme(isDark = isSystemInDarkTheme()) {
+                OriginalTempTheme(isDark = isSystemInDarkTheme()) {
                     ParticipantsBottomPanelView(
                         viewModel = meetingViewModel,
                         waitingRoomManagementViewModel = waitingRoomManagementViewModel,
@@ -457,73 +456,6 @@ class BottomFloatingPanelViewHolder(
                 }
             }
         }
-
-        setupFabUpdater()
-        setupFabLabelUpdater()
-    }
-
-    /**
-     * Add fab label views into the update list and set up the color of background
-     */
-    private fun setupFabLabelUpdater() {
-        setupFabLabelUpdater(binding.bottomFloatingPanel.fabMicLabel)
-        setupFabLabelUpdater(binding.bottomFloatingPanel.fabCamLabel)
-        setupFabLabelUpdater(binding.bottomFloatingPanel.fabHoldLabel)
-        setupFabLabelUpdater(binding.bottomFloatingPanel.fabSpeakerLabel)
-        setupFabLabelUpdater(binding.bottomFloatingPanel.fabEndLabel)
-    }
-
-    /**
-     * Set up the background color for updating when panel is sliding
-     *
-     * @param label the target textview
-     */
-    private fun setupFabLabelUpdater(label: TextView) {
-        val isDarkMode = Util.isDarkMode(context)
-        val fabLabelColorStart =
-            if (isDarkMode) FAB_LABEL_COLOR_DARK_MODE else FAB_LABEL_COLOR_START_LIGHT_MODE
-        val fabLabelColorEnd =
-            if (isDarkMode) FAB_LABEL_COLOR_DARK_MODE else FAB_LABEL_COLOR_END_LIGHT_MODE
-
-        propertyUpdaters.add(
-            propertyUpdater(
-                label, fabLabelColorStart, fabLabelColorEnd
-            ) { view, value -> view.setTextColor(composeColor(value)) })
-    }
-
-    /**
-     * Add fab icon views into the update list and set up the color of background
-     */
-    private fun setupFabUpdater() {
-        setupFabBackgroundTintUpdater(binding.bottomFloatingPanel.fabMic)
-        setupFabBackgroundTintUpdater(binding.bottomFloatingPanel.fabCam)
-        setupFabBackgroundTintUpdater(binding.bottomFloatingPanel.fabHold)
-        setupFabBackgroundTintUpdater(binding.bottomFloatingPanel.fabSpeaker)
-    }
-
-    /**
-     * Set up the background tint color for updating when panel is sliding
-     *
-     * @param fab the target icon
-     */
-    private fun setupFabBackgroundTintUpdater(fab: OnOffFab) {
-        propertyUpdaters.add(
-            propertyUpdater(
-                fab, FAB_TINT_COLOR_START, FAB_TINT_COLOR_END
-            ) { view, value ->
-                if (view.isOn || !view.enable) {
-                    run {
-                        val argbEvaluator = ArgbEvaluator()
-                        val background = argbEvaluator.evaluate(
-                            value,
-                            ContextCompat.getColor(context, R.color.grey_032_white_054),
-                            ContextCompat.getColor(context, R.color.grey_060_white_054)
-                        ) as Int
-
-                        view.backgroundTintList = ColorStateList.valueOf(background)
-                    }
-                }
-            })
     }
 
     /**
@@ -558,7 +490,7 @@ class BottomFloatingPanelViewHolder(
      */
     fun updateMicIcon(micOn: Boolean) {
         savedMicState = micOn
-        floatingPanelView.fabMic.isOn = micOn
+        meetingActionButtons.isMicOn = micOn
     }
 
     /**
@@ -568,44 +500,7 @@ class BottomFloatingPanelViewHolder(
      */
     fun updateCamIcon(camOn: Boolean) {
         savedCamState = camOn
-        floatingPanelView.fabCam.isOn = camOn
-    }
-
-    /**
-     * Enabling or disabling the on hold button
-     *
-     * @param isEnabled True, if enabled. False, if disabled
-     * @param isHold True, if it is an on hold button. False, if it is switch call button
-     */
-    fun enableHoldIcon(isEnabled: Boolean, isHold: Boolean) {
-        disableEnableButtons(isEnabled, isHold)
-    }
-
-    /**
-     * Method to control when to switch the button from on hold to switch call
-     *
-     * @param isAnotherCallOnHold True, if another call is in progress. False, if not
-     */
-    fun changeOnHoldIcon(isAnotherCallOnHold: Boolean) {
-        if (isAnotherCallOnHold) {
-            changeOnHoldIconDrawable(true)
-            floatingPanelView.fabHold.isOn = true
-        } else {
-            floatingPanelView.fabHold.isOn = false
-            changeOnHoldIconDrawable(false)
-        }
-    }
-
-    /**
-     * Method of changing the on hold button icon appropriately
-     *
-     * @param existsAnotherCallOnHold True, if another call is in progress. False, if not.
-     */
-    fun changeOnHoldIconDrawable(existsAnotherCallOnHold: Boolean) {
-        floatingPanelView.fabHold.setOnIcon(
-            if (existsAnotherCallOnHold) R.drawable.ic_call_swap
-            else R.drawable.ic_transfers_pause
-        )
+        meetingActionButtons.isCameraOn = camOn
     }
 
     /**
@@ -615,38 +510,8 @@ class BottomFloatingPanelViewHolder(
      */
     fun updateSpeakerIcon(device: AppRTCAudioManager.AudioDevice) {
         Timber.d("Update speaker icon. Audio device is $device")
-        when (device) {
-            AppRTCAudioManager.AudioDevice.SPEAKER_PHONE -> {
-                floatingPanelView.fabSpeaker.setOnIcon(R.drawable.ic_speaker_on)
-                floatingPanelView.fabSpeaker.enable = true
-                floatingPanelView.fabSpeaker.isOn = true
-                floatingPanelView.fabSpeakerLabel.text = context.getString(R.string.general_speaker)
-            }
-
-            AppRTCAudioManager.AudioDevice.EARPIECE -> {
-                floatingPanelView.fabSpeaker.setOnIcon(R.drawable.ic_speaker_off)
-                floatingPanelView.fabSpeaker.enable = true
-                floatingPanelView.fabSpeaker.isOn = false
-                floatingPanelView.fabSpeakerLabel.text = context.getString(R.string.general_speaker)
-            }
-
-            AppRTCAudioManager.AudioDevice.WIRED_HEADSET,
-            AppRTCAudioManager.AudioDevice.BLUETOOTH,
-            -> {
-                floatingPanelView.fabSpeaker.setOnIcon(R.drawable.ic_headphone)
-                floatingPanelView.fabSpeaker.enable = true
-                floatingPanelView.fabSpeaker.isOn = true
-                floatingPanelView.fabSpeakerLabel.text =
-                    context.getString(R.string.general_headphone)
-            }
-
-            else -> {
-                floatingPanelView.fabSpeaker.setOnIcon(R.drawable.ic_speaker_on)
-                floatingPanelView.fabSpeaker.enable = false
-                floatingPanelView.fabSpeaker.isOn = true
-                floatingPanelView.fabSpeakerLabel.text = context.getString(R.string.general_speaker)
-            }
-        }
+        meetingActionButtons.currentAudioDevice = device
+        meetingActionButtons.isSpeakerOn = device != AppRTCAudioManager.AudioDevice.EARPIECE
     }
 
     /**
@@ -662,6 +527,7 @@ class BottomFloatingPanelViewHolder(
         } else FrameLayout.LayoutParams.MATCH_PARENT
 
         floatingPanelView.root.layoutParams = params
+        meetingActionButtons.setNewTooltipKey()
     }
 
     /**
@@ -720,7 +586,7 @@ class BottomFloatingPanelViewHolder(
      * @param isGranted if have mic permission, is true, else is false
      */
     fun updateMicPermissionWaring(isGranted: Boolean) {
-        floatingPanelView.micWarning.isVisible = !isGranted
+        meetingActionButtons.showMicWarning = !isGranted
     }
 
     /**
@@ -729,7 +595,7 @@ class BottomFloatingPanelViewHolder(
      * @param isGranted if have cam permission, is true, else is false
      */
     fun updateCamPermissionWaring(isGranted: Boolean) {
-        floatingPanelView.camWarning.isVisible = !isGranted
+        meetingActionButtons.showCameraWarning = !isGranted
     }
 
     companion object {

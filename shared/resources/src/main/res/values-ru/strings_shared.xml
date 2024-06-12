@@ -91,7 +91,7 @@
     <!-- Title for Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
     <string name="dialog_onboarding_feature_title_backup_rewind">Данные больше не потеряются</string>
     <!-- Description about Backup and Rewind features on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_feature_description_backup_rewind">Создавайте резервные копии и синхронизируйте данные для полной уверенности. Также используйте функцию перемотки, чтобы восстановить папки до любой даты за период до 180 дней.</string>
+    <string name="dialog_onboarding_feature_description_backup_rewind">Перемотка позволяет восстанавливать файлы и папки на любую дату за период до 180 дней, чтобы ваши данные были защищены от случайного повреждения и постороннего вмешательства.</string>
     <!-- Title for MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
     <string name="dialog_onboarding_feature_title_vpn">MEGA&#160;VPN</string>
     <!-- Description about MEGA VPN feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
@@ -171,7 +171,7 @@
     <!-- Error message when the playlist name already exists -->
     <string name="video_section_playlists_error_message_playlist_name_exists">Плейлист с таким названием уже существует. Введите другое название.</string>
     <!-- Delete playlist dialog title of the video section playlists tab -->
-    <string name="video_section_playlists_delete_playlist_dialog_title">Удалить плейлист\?</string>
+    <string name="video_section_playlists_delete_playlist_dialog_title">Удалить плейлист?</string>
     <!-- Delete button title of the video section playlists tab delete playlist dialog -->
     <string name="video_section_playlists_delete_playlist_dialog_delete_button">Удалить</string>
     <!-- Text that indicates that there’s no playlist to show. -->
@@ -179,7 +179,7 @@
     <!-- Delete option title of the video section playlist bottom sheet -->
     <string name="video_section_playlist_bottom_sheet_option_title_delete">Удалить плейлист</string>
     <!-- Remove videos dialog title of the video section playlist detail -->
-    <string name="video_section_playlist_detail_remove_videos_dialog_title">Удалить из плейлиста\?</string>
+    <string name="video_section_playlist_detail_remove_videos_dialog_title">Удалить из плейлиста?</string>
     <!-- Remove button title of the video section playlist detail remove videos dialog -->
     <string name="video_section_playlist_detail_remove_videos_dialog_remove_button">Удалить</string>
     <!-- Play all button title of the video section playlist detail -->
@@ -271,7 +271,7 @@
         <item quantity="other">Поделиться ссылками</item>
     </plurals>
     <!-- Title of the dialog to ask the user to use the selected location as default location for next downloads-->
-    <string name="transfers_dialog_save_download_location_title">Скачивать в эту папку\?</string>
+    <string name="transfers_dialog_save_download_location_title">Скачивать в эту папку?</string>
     <!-- Option to don't use the selected location as default location for next downloads-->
     <string name="transfers_dialog_save_download_location_only_this_time_option">Только в этот раз</string>
     <!-- Option to use the selected location as default location for next downloads-->
@@ -295,9 +295,117 @@
     <!-- Hint text explaining that you can change the email and resend the create account link to the new email address. This appears on the confirmation email screen under the email address text input field. -->
     <string name="account_confirm_email_misspelled_email_description">Если вы неправильно написали свой адрес электронной почты, исправьте его и нажмите [A]«Выслать повторно»[/A].</string>
     <!-- Title of the insufficient storage error banner -->
-    <string name="sync_error_storage_over_quota_banner_title">Синхронизация приостановлена, в вашем плане MEGA закончилось место.</string>
+    <string name="sync_error_storage_over_quota_banner_title">Синхронизация приостановлена, в вашем плане MEGA закончилось место</string>
     <!-- Title of the insufficient storage error action -->
     <string name="sync_error_storage_over_quota_banner_action">Улучшить</string>
     <!-- The warning message shown when the User enables the Device Charging requirement in Settings Camera Uploads, enables Camera Uploads, begins uploading content and the Device is not charged -->
-    <string name="camera_uploads_phone_not_charging_message">Upload paused, phone is not charging</string>
+    <string name="camera_uploads_phone_not_charging_message">Загрузка приостановлена, устройство не заряжается</string>
+    <!-- Label of the Device Status informing the user that Nothing is set up for the Current Device -->
+    <string name="device_center_list_view_item_status_nothing_setup">Синхронизация не настроена</string>
+    <!-- The title of the warning dialog shown to a suspended Pro Flexi Account User -->
+    <string name="account_pro_flexi_account_deactivated_dialog_title">Аккаунт деактивирован</string>
+    <!-- The body of the warning dialog shown to a suspended Pro Flexi Account User -->
+    <string name="account_pro_flexi_account_deactivated_dialog_body">Ваш аккаунт Pro&#160;Flexi был деактивирован из-за сбоя оплаты или из-за того, что вы отменили подписку. Вы не сможете получить доступ к данным, хранящимся в вашем аккаунте.\nДля оплаты и возобновления подписки войдите в MEGA через веб-браузер.</string>
+    <!-- Label for new low-tier plan Starter. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_starter_label">Starter</string>
+    <!-- Label for new low-tier plan Basic. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_basic_label">Basic</string>
+    <!-- Label for new low-tier plan Essential. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
+    <string name="general_low_tier_plan_essential_label">Essential</string>
+    <!-- The Body Text of a Settings Camera Uploads Option that decides whether or not the Device must be charged for Camera Uploads to start uploading content -->
+    <string name="settings_camera_uploads_upload_only_while_charging_option_body">Загрузка будет приостановлена до тех пор, пока вы не начнете заряжать устройство. Загрузка по-прежнему будет приостановлена, если уровень заряда батареи ниже 20%.</string>
+    <!-- Title of the synced folder list empty state -->
+    <string name="device_center_sync_list_empty_state_title">Синхронизация не настроена</string>
+    <!-- Message of the synced folder list empty state -->
+    <string name="device_center_sync_list_empty_state_message">Синхронизируйте локальную папку на устройстве с папкой в MEGA.</string>
+    <!-- Label for the button or menu option to add a new sync -->
+    <string name="device_center_sync_add_new_syn_button_option">Добавить синхронизацию</string>
+    <!-- Text for the Sync solved issues chip -->
+    <string name="device_center_sync_solved_issues_chip_text">Решённые проблемы</string>
+    <!-- Warning message to indicate that cannot select a currently synced folder -->
+    <string name="device_center_new_sync_select_local_device_folder_currently_synced_message">Эту папку невозможно синхронизировать. Настройте её синхронизацию с MEGA с помощью загрузок из камеры.</string>
+    <!-- Label for the file info information screen description field -->
+    <string name="file_info_information_description_label">Описание</string>
+    <!-- Placeholder for the file info information screen description field -->
+    <string name="file_info_information_description_placeholder">Добавить описание</string>
+    <!-- Description added snack bar for the file info information screen-->
+    <string name="file_info_information_snackbar_description_added">Описание добавлено</string>
+    <!-- Description updated snack bar for the file info information screen-->
+    <string name="file_info_information_snackbar_description_updated">Описание обновлено</string>
+    <!-- Title to mention other features of Pro plans on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_title_additional_features">Плюс доступ к этим замечательным преимуществам:</string>
+    <!-- Description to mention other features of Pro plans (e.g. Mega VPN, chats and meetings, Android Sync and no ads) on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_description_additional_features_with_ads">&#8226;&#160;MEGA&#160;VPN \n&#8226;&#160;Неограниченные звонки и встречи \n&#8226;&#160;Автоматическая синхронизация папок на мобильном устройстве \n&#8226;&#160;Без рекламы</string>
+    <!-- Description to mention other features of Pro plans (e.g. Mega VPN, chats and meetings, Android Sync and no ads) on Onboarding dialog (for user to choose account - Free or Pro). -->
+    <string name="dialog_onboarding_feature_description_additional_features_without_ads">&#8226;&#160;MEGA&#160;VPN \n&#8226;&#160;Неограниченные звонки и встречи \n&#8226;&#160;Автоматическая синхронизация папок на мобильном устройстве</string>
+    <!-- Text for the Sync solved issues list empty state -->
+    <string name="device_center_sync_solved_issues_empty_state_text">Нет решённых проблем</string>
+    <!-- Title of first tour screen -->
+    <string name="cloud_drive_tour_first_title">Ключи хранятся у вас</string>
+    <!-- Title of second tour screen -->
+    <string name="cloud_drive_tour_second_title">Зашифрованный чат</string>
+    <!-- Title of third tour screen -->
+    <string name="cloud_drive_tour_third_title">Создайте свою сеть</string>
+    <!-- Title of fourth tour screen -->
+    <string name="cloud_drive_tour_fourth_title">Ваши фотографии в облаке</string>
+    <!-- Title of fifth tour screen -->
+    <string name="cloud_drive_tour_fifth_title">MEGA-встреча</string>
+    <!-- First subtitle of the tour screen -->
+    <string name="cloud_drive_tour_first_subtitle">Безопасность — это то, для чего существуем. Ваши файлы в безопасности за нашей хорошо смазанной шифровальной машиной, где только вы можете получить доступ к ним.</string>
+    <!-- Second subtitle of the tour screen -->
+    <string name="cloud_drive_tour_second_subtitle">Полностью зашифрованный чат с голосовыми и видеозвонками, групповой обмен сообщениями и интеграция файлов с вашим облачным диском.</string>
+    <!-- Third subtitle of the tour screen -->
+    <string name="cloud_drive_tour_third_subtitle">Добавляйте контакты, создавайте сообщество, сотрудничайте и совершайте голосовые и видеозвонки, не покидая MEGA</string>
+    <!-- Fourth subtitle of the tour screen -->
+    <string name="cloud_drive_tour_fourth_subtitle">Загрузки из камеры — важная функция для любого мобильного устройства, и мы о ней позаботились. Зарегистрируйтесь сейчас.</string>
+    <!-- Fifth subtitle of the tour screen -->
+    <string name="cloud_drive_tour_fifth_subtitle">Зашифрованная с нулевым разглашением видеовстреча.</string>
+    <!-- Titles of the tour screen to onboard users with the MEGA application -->
+    <string-array name="cloud_drive_tour_titles">
+        <item>@string/cloud_drive_tour_first_title</item>
+        <item>@string/cloud_drive_tour_second_title</item>
+        <item>@string/cloud_drive_tour_third_title</item>
+        <item>@string/cloud_drive_tour_fourth_title</item>
+        <item>@string/cloud_drive_tour_fifth_title</item>
+    </string-array>
+    <!-- Subtitles of the tour screen to onboard users with the MEGA application -->
+    <string-array name="cloud_drive_tour_subtitles">
+        <item>@string/cloud_drive_tour_first_subtitle</item>
+        <item>@string/cloud_drive_tour_second_subtitle</item>
+        <item>@string/cloud_drive_tour_third_subtitle</item>
+        <item>@string/cloud_drive_tour_fourth_subtitle</item>
+        <item>@string/cloud_drive_tour_fifth_subtitle</item>
+    </string-array>
+    <!-- Title of the Raise to Hand Feature Introduction Tooltip -->
+    <string name="meetings_raised_hand_tooltip_title">[A]Новая функция: поднять руку[/A]</string>
+    <!-- Message of the synced folder list empty state for free accounts -->
+    <string name="device_center_sync_list_empty_state_message_free_account">Обеспечьте синхронизацию и актуальность информации, перейдя на один из наших планов Pro.</string>
+    <!-- "Upgrade now" label for a button, menu entry, etc -->
+    <string name="general_upgrade_now_label">Улучшить</string>
+    <!-- Title of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_title">Улучшение до Pro</string>
+    <!-- Message of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_message">Раскройте возможности синхронизации мобильного устройства с облаком с помощью наших планов Pro.</string>
+    <!-- Confirm button text of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_confirm_button">Улучшить</string>
+    <!-- Cancel button text of the upgrade dialog displayed for free accounts when try to add a new sync -->
+    <string name="device_center_sync_upgrade_dialog_cancel_button">Не сейчас</string>
+    <!-- Title of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_title">Конфликт между папками загрузок</string>
+    <!-- Body of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_body">Ваша папка загрузок из камеры и дополнительная папка для загрузки медиафайлов не могут быть связаны друг с другом. Выберите другую папку.</string>
+    <!-- The confirmation Button text of the Warning Dialog shown when the new Local Primary or Secondary Folder is same as, a parent folder or sub-folder of the opposite Local Folder -->
+    <string name="settings_camera_uploads_related_new_local_folder_warning_dialog_confirm_button">Понятно</string>
+    <!-- Warning message shown when trying to select a local folder but there isn’t any app to do that. -->
+    <string name="general_no_picker_warning">На этом устройстве нет приложения для выбора папок</string>
+    <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be able to sync folders. Keep the bullet point, as this string is part of the bullet point list. -->
+    <string name="account_upgrade_account_description_feature_sync">&#8226;&#160;Автоматическая синхронизация папок на мобильном устройстве</string>
+    <!-- The error dialog text displayed when user opens Android Sync while having previously established syncs -->
+    <string name="sync_error_dialog_free_user">Синхронизация приостановлена. Синхронизация доступна на плане Pro.</string>
+    <!-- The error dialog confirm action text -->
+    <string name="sync_error_dialog_free_user_confirm_action">Ok</string>
+    <!-- The error banner text displayed when user opens Android Sync while having previously established syncs -->
+    <string name="sync_error_banner_free_user">Синхронизация приостановлена, так как ваша подписка на план MEGA Pro была отменена. Оформите подписку, чтобы продолжить синхронизацию.</string>
+    <!-- Hidden items -->
+    <string name="hidden_items">Скрытые элементы</string>
 </resources>

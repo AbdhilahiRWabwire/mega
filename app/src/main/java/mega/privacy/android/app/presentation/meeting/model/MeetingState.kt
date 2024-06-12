@@ -47,7 +47,6 @@ import mega.privacy.android.domain.entity.meeting.ParticipantsSection
  * @property chatIdToOpen                               Chat Id of the chat that should be opened.
  * @property callType                                   [CallType]
  * @property isParticipantSharingScreen                 True, if a participant is sharing the screen. False, if not.
- * @property startOrStopRecordingParticipantName        Name of the [Participant] who has started/stopped the recording.
  * @property isNecessaryToUpdateCall                    True, it is necessary to update call. False, it's not necessary.
  * @property isScheduledMeeting                         True, if it is a scheduled meeting. False, if not.
  * @property myFullName                                 My full name
@@ -63,6 +62,13 @@ import mega.privacy.android.domain.entity.meeting.ParticipantsSection
  * @property callEndedDueToFreePlanLimits               State event to show the force free plan limit participants dialog.
  * @property action                                     Meeting action type
  * @property currentCall                                [ChatCall]
+ * @property myUserHandle                               My user handle
+ * @property userToShowInHandRaisedSnackbar             User identifiers with changes in the raised hand that should be shown in the snackbar.
+ * @property shouldParticipantInCallListBeShown         True, it must be shown. False, must be hidden
+ * @property handRaisedSnackbarMsg                      Message to show in Snackbar.
+ * @property isRaiseToSpeakFeatureFlagEnabled           True, if Raise to speak feature flag enabled. False, otherwise.
+ * @property isWaitingForGroupHandRaisedSnackbars       Waiting for group hand raised snackbars.
+ * @property showLowerHandButtonInSnackbar              True, show lower hand button. False, show view button.
  */
 data class MeetingState(
     val chatId: Long = -1L,
@@ -110,6 +116,13 @@ data class MeetingState(
     val callEndedDueToFreePlanLimits: Boolean = false,
     val action: String? = null,
     val currentCall: ChatCall? = null,
+    val myUserHandle: Long? = null,
+    val shouldParticipantInCallListBeShown: Boolean = false,
+    val handRaisedSnackbarMsg: StateEventWithContent<String> = consumed(),
+    val isRaiseToSpeakFeatureFlagEnabled: Boolean = false,
+    val userToShowInHandRaisedSnackbar: Map<Long, Boolean> = emptyMap(),
+    val isWaitingForGroupHandRaisedSnackbars: Boolean = false,
+    val showLowerHandButtonInSnackbar: Boolean = false
 ) {
 
     /**
@@ -130,6 +143,38 @@ data class MeetingState(
             }
 
         return true
+    }
+
+    /**
+     * Monitor if is my hand raised to speak
+     */
+    val isMyHandRaisedToSpeak
+        get():Boolean = myUserHandle?.let {
+            currentCall?.usersRaiseHands?.get(
+                it
+            )
+        } ?: false
+
+    /**
+     * Check if is my hand raised to show snackbar
+     */
+    val isMyHandRaisedToShowSnackbar
+        get():Boolean = myUserHandle?.let {
+            userToShowInHandRaisedSnackbar.contains(it) && userToShowInHandRaisedSnackbar[it] == true
+        } ?: false
+
+
+    /**
+     * User ID with hand raised
+     */
+    fun getParticipantNameWithRaisedHand(): String {
+        userToShowInHandRaisedSnackbar.filter { it.value && it.key != myUserHandle }.let { list ->
+            list.entries.first().let { first ->
+                usersInCall.first { it.peerId == first.key }.apply {
+                    return name
+                }
+            }
+        }
     }
 
     /**
@@ -165,6 +210,12 @@ data class MeetingState(
      * Check if Waiting room section should be shown
      */
     fun shouldWaitingRoomSectionBeShown() = hasWaitingRoom && hasHostPermission()
+
+    /**
+     * Number of user for show hand raised snackbar
+     */
+    fun userToShowInHandRaisedSnackbarNumber(): Int =
+        userToShowInHandRaisedSnackbar.filter { it.value }.size
 
     /**
      * Check if Number of participants item should be shown
@@ -207,6 +258,5 @@ data class MeetingState(
          * Max participants in bottom panel
          */
         const val MAX_PARTICIPANTS_IN_BOTTOM_PANEL = 4
-
     }
 }

@@ -7,6 +7,7 @@ import androidx.core.net.toFile
 import androidx.core.net.toUri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.map
 import androidx.lifecycle.switchMap
 import androidx.lifecycle.viewModelScope
@@ -24,11 +25,8 @@ import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import mega.privacy.android.app.DownloadService
 import mega.privacy.android.app.R
-import mega.privacy.android.app.arch.BaseRxViewModel
 import mega.privacy.android.app.domain.usecase.CheckNameCollision
-import mega.privacy.android.app.globalmanagement.TransfersManagement
 import mega.privacy.android.app.imageviewer.data.ImageAdapterItem
 import mega.privacy.android.app.imageviewer.data.ImageItem
 import mega.privacy.android.app.imageviewer.slideshow.ImageSlideshowState
@@ -134,7 +132,9 @@ class ImageViewerViewModel @Inject constructor(
     private val moveNodeToRubbishBinUseCase: MoveNodeToRubbishBinUseCase,
     private val getImageByAlbumImportNodeUseCase: GetImageByAlbumImportNodeUseCase,
     @ApplicationContext private val context: Context,
-) : BaseRxViewModel() {
+) : ViewModel() {
+
+    private val composite = CompositeDisposable()
 
     companion object {
         private const val SLIDESHOW_DELAY = 4L
@@ -158,6 +158,7 @@ class ImageViewerViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        composite.clear()
         timerComposite.dispose()
         Fresco.getImagePipeline()?.clearMemoryCaches()
         super.onCleared()
@@ -441,9 +442,7 @@ class ImageViewerViewModel @Inject constructor(
 
     private fun resetTotalDownloadsIfNeeded() {
         viewModelScope.launch {
-            val currentTransfers = getNumPendingDownloadsNonBackgroundUseCase()
-            val isServiceRunning = TransfersManagement.isServiceRunning(DownloadService::class.java)
-            if (currentTransfers == 0 && !isServiceRunning) {
+            if (getNumPendingDownloadsNonBackgroundUseCase() == 0) {
                 resetTotalDownloadsUseCase()
             }
         }
@@ -512,7 +511,7 @@ class ImageViewerViewModel @Inject constructor(
      */
     @Suppress("SENSELESS_COMPARISON")
     private fun subscribeToNodeChanges() {
-        getGlobalChangesUseCase.get()
+        getGlobalChangesUseCase()
             .subscribeOn(Schedulers.io())
             .observeOn(AndroidSchedulers.mainThread())
             .filter { change -> change is Result.OnNodesUpdate }
@@ -586,15 +585,12 @@ class ImageViewerViewModel @Inject constructor(
             .subscribeAndComplete()
     }
 
-    fun switchNodeOfflineAvailability(
+    fun switchNodeOfflineAvailabilityToFalse(
         nodeItem: MegaNodeItem,
         activity: Activity,
     ) {
-        getNodeUseCase.setNodeAvailableOffline(
+        getNodeUseCase.removeNodeAvailableOffline(
             node = nodeItem.node,
-            setOffline = !nodeItem.isAvailableOffline,
-            isFromIncomingShares = nodeItem.isFromIncoming,
-            isFromBackups = nodeItem.isFromBackups,
             activity = activity
         ).subscribeAndComplete {
             loadSingleNode(nodeItem.handle)

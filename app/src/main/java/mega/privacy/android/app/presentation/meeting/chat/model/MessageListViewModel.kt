@@ -34,8 +34,9 @@ import mega.privacy.android.app.presentation.meeting.chat.mapper.UiChatMessageMa
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.UiChatMessage
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.header.ChatUnreadHeaderMessage
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.header.HeaderMessage
-import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.app.presentation.meeting.chat.view.navigation.compose.ChatArgs
 import mega.privacy.android.domain.entity.chat.ChatMessageStatus
+import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.chat.room.update.MessageReceived
 import mega.privacy.android.domain.usecase.MonitorContactCacheUpdates
 import mega.privacy.android.domain.usecase.chat.message.GetLastMessageSeenIdUseCase
@@ -68,7 +69,6 @@ class MessageListViewModel @Inject constructor(
     private val chatMessageTimeSeparatorMapper: ChatMessageTimeSeparatorMapper,
     remoteMediatorFactory: PagedChatMessageRemoteMediatorFactory,
     savedStateHandle: SavedStateHandle,
-    private val getLastMessageSeenIdUseCase: GetLastMessageSeenIdUseCase,
     private val setMessageSeenUseCase: SetMessageSeenUseCase,
     private val monitorChatRoomMessageUpdatesUseCase: MonitorChatRoomMessageUpdatesUseCase,
     private val monitorReactionUpdatesUseCase: MonitorReactionUpdatesUseCase,
@@ -76,7 +76,8 @@ class MessageListViewModel @Inject constructor(
     monitorPendingMessagesUseCase: MonitorPendingMessagesUseCase,
 ) : ViewModel() {
 
-    private val chatId = savedStateHandle.get<Long?>(Constants.CHAT_ID) ?: -1
+    private val conversationArgs = ChatArgs(savedStateHandle)
+    private val chatId = conversationArgs.chatId
 
     private val unreadCount = MutableStateFlow<Int?>(null)
 
@@ -92,6 +93,8 @@ class MessageListViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(MessageListUiState())
 
+    private var lastNotSeenMessage : TypedMessage? = null
+
     /**
      * State
      */
@@ -99,7 +102,6 @@ class MessageListViewModel @Inject constructor(
 
     init {
         monitorContactCacheUpdate()
-        getLastSeenMessageInformation()
         monitorMessageUpdates()
         monitorReactionUpdates()
     }
@@ -146,18 +148,6 @@ class MessageListViewModel @Inject constructor(
         }
     }
 
-    private fun getLastSeenMessageInformation() {
-        viewModelScope.launch {
-            runCatching {
-                getLastMessageSeenIdUseCase(chatId)
-            }.onSuccess { lastSeenMessageId ->
-                _state.update { it.copy(lastSeenMessageId = lastSeenMessageId) }
-            }.onFailure {
-                Timber.e(it, "Failed to get last seen message id")
-            }
-        }
-    }
-
     private val remoteMediator = remoteMediatorFactory.create(
         chatId = chatId,
         coroutineScope = viewModelScope,
@@ -187,6 +177,11 @@ class MessageListViewModel @Inject constructor(
                 }
             ) { pagingData, pendingMessages ->
                 pagingData.map {
+                    if (it.status == ChatMessageStatus.NOT_SEEN
+                        && (lastNotSeenMessage?.time ?: Long.MAX_VALUE) > it.time
+                    ) {
+                        lastNotSeenMessage = it
+                    }
                     uiChatMessageMapper(it)
                 }
                     .insertSeparators { before, after: UiChatMessage? ->
@@ -201,11 +196,11 @@ class MessageListViewModel @Inject constructor(
                             secondMessage = before
                         ) //Messages are passed in reverse order as the list is reversed in the ui
                     }
-                    .insertSeparators { _, after: UiChatMessage? ->
+                    .insertSeparators { before, _ ->
                         if (unreadCount > 0
-                            && after?.id == state.value.lastSeenMessageId
-                            && after !is HeaderMessage
-                            && state.value.lastSeenMessageId != -1L
+                            && lastNotSeenMessage != null
+                            && before?.id == lastNotSeenMessage?.msgId
+                            && before !is HeaderMessage
                         ) {
                             ChatUnreadHeaderMessage(unreadCount)
                         } else {
@@ -255,7 +250,8 @@ class MessageListViewModel @Inject constructor(
         latestMessageId.longValue = lastMessage?.msgId ?: -1L
         if (lastMessage?.isMine == true) {
             // if user sent a message, reset the extraUnreadCount and remove unread header
-            _state.update { state -> state.copy(extraUnreadCount = 0, lastSeenMessageId = -1) }
+            lastNotSeenMessage = null
+            _state.update { state -> state.copy(extraUnreadCount = 0) }
         }
     }
 

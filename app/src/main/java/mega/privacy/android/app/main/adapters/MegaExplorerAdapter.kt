@@ -1,5 +1,6 @@
 package mega.privacy.android.app.main.adapters
 
+import mega.privacy.android.core.R as CoreUiR
 import android.content.Context
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.graphics.Color
@@ -23,7 +24,6 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import mega.privacy.android.app.MimeTypeList
 import mega.privacy.android.app.MimeTypeThumbnail
-import mega.privacy.android.core.R as CoreUiR
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.NewGridRecyclerView
 import mega.privacy.android.app.components.scrollBar.SectionTitleProvider
@@ -53,6 +53,7 @@ import mega.privacy.android.app.utils.ThumbnailUtils
 import mega.privacy.android.app.utils.TimeUtils.getVideoDuration
 import mega.privacy.android.app.utils.Util.dp2px
 import mega.privacy.android.app.utils.Util.scaleWidthPx
+import mega.privacy.android.domain.entity.account.AccountDetail
 import nz.mega.sdk.MegaApiAndroid
 import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import nz.mega.sdk.MegaNode
@@ -97,6 +98,8 @@ class MegaExplorerAdapter(
     private var placeholderCount: Int = 0
 
     private var outMetrics: DisplayMetrics
+
+    private var accountDetail: AccountDetail? = null
 
     init {
         this.parentHandle = parentHandle
@@ -403,6 +406,10 @@ class MegaExplorerAdapter(
         visibilityFastScroller()
     }
 
+    fun setAccountDetail(accountDetail: AccountDetail?) {
+        this.accountDetail = accountDetail
+    }
+
     /**
      * Get nodes
      */
@@ -531,6 +538,10 @@ class MegaExplorerAdapter(
          */
         fun bind(position: Int, node: MegaNode) {
             with(binding) {
+                itemView.alpha = 0.5f.takeIf {
+                    !node.isInShare && accountDetail?.levelDetail?.accountType?.isPaid == true &&
+                            (node.isMarkedSensitive || megaApi.isSensitiveInherited(node))
+                } ?: 1f
                 imageView = binding.fileExplorerThumbnail
                 itemView.setOnClickListener(null)
                 itemView.setOnLongClickListener(null)
@@ -698,6 +709,10 @@ class MegaExplorerAdapter(
                 return
             }
 
+            itemView.alpha = 0.5f.takeIf {
+                !node.isInShare && accountDetail?.levelDetail?.accountType?.isPaid == true &&
+                        (node.isMarkedSensitive || megaApi.isSensitiveInherited(node))
+            } ?: 1f
             itemView.setOnClickListener(null)
             itemView.setOnLongClickListener(null)
 
@@ -838,9 +853,9 @@ class MegaExplorerAdapter(
         internal fun bind() {
             binding.sortByHeaderViewModel = sortByViewModel
             SortByHeaderViewModel.orderNameMap[if (fragment is IncomingSharesExplorerFragment && parentHandle == INVALID_HANDLE) {
-                sortByViewModel.order.second
+                sortByViewModel.order.othersSortOrder
             } else {
-                sortByViewModel.order.first
+                sortByViewModel.order.cloudSortOrder
             }]?.let {
                 binding.orderNameStringId = it
             }

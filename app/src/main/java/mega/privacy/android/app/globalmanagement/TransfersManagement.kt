@@ -20,14 +20,12 @@ import com.jeremyliao.liveeventbus.LiveEventBus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import mega.privacy.android.app.DownloadService
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.MegaApplication.Companion.getInstance
 import mega.privacy.android.app.R
 import mega.privacy.android.app.UploadService
 import mega.privacy.android.app.constants.EventConstants.EVENT_SHOW_SCANNING_TRANSFERS_DIALOG
 import mega.privacy.android.app.featuretoggle.AppFeatures
-import mega.privacy.android.app.main.megachat.ChatUploadService
 import mega.privacy.android.app.presentation.extensions.getState
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.INVALID_VALUE
@@ -343,31 +341,13 @@ class TransfersManagement @Inject constructor(
         Handler(Looper.getMainLooper()).postDelayed({
             try {
                 applicationScope.launch {
-                    if (!getFeatureFlagValueUseCase(AppFeatures.DownloadWorker)) {
-                        @Suppress("DEPRECATION")
-                        if (megaApi.numPendingDownloads > 0) {
-                            val downloadServiceIntent =
-                                Intent(context, DownloadService::class.java)
-                                    .setAction(Constants.ACTION_RESTART_SERVICE)
-                            tryToStartForegroundService(downloadServiceIntent)
-                        }
-                    }
-
-
                     @Suppress("DEPRECATION")
                     if (megaApi.numPendingUploads > 0) {
                         val uploadServiceIntent = Intent(context, UploadService::class.java)
                             .setAction(Constants.ACTION_RESTART_SERVICE)
-                        if (!getFeatureFlagValueUseCase(AppFeatures.NewChatActivity)) {
-                            val chatUploadServiceIntent =
-                                Intent(context, ChatUploadService::class.java)
-                                    .setAction(Constants.ACTION_RESTART_SERVICE)
+                        val isUploadsWorker = getFeatureFlagValueUseCase(AppFeatures.UploadWorker)
 
-                            tryToStartForegroundService(
-                                uploadServiceIntent,
-                                chatUploadServiceIntent
-                            )
-                        } else {
+                        if (!isUploadsWorker) {
                             tryToStartForegroundService(uploadServiceIntent)
                         }
                     }

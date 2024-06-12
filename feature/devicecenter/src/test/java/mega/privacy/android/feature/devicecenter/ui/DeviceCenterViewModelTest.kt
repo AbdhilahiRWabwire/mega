@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsEnabledUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.feature.devicecenter.domain.entity.DeviceNode
 import mega.privacy.android.feature.devicecenter.domain.entity.OwnDeviceNode
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.ArgumentMatchers.anyBoolean
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
@@ -46,6 +48,10 @@ internal class DeviceCenterViewModelTest {
 
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase = mock {
         onBlocking { invoke() } doReturn emptyFlow()
+    }
+
+    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase = mock {
+        onBlocking { invoke(any()) } doReturn false
     }
 
     private val isCameraUploadsEnabled = true
@@ -77,13 +83,24 @@ internal class DeviceCenterViewModelTest {
             isCameraUploadsEnabledUseCase = isCameraUploadsEnabledUseCase,
             deviceUINodeListMapper = deviceUINodeListMapper,
             monitorConnectivityUseCase = monitorConnectivityUseCase,
+            getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
         )
     }
 
     private suspend fun setupDefaultMocks() {
         whenever(isCameraUploadsEnabledUseCase()).thenReturn(isCameraUploadsEnabled)
-        whenever(getDevicesUseCase(any())).thenReturn(listOf(mock<OwnDeviceNode>()))
-        whenever(deviceUINodeListMapper(any())).thenReturn(listOf(ownDeviceUINode))
+        whenever(
+            getDevicesUseCase(
+                isCameraUploadsEnabled = any(),
+                isSyncFeatureFlagEnabled = any()
+            )
+        ).thenReturn(listOf(mock<OwnDeviceNode>()))
+        whenever(
+            deviceUINodeListMapper(
+                deviceNodes = any(),
+                isSyncFeatureFlagEnabled = anyBoolean(),
+            )
+        ).thenReturn(listOf(ownDeviceUINode))
     }
 
     @Test
@@ -159,7 +176,12 @@ internal class DeviceCenterViewModelTest {
                     status = DeviceCenterUINodeStatus.Initializing,
                     folders = listOf(updatedOwnDeviceFolderUINode)
                 )
-                whenever(deviceUINodeListMapper(any())).thenReturn(listOf(updatedOwnDeviceUINode))
+                whenever(
+                    deviceUINodeListMapper(
+                        deviceNodes = any(),
+                        isSyncFeatureFlagEnabled = anyBoolean(),
+                    )
+                ).thenReturn(listOf(updatedOwnDeviceUINode))
 
                 underTest.getBackupInfo()
                 val thirdState = awaitItem()
@@ -189,7 +211,12 @@ internal class DeviceCenterViewModelTest {
                     id = "9012-3456",
                     status = DeviceCenterUINodeStatus.Initializing,
                 )
-                whenever(deviceUINodeListMapper(any())).thenReturn(listOf(updatedOwnDeviceUINode))
+                whenever(
+                    deviceUINodeListMapper(
+                        deviceNodes = any(),
+                        isSyncFeatureFlagEnabled = anyBoolean(),
+                    )
+                ).thenReturn(listOf(updatedOwnDeviceUINode))
 
                 underTest.getBackupInfo()
                 val thirdState = awaitItem()
@@ -213,7 +240,12 @@ internal class DeviceCenterViewModelTest {
                 val updatedOwnDeviceUINode = ownDeviceUINode.copy(
                     status = DeviceCenterUINodeStatus.Initializing,
                 )
-                whenever(deviceUINodeListMapper(any())).thenReturn(listOf(updatedOwnDeviceUINode))
+                whenever(
+                    deviceUINodeListMapper(
+                        deviceNodes = any(),
+                        isSyncFeatureFlagEnabled = anyBoolean(),
+                    )
+                ).thenReturn(listOf(updatedOwnDeviceUINode))
 
                 underTest.getBackupInfo()
                 val secondState = awaitItem()
@@ -369,8 +401,18 @@ internal class DeviceCenterViewModelTest {
             thirdItem
         )
         whenever(isCameraUploadsEnabledUseCase()).thenReturn(false)
-        whenever(getDevicesUseCase(false)).thenReturn(deviceEntities)
-        whenever(deviceUINodeListMapper(deviceEntities)).thenReturn(itemsToDisplay)
+        whenever(
+            getDevicesUseCase(
+                isCameraUploadsEnabled = false,
+                isSyncFeatureFlagEnabled = false
+            )
+        ).thenReturn(deviceEntities)
+        whenever(
+            deviceUINodeListMapper(
+                deviceNodes = deviceEntities,
+                isSyncFeatureFlagEnabled = false,
+            )
+        ).thenReturn(itemsToDisplay)
 
         underTest.getBackupInfo()
         underTest.onSearchQueryChanged(query)
@@ -402,8 +444,18 @@ internal class DeviceCenterViewModelTest {
                 thirdItem
             )
             whenever(isCameraUploadsEnabledUseCase()).thenReturn(false)
-            whenever(getDevicesUseCase(false)).thenReturn(deviceEntities)
-            whenever(deviceUINodeListMapper(deviceEntities)).thenReturn(itemsToDisplay)
+            whenever(
+                getDevicesUseCase(
+                    isCameraUploadsEnabled = false,
+                    isSyncFeatureFlagEnabled = false
+                )
+            ).thenReturn(deviceEntities)
+            whenever(
+                deviceUINodeListMapper(
+                    deviceNodes = deviceEntities,
+                    isSyncFeatureFlagEnabled = false,
+                )
+            ).thenReturn(itemsToDisplay)
 
             underTest.getBackupInfo()
             underTest.onSearchQueryChanged(query)

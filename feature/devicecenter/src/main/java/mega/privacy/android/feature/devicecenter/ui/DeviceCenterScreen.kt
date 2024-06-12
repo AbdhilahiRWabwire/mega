@@ -37,14 +37,14 @@ import androidx.compose.ui.unit.dp
 import de.palm.composestateevents.EventEffect
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import mega.privacy.android.core.ui.controls.appbar.AppBarType
-import mega.privacy.android.core.ui.controls.appbar.MegaAppBar
-import mega.privacy.android.core.ui.controls.sheets.BottomSheet
-import mega.privacy.android.core.ui.controls.snackbars.MegaSnackbar
-import mega.privacy.android.core.ui.controls.text.MegaText
-import mega.privacy.android.core.ui.model.MenuAction
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.tokens.TextColor
+import mega.privacy.android.shared.original.core.ui.controls.appbar.AppBarType
+import mega.privacy.android.shared.original.core.ui.controls.appbar.MegaAppBar
+import mega.privacy.android.shared.original.core.ui.controls.sheets.BottomSheet
+import mega.privacy.android.shared.original.core.ui.controls.snackbars.MegaSnackbar
+import mega.privacy.android.shared.original.core.ui.controls.text.MegaText
+import mega.privacy.android.shared.original.core.ui.model.MenuAction
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
 import mega.privacy.android.feature.devicecenter.R
 import mega.privacy.android.feature.devicecenter.ui.bottomsheet.DeviceBottomSheetBody
 import mega.privacy.android.feature.devicecenter.ui.lists.DeviceCenterListViewItem
@@ -65,7 +65,7 @@ import mega.privacy.android.feature.devicecenter.ui.renamedevice.RenameDeviceDia
 import mega.privacy.android.legacy.core.ui.controls.appbar.LegacySearchAppBar
 import mega.privacy.android.legacy.core.ui.controls.lists.MenuActionHeader
 import mega.privacy.android.legacy.core.ui.model.SearchWidgetState
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * Test tags for the Device Center Screen
@@ -167,7 +167,8 @@ internal fun DeviceCenterScreen(
                 onInfoClicked = onInfoOptionClicked,
                 onBottomSheetDismissed = {
                     coroutineScope.launch { modalSheetState.hide() }
-                }
+                },
+                isSyncFeatureFlagEnabled = uiState.isSyncFeatureFlagEnabled,
             )
         },
         content = {
@@ -301,7 +302,9 @@ private fun DeviceCenterAppBar(
                         if (uiState.isCameraUploadsEnabled) {
                             list.add(DeviceMenuAction.Info)
                         }
-                        list.add(DeviceMenuAction.CameraUploads)
+                        if (!uiState.isSyncFeatureFlagEnabled) {
+                            list.add(DeviceMenuAction.CameraUploads)
+                        }
                     }
 
                     else -> list.add(DeviceMenuAction.Info)
@@ -485,7 +488,7 @@ private fun DeviceCenterContent(
 @CombinedThemePreviews
 @Composable
 private fun DeviceCenterNoNetworkStatePreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterScreen(
             uiState = DeviceCenterUiState(isInitialLoadingFinished = true),
             snackbarHostState = SnackbarHostState(),
@@ -511,7 +514,7 @@ private fun DeviceCenterNoNetworkStatePreview() {
 @CombinedThemePreviews
 @Composable
 private fun DeviceCenterNoItemsFoundPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterScreen(
             uiState = DeviceCenterUiState(
                 isInitialLoadingFinished = true,
@@ -546,7 +549,7 @@ private fun DeviceCenterNoItemsFoundPreview() {
 @CombinedThemePreviews
 @Composable
 private fun DeviceCenterInInitialLoadingPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterScreen(
             uiState = DeviceCenterUiState(isNetworkConnected = true),
             snackbarHostState = SnackbarHostState(),
@@ -585,7 +588,7 @@ private fun DeviceCenterInDeviceViewPreview() {
         isInitialLoadingFinished = true,
         isNetworkConnected = true,
     )
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterScreen(
             uiState = uiState,
             snackbarHostState = SnackbarHostState(),
@@ -621,7 +624,7 @@ private fun DeviceCenterInFolderViewEmptyStatePreview() {
         selectedDevice = ownDeviceUINode,
         isNetworkConnected = true,
     )
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterScreen(
             uiState = uiState,
             snackbarHostState = SnackbarHostState(),
@@ -656,7 +659,7 @@ private fun DeviceCenterInFolderViewPreview() {
         selectedDevice = ownDeviceUINodeTwo,
         isNetworkConnected = true,
     )
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterScreen(
             uiState = uiState,
             snackbarHostState = SnackbarHostState(),
@@ -685,7 +688,7 @@ private fun DeviceCenterInFolderViewPreview() {
 @CombinedThemePreviews
 @Composable
 private fun DeviceCenterContentWithOwnDeviceSectionOnlyPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterContent(
             itemsToDisplay = listOf(ownDeviceUINode),
             onDeviceClicked = {},
@@ -703,7 +706,7 @@ private fun DeviceCenterContentWithOwnDeviceSectionOnlyPreview() {
 @CombinedThemePreviews
 @Composable
 private fun DeviceCenterContentWithOtherDevicesSectionOnlyPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterContent(
             itemsToDisplay = listOf(otherDeviceUINodeOne),
             onDeviceClicked = {},
@@ -721,7 +724,7 @@ private fun DeviceCenterContentWithOtherDevicesSectionOnlyPreview() {
 @CombinedThemePreviews
 @Composable
 private fun DeviceCenterContentWithBothDeviceSectionsPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         DeviceCenterContent(
             itemsToDisplay = listOf(
                 ownDeviceUINode,

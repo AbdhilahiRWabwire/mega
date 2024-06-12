@@ -131,7 +131,7 @@
     <!-- Dialog option that permits user do not show it again -->
     <string name="checkbox_not_show_again">لا تظهر مرة أخرى</string>
     <!-- Press back while login to cancel current login process. -->
-    <string name="confirm_cancel_login">هل أنت متأكد من أنك تريد إلغاء عملية تسجيل الدخول الحالية؟</string>
+    <string name="confirm_cancel_login">هل تريد بالتأكيد إلغاء عملية تسجيل الدخول الحالية؟</string>
     <!-- Login button -->
     <string name="login_text">تسجيل الدخول</string>
     <!-- email label -->
@@ -608,16 +608,6 @@
     <string name="verify_account_error_invalid_code">رمز خاطئ. يرجى المحاولة مرة أخرى أو إعادة الإرسال.</string>
     <!-- verify phone number successfully -->
     <string name="verify_account_successfully">تم التحقق من رقم هاتفك</string>
-    <!-- If the user has an internal storage and an external SD card, it has to be set on the settings screen, external storage option -->
-    <string-array name="settings_storage_download_location_array">
-        <item>ذاكرة داخلية</item>
-        <item>ذاكرة خارجية</item>
-    </string-array>
-    <!-- choose the way the new user’s email is inserted, import from phone option -->
-    <string-array name="add_contact_array">
-        <item>اكتب بريد المستخدم الالكتروني</item>
-        <item>استيراد من جهاز</item>
-    </string-array>
     <!-- settings option -->
     <string name="settings_camera_upload_on">تفعيل ترفيعات الكاميرا</string>
     <!-- settings option. How to upload the camera images: via Wi-Fi only or via Wi-Fi and data plan -->
@@ -628,19 +618,8 @@
     <string name="settings_secondary_upload_off">تعطيل ترفيعات الوسائط المتعددة</string>
     <!-- Title of shared folder explorer to choose a folder to perform an action -->
     <string name="settings_empty_folder">اختر مجلد</string>
-    <!-- the options of how to upload, but in an array. needed for the settings, how to upload the camera images. only when Wi-Fi connected -->
-    <string-array name="settings_camera_upload_how_to_entries">
-        <item>شبكة الواي فاي Wi-Fi أو بيانات الموبايل</item>
-        <item>شبكة الواي فاي Wi-Fi فقط</item>
-    </string-array>
     <!-- What kind of files are going to be uploaded: images, videos or both -->
     <string name="settings_camera_upload_what_to_upload">رفع ملف</string>
-    <!-- what kind of file are going to be uploaded. Needed for the settings summary -->
-    <string-array name="settings_camera_upload_file_upload_entries">
-        <item>الصور فقط</item>
-        <item>ملفات فيديو فقط</item>
-        <item>الصور و ملفات الفيديو</item>
-    </string-array>
     <!-- Title of ‘Include location tags’ setting option. Once enabled, Camera Uploads will include the location info from pictures those are being uploaded -->
     <string name="settings_camera_upload_include_gps">تشمل علامات الموقع</string>
     <!-- Option to choose that the video compression will only be enable when the device is charging -->
@@ -863,7 +842,7 @@
     <!-- Hint of the confirmation dialog to get link with password -->
     <string name="hint_confirm_password_protection_dialog">تأكيد كلمة المرور</string>
     <!-- Status text at the beginning of getting a link -->
-    <string name="link_request_status">قيد المعالجة...</string>
+    <string name="link_request_status">قيد المعالجة&#8230;</string>
     <!-- Option of the sliding panel to edit the link of a node -->
     <string name="edit_link_option">إدارة الرابط</string>
     <!-- Error alert dialog shown when changing the password the user provides an incorrect password -->
@@ -1112,7 +1091,7 @@
     <!-- Button text shown on SMS verification page, if the user wants to logout current suspended account and login with another account, user can press this button to logout -->
     <string name="sms_logout">[A] تسجيل خروج[/A] للتبديل بين حسابات ميغا MEGA</string>
     <!-- On SMS verification page, if the user presses the logout button, a dialog with this text will show to ask for user’s confirmation. -->
-    <string name="confirm_logout_from_sms_verification">هل أنت متأكد أنك تريد تسجيل الخروج من الحساب الحالي؟</string>
+    <string name="confirm_logout_from_sms_verification">هل تريد بالتأكيد تسجيل الخروج من الحساب الجاري؟</string>
     <!-- Text shown when a message has been deleted in the chat -->
     <string name="non_format_text_deleted_message_by">تم حذف هذه الرسالة من قبل %1$s</string>
     <!-- Text shown when the chat history was cleared by someone -->
@@ -1170,12 +1149,12 @@
     <string name="no_conversation_history">لا توجد سجل للمحادثات</string>
     <!-- Text to indicate that one participant is typing or multiple participants are typing at the same time in a chat room. The "%1$s" placeholder is to put the name(s) of the participant(s). The [A][/A] format marks are to put the text in a different color. -->
     <plurals name="user_typing">
-        <item quantity="zero">%1$s [A] يقوم بالكتابة...[/A]</item>
-        <item quantity="one">%1$s [A] يقوم بالكتابة...[/A]</item>
-        <item quantity="two">%1$s [A] يقوما بالكتابة...[/A]</item>
-        <item quantity="few">%1$s [A] يقومون بالكتابة...[/A]</item>
-        <item quantity="many">%1$s [A] يقومون بالكتابة...[/A]</item>
-        <item quantity="other">%1$s [A] يقومون بالكتابة...[/A]</item>
+        <item quantity="zero">%1$s [A] يقوم بالكتابة&#8230;[/A]</item>
+        <item quantity="one">%1$s [A] يقوم بالكتابة&#8230;[/A]</item>
+        <item quantity="two">%1$s [A] يقوما بالكتابة&#8230;[/A]</item>
+        <item quantity="few">%1$s [A] يقومون بالكتابة&#8230;[/A]</item>
+        <item quantity="many">%1$s [A] يقومون بالكتابة&#8230;[/A]</item>
+        <item quantity="other">%1$s [A] يقومون بالكتابة&#8230;[/A]</item>
     </plurals>
     <!-- text that appear when there are more than 2 people writing at that time in a chat. For example User1, user2 and more are typing… -->
     <string name="more_users_typing">%1$s [A]وأكثر يكتبون&#8230;[/A]</string>
@@ -1825,8 +1804,6 @@
     <string name="settings_chat_upload_quality">جودة الفيديو</string>
     <!-- Label for the option on setting to set up the quality of video files to be uploaded -->
     <string name="settings_video_upload_quality">جودة الفيديو</string>
-    <!-- Text shown when the user refuses to permit the storage permission when enable camera upload -->
-    <string name="on_refuse_storage_permission">تحتاج ترفيعات الكاميرا صلاحية الوصول إلى الصور والوسائط الأخرى الموجودة على جهازك. يرجى الذهاب إلى صفحة الإعدادات ومنح الإذن.</string>
     <!-- Available options for the setting to set up the quality of multimedia files uploaded to the chat or the Camera Uploads -->
     <string-array name="settings_chat_upload_quality_entries">
         <item>منخفضة</item>
@@ -2540,7 +2517,7 @@
     <!-- Title of the screen asking permissions for microphone and write in log calls -->
     <string name="allow_acces_calls_title">تمكين المكالمات</string>
     <!-- Title of the screen asking permissions for contacts -->
-    <string name="allow_acces_contact_title">Allow access to your address book</string>
+    <string name="allow_acces_contact_title">السماح بالوصول إلى دفتر العناوين الخاص بك</string>
     <!-- Subtitle of the screen asking permissions for contacts -->
     <string name="allow_acces_contact_subtitle">اكتشف جهات الاتصال بسهولة من دفتر العناوين الخاص بك على ميغا MEGA.</string>
     <!-- Explanation under the subtitle of asking permissions for contacts to explain that MEGA will never use the address book data for any other purpose -->
@@ -3476,7 +3453,7 @@
     <!-- Action to change name -->
     <string name="change_name_action">تغيير الإسم</string>
     <!-- Action to add photo -->
-    <string name="add_photo_action">إضافة صورة</string>
+    <string name="add_photo_action">تغيير صورة الملف الشخصي</string>
     <!-- Action to add phone number -->
     <string name="add_phone_number_action">إضافة رقم هاتف</string>
     <!-- Warning indicating the app needs write permissions to do any action -->
@@ -3554,8 +3531,6 @@
     <string name="general_camera_enable">تم تشغيل الكاميرا خاصتك.</string>
     <!-- General label for camera disable -->
     <string name="general_camera_disable">تم إيقاف تشغيل الكاميرا خاصتك.</string>
-    <!-- Label for hold meeting -->
-    <string name="meeting_hold">تعليق</string>
     <!-- General label for speaker -->
     <string name="general_speaker">مكبر الصوت</string>
     <!-- General label for headphone-->
@@ -3749,7 +3724,7 @@
     <!-- Dialog message when the existing subscription is from other platform (Stripe and ECP)  -->
     <string name="message_subscription_from_other_platform">لديك بالفعل اشتراك. إذا اشتريت واحدة أخرى ، فسيتم محاسبتك مرتين. لتجنب ذلك، قم بإلغاء اشتراكك الحالي بالانتقال إلى ميغا MEGA في متصفح الحاسوب المكتبي أو الهاتف المحمول. قم بزيارة مركز المساعدة للحصول على مزيد من المعلومات.</string>
     <!-- Warning show to the user when the app needs bluetooth connect permissions to get the best meeting experience and the user has denied them.-->
-    <string name="meeting_bluetooth_connect_required_permissions_warning">Go to Settings to allow MEGA permission to access your nearby devices using Bluetooth.</string>
+    <string name="meeting_bluetooth_connect_required_permissions_warning">انتقل إلى الإعدادات للسماح لميغا MEGA بالوصول إلى أجهزتك القريبة باستخدام البلوتوث.</string>
     <!-- Warning indicating the billing is not available and giving some indications to continue with the upgrade. -->
     <string name="upgrade_billing_warning">نحن غير قادرين على المضي قدماً في الفواتير. إذا كنت تستخدم تطبيقًا مزدوجًا ، فالرجاء تسجيل الدخول إلى ميغا MEGA بدونه. إذا لم يكن كذلك، فحاول الترقية من خلال متصفح الويب الخاص بك.</string>
     <!-- Title for subscription dialog that shows before delete account -->
@@ -3931,7 +3906,7 @@
     <!-- Informs about a name collision, the folder is trying to upload, move or copy already exists on the location. The placeholder is for the name of the folder. -->
     <string name="folder_already_exists_in_location">يوجد ملف اسمه [B]%1$s[/B] بالفعل في هذا الموقع.</string>
     <!-- Banner text to indicate poor network quality -->
-    <string name="calls_call_screen_poor_network_quality">اتصال سيء</string>
+    <string name="calls_call_screen_poor_network_quality">اتصال ضعيف</string>
     <!-- Message shown in a chat room when a call is ended because the connection has been lost and could not be reconnected -->
     <string name="calls_chat_screen_unable_to_reconnect_the_call">غير قادر على إعادة الاتصال</string>
     <!-- Size in bytes. The placeholder is for the size value, please adjust the position based on linguistics -->
@@ -4131,7 +4106,7 @@
     <!-- Description of the Backups feature when no Backup files or folders exist -->
     <string name="backups_empty_state_body">هذا هو المكان الذي يتم فيه تخزين الملفات والمجلدات التي تم نسخها احتياطيًا. العناصر التي تم نسخها احتياطيًا هي ”للقراءة فقط“ لحمايتها من التعديل العرضي في السواقة السحابية الخاص بك.\nيمكنك نسخ العناصر احتياطيًا من جهاز الكمبيوتر الخاص بك إلى ميغا MEGA باستخدام تطبيق الحاسوب المكتبي الخاص بنا.</string>
     <!-- Message error shown when trying to log in on an account that has been suspended due to breaches of copyright -->
-    <string name="dialog_account_suspended_ToS_copyright_message">Your MEGA account has been suspended due to repeated allegations of copyright infringements. This means you cannot access your account or data within it.\nCheck your email inbox for more information on how to file a counter-notice.</string>
+    <string name="dialog_account_suspended_ToS_copyright_message">تم تعليق حساب ميغا MEGA الخاص بك بسبب الادعاءات المتكررة بانتهاكات حقوق الطبع والنشر. هذا يعني أنه لا يمكنك الوصول إلى حسابك أو البيانات الموجودة فيه.\nتحقق من صندوق البريد الإلكتروني الخاص بك للحصول على مزيد من المعلومات حول كيفية تقديم إشعار مضاد.</string>
     <!-- Message error shown when trying to log in on an account that has been terminated due to breaches of all reasons of breaching Terms of Service, except copyright. -->
     <string name="dialog_account_suspended_ToS_non_copyright_message">تم إنهاء حسابك بسبب خرق لشروط خدمة ميغا MEGA.\n لن تتمكن من استعادة الوصول إلى بياناتك المخزنة أو لن يُسمح لك بتسجيل حساب ميغا MEGA جديد.</string>
     <!-- Title of the Meetings tab for the chat section -->
@@ -4282,7 +4257,7 @@
     <!-- Dialog confirmation text for removing photos in an album -->
     <string name="photos_album_remove_from_album_confirmation_text">إزالة من الألبوم؟</string>
     <!-- This is the Body of the Dialog that appears when the user has denied the Media Permissions in Settings Camera Uploads -->
-    <string name="settings_camera_uploads_grant_media_permissions_body">To enable camera uploads, allow MEGA access to your photos and other media on your device.</string>
+    <string name="settings_camera_uploads_grant_media_permissions_body">لتمكين ترفيعات الكاميرا اسمح لميغا MEGA بالوصول إلى صورك والوسائط الأخرى على جهازك.</string>
     <!-- This is the "Positive Button" of the Dialog that appears when the user has denied the Media Permissions in Settings Camera Uploads. Upon click, the Android OS will attempt to request the Media Permission again -->
     <string name="settings_camera_uploads_grant_media_permissions_positive_button">السماح بالوصول</string>
     <!-- This is the "Positive Button" of the Dialog that appears when the user has denied the Media Permissions in Settings Camera Uploads. Upon click, the Dialog will simply be dismissed. -->
@@ -5201,7 +5176,7 @@
     <!-- The Off option to disable subtitles in the enable subtitle dialog. When user taps on Subtitle icon to enable them this dialog will be shown. -->
     <string name="media_player_video_enable_subtitle_dialog_option_off">ايقاف</string>
     <!-- The Add subtitle option in the enable subtitle dialog. When user taps on Subtitle icon to enable them this dialog will be shown. -->
-    <string name="media_player_video_enable_subtitle_dialog_option_add_subtitle">أضف ترجمات...</string>
+    <string name="media_player_video_enable_subtitle_dialog_option_add_subtitle">أضف ترجمات&#8230;</string>
     <!-- Slideshow settings page title -->
     <string name="slideshow_settings_page_title">خيارات عرض الشرائح</string>
     <!-- Slideshow speed preference -->
@@ -5609,7 +5584,7 @@
     <!-- General button text to save selected items to cloud drive -->
     <string name="general_save_to_cloud_drive">حفظ في السواقة السحابية</string>
     <!-- Album import saving -->
-    <string name="album_import_saving">جاري الحفظ...</string>
+    <string name="album_import_saving">جاري الحفظ&#8230;</string>
     <!-- Album import success message -->
     <string name="album_import_success_message">تم حفظ ”%1$s“ في السواقة السحابية.</string>
     <!-- Album import error message -->
@@ -6022,15 +5997,15 @@
     <!-- Title about Pro plans on Onboarding dialog (for user to choose account - Free or Pro).  -->
     <string name="dialog_onboarding_get_pro_title">احصل على المزيد مع باقة برو Pro</string>
     <!-- Short description about Pro plans on Onboarding dialog (for user to choose account - Free or Pro). %1$s placeholder will be replaced with correct localised price (e.g. $4.99). -->
-    <string name="dialog_onboarding_get_pro_description">Upgrade to a Pro plan and get more storage and access to Pro features. Plans start from as low as %1$s a month.</string>
+    <string name="dialog_onboarding_get_pro_description">قم بالترقية إلى باقة برو Pro واحصل على المزيد من مساحة التخزين والوصول إلى ميزات برو Pro. تبدأ الباقات من مستوى منخفض يصل حتى %1$s شهر.</string>
     <!-- Title about features available on Pro plan on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_some_features_title">MEGA&#160;Pro plans include:</string>
+    <string name="dialog_onboarding_some_features_title">تتضمن باقة ميغا برو MEGA&#160;Pro ما يلي:</string>
     <!-- Title for Storage feature on Onboarding dialog (for user to choose account - Free or Pro).  -->
-    <string name="dialog_onboarding_feature_title_storage">Ultimate storage flexibility</string>
+    <string name="dialog_onboarding_feature_title_storage">مرونة تخزين فائقة</string>
     <!-- Description about Storage feature on Onboarding dialog (for user to choose account - Free or Pro). %1$s placeholder will be replaced with correct localised storage size (e.g. 400GB or 2TB)  -->
-    <string name="dialog_onboarding_feature_description_storage">Starting from %1$s, find the perfect fit for your storage needs.</string>
+    <string name="dialog_onboarding_feature_description_storage">بدءًا من %1$s ابحث عن الملاءمة المثالية لاحتياجات التخزين الخاصة بك.</string>
     <!-- Title for Button to view Pro plans on Onboarding dialog (for user to choose account - Free or Pro). After clicking on the button user will redirecting to Upgrade Account screen.  -->
-    <string name="dialog_onboarding_button_view_pro_plan">Upgrade to Pro today</string>
+    <string name="dialog_onboarding_button_view_pro_plan">قم بالترقية إلى برو Pro اليوم</string>
     <!-- Label indicating that a participant is presenting in the main view of the call -->
     <string name="meetings_meeting_screen_main_view_participant_is_presenting_label">%1$s يقوم بالتقديم</string>
     <!-- Warning indicating that a participant is sharing the screen-->
@@ -6129,10 +6104,8 @@
     <string name="meetings_muted_by_a_participant_snackbar_message">لقد تم كتم صوتك من قِبل %s</string>
     <!-- Title of subscription details section, which shows to the user to provide details about subscription. -->
     <string name="account_upgrade_account_description_subscription_title">تفاصيل الاشتراك</string>
-    <!-- Details body for the subscription details section, which shows to the user to provide details about subscription. -->
-    <string name="account_upgrade_subscription_details">يتم تجديد الاشتراكات تلقائيًا لفترات اشتراك متتالية من نفس المدة وبنفس سعر الفترة الأولية المختارة. يمكنك إيقاف التجديد التلقائي لاشتراك ميغا برو MEGA&#160;Pro الخاص بك في موعد لا يتجاوز 24 ساعة قبل استحقاق دفعة الاشتراك التالية عبر الاشتراكات في [A]غوغل بلاي Google Play[/A].</string>
     <!-- Text content for the chat bottom sheet when gallery permission is not granted -->
-    <string name="chat_toolbar_bottom_sheet_allow_gallery_access_title">Allow access to your Gallery</string>
+    <string name="chat_toolbar_bottom_sheet_allow_gallery_access_title">السماح بالوصول إلى معرض الصور الخاص بك</string>
     <!-- Button text to grant permission in the chat bottom sheet -->
     <string name="chat_toolbar_bottom_sheet_grant_gallery_access_button">السماح بالوصول</string>
     <!-- The title of the Dialog shown to Update the application from playstore -->
@@ -6156,7 +6129,7 @@
     <!-- Camera uploads no internet info in Photos screen. -->
     <string name="photos_camera_uploads_no_internet">Upload paused due to no internet connection</string>
     <!-- Camera uploads low battery info in Photos screen. -->
-    <string name="photos_camera_uploads_low_battery">Upload paused as battery is below %1$d%%</string>
+    <string name="photos_camera_uploads_low_battery">تم إيقاف الترفيع مؤقتًا لأن البطارية أقل من %1$d%%</string>
     <!-- Camera uploads general issue info in Photos screen. -->
     <string name="photos_camera_uploads_general_issue">توقفت ترفيعات الكاميرا عن العمل. حاول إعادة تمكين ترفيعات الكاميرا لحلها. في حالة استمرار المشكلة، تواصل مع الدعم.</string>
     <!-- Camera uploads pending info in Photos screen. -->
@@ -6237,7 +6210,7 @@
     <!-- Expiration date and time for promotional notifications. Shown on Notifications screen under each promotional notification. The placeholder %1$s will be replaced with localised date and the placeholder %2$s will be replaced with localised time.  -->
     <string name="notifications_screen_notification_promo_expiration_time">تنتهي الصلاحية في %1$s الساعة %2$s</string>
     <!-- Warning Message and upgrade link for organiser for Free Call -->
-    <string name="meetings_free_call_organiser_number_of_participants_warning">Only 100 participants can join the call. Any additional participants will only be able to send and receive messages. The organiser can upgrade to Pro to remove these restrictions.</string>
+    <string name="meetings_free_call_organiser_number_of_participants_warning">يمكن لـ 100 مشارك فقط الانضمام إلى المكالمة. لن يتمكن أي مشارك إضافي إلا من إرسال الرسائل وتلقيها. يمكن للمنظم الترقية إلى برو Pro لإزالة هذه القيود.</string>
     <!-- Warning Message for non organiser for Free Call -->
     <string name="meetings_free_call_non_organiser_number_of_participants_warning">يمكن لـ 100&#160;مشارك فقط الانضمام إلى المكالمة. لن يتمكن أي مشارك إضافي إلا من إرسال المحادثات وقراءتها. اطلب من المنظم إزالة هذا التقييد.</string>
     <!-- The Video Quality Option shown in a Dialog in Settings Camera Uploads, indicating that the Videos will be compressed to Low Quality before being uploaded by Camera Uploads -->
@@ -6249,7 +6222,7 @@
     <!-- The Video Quality Option shown in a Dialog in Settings Camera Uploads, indicating that the Videos are automatically uploaded by Camera Uploads without any Video Compression -->
     <string name="settings_camera_uploads_video_quality_dialog_option_original">الأصلي</string>
     <!-- Warning shown when the recording of audio permission is required for sending a voice clip and it has been denied by the user -->
-    <string name="chat_microphone_permissions_denied_for_voice_clip">You denied MEGA access to your microphone. If you’d like to record a voice clip, allow MEGA permission to do so.</string>
+    <string name="chat_microphone_permissions_denied_for_voice_clip">لقد رفضت وصول ميغا MEGA إلى الميكروفون الخاص بك. إذا كنت ترغب في تسجيل مقطع صوتي، اسمح لميغا MEGA بالحصول على إذن للقيام بذلك.</string>
     <!-- Free plan limitation dialog title for scheduled meeting calls with more than 100 participants -->
     <string name="meetings_schedule_meeting_free_plan_100_participants_limit_dialog_title">لا يمكن الانضمام</string>
     <!-- Free plan limitation dialogue description for scheduled meeting calls with more than 100 participants -->
@@ -6272,11 +6245,15 @@
     <string name="hidden_nodes_benefit_description_out_of_sight">عليك أن تقرر متى تكون الملفات المخفية مرئية. هناك إعداد جديد لإظهار العناصر المخفية مؤقتًا.</string>
     <!-- The snackbar message of hidden nodes operation -->
     <plurals name="hidden_nodes_result_message">
-        <item quantity="one">%1$d item hidden</item>
-        <item quantity="other">%1$d items hidden</item>
+        <item quantity="zero">%1$d عنصر مخفي</item>
+        <item quantity="one">%1$d عنصر مخفي</item>
+        <item quantity="two">%1$d عنصرين مخفيين</item>
+        <item quantity="few">%1$d عناصر مخفية</item>
+        <item quantity="many">%1$d عنصر مخفي</item>
+        <item quantity="other">%1$d عنصر مخفي</item>
     </plurals>
     <!-- Description of feature, which will be available for user, if they buy plan. This feature means user will be prioritised when customer support is needed. Keep the bullet point, as this string is part of the bullet point list. -->
-    <string name="account_upgrade_account_description_priority_support">&#8226;&#160;Priority support</string>
+    <string name="account_upgrade_account_description_priority_support">&#8226; &#160;أولوية الدعم</string>
     <!-- The title of the Upgrade bottom sheet dialog  -->
     <string name="meetings_upgrade_pro_plan_title">قم بالترقية إلى برو Pro للحصول على مكالمات غير محدودة</string>
     <!-- The body of the Upgrade bottom sheet dialog  -->
@@ -6310,21 +6287,68 @@
     <!-- Search drop down chips filter type date modified older -->
     <string name="search_dropdown_chip_filter_type_date_older">أقدم</string>
     <!-- String below login button next to button for reporting a login issue -->
-    <string name="general_login_label_trouble_logging_in">Trouble logging in?</string>
+    <string name="general_login_label_trouble_logging_in">مشكلة في تسجيل الدخول؟</string>
     <!-- Button text for reporting an issue on the login screen -->
-    <string name="general_login_button_report_your_issue">Report your issue</string>
+    <string name="general_login_button_report_your_issue">أبلغ عن مشكلتك</string>
     <!-- Hidden nodes show items -->
     <string name="hidden_nodes_show_items">عرض العناصر المخفية</string>
     <!-- Hidden nodes show items description -->
-    <string name="hidden_nodes_show_items_description">All hidden items will be visible, but blurred to indicate their “hidden” status</string>
+    <string name="hidden_nodes_show_items_description">ستكون جميع العناصر المخفية مرئية ولكن غير واضحة للإشارة إلى حالتها «المخفية»</string>
     <!-- Button text for photo option in camera screen -->
-    <string name="camera_photo_button">Photo</string>
+    <string name="camera_photo_button">صورة</string>
     <!--  -->
-    <string name="camera_flash_mode_on">Flash mode on</string>
+    <string name="camera_flash_mode_on">وضع الفلاش قيد التشغيل</string>
     <!--  -->
-    <string name="camera_flash_mode_off">Flash mode off</string>
+    <string name="camera_flash_mode_off">إيقاف تشغيل وضع الفلاش</string>
     <!--  -->
-    <string name="camera_flash_mode_auto">Flash mode auto</string>
+    <string name="camera_flash_mode_auto">وضع الفلاش تلقائي</string>
     <!--  -->
-    <string name="camera_send_to">Send to %1$s</string>
+    <string name="camera_send_to">أرسل إلى %1$s</string>
+    <!-- Title of call button to show more options in call screen -->
+    <string name="meetings_more_call_option_button">المزيد</string>
+    <!-- Title of raise hand button in call screen -->
+    <string name="meetings_raise_hand_option_button">ارفع يدك</string>
+    <!-- Title of lower hand button in call screen -->
+    <string name="meetings_lower_hand_option_button">انزل يدك</string>
+    <!-- Title of put call on hold button in call screen -->
+    <string name="meetings_put_call_on_hold_option_button">ضع المكالمة في وضع الانتظار</string>
+    <!-- Title of swap calls button in call screen -->
+    <string name="meetings_swap_calls_option_button">تبديل المكالمات</string>
+    <!-- Title of resume call button in call screen -->
+    <string name="meetings_resume_call_option_button">استئناف المكالمة</string>
+    <!-- Text of pop up informing about the Raise hand feature -->
+    <string name="meetings_new_feature_raise_hand_layout">ميزة جديدة: رفع اليد</string>
+    <!-- The snackbar message of your hand is raised -->
+    <string name="meeting_your_hand_is_raised_message">لقد رفعت يدك</string>
+    <!-- The snackbar message of you and others raised your hands -->
+    <plurals name="meeting_you_and_others_raised_your_hands_message">
+        <item quantity="zero">أنت و %1$d آخر رفعتوا يدكم</item>
+        <item quantity="one">أنت و %1$d آخر رفعتوا يدكم</item>
+        <item quantity="two">أنت و %1$d آخرون رفعتوا يدكم</item>
+        <item quantity="few">أنت و %1$d آخرون رفعتوا يدكم</item>
+        <item quantity="many">أنت و %1$d آخرون رفعتوا يدكم</item>
+        <item quantity="other">أنت و %1$d آخرون رفعتوا يدكم</item>
+    </plurals>
+    <!-- The snackbar message of another participant raised their hand -->
+    <string name="meetings_one_participant_raised_their_hand_message">%1$s رفعوا يدهم</string>
+    <!-- The snackbar message two or more participants raised their hands -->
+    <plurals name="meetings_other_participants_raised_their_hands_message">
+        <item quantity="zero">%1$s و %2$d آخر رفعوا يدهم</item>
+        <item quantity="one">%1$s و %2$d آخر رفعوا يدهم</item>
+        <item quantity="two">%1$s و %2$d آخرون رفعوا يدهم</item>
+        <item quantity="few">%1$s و %2$d آخرون رفعوا يدهم</item>
+        <item quantity="many">%1$s و %2$d آخرون رفعوا يدهم</item>
+        <item quantity="other">%1$s و %2$d آخرون رفعوا يدهم</item>
+    </plurals>
+    <!-- Hidden nodes sharing album -->
+    <string name="hidden_nodes_sharing_album">There are hidden items in this album. Sharing the album will mean that the hidden items are visible to those you share with. The items will still be hidden in your Cloud drive.</string>
+    <!-- Hidden nodes items -->
+    <plurals name="hidden_nodes_items">
+        <item quantity="zero"></item>
+        <item quantity="one"></item>
+        <item quantity="two"></item>
+        <item quantity="few"></item>
+        <item quantity="many"></item>
+        <item quantity="other"></item>
+    </plurals>
 </resources>

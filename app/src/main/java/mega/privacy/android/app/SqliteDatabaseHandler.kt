@@ -5,7 +5,6 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import android.provider.Settings
-import android.text.TextUtils
 import android.util.Base64
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
@@ -65,92 +64,6 @@ class SqliteDatabaseHandler @Inject constructor(
     private val writableDatabase: SupportSQLiteDatabase by lazy { sqLiteOpenHelper.writableDatabase }
     private val readableDatabase: SupportSQLiteDatabase by lazy { sqLiteOpenHelper.readableDatabase }
 
-    override fun saveCredentials(userCredentials: UserCredentials) {
-        val values = ContentValues().apply {
-            with(userCredentials) {
-                put(KEY_ID, 1)
-                email?.let { put(KEY_EMAIL, encrypt(it)) }
-                session?.let { put(KEY_SESSION, encrypt(it)) }
-                myHandle?.let { put(KEY_MY_HANDLE, encrypt(it)) }
-            }
-        }
-        writableDatabase.insert(TABLE_CREDENTIALS, SQLiteDatabase.CONFLICT_REPLACE, values)
-    }
-
-    override fun saveMyEmail(email: String?) {
-        Timber.d("saveEmail: %s", email)
-        val selectQuery = "SELECT * FROM $TABLE_CREDENTIALS"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_CREDENTIALS_TABLE =
-                        "UPDATE $TABLE_CREDENTIALS SET $KEY_EMAIL= '${encrypt(email)}' WHERE $KEY_ID = '1'"
-                    writableDatabase.execSQL(UPDATE_CREDENTIALS_TABLE)
-                } else {
-                    values.put(KEY_EMAIL, encrypt(email))
-                    writableDatabase.insert(TABLE_CREDENTIALS, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
-    override fun saveMyFirstName(firstName: String?) {
-        val selectQuery = "SELECT * FROM $TABLE_CREDENTIALS"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_CREDENTIALS_TABLE =
-                        "UPDATE $TABLE_CREDENTIALS SET $KEY_FIRST_NAME= '${encrypt(firstName)}' WHERE $KEY_ID = '1'"
-                    writableDatabase.execSQL(UPDATE_CREDENTIALS_TABLE)
-                } else {
-                    values.put(KEY_FIRST_NAME, encrypt(firstName))
-                    writableDatabase.insert(TABLE_CREDENTIALS, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
-    override fun saveMyLastName(lastName: String?) {
-        val selectQuery = "SELECT * FROM $TABLE_CREDENTIALS"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_CREDENTIALS_TABLE =
-                        "UPDATE $TABLE_CREDENTIALS SET $KEY_LAST_NAME= '${encrypt(lastName)}' WHERE $KEY_ID = '1'"
-                    writableDatabase.execSQL(UPDATE_CREDENTIALS_TABLE)
-                } else {
-                    values.put(KEY_LAST_NAME, encrypt(lastName))
-                    writableDatabase.insert(TABLE_CREDENTIALS, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
-    override val myEmail: String?
-        get() {
-            val selectQuery = "SELECT $KEY_EMAIL FROM $TABLE_CREDENTIALS"
-            var email: String? = null
-            try {
-                readableDatabase.query(selectQuery).use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        email = decrypt(cursor.getString(0))
-                    }
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "Exception opening or managing DB cursor")
-            }
-            return email
-        }
-
     //get the credential of last login
     override val credentials: UserCredentials?
         get() {
@@ -200,25 +113,6 @@ class SqliteDatabaseHandler @Inject constructor(
             }
             return ephemeralCredentials
         }
-
-    override fun shouldAskForDisplayOver(): Boolean {
-        var should = true
-        val text = getStringValue(TABLE_PREFERENCES, KEY_ASK_FOR_DISPLAY_OVER, "")
-        if (!TextUtils.isEmpty(text)) {
-            should = text.toBoolean()
-        }
-        return should
-    }
-
-    override fun dontAskForDisplayOver() {
-        writableDatabase.execSQL(
-            "UPDATE $TABLE_PREFERENCES SET $KEY_ASK_FOR_DISPLAY_OVER = '${
-                encrypt(
-                    "false"
-                )
-            }';"
-        )
-    }
 
     /**
      * Gets preferences.
@@ -662,22 +556,6 @@ class SqliteDatabaseHandler @Inject constructor(
         return null
     }
 
-    override fun areNotificationsEnabled(handle: String?): String? {
-        val selectQuery =
-            "SELECT * FROM $TABLE_CHAT_ITEMS WHERE $KEY_CHAT_HANDLE = '${encrypt(handle)}'"
-        var result: String? = Constants.NOTIFICATIONS_ENABLED
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    result = decrypt(cursor.getString(2))
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-        return result
-    }
-
     /**
      * Extracts a completed transfer of a row.
      *
@@ -987,12 +865,6 @@ class SqliteDatabaseHandler @Inject constructor(
             Timber.e(e, "Exception opening or managing DB cursor")
         }
         return null
-    }
-
-    override fun setContactNickname(nickname: String?, handle: Long) {
-        applicationScope.launch {
-            megaLocalRoomGateway.updateContactNicknameByHandle(handle, nickname)
-        }
     }
 
     override fun findContactByHandle(handleParam: Long): Contact? =
@@ -1309,65 +1181,6 @@ class SqliteDatabaseHandler @Inject constructor(
         }
     }
 
-    override fun setCamSyncWifi(wifi: Boolean) {
-        val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_PREFERENCES_TABLE =
-                        "UPDATE $TABLE_PREFERENCES SET $KEY_CAM_SYNC_WIFI= '${encrypt(wifi.toString())}' WHERE $KEY_ID = '1'"
-                    writableDatabase.execSQL(UPDATE_PREFERENCES_TABLE)
-                } else {
-                    values.put(KEY_CAM_SYNC_WIFI, encrypt(wifi.toString()))
-                    writableDatabase.insert(TABLE_PREFERENCES, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
-    override fun setPreferredViewList(list: Boolean) {
-        val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_PREFERENCES_TABLE =
-                        "UPDATE $TABLE_PREFERENCES SET $KEY_PREFERRED_VIEW_LIST= '${encrypt(list.toString())}' WHERE $KEY_ID = '1'"
-                    writableDatabase.execSQL(UPDATE_PREFERENCES_TABLE)
-                } else {
-                    values.put(KEY_PREFERRED_VIEW_LIST, encrypt(list.toString()))
-                    writableDatabase.insert(TABLE_PREFERENCES, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
-    override fun setPreferredViewListCamera(list: Boolean) {
-        val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_PREFERENCES_TABLE =
-                        "UPDATE $TABLE_PREFERENCES SET $KEY_PREFERRED_VIEW_LIST_CAMERA= '${
-                            encrypt(list.toString())
-                        }' WHERE $KEY_ID = '1'"
-                    writableDatabase.execSQL(UPDATE_PREFERENCES_TABLE)
-                } else {
-                    values.put(KEY_PREFERRED_VIEW_LIST_CAMERA, encrypt(list.toString()))
-                    writableDatabase.insert(TABLE_PREFERENCES, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
     override fun setPreferredSortCloud(order: String?) {
         val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
         val values = ContentValues()
@@ -1411,27 +1224,6 @@ class SqliteDatabaseHandler @Inject constructor(
         }
     }
 
-    override fun setLastUploadFolder(folderPath: String) {
-        val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_PREFERENCES_TABLE =
-                        "UPDATE $TABLE_PREFERENCES SET $KEY_LAST_UPLOAD_FOLDER= '${
-                            encrypt(folderPath)
-                        }' WHERE $KEY_ID = '1'"
-                    writableDatabase.execSQL(UPDATE_PREFERENCES_TABLE)
-                } else {
-                    values.put(KEY_LAST_UPLOAD_FOLDER, encrypt(folderPath))
-                    writableDatabase.insert(TABLE_PREFERENCES, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
     override fun setLastCloudFolder(folderHandle: String) {
         val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
         val values = ContentValues()
@@ -1456,134 +1248,6 @@ class SqliteDatabaseHandler @Inject constructor(
             Timber.e(e, "Exception opening or managing DB cursor")
         }
     }
-
-    override fun setKeepFileNames(charging: Boolean) {
-        val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_PREFERENCES_TABLE =
-                        "UPDATE $TABLE_PREFERENCES SET $KEY_KEEP_FILE_NAMES= '${encrypt(charging.toString())}' WHERE $KEY_ID = '1'"
-                    writableDatabase.execSQL(UPDATE_PREFERENCES_TABLE)
-                } else {
-                    values.put(KEY_KEEP_FILE_NAMES, encrypt(charging.toString()))
-                    writableDatabase.insert(TABLE_PREFERENCES, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
-    override fun setCamSyncEnabled(enabled: Boolean) {
-        Timber.d("setCamSyncEnabled: %s", enabled)
-        val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_PREFERENCES_TABLE =
-                        "UPDATE $TABLE_PREFERENCES SET $KEY_CAM_SYNC_ENABLED= '${encrypt(enabled.toString())}' WHERE $KEY_ID = '1'"
-                    writableDatabase.execSQL(UPDATE_PREFERENCES_TABLE)
-                } else {
-                    values.put(KEY_CAM_SYNC_ENABLED, encrypt(enabled.toString()))
-                    writableDatabase.insert(TABLE_PREFERENCES, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
-    override fun setSecondaryUploadEnabled(enabled: Boolean) {
-        Timber.d("setSecondaryUploadEnabled: %s", enabled)
-        val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_PREFERENCES_TABLE =
-                        "UPDATE $TABLE_PREFERENCES SET $KEY_SEC_FOLDER_ENABLED= '${encrypt(enabled.toString())}' WHERE $KEY_ID = '1'"
-                    writableDatabase.execSQL(UPDATE_PREFERENCES_TABLE)
-                } else {
-                    values.put(KEY_SEC_FOLDER_ENABLED, encrypt(enabled.toString()))
-                    writableDatabase.insert(TABLE_PREFERENCES, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
-    override fun setCamSyncHandle(handle: Long) {
-        val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_PREFERENCES_TABLE =
-                        "UPDATE $TABLE_PREFERENCES SET $KEY_CAM_SYNC_HANDLE= '${encrypt(handle.toString())}' WHERE $KEY_ID = '1'"
-                    writableDatabase.execSQL(UPDATE_PREFERENCES_TABLE)
-                } else {
-                    values.put(KEY_CAM_SYNC_HANDLE, encrypt(handle.toString()))
-                    writableDatabase.insert(TABLE_PREFERENCES, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-                Timber.d("Set new primary handle: %s", handle)
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
-    override fun setSecondaryFolderHandle(handle: Long) {
-        Timber.d("setSecondaryFolderHandle: %s", handle)
-        val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_PREFERENCES_TABLE =
-                        "UPDATE $TABLE_PREFERENCES SET $KEY_SEC_FOLDER_HANDLE= '${encrypt(handle.toString())}' WHERE $KEY_ID = '1'"
-                    writableDatabase.execSQL(UPDATE_PREFERENCES_TABLE)
-                } else {
-                    values.put(KEY_SEC_FOLDER_HANDLE, encrypt(handle.toString()))
-                    writableDatabase.insert(TABLE_PREFERENCES, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-                Timber.d("Set new secondary handle: %s", handle)
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
-    override var passcodeLockType: String?
-        get() = getStringValue(TABLE_PREFERENCES, KEY_PASSCODE_LOCK_TYPE, "")
-        set(passcodeLockType) {
-            Timber.d("setPasscodeLockType")
-            val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
-            val values = ContentValues()
-            try {
-                readableDatabase.query(selectQuery).use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val UPDATE_PREFERENCES_TABLE =
-                            "UPDATE $TABLE_PREFERENCES SET $KEY_PASSCODE_LOCK_TYPE= '${
-                                encrypt(passcodeLockType)
-                            }' WHERE $KEY_ID = '1'"
-                        writableDatabase.execSQL(UPDATE_PREFERENCES_TABLE)
-                    } else {
-                        values.put(KEY_PASSCODE_LOCK_TYPE, encrypt(passcodeLockType))
-                        writableDatabase.insert(
-                            TABLE_PREFERENCES,
-                            SQLiteDatabase.CONFLICT_NONE,
-                            values
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "Exception opening or managing DB cursor")
-            }
-        }
 
     override fun setAccountDetailsTimeStamp() {
         setAccountDetailsTimeStamp(System.currentTimeMillis() / 1000)
@@ -1862,30 +1526,7 @@ class SqliteDatabaseHandler @Inject constructor(
                 Timber.e(e, "Exception opening or managing DB cursor")
             }
         }
-    /**
-     * Gets the time required before ask for the passcode.
-     *
-     * @return The time required before ask for the passcode.
-     */
-    /**
-     * Sets the time required before ask for the passcode.
-     *
-     * @param requiredTime The time required before ask for the passcode.
-     */
-    override var passcodeRequiredTime: Int
-        get() = getStringValue(
-            TABLE_PREFERENCES,
-            KEY_PASSCODE_LOCK_REQUIRE_TIME,
-            Constants.REQUIRE_PASSCODE_INVALID.toString()
-        )?.toIntOrNull()
-            ?: Constants.REQUIRE_PASSCODE_INVALID
-        set(requiredTime) {
-            setStringValue(
-                TABLE_PREFERENCES,
-                KEY_PASSCODE_LOCK_REQUIRE_TIME,
-                requiredTime.toString()
-            )
-        }
+
     /**
      * Checks if the fingerprint lock setting is enabled.
      *
@@ -1984,28 +1625,6 @@ class SqliteDatabaseHandler @Inject constructor(
                     Timber.d("UPDATE_ATTRIBUTES_TABLE : %s", UPDATE_ATTRIBUTES_TABLE)
                 } else {
                     values.put(KEY_ATTR_ASK_NOAPP_DOWNLOAD, encrypt(askNoAppDownload))
-                    writableDatabase.insert(TABLE_ATTRIBUTES, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
-    override fun setAttrAttempts(attempt: Int) {
-        val selectQuery = "SELECT * FROM $TABLE_ATTRIBUTES"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_ATTRIBUTES_TABLE =
-                        "UPDATE $TABLE_ATTRIBUTES SET $KEY_ATTR_INTENTS='${
-                            encrypt(attempt.toString())
-                        }' WHERE $KEY_ID ='1'"
-                    writableDatabase.execSQL(UPDATE_ATTRIBUTES_TABLE)
-                    Timber.d("UPDATE_ATTRIBUTES_TABLE : %s", UPDATE_ATTRIBUTES_TABLE)
-                } else {
-                    values.put(KEY_ATTR_INTENTS, encrypt(attempt.toString()))
                     writableDatabase.insert(TABLE_ATTRIBUTES, SQLiteDatabase.CONFLICT_NONE, values)
                 }
             }
@@ -2175,32 +1794,7 @@ class SqliteDatabaseHandler @Inject constructor(
             Timber.i("Setting the last public handle type in the DB")
             setIntValue(TABLE_ATTRIBUTES, KEY_LAST_PUBLIC_HANDLE_TYPE, lastPublicHandleType)
         }
-    /**
-     * Get the storage state value from the database.
-     *
-     * @return Storage state value.
-     */
-    /**
-     * Set the storage state value into the database.
-     *
-     * @param storageState Storage state value.
-     */
-    override var storageState: StorageState
-        get() {
-            Timber.i("Getting the storage state from DB")
-            return storageStateMapper(
-                getIntValue(
-                    tableName = TABLE_ATTRIBUTES,
-                    columnName = KEY_STORAGE_STATE,
-                    defaultValue = storageStateIntMapper(StorageState.Unknown),
-                )
-            )
 
-        }
-        set(storageState) {
-            Timber.i("Setting the storage state in the DB")
-            setIntValue(TABLE_ATTRIBUTES, KEY_STORAGE_STATE, storageStateIntMapper(storageState))
-        }
     /**
      * Get the handle of "My chat files" folder from the database.
      *
@@ -2292,7 +1886,6 @@ class SqliteDatabaseHandler @Inject constructor(
     override fun clearCredentials() {
         Timber.w("Clear local credentials!")
         writableDatabase.execSQL("DROP TABLE IF EXISTS $TABLE_CREDENTIALS")
-        legacyDatabaseMigration.onCreate(writableDatabase)
     }
 
     override fun clearEphemeral() {
@@ -2354,16 +1947,6 @@ class SqliteDatabaseHandler @Inject constructor(
 
     override fun clearOffline() {
         writableDatabase.execSQL("DELETE TABLE IF EXISTS $TABLE_OFFLINE")
-    }
-
-    /**
-     * Adds a pending message from File Explorer.
-     *
-     * @param message Pending message to add.
-     * @return The identifier of the pending message.
-     */
-    override fun addPendingMessageFromFileExplorer(message: PendingMessage): Long {
-        return addPendingMessage(message, PendingMessageState.PREPARING_FROM_EXPLORER.value)
     }
 
     /**
@@ -2659,26 +2242,6 @@ class SqliteDatabaseHandler @Inject constructor(
                     writableDatabase.execSQL(UPDATE_ATTRIBUTES_TABLE)
                 } else {
                     values.put(KEY_AUTO_PLAY, encrypt(enabled))
-                    writableDatabase.insert(TABLE_PREFERENCES, SQLiteDatabase.CONFLICT_NONE, values)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception opening or managing DB cursor")
-        }
-    }
-
-    override fun setShowInviteBanner(show: String) {
-        Timber.d("setCloseInviteBanner")
-        val selectQuery = "SELECT * FROM $TABLE_PREFERENCES"
-        val values = ContentValues()
-        try {
-            readableDatabase.query(selectQuery).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val UPDATE_ATTRIBUTES_TABLE =
-                        "UPDATE $TABLE_PREFERENCES SET $KEY_SHOW_INVITE_BANNER='${encrypt(show)}' WHERE $KEY_ID ='1'"
-                    writableDatabase.execSQL(UPDATE_ATTRIBUTES_TABLE)
-                } else {
-                    values.put(KEY_SHOW_INVITE_BANNER, encrypt(show))
                     writableDatabase.insert(TABLE_PREFERENCES, SQLiteDatabase.CONFLICT_NONE, values)
                 }
             }

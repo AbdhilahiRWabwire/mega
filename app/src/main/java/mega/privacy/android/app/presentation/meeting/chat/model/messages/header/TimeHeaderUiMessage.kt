@@ -1,10 +1,11 @@
 package mega.privacy.android.app.presentation.meeting.chat.model.messages.header
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavHostController
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.UIMessageState
 import mega.privacy.android.app.presentation.meeting.chat.view.message.TimeHeader
 import mega.privacy.android.app.utils.TimeUtils
-import mega.privacy.android.core.ui.controls.chat.messages.reaction.model.UIReaction
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.reaction.model.UIReaction
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 
 /**
@@ -29,6 +30,7 @@ class TimeHeaderUiMessage(
         onForwardClicked: (TypedMessage) -> Unit,
         onSelectedChanged: (Boolean) -> Unit,
         onNotSentClick: (TypedMessage) -> Unit,
+        navHostController: NavHostController,
     ) {
         TimeHeader(
             timeString = TimeUtils.formatTime(timeSent),

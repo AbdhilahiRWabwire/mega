@@ -69,21 +69,21 @@ import mega.privacy.android.app.presentation.login.model.LoginError
 import mega.privacy.android.app.presentation.login.model.LoginState
 import mega.privacy.android.app.presentation.login.model.MultiFactorAuthState
 import mega.privacy.android.app.presentation.twofactorauthentication.view.TwoFactorAuthenticationField
-import mega.privacy.android.core.ui.controls.buttons.RaisedDefaultMegaButton
-import mega.privacy.android.core.ui.controls.buttons.TextMegaButton
-import mega.privacy.android.core.ui.controls.progressindicator.MegaCircularProgressIndicator
-import mega.privacy.android.core.ui.controls.progressindicator.MegaLinearProgressIndicator
-import mega.privacy.android.core.ui.controls.textfields.LabelTextField
-import mega.privacy.android.core.ui.controls.textfields.PasswordTextField
-import mega.privacy.android.core.ui.theme.extensions.red_600_white_alpha_087
-import mega.privacy.android.core.ui.theme.extensions.textColorPrimary
-import mega.privacy.android.core.ui.theme.extensions.textColorSecondary
+import mega.privacy.android.shared.original.core.ui.controls.buttons.RaisedDefaultMegaButton
+import mega.privacy.android.shared.original.core.ui.controls.buttons.TextMegaButton
+import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaCircularProgressIndicator
+import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaLinearProgressIndicator
+import mega.privacy.android.shared.original.core.ui.controls.textfields.LabelTextField
+import mega.privacy.android.shared.original.core.ui.controls.textfields.PasswordTextField
+import mega.privacy.android.shared.original.core.ui.theme.extensions.red_600_white_alpha_087
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorPrimary
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorSecondary
 import mega.privacy.android.domain.entity.Progress
 import mega.privacy.android.domain.entity.account.AccountSession
 import mega.privacy.android.domain.entity.login.FetchNodesTemporaryError
 import mega.privacy.android.domain.entity.login.FetchNodesUpdate
 import mega.privacy.android.legacy.core.ui.controls.appbar.SimpleTopAppBar
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * Login fragment view.
@@ -558,7 +558,7 @@ private fun TwoFactorAuthentication(
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, name = "DarkPreviewEmptyLoginView")
 @Composable
 private fun PreviewEmptyLoginView() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         var state by remember { mutableStateOf(LoginState(isLoginRequired = true)) }
 
         RequireLogin(
@@ -585,7 +585,7 @@ private fun PreviewEmptyLoginView() {
 private fun PreviewLoginView(
     @PreviewParameter(LoginStateProvider::class) state: LoginState,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         LoginView(
             state = state,
             onEmailChanged = {},

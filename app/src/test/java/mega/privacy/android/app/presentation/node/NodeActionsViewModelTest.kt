@@ -7,24 +7,27 @@ import de.palm.composestateevents.StateEventWithContentConsumed
 import de.palm.composestateevents.StateEventWithContentTriggered
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.chat.mapper.ChatRequestMessageMapper
 import mega.privacy.android.app.presentation.meeting.chat.view.message.attachment.NodeContentUriIntentMapper
 import mega.privacy.android.app.presentation.movenode.mapper.MoveRequestMessageMapper
 import mega.privacy.android.app.presentation.snackbar.SnackBarHandler
 import mega.privacy.android.app.presentation.versions.mapper.VersionHistoryRemoveMessageMapper
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.AudioFileTypeInfo
 import mega.privacy.android.domain.entity.ImageFileTypeInfo
 import mega.privacy.android.domain.entity.PdfFileTypeInfo
 import mega.privacy.android.domain.entity.StaticImageFileTypeInfo
 import mega.privacy.android.domain.entity.TextFileTypeInfo
-import mega.privacy.android.domain.entity.UrlFileTypeInfo
 import mega.privacy.android.domain.entity.UnknownFileTypeInfo
+import mega.privacy.android.domain.entity.UrlFileTypeInfo
 import mega.privacy.android.domain.entity.VideoFileTypeInfo
 import mega.privacy.android.domain.entity.ZipFileTypeInfo
+import mega.privacy.android.domain.entity.account.AccountDetail
+import mega.privacy.android.domain.entity.account.AccountLevelDetail
 import mega.privacy.android.domain.entity.node.ChatRequestResult
 import mega.privacy.android.domain.entity.node.MoveRequestResult
 import mega.privacy.android.domain.entity.node.NodeContentUri
@@ -34,10 +37,11 @@ import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.exception.node.ForeignNodeException
 import mega.privacy.android.domain.usecase.GetPathFromNodeContentUseCase
+import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
+import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.account.SetCopyLatestTargetPathUseCase
 import mega.privacy.android.domain.usecase.account.SetMoveLatestTargetPathUseCase
 import mega.privacy.android.domain.usecase.chat.AttachMultipleNodesUseCase
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.filenode.DeleteNodeVersionsUseCase
 import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodesUseCase
@@ -85,9 +89,10 @@ class NodeActionsViewModelTest {
     private val listToStringWithDelimitersMapper: ListToStringWithDelimitersMapper = mock()
     private val nodeContentUriIntentMapper: NodeContentUriIntentMapper = mock()
     private val getNodeContentUriUseCase: GetNodeContentUriUseCase = mock()
-    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase = mock()
     private val getPathFromNodeContentUseCase: GetPathFromNodeContentUseCase = mock()
     private val getNodePreviewFileUseCase: GetNodePreviewFileUseCase = mock()
+    private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase = mock()
+    private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase = mock()
     private val sampleNode = mock<TypedFileNode>().stub {
         on { id } doReturn NodeId(123)
     }
@@ -110,10 +115,11 @@ class NodeActionsViewModelTest {
             listToStringWithDelimitersMapper = listToStringWithDelimitersMapper,
             getNodeContentUriUseCase = getNodeContentUriUseCase,
             nodeContentUriIntentMapper = nodeContentUriIntentMapper,
-            getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             getPathFromNodeContentUseCase = getPathFromNodeContentUseCase,
             getNodePreviewFileUseCase = getNodePreviewFileUseCase,
-            applicationScope = applicationScope
+            applicationScope = applicationScope,
+            updateNodeSensitiveUseCase = updateNodeSensitiveUseCase,
+            monitorAccountDetailUseCase = monitorAccountDetailUseCase,
         )
     }
 
@@ -276,13 +282,11 @@ class NodeActionsViewModelTest {
 
                 is TextFileTypeInfo -> {
                     verifyNoMoreInteractions(getNodeContentUriUseCase)
-                    verifyNoMoreInteractions(getFeatureFlagValueUseCase)
                 }
 
                 is UrlFileTypeInfo -> {
                     verify(getNodeContentUriUseCase).invoke(node)
                     verify(getPathFromNodeContentUseCase).invoke(content)
-                    verifyNoMoreInteractions(getFeatureFlagValueUseCase)
                 }
 
                 is VideoFileTypeInfo,
@@ -290,16 +294,73 @@ class NodeActionsViewModelTest {
                 is AudioFileTypeInfo,
                 -> {
                     verify(getNodeContentUriUseCase).invoke(node)
-                    verifyNoMoreInteractions(getFeatureFlagValueUseCase)
                 }
 
                 else -> {
                     verify(getNodePreviewFileUseCase).invoke(node)
-                    verifyNoMoreInteractions(getFeatureFlagValueUseCase)
                 }
             }
             Truth.assertThat(actual).isInstanceOf(expected::class.java)
         }
+
+    @Test
+    fun `test that isOnboarding should return true when isPaid is true`() = runTest {
+        val accountType = mock<AccountType> {
+            on { isPaid } doReturn true
+        }
+        val accountLevelDetail = mock<AccountLevelDetail> {
+            on { this.accountType } doReturn accountType
+        }
+        val accountDetail = mock<AccountDetail> {
+            on { levelDetail } doReturn accountLevelDetail
+        }
+        whenever(monitorAccountDetailUseCase()) doReturn flowOf(accountDetail)
+        initViewModel()
+        val result = viewModel.isOnboarding()
+        Truth.assertThat(result).isTrue()
+    }
+
+    @Test
+    fun `test that isOnboarding should return false when accountType isPaid is false`() = runTest {
+        val accountType = mock<AccountType> {
+            on { isPaid } doReturn false
+        }
+        val accountLevelDetail = mock<AccountLevelDetail> {
+            on { this.accountType } doReturn accountType
+        }
+        val accountDetail = mock<AccountDetail> {
+            on { levelDetail } doReturn accountLevelDetail
+        }
+        whenever(monitorAccountDetailUseCase()) doReturn flowOf(accountDetail)
+        initViewModel()
+        val result = viewModel.isOnboarding()
+        Truth.assertThat(result).isFalse()
+    }
+
+    @Test
+    fun `test that isOnboarding should return false when accountType is null`() = runTest {
+        val accountLevelDetail = mock<AccountLevelDetail> {
+            on { accountType } doReturn null
+        }
+        val accountDetail = mock<AccountDetail> {
+            on { levelDetail } doReturn accountLevelDetail
+        }
+        whenever(monitorAccountDetailUseCase()) doReturn flowOf(accountDetail)
+        initViewModel()
+        val result = viewModel.isOnboarding()
+        Truth.assertThat(result).isFalse()
+    }
+
+    @Test
+    fun `test that isOnboarding should return false when levelDetail is null`() = runTest {
+        val accountDetail = mock<AccountDetail> {
+            on { levelDetail } doReturn null
+        }
+        whenever(monitorAccountDetailUseCase()) doReturn flowOf(accountDetail)
+        initViewModel()
+        val result = viewModel.isOnboarding()
+        Truth.assertThat(result).isFalse()
+    }
 
     private fun provideNodeType() = Stream.of(
         Arguments.of(

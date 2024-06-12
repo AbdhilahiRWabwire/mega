@@ -45,6 +45,7 @@ import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.WebViewActivity
 import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
+import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.session.SessionContainer
 import mega.privacy.android.app.components.transferWidget.TransfersWidgetView
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
@@ -66,11 +67,13 @@ import mega.privacy.android.app.presentation.imagepreview.fetcher.SharedItemsIma
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewFetcherSource
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewMenuSource
 import mega.privacy.android.app.presentation.manager.model.TransfersTab
+import mega.privacy.android.app.presentation.meeting.chat.extension.getInfo
 import mega.privacy.android.app.presentation.movenode.mapper.MoveRequestMessageMapper
 import mega.privacy.android.app.presentation.node.FileNodeContent
 import mega.privacy.android.app.presentation.node.NodeActionHandler
 import mega.privacy.android.app.presentation.node.NodeActionsViewModel
 import mega.privacy.android.app.presentation.pdfviewer.PdfViewerActivity
+import mega.privacy.android.app.presentation.qrcode.findActivity
 import mega.privacy.android.app.presentation.search.mapper.NodeSourceTypeToViewTypeMapper
 import mega.privacy.android.app.presentation.search.model.SearchFilter
 import mega.privacy.android.app.presentation.search.navigation.contactArraySeparator
@@ -85,8 +88,6 @@ import mega.privacy.android.app.presentation.transfers.starttransfer.view.StartT
 import mega.privacy.android.app.textEditor.TextEditorActivity
 import mega.privacy.android.app.textEditor.TextEditorViewModel
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.app.zippreview.ui.ZipBrowserActivity
-import mega.privacy.android.core.ui.controls.layouts.MegaScaffold
 import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.domain.entity.AudioFileTypeInfo
 import mega.privacy.android.domain.entity.ThemeMode
@@ -102,7 +103,9 @@ import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.search.SearchCategory
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.feature.sync.data.mapper.ListToStringWithDelimitersMapper
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.navigation.MegaNavigator
+import mega.privacy.android.shared.original.core.ui.controls.layouts.MegaScaffold
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.mobile.analytics.event.SearchAudioFilterPressedEvent
 import mega.privacy.mobile.analytics.event.SearchDocsFilterPressedEvent
 import mega.privacy.mobile.analytics.event.SearchImageFilterPressedEvent
@@ -146,6 +149,12 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
      */
     @Inject
     lateinit var listToStringWithDelimitersMapper: ListToStringWithDelimitersMapper
+
+    /**
+     * MegaNavigator
+     */
+    @Inject
+    lateinit var megaNavigator: MegaNavigator
 
     private val nameCollisionActivityContract =
         registerForActivityResult(NameCollisionActivityContract()) { result: String? ->
@@ -236,7 +245,7 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
             val navHostController = rememberNavController(bottomSheetNavigator)
             val coroutineScope = rememberCoroutineScope()
             SessionContainer {
-                MegaAppTheme(isDark = themeMode.isDarkMode()) {
+                OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                     MegaScaffold(
                         modifier = Modifier
                             .fillMaxSize()
@@ -371,10 +380,20 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
                     onConsumed = nodeActionsViewModel::clearAllConsumed,
                     action = viewModel::clearSelection
                 )
+                EventEffect(
+                    event = nodeActionState.infoToShowEvent,
+                    onConsumed = nodeActionsViewModel::onInfoToShowEventConsumed,
+                ) { info ->
+                    info?.let {
+                        info.getInfo(this@SearchActivity).let { text ->
+                            scaffoldState.snackbarHostState.showSnackbar(text)
+                        }
+                    } ?: findActivity()?.finish()
+                }
             }
         }
 
-        sortByHeaderViewModel.orderChangeEvent.observe(this) {
+        collectFlow(sortByHeaderViewModel.orderChangeState) {
             viewModel.onSortOrderChanged()
         }
     }
@@ -487,24 +506,19 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
         }
     }
 
-    private suspend fun openZipFile(
+    private fun openZipFile(
         localFile: File,
         fileNode: TypedFileNode,
     ) {
         Timber.d("The file is zip, open in-app.")
-        if (ZipBrowserActivity.zipFileFormatCheck(this, localFile.absolutePath)) {
-            startActivity(
-                Intent(this, ZipBrowserActivity::class.java).apply {
-                    putExtra(
-                        ZipBrowserActivity.EXTRA_PATH_ZIP, localFile.absolutePath
-                    )
-                    putExtra(
-                        ZipBrowserActivity.EXTRA_HANDLE_ZIP, fileNode.id.longValue
-                    )
-                }
-            )
-        } else {
-            snackbarHostState.showSnackbar(getString(R.string.message_zip_format_error))
+        megaNavigator.openZipBrowserActivity(
+            context = this,
+            zipFilePath = localFile.absolutePath,
+            nodeHandle = fileNode.id.longValue
+        ) {
+            lifecycleScope.launch {
+                snackbarHostState.showSnackbar(getString(R.string.message_zip_format_error))
+            }
         }
     }
 
@@ -591,7 +605,6 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
             menuOptionsSource = menuOptionsSource,
             anchorImageNodeId = currentFileNode.id,
             params = mapOf(paramKey to currentFileNodeParentId),
-            showScreenLabel = false
         )
         startActivity(intent)
     }

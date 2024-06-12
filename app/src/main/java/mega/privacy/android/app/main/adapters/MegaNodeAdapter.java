@@ -11,7 +11,6 @@ import static mega.privacy.android.app.utils.Constants.LINKS_ADAPTER;
 import static mega.privacy.android.app.utils.Constants.MAX_WIDTH_CONTACT_NAME_LAND;
 import static mega.privacy.android.app.utils.Constants.MAX_WIDTH_CONTACT_NAME_PORT;
 import static mega.privacy.android.app.utils.Constants.OUTGOING_SHARES_ADAPTER;
-import static mega.privacy.android.app.utils.Constants.SEARCH_ADAPTER;
 import static mega.privacy.android.app.utils.ContactUtil.getContactNameDB;
 import static mega.privacy.android.app.utils.ContactUtil.getMegaUserNameDB;
 import static mega.privacy.android.app.utils.FileUtil.getLocalFile;
@@ -89,7 +88,6 @@ import mega.privacy.android.app.main.ManagerActivity;
 import mega.privacy.android.app.main.contactSharedFolder.ContactSharedFolderFragment;
 import mega.privacy.android.app.presentation.backups.BackupsFragment;
 import mega.privacy.android.app.presentation.bottomsheet.NodeOptionsBottomSheetDialogFragment;
-import mega.privacy.android.app.presentation.search.SearchFragment;
 import mega.privacy.android.app.utils.ColorUtils;
 import mega.privacy.android.app.utils.MegaNodeUtil;
 import mega.privacy.android.app.utils.NodeTakenDownDialogListener;
@@ -219,17 +217,17 @@ public class MegaNodeAdapter extends RecyclerView.Adapter<MegaNodeAdapter.ViewHo
         private void bind() {
             binding.setSortByHeaderViewModel(sortByViewModel);
 
-            SortOrder orderType = sortByViewModel.getOrder().getFirst();
+            SortOrder orderType = sortByViewModel.getOrder().getCloudSortOrder();
 
             // Root of incoming shares tab, display sort options OTHERS
             if (type == INCOMING_SHARES_ADAPTER
                     && ((ManagerActivity) context).getDeepBrowserTreeIncoming() == 0) {
-                orderType = sortByViewModel.getOrder().getSecond();
+                orderType = sortByViewModel.getOrder().getOthersSortOrder();
             }
             // Root of outgoing shares tab, display sort options OTHERS
             else if (type == OUTGOING_SHARES_ADAPTER
                     && ((ManagerActivity) context).getDeepBrowserTreeOutgoing() == 0) {
-                orderType = sortByViewModel.getOrder().getSecond();
+                orderType = sortByViewModel.getOrder().getOthersSortOrder();
             }
 
             binding.setOrderNameStringId(SortByHeaderViewModel.getOrderNameMap().get(orderType));
@@ -406,8 +404,6 @@ public class MegaNodeAdapter extends RecyclerView.Adapter<MegaNodeAdapter.ViewHo
                 ((ContactFileListFragment) fragment).hideMultipleSelect();
             } else if (type == CONTACT_SHARED_FOLDER_ADAPTER) {
                 ((ContactSharedFolderFragment) fragment).hideMultipleSelect();
-            } else if (type == SEARCH_ADAPTER) {
-                ((SearchFragment) fragment).hideMultipleSelect();
             }
         }
     }
@@ -1302,8 +1298,6 @@ public class MegaNodeAdapter extends RecyclerView.Adapter<MegaNodeAdapter.ViewHo
             ((ContactFileListFragment) fragment).itemClick(currentPosition);
         } else if (type == CONTACT_SHARED_FOLDER_ADAPTER) {
             ((ContactSharedFolderFragment) fragment).itemClick(currentPosition);
-        } else if (type == SEARCH_ADAPTER) {
-            ((SearchFragment) fragment).itemClick(currentPosition);
         }
     }
 
@@ -1320,8 +1314,6 @@ public class MegaNodeAdapter extends RecyclerView.Adapter<MegaNodeAdapter.ViewHo
                 ((ContactFileListFragment) fragment).itemClick(currentPosition);
             } else if (type == CONTACT_SHARED_FOLDER_ADAPTER) {
                 ((ContactSharedFolderFragment) fragment).itemClick(currentPosition);
-            } else if (type == SEARCH_ADAPTER) {
-                ((SearchFragment) fragment).itemClick(currentPosition);
             }
         } else {
             if (type == CONTACT_FILE_ADAPTER) {
@@ -1353,9 +1345,6 @@ public class MegaNodeAdapter extends RecyclerView.Adapter<MegaNodeAdapter.ViewHo
         } else if (type == CONTACT_FILE_ADAPTER) {
             ((ContactFileListFragment) fragment).activateActionMode();
             ((ContactFileListFragment) fragment).itemClick(currentPosition);
-        } else if (type == SEARCH_ADAPTER) {
-            ((SearchFragment) fragment).activateActionMode();
-            ((SearchFragment) fragment).itemClick(currentPosition);
         }
 
         return true;

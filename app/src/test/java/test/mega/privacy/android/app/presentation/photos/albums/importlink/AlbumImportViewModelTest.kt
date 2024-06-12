@@ -9,10 +9,8 @@ import de.palm.composestateevents.StateEventWithContentTriggered
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.constants.StringsConstants.INVALID_CHARACTERS
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.mapper.GetStringFromStringResMapper
 import mega.privacy.android.app.presentation.photos.albums.AlbumScreenWrapperActivity.Companion.ALBUM_LINK
 import mega.privacy.android.app.presentation.photos.albums.importlink.AlbumImportViewModel
@@ -28,7 +26,6 @@ import mega.privacy.android.domain.entity.photos.Photo
 import mega.privacy.android.domain.usecase.GetUserAlbums
 import mega.privacy.android.domain.usecase.HasCredentialsUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.filelink.GetPublicNodeFromSerializedDataUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.photos.DownloadPublicAlbumPhotoPreviewUseCase
@@ -45,8 +42,6 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.verify
-import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 
 @ExperimentalCoroutinesApi
@@ -83,8 +78,6 @@ class AlbumImportViewModelTest {
 
     private val mockMonitorConnectivityUseCase: MonitorConnectivityUseCase = mock()
 
-    private val mockGetFeatureFlagValueUseCase: GetFeatureFlagValueUseCase = mock()
-
     private val mockGetPublicNodeFromSerializedDataUseCase: GetPublicNodeFromSerializedDataUseCase =
         mock()
 
@@ -108,7 +101,6 @@ class AlbumImportViewModelTest {
             isAlbumLinkValidUseCase = mockIsAlbumLinkValidUseCase,
             monitorConnectivityUseCase = mockMonitorConnectivityUseCase,
             defaultDispatcher = StandardTestDispatcher(),
-            getFeatureFlagValueUseCase = mockGetFeatureFlagValueUseCase,
             getPublicNodeFromSerializedDataUseCase = mockGetPublicNodeFromSerializedDataUseCase,
         )
     }
@@ -409,38 +401,15 @@ class AlbumImportViewModelTest {
     }
 
     @Test
-    fun `test that start download invokes legacy code when DownloadWorker feature flag is false`() =
-        runTest {
-            stubSelectedMegaNode()
-            whenever(mockGetFeatureFlagValueUseCase(AppFeatures.DownloadWorker)).thenReturn(false)
-            val legacyDownload = mock<(megaNodes: List<MegaNode>) -> Unit>()
-            underTest.startDownload(legacyDownload)
-            advanceUntilIdle()
-            verify(legacyDownload).invoke(any())
-        }
-
-    @Test
-    fun `test that start download does not invoke legacy code when DownloadWorker feature flag is true`() =
-        runTest {
-            stubSelectedMegaNode()
-            whenever(mockGetFeatureFlagValueUseCase(AppFeatures.DownloadWorker)).thenReturn(true)
-            val legacyDownload = mock<(megaNodes: List<MegaNode>) -> Unit>()
-            underTest.startDownload(legacyDownload)
-            advanceUntilIdle()
-            verifyNoInteractions(legacyDownload)
-        }
-
-    @Test
-    fun `test that start download triggers the correct download event when DownloadWorker feature flag is true`() =
+    fun `test that start download triggers the correct download event when start download is triggered`() =
         runTest {
             val megaNode = stubSelectedMegaNode()
             val node = mock<PublicLinkFile>()
-            whenever(mockGetFeatureFlagValueUseCase(AppFeatures.DownloadWorker)).thenReturn(true)
             whenever(mockGetPublicNodeFromSerializedDataUseCase(megaNode.serialize()))
                 .thenReturn(node)
             underTest.stateFlow.test {
                 awaitItem() //initial
-                underTest.startDownload(mock())
+                underTest.startDownload()
                 val actual = awaitItem().downloadEvent
                 assertThat(actual).isInstanceOf(StateEventWithContentTriggered::class.java)
                 val content = (actual as StateEventWithContentTriggered).content
@@ -456,7 +425,7 @@ class AlbumImportViewModelTest {
         runTest {
             stubSelectedTypedNode()
             underTest.stateFlow.test {
-                underTest.startDownload(mock())
+                underTest.startDownload()
                 assertThat(awaitItem().selectedPhotos).isNotEmpty()
                 underTest.clearSelection()
                 val actual =
@@ -471,7 +440,7 @@ class AlbumImportViewModelTest {
             stubSelectedTypedNode()
             underTest.stateFlow.test {
                 awaitItem() //initial
-                underTest.startDownload(mock())
+                underTest.startDownload()
                 assertThat(awaitItem().downloadEvent).isInstanceOf(StateEventWithContentTriggered::class.java)
                 awaitItem() //clear selection
                 underTest.consumeDownloadEvent()
@@ -482,7 +451,6 @@ class AlbumImportViewModelTest {
     private suspend fun stubSelectedTypedNode(): TypedNode {
         val megaNode = stubSelectedMegaNode()
         val node = mock<PublicLinkFile>()
-        whenever(mockGetFeatureFlagValueUseCase(AppFeatures.DownloadWorker)).thenReturn(true)
         whenever(mockGetPublicNodeFromSerializedDataUseCase(megaNode.serialize()))
             .thenReturn(node)
         return node

@@ -8,13 +8,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
-import mega.privacy.android.core.ui.controls.dividers.DividerType
-import mega.privacy.android.core.ui.controls.dividers.MegaDivider
-import mega.privacy.android.core.ui.controls.lists.GenericTwoLineListItem
-import mega.privacy.android.core.ui.preview.BooleanProvider
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.controls.dividers.DividerType
+import mega.privacy.android.shared.original.core.ui.controls.dividers.MegaDivider
+import mega.privacy.android.shared.original.core.ui.controls.lists.GenericTwoLineListItem
+import mega.privacy.android.shared.original.core.ui.preview.BooleanProvider
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.legacy.core.ui.controls.controlssliders.MegaSwitch
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * A [Composable] that displays a [MegaSwitch] to enable or disable the charging requirement for
@@ -33,6 +33,8 @@ internal fun UploadOnlyWhileChargingTile(
         GenericTwoLineListItem(
             modifier = Modifier.testTag(UPLOAD_ONLY_WHILE_CHARGING_TILE),
             title = stringResource(SharedR.string.settings_camera_uploads_upload_only_while_charging_option_name),
+            subtitle = stringResource(SharedR.string.settings_camera_uploads_upload_only_while_charging_option_body),
+            showEntireSubtitle = true,
             trailingIcons = {
                 MegaSwitch(
                     modifier = Modifier.testTag(UPLOAD_ONLY_WHILE_CHARGING_TILE_SWITCH),
@@ -58,7 +60,7 @@ internal fun UploadOnlyWhileChargingTile(
 private fun UploadOnlyWhileChargingTilePreview(
     @PreviewParameter(BooleanProvider::class) isChecked: Boolean,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         UploadOnlyWhileChargingTile(
             isChecked = isChecked,
             onCheckedChange = {},

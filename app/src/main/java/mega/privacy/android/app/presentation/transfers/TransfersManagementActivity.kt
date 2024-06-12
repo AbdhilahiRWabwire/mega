@@ -20,9 +20,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.jeremyliao.liveeventbus.LiveEventBus
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.UploadService
 import mega.privacy.android.app.activities.PasscodeActivity
@@ -47,7 +49,7 @@ import mega.privacy.android.domain.entity.transfer.TransferType
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.QuotaExceededMegaException
 import mega.privacy.android.domain.usecase.GetThemeMode
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -245,7 +247,7 @@ open class TransfersManagementActivity : PasscodeActivity() {
             val uiState by transfersManagementViewModel.state.collectAsStateWithLifecycle(
                 TransferManagementUiState()
             )
-            MegaAppTheme(isDark = themeMode.isDarkMode()) {
+            OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                 @OptIn(ExperimentalAnimationApi::class)
                 AnimatedVisibility(
                     visible = uiState.widgetVisible,
@@ -286,14 +288,15 @@ open class TransfersManagementActivity : PasscodeActivity() {
      * Defines the click action of the transfers widget.
      * Launches an Intent to navigate to In progress tab in Transfers section.
      */
-    protected fun openTransfersSection() {
-        if (megaApi.isLoggedIn == 0 || dbH.credentials == null) {
+    private fun openTransfersSection() = lifecycleScope.launch {
+        val credentials = runCatching { getAccountCredentialsUseCase() }.getOrNull()
+        if (megaApi.isLoggedIn == 0 || credentials == null) {
             Timber.w("Not logged in, no action.")
-            return
+            return@launch
         }
 
         startActivity(
-            Intent(this, ManagerActivity::class.java)
+            Intent(this@TransfersManagementActivity, ManagerActivity::class.java)
                 .setAction(ACTION_SHOW_TRANSFERS)
                 .putExtra(TRANSFERS_TAB, TransfersTab.PENDING_TAB)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)

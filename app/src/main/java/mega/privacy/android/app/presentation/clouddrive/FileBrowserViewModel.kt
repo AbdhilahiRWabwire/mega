@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import mega.privacy.android.app.extensions.updateItemAt
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.globalmanagement.TransfersManagement
 import mega.privacy.android.app.presentation.clouddrive.model.FileBrowserState
 import mega.privacy.android.app.presentation.data.NodeUIItem
@@ -49,7 +48,7 @@ import mega.privacy.android.domain.usecase.MonitorMediaDiscoveryView
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.account.MonitorRefreshSessionUseCase
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsHidingActionAllowedUseCase
 import mega.privacy.android.domain.usecase.filebrowser.GetFileBrowserNodeChildrenUseCase
 import mega.privacy.android.domain.usecase.folderlink.ContainsMediaItemUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
@@ -57,6 +56,7 @@ import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.quota.GetBandwidthOverQuotaDelayUseCase
+import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
 import mega.privacy.android.domain.usecase.viewtype.MonitorViewType
 import mega.privacy.android.domain.usecase.viewtype.SetViewType
 import nz.mega.sdk.MegaApiJava
@@ -102,11 +102,12 @@ class FileBrowserViewModel @Inject constructor(
     private val fileDurationMapper: FileDurationMapper,
     private val monitorOfflineNodeUpdatesUseCase: MonitorOfflineNodeUpdatesUseCase,
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
-    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val durationInSecondsTextMapper: DurationInSecondsTextMapper,
     private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase,
     private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
     private val isHiddenNodesOnboardedUseCase: IsHiddenNodesOnboardedUseCase,
+    private val isHidingActionAllowedUseCase: IsHidingActionAllowedUseCase,
+    private val monitorShowHiddenItemsUseCase: MonitorShowHiddenItemsUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(FileBrowserState())
@@ -121,6 +122,8 @@ class FileBrowserViewModel @Inject constructor(
      */
     private val handleStack = Stack<Long>()
 
+    private var showHiddenItems: Boolean = true
+
     init {
         refreshNodes()
         monitorMediaDiscovery()
@@ -130,6 +133,7 @@ class FileBrowserViewModel @Inject constructor(
         monitorNodeUpdates()
         monitorAccountDetail()
         monitorIsHiddenNodesOnboarded()
+        monitorShowHiddenItems()
     }
 
     private fun monitorConnectivity() {
@@ -346,7 +350,8 @@ class FileBrowserViewModel @Inject constructor(
 
         val childrenNodes = getFileBrowserNodeChildrenUseCase(fileBrowserHandle)
         val showMediaDiscoveryIcon = !isRootNode && containsMediaItemUseCase(childrenNodes)
-        val nodeUIItems = getNodeUiItems(childrenNodes)
+        val sourceNodeUIItems = getNodeUiItems(childrenNodes)
+        val nodeUIItems = filterNonSensitiveNodes(sourceNodeUIItems)
         val sortOrder = getCloudSortOrder()
         val isFileBrowserEmpty = isRootNode || (fileBrowserHandle == MegaApiJava.INVALID_HANDLE)
 
@@ -354,6 +359,7 @@ class FileBrowserViewModel @Inject constructor(
             it.copy(
                 showMediaDiscoveryIcon = showMediaDiscoveryIcon,
                 nodesList = nodeUIItems,
+                sourceNodesList = sourceNodeUIItems,
                 isLoading = false,
                 sortOrder = sortOrder,
                 isFileBrowserEmpty = isFileBrowserEmpty,
@@ -717,7 +723,7 @@ class FileBrowserViewModel @Inject constructor(
                 item = item,
                 selectedNodeHandle = state.value.selectedNodeHandles
             )
-            if (getFeatureFlagValueUseCase(AppFeatures.DownloadWorker) && optionsItemInfo.optionClickedType == OptionItems.DOWNLOAD_CLICKED) {
+            if (optionsItemInfo.optionClickedType == OptionItems.DOWNLOAD_CLICKED) {
                 _state.update {
                     it.copy(
                         downloadEvent = triggered(
@@ -800,9 +806,24 @@ class FileBrowserViewModel @Inject constructor(
     private fun monitorAccountDetail() {
         monitorAccountDetailUseCase()
             .onEach { accountDetail ->
-                _state.update {
-                    it.copy(accountType = accountDetail.levelDetail?.accountType)
-                }
+                _state.update { it.copy(accountType = accountDetail.levelDetail?.accountType) }
+                if (_state.value.isLoading) return@onEach
+
+                val nodes = filterNonSensitiveNodes(nodes = _state.value.sourceNodesList)
+                _state.update { it.copy(nodesList = nodes) }
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun monitorShowHiddenItems() {
+        monitorShowHiddenItemsUseCase()
+            .conflate()
+            .onEach { show ->
+                showHiddenItems = show
+                if (_state.value.isLoading) return@onEach
+
+                val nodes = filterNonSensitiveNodes(nodes = _state.value.sourceNodesList)
+                _state.update { it.copy(nodesList = nodes) }
             }
             .launchIn(viewModelScope)
     }
@@ -825,10 +846,27 @@ class FileBrowserViewModel @Inject constructor(
         }
     }
 
+    private fun filterNonSensitiveNodes(nodes: List<NodeUIItem<TypedNode>>): List<NodeUIItem<TypedNode>> {
+        val showHiddenItems = showHiddenItems
+        val accountType = _state.value.accountType ?: return nodes
+
+        return if (showHiddenItems || !accountType.isPaid) {
+            nodes
+        } else {
+            nodes.filter { !it.node.isMarkedSensitive && !it.node.isSensitiveInherited }
+        }
+    }
+
     /**
      * This method will handle the sort order change event
      */
     fun onCloudDriveSortOrderChanged() {
         setPendingRefreshNodes()
     }
+
+    /**
+     * Check if the current node can be hidden
+     */
+    suspend fun isHidingActionAllowed(nodeId: NodeId): Boolean =
+        isHidingActionAllowedUseCase(nodeId)
 }

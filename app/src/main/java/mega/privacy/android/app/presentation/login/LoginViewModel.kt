@@ -55,6 +55,7 @@ import mega.privacy.android.domain.exception.login.FetchNodesErrorAccess
 import mega.privacy.android.domain.exception.login.FetchNodesException
 import mega.privacy.android.domain.qualifier.LoginMutex
 import mega.privacy.android.domain.usecase.RootNodeExistsUseCase
+import mega.privacy.android.domain.usecase.account.ClearUserCredentialsUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountBlockedUseCase
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.camerauploads.HasCameraSyncEnabledUseCase
@@ -86,6 +87,7 @@ import mega.privacy.android.domain.usecase.transfers.CancelTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.OngoingTransfersExistUseCase
 import mega.privacy.android.domain.usecase.transfers.chatuploads.StartChatUploadsWorkerUseCase
 import mega.privacy.android.domain.usecase.transfers.downloads.StartDownloadWorkerUseCase
+import mega.privacy.android.domain.usecase.transfers.uploads.StartUploadsWorkerUseCase
 import mega.privacy.android.domain.usecase.workers.StopCameraUploadsUseCase
 import mega.privacy.mobile.analytics.event.AccountRegistrationEvent
 import timber.log.Timber
@@ -134,6 +136,8 @@ class LoginViewModel @Inject constructor(
     private val createSupportTicketEmailUseCase: CreateSupportTicketEmailUseCase,
     @LoginMutex private val loginMutex: Mutex,
     private val transfersManagement: TransfersManagement,
+    private val clearUserCredentialsUseCase: ClearUserCredentialsUseCase,
+    private val startUploadsWorkerUseCase: StartUploadsWorkerUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LoginState())
@@ -207,6 +211,11 @@ class LoginViewModel @Inject constructor(
                 flowOf(getFeatureFlagValueUseCase(AppFeatures.LoginReportIssueButton)).map { enabled ->
                     { state: LoginState ->
                         state.copy(enabledFlags = if (enabled) state.enabledFlags + AppFeatures.LoginReportIssueButton else state.enabledFlags - AppFeatures.LoginReportIssueButton)
+                    }
+                },
+                flowOf(getFeatureFlagValueUseCase(AppFeatures.NewConfirmEmailFragment)).map { enabled ->
+                    { state: LoginState ->
+                        state.copy(enabledFlags = if (enabled) state.enabledFlags + AppFeatures.NewConfirmEmailFragment else state.enabledFlags - AppFeatures.NewConfirmEmailFragment)
                     }
                 },
             ).collect {
@@ -745,13 +754,12 @@ class LoginViewModel @Inject constructor(
                         )
                     }
 
-                    if (getFeatureFlagValueUseCase(AppFeatures.DownloadWorker)) {
-                        /*In case the app crash or restarts, we need to restart the worker
-                        in order to monitor current transfers and update the related notification.*/
-                        startDownloadWorkerUseCase()
-                    }
-                    if (getFeatureFlagValueUseCase(AppFeatures.NewChatActivity)) {
-                        startChatUploadsWorkerUseCase()
+                    /*In case the app crash or restarts, we need to restart the worker
+                    in order to monitor current transfers and update the related notification.*/
+                    startDownloadWorkerUseCase()
+                    startChatUploadsWorkerUseCase()
+                    if (getFeatureFlagValueUseCase(AppFeatures.UploadWorker)) {
+                        startUploadsWorkerUseCase()
                     }
                     //Login check resumed pending transfers
                     transfersManagement.checkResumedPendingTransfers()
@@ -901,6 +909,10 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Clear ephemeral
+     *
+     */
     fun clearEphemeral() {
         viewModelScope.launch {
             runCatching { clearEphemeralCredentialsUseCase() }
@@ -943,13 +955,34 @@ class LoginViewModel @Inject constructor(
     /**
      * On report issue
      */
-    fun onReportIssue(title: String, sendEmail: (SupportEmailTicket) -> Unit) {
+    fun onReportIssue(
+        title: String,
+        sendEmail: (SupportEmailTicket) -> Unit,
+        openReportIssueFragment: () -> Unit,
+    ) {
         viewModelScope.launch {
-            val ticket =
-                createSupportTicketEmailUseCase(title)
-            sendEmail(ticket)
+            if (getFeatureFlagValueUseCase(AppFeatures.ReportIssueViaEmail)) {
+                openReportIssueFragment()
+            } else {
+                val ticket =
+                    createSupportTicketEmailUseCase(title)
+                sendEmail(ticket)
+            }
         }
     }
+
+    /**
+     * Clear user credentials
+     *
+     */
+    fun clearUserCredentials() {
+        viewModelScope.launch {
+            clearUserCredentialsUseCase()
+        }
+    }
+
+    internal suspend fun isNewTourFragmentEnabled() =
+        getFeatureFlagValueUseCase(AppFeatures.NewTourFragment)
 
     companion object {
         /**

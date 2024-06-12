@@ -11,9 +11,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavHostController
 import mega.privacy.android.app.presentation.meeting.chat.view.message.normal.ChatMessageTextViewModel
-import mega.privacy.android.core.ui.controls.chat.messages.ChatBubble
-import mega.privacy.android.core.ui.controls.chat.messages.MessageText
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.ChatBubble
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.MessageText
 import mega.privacy.android.domain.entity.chat.messages.normal.TextLinkMessage
 
 /**
@@ -29,6 +30,7 @@ fun ChatLinksMessageView(
     contentLinks: List<LinkContent>,
     linkViews: @Composable () -> Unit,
     interactionEnabled: Boolean,
+    navHostController: NavHostController,
     modifier: Modifier = Modifier,
     onLongClick: () -> Unit = {},
     viewModel: ChatMessageTextViewModel = hiltViewModel(),
@@ -56,7 +58,7 @@ fun ChatLinksMessageView(
                             if (contentLink == null) {
                                 link
                             } else {
-                                contentLink.onClick(context)
+                                contentLink.onClick(context, navHostController)
                                 null
                             }
                         }

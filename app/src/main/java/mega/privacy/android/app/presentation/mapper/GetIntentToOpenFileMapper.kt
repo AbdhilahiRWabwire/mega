@@ -41,10 +41,10 @@ import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.qualifier.IoDispatcher
+import mega.privacy.android.domain.usecase.AddNodeType
 import mega.privacy.android.domain.usecase.GetCloudSortOrder
 import mega.privacy.android.domain.usecase.GetFileUrlByNodeHandleUseCase
 import mega.privacy.android.domain.usecase.GetLocalFileForNodeUseCase
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunningUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerSetMaxBufferSizeUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
@@ -77,8 +77,8 @@ class GetIntentToOpenFileMapper @Inject constructor(
     private val httpServerIsRunning: MegaApiHttpServerIsRunningUseCase,
     private val httpServerSetMaxBufferSize: MegaApiHttpServerSetMaxBufferSizeUseCase,
     private val getNodeByHandle: GetNodeByHandle,
+    private val addNodeType: AddNodeType,
     private val getCloudSortOrder: GetCloudSortOrder,
-    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
 
@@ -253,7 +253,6 @@ class GetIntentToOpenFileMapper @Inject constructor(
                     imageSource = ImagePreviewFetcherSource.CLOUD_DRIVE,
                     menuOptionsSource = ImagePreviewMenuSource.CLOUD_DRIVE,
                     anchorImageNodeId = fileNode.id,
-                    showScreenLabel = false,
                     params = mapOf(CloudDriveImageNodeFetcher.PARENT_ID to parentNodeHandle),
                 )
             } else if (viewType == INCOMING_SHARES_ADAPTER || viewType == OUTGOING_SHARES_ADAPTER) {
@@ -264,7 +263,6 @@ class GetIntentToOpenFileMapper @Inject constructor(
                     menuOptionsSource = ImagePreviewMenuSource.SHARED_ITEMS,
                     anchorImageNodeId = fileNode.id,
                     params = mapOf(SharedItemsImageNodeFetcher.PARENT_ID to parentNodeHandle),
-                    showScreenLabel = false,
                 )
             } else if (viewType == LINKS_ADAPTER) {
                 val parentNodeHandle = fileNode.parentId.longValue
@@ -274,7 +272,6 @@ class GetIntentToOpenFileMapper @Inject constructor(
                     menuOptionsSource = ImagePreviewMenuSource.LINKS,
                     anchorImageNodeId = fileNode.id,
                     params = mapOf(SharedItemsImageNodeFetcher.PARENT_ID to parentNodeHandle),
-                    showScreenLabel = false,
                 )
             } else if (viewType == RUBBISH_BIN_ADAPTER) {
                 ImagePreviewActivity.createIntent(
@@ -282,7 +279,6 @@ class GetIntentToOpenFileMapper @Inject constructor(
                     imageSource = ImagePreviewFetcherSource.RUBBISH_BIN,
                     menuOptionsSource = ImagePreviewMenuSource.RUBBISH_BIN,
                     anchorImageNodeId = fileNode.id,
-                    showScreenLabel = false,
                     params = mapOf(RubbishBinImageNodeFetcher.PARENT_ID to fileNode.parentId.longValue),
                 )
             } else {
@@ -294,10 +290,10 @@ class GetIntentToOpenFileMapper @Inject constructor(
                 )
             }
         } else {
-            getNodeByHandle(fileNode.id.longValue)?.let { node ->
-                if (viewType == Constants.FOLDER_LINK_ADAPTER) {
-                    (activity as FolderLinkComposeActivity).downloadNodes(listOf(node))
-                } else {
+            if (viewType == Constants.FOLDER_LINK_ADAPTER) {
+                (activity as FolderLinkComposeActivity).downloadNodes(listOf(addNodeType(fileNode)))
+            } else {
+                getNodeByHandle(fileNode.id.longValue)?.let { node ->
                     MegaNodeUtil.onNodeTapped(
                         activity,
                         node,

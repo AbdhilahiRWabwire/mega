@@ -576,7 +576,7 @@ class ImageViewerActivity : BaseActivity(), PermissionRequester, SnackbarShower 
     }
 
     private fun setupAttachers(savedInstanceState: Bundle?) {
-        dragToExit = DragToExitSupport(this, { activate ->
+        dragToExit = DragToExitSupport(this, lifecycleScope, { activate ->
             if (activate) {
                 dragStarted = true
                 binding.imagesNavHostFragment.setBackgroundResource(android.R.color.transparent)
@@ -697,7 +697,11 @@ class ImageViewerActivity : BaseActivity(), PermissionRequester, SnackbarShower 
                     imageItem.nodeItem?.node != null -> {
                         trackOnShareClicked()
                         viewModel.exportNode(imageItem.nodeItem!!.node!!).observe(this) { link ->
-                            if (!link.isNullOrBlank()) MegaNodeUtil.shareLink(this, link, imageItem.name)
+                            if (!link.isNullOrBlank()) MegaNodeUtil.shareLink(
+                                this,
+                                link,
+                                imageItem.name
+                            )
                         }
                     }
 
@@ -741,28 +745,11 @@ class ImageViewerActivity : BaseActivity(), PermissionRequester, SnackbarShower 
 
 
     fun saveNode(node: MegaNode) {
-        lifecycleScope.launch {
-            if (startDownloadViewModel.shouldDownloadWithDownloadWorker()) {
-                if (node.isForeign) {
-                    startDownloadViewModel.onDownloadClicked(node.serialize())
-                } else {
-                    startDownloadViewModel.onDownloadClicked(NodeId(node.handle))
-                }
-            } else {
-                legacyDownload(node)
-            }
+        if (node.isForeign) {
+            startDownloadViewModel.onDownloadClicked(node.serialize())
+        } else {
+            startDownloadViewModel.onDownloadClicked(NodeId(node.handle))
         }
-    }
-
-    private fun legacyDownload(node: MegaNode) {
-        PermissionUtils.checkNotificationsPermission(this)
-        nodeSaver?.saveNode(
-            node,
-            highPriority = false,
-            isFolderLink = node.isForeign,
-            fromMediaViewer = true,
-            needSerialize = true
-        )
     }
 
     fun saveOfflineNode(nodeHandle: Long) {

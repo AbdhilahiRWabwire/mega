@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.manager.model
 
+import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
 import mega.privacy.android.domain.entity.chat.ChatLinkContent
 import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.MoveRequestResult
@@ -25,16 +26,17 @@ import mega.privacy.android.domain.entity.node.RestoreNodeResult
  * @property nodeNameCollisionResult
  * @property moveRequestResult
  * @property message
- * @property chatLinkContent                        Result of check link request
- * @property androidSyncServiceEnabled              Indicates if need to enable android sync service
- * @property userRootBackupsFolderHandle            The User's Root Backups Folder Handle
- * @property callInProgressChatId                   Chat ID of the current call in progress.
- * @property deviceCenterPreviousBottomNavigationItem  A potentially nullable Integer that holds the
+ * @property chatLinkContent                            Result of check link request
+ * @property androidSyncServiceEnabled                  Indicates if need to enable android sync service
+ * @property userRootBackupsFolderHandle                The User's Root Backups Folder Handle
+ * @property callInProgressChatId                       Chat ID of the current call in progress.
+ * @property deviceCenterPreviousBottomNavigationItem   A potentially nullable Integer that holds the previous Bottom Navigation item before accessing Device Center
  * @property callEndedDueToFreePlanLimits               State event to show the force free plan limit participants dialog.
  * @property shouldUpgradeToProPlan                     State to show the upgrade to Pro plan dialog.
  * @property isCallUnlimitedProPlanFeatureFlagEnabled   True, if Call Unlimited Pro Plan feature flag enabled. False, otherwise.
- * @property usersCallLimitReminders   [UsersCallLimitReminders]
- * previous Bottom Navigation item before accessing Device Center
+ * @property usersCallLimitReminders                    [UsersCallLimitReminders]
+ * @property searchQuery                                Search query
+ * @property isSyncFeatureFlagEnabled                   True if Android Sync feature flag is enabled. False otherwise.
  */
 data class ManagerState(
     val isFirstNavigationLevel: Boolean = true,
@@ -50,7 +52,7 @@ data class ManagerState(
     val restoreNodeResult: Result<RestoreNodeResult>? = null,
     val nodeNameCollisionResult: NodeNameCollisionResult? = null,
     val moveRequestResult: Result<MoveRequestResult>? = null,
-    val message: String? = null,
+    val message: InfoToShow? = null,
     val chatLinkContent: Result<ChatLinkContent>? = null,
     val androidSyncServiceEnabled: Boolean = false,
     val userRootBackupsFolderHandle: NodeId = NodeId(-1L),
@@ -59,5 +61,7 @@ data class ManagerState(
     val callEndedDueToFreePlanLimits: Boolean = false,
     val shouldUpgradeToProPlan: Boolean = false,
     val isCallUnlimitedProPlanFeatureFlagEnabled: Boolean = false,
-    val usersCallLimitReminders: UsersCallLimitReminders = UsersCallLimitReminders.Enabled
+    val usersCallLimitReminders: UsersCallLimitReminders = UsersCallLimitReminders.Enabled,
+    val searchQuery: String = "",
+    val isSyncFeatureFlagEnabled: Boolean = false,
 )

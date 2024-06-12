@@ -7,10 +7,12 @@ import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineDispatcher
-import mega.privacy.android.data.mapper.transfer.DownloadNotificationMapper
+import kotlinx.coroutines.flow.Flow
 import mega.privacy.android.data.mapper.transfer.OverQuotaNotificationBuilder
 import mega.privacy.android.data.mapper.transfer.TransfersFinishedNotificationMapper
+import mega.privacy.android.data.mapper.transfer.TransfersNotificationMapper
 import mega.privacy.android.domain.entity.transfer.ActiveTransferTotals
+import mega.privacy.android.domain.entity.transfer.MonitorOngoingActiveTransfersResult
 import mega.privacy.android.domain.entity.transfer.TransferEvent
 import mega.privacy.android.domain.entity.transfer.TransferType
 import mega.privacy.android.domain.monitoring.CrashReporter
@@ -21,7 +23,7 @@ import mega.privacy.android.domain.usecase.transfers.active.ClearActiveTransfers
 import mega.privacy.android.domain.usecase.transfers.active.CorrectActiveTransfersUseCase
 import mega.privacy.android.domain.usecase.transfers.active.GetActiveTransferTotalsUseCase
 import mega.privacy.android.domain.usecase.transfers.active.HandleTransferEventUseCase
-import mega.privacy.android.domain.usecase.transfers.active.MonitorOngoingActiveTransfersUseCase
+import mega.privacy.android.domain.usecase.transfers.active.MonitorOngoingActiveTransfersUntilFinishedUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
 import timber.log.Timber
 
@@ -36,7 +38,7 @@ class DownloadsWorker @AssistedInject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     monitorTransferEventsUseCase: MonitorTransferEventsUseCase,
     handleTransferEventUseCase: HandleTransferEventUseCase,
-    monitorOngoingActiveTransfersUseCase: MonitorOngoingActiveTransfersUseCase,
+    private val monitorOngoingActiveTransfersUntilFinishedUseCase: MonitorOngoingActiveTransfersUntilFinishedUseCase,
     areTransfersPausedUseCase: AreTransfersPausedUseCase,
     getActiveTransferTotalsUseCase: GetActiveTransferTotalsUseCase,
     overQuotaNotificationBuilder: OverQuotaNotificationBuilder,
@@ -44,11 +46,12 @@ class DownloadsWorker @AssistedInject constructor(
     areNotificationsEnabledUseCase: AreNotificationsEnabledUseCase,
     correctActiveTransfersUseCase: CorrectActiveTransfersUseCase,
     clearActiveTransfersIfFinishedUseCase: ClearActiveTransfersIfFinishedUseCase,
-    private val downloadNotificationMapper: DownloadNotificationMapper,
+    private val transfersNotificationMapper: TransfersNotificationMapper,
     private val transfersFinishedNotificationMapper: TransfersFinishedNotificationMapper,
     private val scanMediaFileUseCase: ScanMediaFileUseCase,
     crashReporter: CrashReporter,
     foregroundSetter: ForegroundSetter? = null,
+    notificationSamplePeriod: Long? = null,
 ) : AbstractTransfersWorker(
     context = context,
     workerParams = workerParams,
@@ -56,7 +59,6 @@ class DownloadsWorker @AssistedInject constructor(
     ioDispatcher = ioDispatcher,
     monitorTransferEventsUseCase = monitorTransferEventsUseCase,
     handleTransferEventUseCase = handleTransferEventUseCase,
-    monitorOngoingActiveTransfersUseCase = monitorOngoingActiveTransfersUseCase,
     areTransfersPausedUseCase = areTransfersPausedUseCase,
     getActiveTransferTotalsUseCase = getActiveTransferTotalsUseCase,
     overQuotaNotificationBuilder = overQuotaNotificationBuilder,
@@ -66,15 +68,19 @@ class DownloadsWorker @AssistedInject constructor(
     clearActiveTransfersIfFinishedUseCase = clearActiveTransfersIfFinishedUseCase,
     crashReporter = crashReporter,
     foregroundSetter = foregroundSetter,
+    notificationSamplePeriod = notificationSamplePeriod,
 ) {
 
-    override val finalNotificationId = DOWNLOAD_NOTIFICATION_ID
-    override val updateNotificationId = NOTIFICATION_DOWNLOAD_FINAL
+    override val finalNotificationId = DOWNLOAD_FINAL_NOTIFICATION_ID
+    override val updateNotificationId = DOWNLOAD_UPDATE_NOTIFICATION_ID
+
+    override fun monitorProgress(): Flow<MonitorOngoingActiveTransfersResult> =
+        monitorOngoingActiveTransfersUntilFinishedUseCase(type)
 
     override fun createUpdateNotification(
         activeTransferTotals: ActiveTransferTotals,
         paused: Boolean,
-    ) = downloadNotificationMapper(activeTransferTotals, paused)
+    ) = transfersNotificationMapper(activeTransferTotals, paused)
 
     override suspend fun createFinishNotification(activeTransferTotals: ActiveTransferTotals) =
         transfersFinishedNotificationMapper(activeTransferTotals)
@@ -94,8 +100,8 @@ class DownloadsWorker @AssistedInject constructor(
          * Tag for enqueue the worker to work manager
          */
         const val SINGLE_DOWNLOAD_TAG = "MEGA_DOWNLOAD_TAG"
-        private const val DOWNLOAD_NOTIFICATION_ID = 2
-        private const val NOTIFICATION_DOWNLOAD_FINAL = 4
+        private const val DOWNLOAD_FINAL_NOTIFICATION_ID = 2
+        private const val DOWNLOAD_UPDATE_NOTIFICATION_ID = 4
     }
 }
 

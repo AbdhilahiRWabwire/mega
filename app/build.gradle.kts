@@ -1,4 +1,5 @@
-import groovy.lang.Closure
+import com.android.build.api.dsl.ApplicationExtension
+import com.google.firebase.appdistribution.gradle.AppDistributionExtension
 import mega.privacy.android.build.buildTypeMatches
 import mega.privacy.android.build.getAppGitHash
 import mega.privacy.android.build.getChatGitHash
@@ -24,54 +25,23 @@ import mega.privacy.android.build.shouldUsePrebuiltSdk
 
 
 plugins {
-    id("com.android.application")
-    id("kotlin-android")
+    alias(convention.plugins.mega.android.app)
+    alias(convention.plugins.mega.android.test)
+    alias(convention.plugins.mega.android.application.jacoco)
     id("kotlin-parcelize")
     id("kotlin-kapt")
     id("androidx.navigation.safeargs.kotlin")
     id("com.google.firebase.appdistribution")
-    id("jacoco")
     id("com.google.gms.google-services")
     id("de.mannodermaus.android-junit5")
     id("com.google.firebase.crashlytics")
     id("com.google.firebase.firebase-perf")
     id("androidx.baselineprofile")
-    alias(convention.plugins.mega.android.test)
-}
-
-configurations {
-    jacocoAnt
-}
-
-jacoco {
-    toolVersion = "0.8.11"
 }
 
 android {
-    val compileSdkVersion: Int by rootProject.extra
-    compileSdk = compileSdkVersion
-    val buildTools: String by rootProject.extra
-    buildToolsVersion = buildTools
-
-    buildFeatures {
-        dataBinding = true
-        viewBinding = true
-        compose = true
-        buildConfig = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = androidx.versions.compose.compiler.get()
-    }
-
     defaultConfig {
         applicationId = "mega.privacy.android.app"
-
-        val minSdkVersion: Int by rootProject.extra
-        minSdk = minSdkVersion
-
-        val targetSdkVersion: Int by rootProject.extra
-        targetSdk = targetSdkVersion
 
         val appVersion: String by rootProject.extra
         versionName = appVersion
@@ -88,51 +58,18 @@ android {
                         "${getAppGitHash(project)})"
         }
 
-        multiDexEnabled = true
-        ndk {
-            abiFilters += listOf("armeabi-v7a", "x86", "x86_64", "arm64-v8a")
-        }
-
         buildConfigField("String", "USER_AGENT", "\"MEGAAndroid/${versionName}_${versionCode}\"")
-
         buildConfigField("boolean", "ACTIVATE_GREETER", "${shouldActivateGreeter(project)}")
-
         buildConfigField("boolean", "ACTIVATE_NOCTURN", "${shouldActivateNocturn(project)}")
-
         buildConfigField("long", "NOCTURN_TIMEOUT", "${getNocturnTimeout(project)}")
-
         buildConfigField("int", "KARMA_PLUGIN_PORT", "${getKarmaPluginPort(project)}")
-
         resValue("string", "app_version", "\"${versionName}${versionNameSuffix}\"")
 
         val megaSdkVersion: String by rootProject.extra
-
         resValue("string", "sdk_version", "\"${getSdkGitHash(megaSdkVersion, project)}\"")
-
         resValue("string", "karere_version", "\"${getChatGitHash(megaSdkVersion, project)}\"")
 
         testInstrumentationRunner = "test.mega.privacy.android.app.HiltTestRunner"
-
-        resourceConfigurations += listOf(
-            "en",
-            "ar",
-            "de",
-            "es",
-            "fr",
-            "in",
-            "it",
-            "ja",
-            "ko",
-            "nl",
-            "pl",
-            "pt",
-            "ro",
-            "ru",
-            "th",
-            "vi",
-            "zh-rCN",
-            "zh-rTW"
-        )
 
         withGroovyBuilder {
             "firebaseCrashlytics" {
@@ -143,53 +80,6 @@ android {
                 "unstrippedNativeLibsDir"(nativeLibsDir(project))
             }
         }
-    }
-
-    sourceSets {
-        getByName("debug") {
-            res {
-                srcDirs("src/main/res")
-            }
-        }
-
-        register("qa") {
-            java {
-                srcDirs("src/qa/java")
-            }
-            res {
-                srcDirs("src/qa/res")
-            }
-        }
-    }
-
-    packaging {
-        jniLibs.pickFirsts.add("lib/arm64-v8a/libc++_shared.so")
-        jniLibs.pickFirsts.add("lib/arm64-v8a/libmega.so")
-        jniLibs.pickFirsts.add("lib/arm64-v8a/libjniPdfium.so")
-        jniLibs.pickFirsts.add("lib/arm64-v8a/libmodpdfium.so")
-        jniLibs.pickFirsts.add("lib/arm64-v8a/libmodft2.so")
-        jniLibs.pickFirsts.add("lib/arm64-v8a/libmodpng.so")
-
-        jniLibs.pickFirsts.add("lib/armeabi-v7a/libc++_shared.so")
-        jniLibs.pickFirsts.add("lib/armeabi-v7a/libmega.so")
-        jniLibs.pickFirsts.add("lib/armeabi-v7a/libjniPdfium.so")
-        jniLibs.pickFirsts.add("lib/armeabi-v7a/libmodpdfium.so")
-        jniLibs.pickFirsts.add("lib/armeabi-v7a/libmodft2.so")
-        jniLibs.pickFirsts.add("lib/armeabi-v7a/libmodpng.so")
-
-        jniLibs.pickFirsts.add("lib/x86/libc++_shared.so")
-        jniLibs.pickFirsts.add("lib/x86/libmega.so")
-        jniLibs.pickFirsts.add("lib/x86/libjniPdfium.so")
-        jniLibs.pickFirsts.add("lib/x86/libmodpdfium.so")
-        jniLibs.pickFirsts.add("lib/x86/libmodft2.so")
-        jniLibs.pickFirsts.add("lib/x86/libmodpng.so")
-
-        jniLibs.pickFirsts.add("lib/x86_64/libc++_shared.so")
-        jniLibs.pickFirsts.add("lib/x86_64/libmega.so")
-        jniLibs.pickFirsts.add("lib/x86_64/libjniPdfium.so")
-        jniLibs.pickFirsts.add("lib/x86_64/libmodpdfium.so")
-        jniLibs.pickFirsts.add("lib/x86_64/libmodft2.so")
-        jniLibs.pickFirsts.add("lib/x86_64/libmodpng.so")
     }
 
     buildTypes {
@@ -222,26 +112,6 @@ android {
         }
     }
 
-    compileOptions {
-        // Sets Java compatibility to JavaVersion in Project Root
-        val javaVersion: JavaVersion by rootProject.extra
-        sourceCompatibility = javaVersion
-        targetCompatibility = javaVersion
-    }
-
-    kotlin {
-        val jdk: String by rootProject.extra
-        jvmToolchain(jdk.toInt())
-    }
-
-    kotlinOptions {
-        val jdk: String by rootProject.extra
-        jvmTarget = jdk
-        val shouldSuppressWarnings: Boolean by rootProject.extra
-        suppressWarnings = shouldSuppressWarnings
-        freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
-    }
-
     flavorDimensions += "service"
     productFlavors {
         create("gms") {
@@ -271,9 +141,9 @@ android {
     }
 }
 
-project.extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
+project.extensions.configure<ApplicationExtension> {
     buildTypes.configureEach {
-        configure<com.google.firebase.appdistribution.gradle.AppDistributionExtension> {
+        configure<AppDistributionExtension> {
             if (name == "release") {
                 appId = "1:268821755439:android:9b611c50c9f7a503"
             } else if (name == "qa") {
@@ -289,8 +159,7 @@ dependencies {
     // Modules
     implementation(project(":core:formatter"))
     implementation(project(":domain"))
-    implementation(project(":core-ui"))
-    implementation(project(":shared:theme"))
+    implementation(project(":shared:original-core-ui"))
     implementation(project(":legacy-core-ui"))
     implementation(project(":data"))
     implementation(project(":navigation"))
@@ -444,10 +313,6 @@ dependencies {
         implementation(files("../sdk/src/main/jni/megachat/webrtc/libwebrtc.jar"))
     }
 
-    // Kotlin + coroutines
-    // Java Code Coverage
-    jacocoAnt("org.jacoco:org.jacoco.ant:0.8.11:nodeps")
-
     // Testing dependencies
     testImplementation(testlib.bundles.unit.test)
     testImplementation(lib.bundles.unit.test)
@@ -499,127 +364,6 @@ dependencies {
     "qaImplementation"(testlib.compose.manifest)
 
     lintChecks(project(":lint"))
-}
-
-tasks.register("instrumentClasses") {
-    dependsOn("compileGmsDebugSources")
-    val outputDir = "${buildDir.path}/intermediates/classes-instrumented/gms/debug/"
-    doLast {
-        println("Instrumenting classes")
-
-        val fileFilter = listOf(
-            // data binding
-            "android/databinding/**/*.class",
-            "**/android/databinding/*Binding.class",
-            "**/android/databinding/*",
-            "**/androidx/databinding/*",
-            "**/BR.*",
-            // android
-            "**/R.class",
-            "**/R$*.class",
-            "**/BuildConfig.*",
-            "**/Manifest*.*",
-            "**/*Test*.*",
-            "android/**/*.*",
-            // dagger
-            "**/*_MembersInjector.class",
-            "**/Dagger*Component.class",
-            "**/Dagger*Component\$Builder.class",
-            "**/Dagger*Subcomponent*.class",
-            "**/*Subcomponent\$Builder.class",
-            "**/*Module_*Factory.class",
-            "**/di/module/*",
-            "**/*_Factory*.*",
-            "**/*Module*.*",
-            "**/*Dagger*.*",
-            "**/*Hilt*.*",
-            // kotlin
-            "**/*MapperImpl*.*",
-            "**/*\$ViewInjector*.*",
-            "**/*\$ViewBinder*.*",
-            "**/BuildConfig.*",
-            "**/*Component*.*",
-            "**/*BR*.*",
-            "**/Manifest*.*",
-            "**/*\$Lambda$*.*",
-//                "**/*Companion*.*",
-            "**/*Module*.*",
-            "**/*Dagger*.*",
-            "**/*Hilt*.*",
-            "**/*MembersInjector*.*",
-            "**/*_MembersInjector.class",
-            "**/*_Factory*.*",
-            "**/*_Provide*Factory*.*",
-//                "**/*Extensions*.*",
-            // sealed and data classes
-            "**/*$Result.*",
-            "**/*$Result$*.*",
-            // adapters generated by moshi
-            "**/*JsonAdapter.*",
-            //entity in domain layer
-            "**/domain/entity/*",
-            // model in data layer
-            "**/data/model/*",
-        )
-        val excludesPattern = fileFilter.joinToString()
-        val jacocoAntConfig by configurations.jacocoAnt
-        ant.withGroovyBuilder {
-            "taskdef"(
-                "name" to "instrument",
-                "classname" to "org.jacoco.ant.InstrumentTask",
-                "classpath" to jacocoAntConfig.asPath
-            )
-            "instrument"("destdir" to outputDir) {
-                "fileset"(
-                    "dir" to "${buildDir.path}/intermediates/javac/gmsDebug/compileGmsDebugJavaWithJavac/classes",
-                    "excludes" to excludesPattern
-                )
-                "fileset"(
-                    "dir" to "${buildDir.path}/tmp/kotlin-classes/gmsDebug",
-                    "excludes" to excludesPattern
-                )
-            }
-        }
-        /* Add the instrumented classes to the beginning of classpath */
-        tasks.named("testGmsDebugUnitTest") {
-            if (hasProperty("classpath")) {
-                setProperty("classpath", files(outputDir) + property("classpath") as FileCollection)
-            }
-        }
-    }
-}
-
-tasks.register("createUnitTestCoverageReport") {
-    dependsOn("instrumentClasses", "testGmsDebugUnitTest")
-    val jacocoAntConfig by configurations.jacocoAnt
-    doLast {
-        ant.withGroovyBuilder {
-            "taskdef"(
-                "name" to "report",
-                "classname" to "org.jacoco.ant.ReportTask",
-                "classpath" to jacocoAntConfig.asPath
-            )
-            "report"() {
-                "executiondata" {
-                    ant.withGroovyBuilder {
-                        "file"("file" to "${buildDir.path}/jacoco/testGmsDebugUnitTest.exec")
-                    }
-                }
-                "structure"("name" to "Coverage") {
-                    "classfiles" {
-                        "fileset"("dir" to "${buildDir.path}/intermediates/javac/gmsDebug/compileGmsDebugJavaWithJavac/classes")
-                        "fileset"("dir" to "${buildDir.path}/tmp/kotlin-classes/gmsDebug")
-                    }
-                    "sourcefiles" {
-                        "fileset"("dir" to "src/main/java")
-                        "fileset"("dir" to "src/test/java")
-                    }
-                }
-                "html"("destdir" to "${buildDir.path}/reports/jacoco/html")
-                "csv"("destfile" to "${buildDir.path}/reports/jacoco/gmsDebugUnitTestCoverage.csv")
-            }
-        }
-    }
 }
 
 /**

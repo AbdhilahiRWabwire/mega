@@ -5,8 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import mega.privacy.android.core.ui.controls.chat.messages.CoreVoiceClipMessageView
 import mega.privacy.android.domain.entity.chat.messages.PendingVoiceClipMessage
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.CoreVoiceClipMessageView
 
 /**
  * View for pending voice clips (not send to SDK yet)
@@ -24,7 +24,8 @@ fun PendingVoiceClipMessageView(
         timestamp = uiState.duration ?: "",
         modifier = modifier,
         exists = true,
-        loadProgress = uiState.loadProgress?.floatValue,
+        loadProgress = uiState.progress?.floatValue ?: 0f,
         interactionEnabled = false,
+        showPausedTransfersWarning = uiState.areTransfersPaused,
     )
 }

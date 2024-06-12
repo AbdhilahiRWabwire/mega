@@ -25,12 +25,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
-import mega.privacy.android.shared.theme.MegaAppTheme
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.preview.TextFieldProvider
-import mega.privacy.android.core.ui.preview.TextFieldState
-import mega.privacy.android.core.ui.theme.extensions.grey_alpha_038_white_alpha_038
-import mega.privacy.android.core.ui.theme.extensions.textColorSecondary
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.preview.TextFieldProvider
+import mega.privacy.android.shared.original.core.ui.preview.TextFieldState
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_alpha_038_white_alpha_038
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorSecondary
 
 /**
  * Text button with icon chip
@@ -128,7 +128,7 @@ private fun colorsUnChecked() = ButtonDefaults.buttonColors(
 private fun PreviewTextButtonWithIconChip(
     @PreviewParameter(TextFieldProvider::class) state: TextFieldState,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         TextButtonWithIconChip(
             onClick = { },
             text = "weekdays",

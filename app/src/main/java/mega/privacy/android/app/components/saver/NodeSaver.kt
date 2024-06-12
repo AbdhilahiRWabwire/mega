@@ -10,12 +10,15 @@ import android.os.Bundle
 import android.os.StatFs
 import android.text.TextUtils
 import androidx.documentfile.provider.DocumentFile
+import androidx.lifecycle.lifecycleScope
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.disposables.CompositeDisposable
+import io.reactivex.rxjava3.functions.Consumer
 import io.reactivex.rxjava3.kotlin.addTo
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.launch
 import mega.privacy.android.app.BaseActivity
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.MegaOffline
@@ -34,7 +37,6 @@ import mega.privacy.android.app.main.FileStorageActivity.PICK_FOLDER_TYPE
 import mega.privacy.android.app.main.FileStorageActivity.PickFolderType
 import mega.privacy.android.app.presentation.extensions.getStorageState
 import mega.privacy.android.app.utils.AlertsAndWarnings.showOverDiskQuotaPaywallWarning
-import mega.privacy.android.app.utils.CacheFolderManager.buildVoiceClipFile
 import mega.privacy.android.app.utils.Constants.REQUEST_CODE_SELECT_LOCAL_FOLDER
 import mega.privacy.android.app.utils.Constants.REQUEST_CODE_TREE
 import mega.privacy.android.app.utils.Constants.REQUEST_WRITE_STORAGE
@@ -45,16 +47,12 @@ import mega.privacy.android.app.utils.FileUtil.getTotalSize
 import mega.privacy.android.app.utils.MegaNodeUtil.autoPlayNode
 import mega.privacy.android.app.utils.OfflineUtils.getOfflineFile
 import mega.privacy.android.app.utils.RunOnUIThreadUtils.post
-import mega.privacy.android.app.utils.RxUtil.logErr
 import mega.privacy.android.app.utils.SDCardOperator
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.Util.getSizeString
 import mega.privacy.android.app.utils.Util.storeDownloadLocationIfNeeded
 import mega.privacy.android.app.utils.permission.PermissionUtils.hasPermissions
 import mega.privacy.android.domain.entity.StorageState
-import nz.mega.sdk.MegaApiJava.nodeListToArray
-import nz.mega.sdk.MegaNode
-import nz.mega.sdk.MegaNodeList
 import timber.log.Timber
 import java.util.concurrent.Callable
 
@@ -101,20 +99,6 @@ class NodeSaver(
     }
 
     /**
-     * Save an offline node into device.
-     *
-     * @param node the offline node to save
-     * @param fromMediaViewer whether this download is from media viewer
-     */
-    @JvmOverloads
-    fun saveOfflineNode(
-        node: MegaOffline,
-        fromMediaViewer: Boolean = false,
-    ) {
-        saveOfflineNodes(listOf(node), fromMediaViewer)
-    }
-
-    /**
      * Save offline nodes into device.
      *
      * @param nodes the offline nodes to save
@@ -132,236 +116,6 @@ class NodeSaver(
             }
             OfflineSaving(totalSize, nodes, fromMediaViewer)
         }
-    }
-
-    /**
-     * Save a MegaNode into device.
-     *
-     * @param handle the handle of node to save
-     * @param highPriority whether this download is high priority or not
-     * @param isFolderLink whether this download is a folder link
-     * @param fromMediaViewer whether this download is from media viewer
-     * @param needSerialize whether this download need serialize
-     */
-    @JvmOverloads
-    fun saveHandle(
-        handle: Long,
-        highPriority: Boolean = false,
-        isFolderLink: Boolean = false,
-        fromMediaViewer: Boolean = false,
-        needSerialize: Boolean = false,
-    ) {
-        saveHandles(
-            handles = listOf(handle),
-            highPriority = highPriority,
-            isFolderLink = isFolderLink,
-            fromMediaViewer = fromMediaViewer,
-            needSerialize = needSerialize,
-        )
-    }
-
-    /**
-     * Save a list of MegaNode into device.
-     * No matter if the list contains only files, or files and folders.
-     *
-     * @param handles the handle list of nodes to save
-     * @param highPriority whether this download is high priority or not
-     * @param isFolderLink whether this download is a folder link
-     * @param fromMediaViewer whether this download is from media viewer
-     * @param needSerialize whether this download need serialize
-     */
-    @JvmOverloads
-    fun saveHandles(
-        handles: List<Long>,
-        highPriority: Boolean = false,
-        isFolderLink: Boolean = false,
-        fromMediaViewer: Boolean = false,
-        needSerialize: Boolean = false,
-    ) {
-        save(app) {
-            val nodes = ArrayList<MegaNode>()
-            val api = if (isFolderLink) megaApiFolder else megaApi
-
-            for (handle in handles) {
-                val node = api.getNodeByHandle(handle)
-                if (node != null) {
-                    nodes.add(node)
-                }
-            }
-
-            MegaNodeSaving(
-                totalSize = nodesTotalSize(nodes),
-                highPriority = highPriority,
-                isFolderLink = isFolderLink,
-                nodes = nodes,
-                fromMediaViewer = fromMediaViewer,
-                needSerialize = needSerialize
-            )
-        }
-    }
-
-    /**
-     * Save a MegaNode into device.
-     *
-     * @param node node to save
-     * @param highPriority whether this download is high priority or not
-     * @param isFolderLink whether this download is a folder link
-     * @param fromMediaViewer whether this download is from media viewer
-     * @param needSerialize whether this download need serialize
-     */
-    @JvmOverloads
-    fun saveNode(
-        node: MegaNode,
-        highPriority: Boolean = false,
-        isFolderLink: Boolean = false,
-        fromMediaViewer: Boolean = false,
-        needSerialize: Boolean = false,
-    ) {
-        saveNodes(
-            nodes = listOf(node),
-            highPriority = highPriority,
-            isFolderLink = isFolderLink,
-            fromMediaViewer = fromMediaViewer,
-            needSerialize = needSerialize,
-        )
-    }
-
-    /**
-     * Save a list of MegaNodeList into device.
-     *
-     * @param nodeLists MegaNodeLists to save
-     * @param highPriority whether this download is high priority or not
-     * @param isFolderLink whether this download is a folder link
-     * @param fromMediaViewer whether this download is from media viewer
-     * @param needSerialize whether this download need serialize
-     */
-    @JvmOverloads
-    fun saveNodeLists(
-        nodeLists: List<MegaNodeList>,
-        highPriority: Boolean = false,
-        isFolderLink: Boolean = false,
-        fromMediaViewer: Boolean = false,
-        needSerialize: Boolean = false,
-    ) {
-        save(app) {
-            val nodes = ArrayList<MegaNode>()
-            for (nodeList in nodeLists) {
-                val array = nodeListToArray(nodeList)
-                if (array != null) {
-                    nodes.addAll(array)
-                }
-            }
-
-            MegaNodeSaving(
-                nodesTotalSize(nodes), highPriority, isFolderLink, nodes, fromMediaViewer,
-                needSerialize
-            )
-        }
-    }
-
-    /**
-     * Save a list of MegaNode into device.
-     *
-     * @param nodes nodes to save
-     * @param highPriority whether this download is high priority or not
-     * @param isFolderLink whether this download is a folder link
-     * @param fromMediaViewer whether this download is from media viewer
-     * @param needSerialize whether this download need serialize
-     * @param downloadForPreview whether this download is for preview
-     * @param downloadByOpenWith whether this download is triggered by open with
-     */
-    @JvmOverloads
-    fun saveNodes(
-        nodes: List<MegaNode>,
-        highPriority: Boolean = false,
-        isFolderLink: Boolean = false,
-        fromMediaViewer: Boolean = false,
-        needSerialize: Boolean = false,
-        downloadForPreview: Boolean = false,
-        downloadByOpenWith: Boolean = false,
-    ) {
-        save(app) {
-            MegaNodeSaving(
-                totalSize = nodesTotalSize(nodes = nodes),
-                highPriority = highPriority,
-                isFolderLink = isFolderLink,
-                nodes = nodes,
-                fromMediaViewer = fromMediaViewer,
-                needSerialize = needSerialize,
-                downloadForPreview = downloadForPreview,
-                downloadByOpenWith = downloadByOpenWith
-            )
-        }
-    }
-
-    /**
-     * Save a MegaNode into device.
-     *
-     * @param node node to save
-     * @param parentPath parent path
-     */
-    fun saveNode(node: MegaNode, parentPath: String) {
-        Completable
-            .fromCallable(Callable {
-                this.saving = MegaNodeSaving(
-                    node.size,
-                    highPriority = false,
-                    isFolderLink = false,
-                    nodes = listOf(node),
-                    fromMediaViewer = false,
-                    needSerialize = false
-                )
-
-                if (lackPermission()) {
-                    return@Callable
-                }
-
-                checkSizeBeforeDownload(getCorrectDownloadPath(parentPath), app)
-            })
-            .subscribeOn(Schedulers.io())
-            .subscribeBy(onError = { logErr("NodeSaver saveNode") })
-            .addTo(compositeDisposable)
-    }
-
-    /**
-     * Download voice clip.
-     *
-     * @param nodeList voice clip to download
-     */
-    fun downloadVoiceClip(nodeList: MegaNodeList) {
-        Completable
-            .fromCallable(Callable {
-                val nodes = nodeListToArray(nodeList)
-                if (nodes == null || nodes.isEmpty()) {
-                    return@Callable
-                }
-
-                val parentPath =
-                    buildVoiceClipFile(nodes[0].name)?.parentFile?.path ?: return@Callable
-
-                val totalSize = nodesTotalSize(nodes)
-
-                if (notEnoughSpace(parentPath, totalSize)) {
-                    return@Callable
-                }
-
-                val voiceClipSaving = MegaNodeSaving(
-                    totalSize,
-                    highPriority = true,
-                    isFolderLink = false,
-                    nodes = nodes,
-                    fromMediaViewer = false,
-                    needSerialize = true,
-                    isVoiceClip = true
-                )
-
-                voiceClipSaving.doDownload(
-                    megaApi, megaApiFolder, parentPath, false, null, null
-                )
-            })
-            .subscribeOn(Schedulers.io())
-            .subscribeBy(onError = { logErr("NodeSaver downloadVoiceClip") })
-            .addTo(compositeDisposable)
     }
 
     /**
@@ -420,8 +174,14 @@ class NodeSaver(
                 return false
             }
 
-            if (dbHandler.credentials != null && dbHandler.askSetDownloadLocation && activity is BaseActivity) {
-                activity.showConfirmationSaveInSameLocation(parentPath)
+            if (dbHandler.askSetDownloadLocation && activity is BaseActivity) {
+                activity.lifecycleScope.launch {
+                    val credentials =
+                        runCatching { activity.getAccountCredentialsUseCase() }.getOrNull()
+                    if (credentials != null) {
+                        activity.showConfirmationSaveInSameLocation(parentPath)
+                    }
+                }
             }
 
             Completable
@@ -587,16 +347,6 @@ class NodeSaver(
         activityLauncher.launchActivityForResult(intent, REQUEST_CODE_SELECT_LOCAL_FOLDER)
     }
 
-    private fun nodesTotalSize(nodes: List<MegaNode>): Long {
-        var totalSize = 0L
-
-        for (node in nodes) {
-            totalSize += if (node.isFolder) nodesTotalSize(megaApi.getChildren(node)) else node.size
-        }
-
-        return totalSize
-    }
-
     private fun notEnoughSpace(parentPath: String, totalSize: Long): Boolean {
         var availableFreeSpace = Long.MAX_VALUE
         try {
@@ -742,4 +492,9 @@ class NodeSaver(
 
         private const val STATE_KEY_SAVING = "saving"
     }
+
+    private fun logErr(context: String): Consumer<in Throwable> =
+        Consumer { throwable: Throwable? ->
+            Timber.e(throwable, "$context onError")
+        }
 }

@@ -21,6 +21,7 @@ import mega.privacy.android.data.gateway.preferences.AccountPreferencesGateway
 import mega.privacy.android.data.gateway.preferences.CallsPreferencesGateway
 import mega.privacy.android.data.gateway.preferences.CameraUploadsSettingsPreferenceGateway
 import mega.privacy.android.data.gateway.preferences.ChatPreferencesGateway
+import mega.privacy.android.data.gateway.preferences.CredentialsPreferencesGateway
 import mega.privacy.android.data.gateway.preferences.EphemeralCredentialsGateway
 import mega.privacy.android.data.listener.OptionalMegaChatRequestListenerInterface
 import mega.privacy.android.data.listener.OptionalMegaRequestListenerInterface
@@ -37,9 +38,9 @@ import mega.privacy.android.data.mapper.login.AccountSessionMapper
 import mega.privacy.android.data.mapper.login.UserCredentialsMapper
 import mega.privacy.android.data.mapper.settings.CookieSettingsIntMapper
 import mega.privacy.android.data.mapper.settings.CookieSettingsMapper
-import mega.privacy.android.data.mapper.toAccountType
 import mega.privacy.android.data.model.GlobalUpdate
 import mega.privacy.android.data.repository.account.DefaultAccountRepository
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.Currency
 import mega.privacy.android.domain.entity.SubscriptionOption
 import mega.privacy.android.domain.entity.account.CurrencyPoint
@@ -48,6 +49,7 @@ import mega.privacy.android.domain.entity.achievement.AchievementsOverview
 import mega.privacy.android.domain.entity.achievement.MegaAchievement
 import mega.privacy.android.domain.entity.login.EphemeralCredentials
 import mega.privacy.android.domain.entity.settings.cookie.CookieType
+import mega.privacy.android.domain.entity.user.UserCredentials
 import mega.privacy.android.domain.entity.user.UserId
 import mega.privacy.android.domain.entity.user.UserUpdate
 import mega.privacy.android.domain.exception.ChangeEmailException
@@ -126,6 +128,7 @@ class DefaultAccountRepositoryTest {
         mock<CameraUploadsSettingsPreferenceGateway>()
     private val cookieSettingsMapper = mock<CookieSettingsMapper>()
     private val cookieSettingsIntMapper = mock<CookieSettingsIntMapper>()
+    private val credentialsPreferencesGateway = mock<CredentialsPreferencesGateway>()
 
     private val pricing = mock<MegaPricing> {
         on { numProducts }.thenReturn(1)
@@ -144,7 +147,7 @@ class DefaultAccountRepositoryTest {
     private val appEventGateway: AppEventGateway = mock()
 
     private val subscriptionOption = SubscriptionOption(
-        accountType = toAccountType(1),
+        accountType = AccountType.PRO_I,
         months = 1,
         handle = 1560943707714440503,
         storage = 450,
@@ -183,6 +186,7 @@ class DefaultAccountRepositoryTest {
             cameraUploadsSettingsPreferenceGateway,
             cookieSettingsMapper,
             cookieSettingsIntMapper,
+            credentialsPreferencesGateway
         )
     }
 
@@ -222,6 +226,7 @@ class DefaultAccountRepositoryTest {
             cameraUploadsSettingsPreferenceGateway = cameraUploadsSettingsPreferenceGateway,
             cookieSettingsMapper = cookieSettingsMapper,
             cookieSettingsIntMapper = cookieSettingsIntMapper,
+            credentialsPreferencesGateway = credentialsPreferencesGateway
         )
 
     }
@@ -301,8 +306,7 @@ class DefaultAccountRepositoryTest {
 
             whenever(
                 subscriptionOptionListMapper(
-                    request,
-                    currencyMapper,
+                    request
                 )
             ).thenReturn(
                 listOf(subscriptionOption)
@@ -335,8 +339,7 @@ class DefaultAccountRepositoryTest {
 
             whenever(
                 subscriptionOptionListMapper(
-                    request,
-                    currencyMapper,
+                    request
                 )
             ).thenReturn(
                 listOf(subscriptionOption)
@@ -843,7 +846,7 @@ class DefaultAccountRepositoryTest {
                 userCredentialsMapper("test@mega.nz", "AFasdffW456sdfg", null, null, "1536456")
 
             underTest.saveAccountCredentials()
-            verify(localStorageGateway).saveCredentials(credentials)
+            verify(credentialsPreferencesGateway).save(credentials)
             verify(ephemeralCredentialsGateway).clear()
         }
 
@@ -860,8 +863,9 @@ class DefaultAccountRepositoryTest {
     @Test
     fun `test that MegaLocalStorageGateway is invoked for getting account credentials`() =
         runTest {
+            whenever(credentialsPreferencesGateway.monitorCredentials()).thenReturn(flowOf(null))
             underTest.getAccountCredentials()
-            verify(localStorageGateway).getUserCredentials()
+            verify(credentialsPreferencesGateway).monitorCredentials()
         }
 
     @Test
@@ -961,7 +965,7 @@ class DefaultAccountRepositoryTest {
     fun `test that MegaLocalStorageGateway is invoked for clearing account preferences`() =
         runTest {
             underTest.clearAccountPreferences()
-            verify(localStorageGateway).clearCredentials()
+            verify(credentialsPreferencesGateway).clear()
             verify(localStorageGateway).clearPreferences()
             verify(localStorageGateway).setFirstTime(false)
             verify(megaLocalRoomGateway).clearOffline()
@@ -1883,4 +1887,29 @@ class DefaultAccountRepositoryTest {
         assertThat(actual).isEqualTo(email)
         verify(megaApiGateway).cancelCreateAccount(any())
     }
+
+    @Test
+    fun `test that monitor credentials returns correctly`() = runTest {
+        val credentials = mock<UserCredentials>()
+        whenever(credentialsPreferencesGateway.monitorCredentials()).thenReturn(flowOf(credentials))
+        underTest.monitorCredentials().test {
+            assertThat(awaitItem()).isEqualTo(credentials)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun `test that credentialsPreferencesGateway calls save when setCredentials called`() =
+        runTest {
+            val credentials = mock<UserCredentials>()
+            underTest.setCredentials(credentials)
+            verify(credentialsPreferencesGateway).save(credentials)
+        }
+
+    @Test
+    fun `test that credentialsPreferencesGateway calls clear when clearCredentials called`() =
+        runTest {
+            underTest.clearCredentials()
+            verify(credentialsPreferencesGateway).clear()
+        }
 }

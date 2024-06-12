@@ -1,7 +1,6 @@
 package mega.privacy.android.domain.repository
 
 import kotlinx.coroutines.flow.Flow
-import mega.privacy.android.domain.entity.FileTypeInfo
 import mega.privacy.android.domain.entity.FolderTreeInfo
 import mega.privacy.android.domain.entity.NodeLabel
 import mega.privacy.android.domain.entity.Offline
@@ -25,13 +24,6 @@ import mega.privacy.android.domain.entity.user.UserId
  *
  */
 interface NodeRepository {
-    /**
-     * Get a list of all outgoing shares
-     *
-     * @param order sort order, if null the default order is applied
-     * @return List of MegaNode of all active and pending outbound shared by current user
-     */
-    suspend fun getOutgoingSharesNode(order: SortOrder): List<ShareData>
 
     /**
      * Get a list of all outgoing shares for a given node
@@ -54,13 +46,6 @@ interface NodeRepository {
      * @return List of [ShareData]
      */
     suspend fun getUnverifiedOutgoingShares(order: SortOrder): List<ShareData>
-
-    /**
-     * Provides Verified incoming shares from SDK
-     *
-     * @return List of [ShareData]
-     */
-    suspend fun getVerifiedIncomingShares(order: SortOrder): List<ShareData>
 
     /**
      * Provides all outgoing shares from SDK with proper sorting and filtering
@@ -142,13 +127,6 @@ interface NodeRepository {
      */
     suspend fun getNodePathById(nodeId: NodeId): String
 
-    /**
-     * Get node children
-     *
-     * @param folderNode
-     * @return
-     */
-    suspend fun getNodeChildren(folderNode: FolderNode): List<UnTypedNode>
 
     /**
      * Get node children
@@ -157,14 +135,7 @@ interface NodeRepository {
      * @param order [SortOrder]
      * @return
      */
-    suspend fun getNodeChildren(nodeId: NodeId, order: SortOrder?): List<UnTypedNode>
-
-    /**
-     * Get the number of versions of the node, including the current version
-     * @param handle the handle of the node
-     * @return the number of versions of the node or 0 if the file is not found
-     */
-    suspend fun getNumVersions(handle: Long): Int
+    suspend fun getNodeChildren(nodeId: NodeId, order: SortOrder? = null): List<UnTypedNode>
 
     /**
      * Get the history versions of the node
@@ -276,18 +247,6 @@ interface NodeRepository {
     suspend fun setShareAccess(nodeId: NodeId, accessPermission: AccessPermission, email: String)
 
     /**
-     * Load offline nodes
-     *
-     * @param path         Node path
-     * @param searchQuery  search query for database
-     * @return List of [OfflineNodeInformation]
-     */
-    suspend fun loadOfflineNodes(
-        path: String,
-        searchQuery: String?,
-    ): List<OfflineNodeInformation>
-
-    /**
      * Gets invalid handle
      */
     suspend fun getInvalidHandle(): Long
@@ -326,16 +285,6 @@ interface NodeRepository {
      */
     suspend fun getInShares(email: String): List<UnTypedNode>
 
-
-    /**
-     * Get FileTypeInfo given NodeId
-     *
-     * @param nodeId
-     * @return FileTypeInfo if found else null
-     */
-    suspend fun getFileTypeInfo(nodeId: NodeId): FileTypeInfo?
-
-
     /**
      * Get default node handle for a folder
      *
@@ -359,6 +308,7 @@ interface NodeRepository {
      * Copy a [Node] and move it to a new [Node] while updating its name if set
      *
      * @param nodeToCopy the [NodeId] to copy
+     * @param nodeToCopySerializedData optional node serialized data when a node from link needs to be copied
      * @param newNodeParent the [NodeId] that [nodeToCopy] will be moved to
      * @param newNodeName the new name for [nodeToCopy] once it is moved to [newNodeParent] if it's not null, if it's null the name will be the same
      *
@@ -366,6 +316,7 @@ interface NodeRepository {
      */
     suspend fun copyNode(
         nodeToCopy: NodeId,
+        nodeToCopySerializedData: String? = null,
         newNodeParent: NodeId,
         newNodeName: String?,
     ): NodeId
@@ -518,12 +469,16 @@ interface NodeRepository {
     ): FileNode?
 
     /**
-     * Get nodes by handles
+     * Get list of files attached to a chat message by its chat and message id
      *
-     * @param handles handle list
-     * @return List<[UnTypedNode]>
+     * @param chatId
+     * @param messageId
      */
-    suspend fun getNodesByHandles(handles: List<Long>): List<UnTypedNode>
+    suspend fun getNodesFromChatMessage(
+        chatId: Long,
+        messageId: Long,
+    ): List<FileNode>
+
 
     /**
      * Get rubbish node
@@ -633,12 +588,6 @@ interface NodeRepository {
         nodeId: NodeId,
         level: AccessPermission,
     ): Boolean
-
-    /**
-     * Remove Offline node
-     * @param nodeId [NodeId]
-     */
-    suspend fun removeOfflineNode(nodeId: String)
 
     /**
      * Get offline Node from parent id
@@ -777,4 +726,37 @@ interface NodeRepository {
      * @param description [String]
      */
     suspend fun setNodeDescription(nodeHandle: NodeId, description: String?)
+
+    /**
+     * Get offline node information by query
+     *
+     * @param query
+     * @return list of offline nodes information
+     */
+    suspend fun getOfflineByQuery(query: String): List<OfflineNodeInformation>?
+
+    /**
+     * Update node tag
+     *
+     * @param nodeHandle [String]
+     * @param oldTag [String]
+     * @param newTag [String]
+     */
+    suspend fun updateNodeTag(nodeHandle: NodeId, oldTag: String, newTag: String)
+
+    /**
+     * Add node tag
+     *
+     * @param nodeHandle [String]
+     * @param tag [String]
+     */
+    suspend fun addNodeTag(nodeHandle: NodeId, tag: String)
+
+    /**
+     * Remove node tag
+     *
+     * @param nodeHandle [String]
+     * @param tag [String]
+     */
+    suspend fun removeNodeTag(nodeHandle: NodeId, tag: String)
 }

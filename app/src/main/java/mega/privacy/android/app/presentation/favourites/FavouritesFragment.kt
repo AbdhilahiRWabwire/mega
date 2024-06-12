@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -30,10 +31,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MimeTypeList
 import mega.privacy.android.app.R
+import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.CustomizedGridLayoutManager
 import mega.privacy.android.app.components.scrollBar.FastScrollerScrollListener
 import mega.privacy.android.app.databinding.FragmentFavouritesBinding
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.fragments.homepage.EventObserver
 import mega.privacy.android.app.fragments.homepage.HomepageSearchable
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
@@ -78,7 +79,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class FavouritesFragment : Fragment(), HomepageSearchable {
     private val viewModel by viewModels<FavouritesViewModel>()
-    private val sortByHeaderViewModel by viewModels<SortByHeaderViewModel>()
+    private val sortByHeaderViewModel by activityViewModels<SortByHeaderViewModel>()
     private lateinit var binding: FragmentFavouritesBinding
     private lateinit var listAdapter: FavouritesAdapter
     private lateinit var gridAdapter: FavouritesGridAdapter
@@ -255,9 +256,11 @@ class FavouritesFragment : Fragment(), HomepageSearchable {
                         if (favouritesState is FavouriteLoadState.Success) {
                             if (isList) {
                                 listAdapter.updateSelectionMode(favouritesState.selectedItems.isNotEmpty())
+                                listAdapter.updateAccountType(favouritesState.accountDetail?.levelDetail?.accountType)
                                 listAdapter.submitList(favouritesState.favourites)
                             } else {
                                 gridAdapter.updateSelectionMode(favouritesState.selectedItems.isNotEmpty())
+                                gridAdapter.updateAccountType(favouritesState.accountDetail?.levelDetail?.accountType)
                                 gridAdapter.submitList(formatGridList(favouritesState))
                             }
                             handleSelectedItems(favouritesState.selectedItems)
@@ -272,10 +275,9 @@ class FavouritesFragment : Fragment(), HomepageSearchable {
             }
         })
 
-        sortByHeaderViewModel.orderChangeEvent.observe(viewLifecycleOwner, EventObserver {
-            viewModel.onOrderChange(sortOrder = it.first)
-        })
-
+        viewLifecycleOwner.collectFlow(sortByHeaderViewModel.orderChangeState) {
+            viewModel.onOrderChange(sortOrder = it.cloudSortOrder)
+        }
     }
 
     /**
@@ -364,7 +366,7 @@ class FavouritesFragment : Fragment(), HomepageSearchable {
         MimeTypeList.typeForName(favourite.typedNode.name).apply {
             when {
                 isImage || (isVideoMimeType || isAudio) || isPdf -> viewLifecycleOwner.lifecycleScope.launch {
-                    if (isImage && getFeatureFlagValueUseCase(AppFeatures.ImagePreview)) {
+                    if (isImage) {
                         val handle = favourite.node.handle
                         launchIntent(
                             ImagePreviewActivity.createIntent(

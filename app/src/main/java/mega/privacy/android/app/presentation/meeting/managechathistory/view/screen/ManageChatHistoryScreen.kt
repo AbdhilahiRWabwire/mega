@@ -2,8 +2,10 @@ package mega.privacy.android.app.presentation.meeting.managechathistory.view.scr
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -15,10 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Scaffold
+import androidx.compose.material.SnackbarHost
+import androidx.compose.material.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,17 +49,17 @@ import mega.privacy.android.app.presentation.meeting.managechathistory.model.Man
 import mega.privacy.android.app.presentation.meeting.managechathistory.view.dialog.ChatHistoryRetentionConfirmationDialog
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.DISABLED_RETENTION_TIME
-import mega.privacy.android.core.ui.controls.appbar.AppBarType
-import mega.privacy.android.core.ui.controls.appbar.MegaAppBar
-import mega.privacy.android.core.ui.controls.buttons.TextMegaButton
-import mega.privacy.android.core.ui.controls.dividers.DividerType
-import mega.privacy.android.core.ui.controls.dividers.MegaDivider
-import mega.privacy.android.core.ui.controls.lists.GenericTwoLineListItem
-import mega.privacy.android.core.ui.controls.text.MegaText
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.tokens.TextColor
 import mega.privacy.android.legacy.core.ui.controls.controlssliders.MegaSwitch
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.controls.appbar.AppBarType
+import mega.privacy.android.shared.original.core.ui.controls.appbar.MegaAppBar
+import mega.privacy.android.shared.original.core.ui.controls.buttons.TextMegaButton
+import mega.privacy.android.shared.original.core.ui.controls.dividers.DividerType
+import mega.privacy.android.shared.original.core.ui.controls.dividers.MegaDivider
+import mega.privacy.android.shared.original.core.ui.controls.lists.GenericTwoLineListItem
+import mega.privacy.android.shared.original.core.ui.controls.text.MegaText
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import java.util.Locale
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -64,6 +69,9 @@ internal fun ManageChatHistoryRoute(
     modifier: Modifier = Modifier,
     viewModel: ManageChatHistoryViewModel = hiltViewModel(),
 ) {
+    val snackBarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     BackHandler {
@@ -77,13 +85,29 @@ internal fun ManageChatHistoryRoute(
         }
     }
 
-    ManageChatHistoryScreen(
-        modifier = modifier.semantics { testTagsAsResourceId = true },
-        uiState = uiState,
-        onNavigateUp = onNavigateUp,
-        onConfirmClearChatClick = viewModel::clearChatHistory,
-        onSetChatRetentionTime = viewModel::setChatRetentionTime
-    )
+    LaunchedEffect(uiState.statusMessageResId) {
+        uiState.statusMessageResId?.let {
+            snackBarHostState.showSnackbar(
+                message = context.getString(it)
+            )
+            viewModel.onStatusMessageDisplayed()
+        }
+    }
+
+    Box(modifier = modifier.semantics { testTagsAsResourceId = true }) {
+        ManageChatHistoryScreen(
+            modifier = Modifier.fillMaxSize(),
+            uiState = uiState,
+            onNavigateUp = onNavigateUp,
+            onConfirmClearChatClick = viewModel::clearChatHistory,
+            onSetChatRetentionTime = viewModel::setChatRetentionTime
+        )
+
+        SnackbarHost(
+            modifier = Modifier.align(Alignment.BottomCenter),
+            hostState = snackBarHostState
+        )
+    }
 }
 
 @Composable
@@ -230,6 +254,7 @@ private fun HistoryClearingOption(
     val isChecked = rememberSaveable(retentionTime) {
         retentionTime != DISABLED_RETENTION_TIME
     }
+    val interactionSource = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -245,11 +270,15 @@ private fun HistoryClearingOption(
             MegaText(
                 modifier = Modifier
                     .padding(top = 2.dp)
-                    .clickable {
-                        if (!formattedRetentionTime.isNullOrBlank()) {
-                            onHistoryClearingOptionSubtitleClick()
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = {
+                            if (!formattedRetentionTime.isNullOrBlank()) {
+                                onHistoryClearingOptionSubtitleClick()
+                            }
                         }
-                    }
+                    )
                     .testTag(HISTORY_CLEARING_OPTION_SUBTITLE_TAG),
                 text = if (!formattedRetentionTime.isNullOrBlank()) {
                     stringResource(id = R.string.subtitle_properties_manage_chat)
@@ -376,7 +405,7 @@ private fun ClearHistoryOption(title: String, modifier: Modifier = Modifier) {
 @CombinedThemePreviews
 @Composable
 private fun ManageChatHistoryScreenWithRetentionTimePreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         ManageChatHistoryScreen(
             uiState = ManageChatHistoryUIState(retentionTime = 3600L),
             onNavigateUp = {},
@@ -389,7 +418,7 @@ private fun ManageChatHistoryScreenWithRetentionTimePreview() {
 @CombinedThemePreviews
 @Composable
 private fun ManageChatHistoryScreenWithoutRetentionTimePreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         ManageChatHistoryScreen(
             uiState = ManageChatHistoryUIState(),
             onNavigateUp = {},

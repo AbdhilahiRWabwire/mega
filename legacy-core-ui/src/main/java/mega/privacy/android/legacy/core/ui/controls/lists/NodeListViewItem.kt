@@ -42,15 +42,15 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import androidx.constraintlayout.compose.Visibility
 import mega.privacy.android.core.R
-import mega.privacy.android.core.ui.controls.images.ThumbnailView
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.color_button_brand
-import mega.privacy.android.core.ui.theme.extensions.red_800_red_400
-import mega.privacy.android.core.ui.theme.extensions.textColorPrimary
-import mega.privacy.android.core.ui.theme.extensions.textColorSecondary
-import mega.privacy.android.core.ui.utils.isScreenOrientationLandscape
+import mega.privacy.android.shared.original.core.ui.controls.images.ThumbnailView
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.extensions.color_button_brand
+import mega.privacy.android.shared.original.core.ui.theme.extensions.red_800_red_400
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorPrimary
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorSecondary
+import mega.privacy.android.shared.original.core.ui.utils.isScreenOrientationLandscape
 import mega.privacy.android.legacy.core.ui.controls.text.MiddleEllipsisText
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import java.io.File
 
 /**
@@ -488,7 +488,7 @@ private fun FilePreview() {
     val imageState = remember {
         mutableStateOf(null as File?)
     }
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         NodeListViewItem(
             modifier = Modifier,
             isSelected = false,
@@ -514,7 +514,7 @@ private fun FolderPreview() {
     val imageState = remember {
         mutableStateOf(null as File?)
     }
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         NodeListViewItem(
             modifier = Modifier,
             isSelected = false,

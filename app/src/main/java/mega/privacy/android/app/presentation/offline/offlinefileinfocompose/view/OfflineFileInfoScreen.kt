@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
+import androidx.compose.ui.unit.dp
 import mega.privacy.android.app.MimeTypeThumbnail
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.fileinfo.view.FileInfoHeader
@@ -22,13 +23,13 @@ import mega.privacy.android.app.presentation.fileinfo.view.MENU_ACTIONS_TO_SHOW
 import mega.privacy.android.app.presentation.fileinfo.view.PreviewWithShadow
 import mega.privacy.android.app.presentation.fileinfo.view.TEST_TAG_TOP_APPBAR
 import mega.privacy.android.app.presentation.offline.offlinefileinfocompose.model.OfflineFileInfoUiState
-import mega.privacy.android.core.ui.controls.appbar.AppBarForCollapsibleHeader
-import mega.privacy.android.core.ui.controls.appbar.AppBarType
-import mega.privacy.android.core.ui.controls.dialogs.MegaAlertDialog
-import mega.privacy.android.core.ui.controls.layouts.ScaffoldWithCollapsibleHeader
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.controls.appbar.AppBarForCollapsibleHeader
+import mega.privacy.android.shared.original.core.ui.controls.appbar.AppBarType
+import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDialog
+import mega.privacy.android.shared.original.core.ui.controls.layouts.ScaffoldWithCollapsibleHeader
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.domain.entity.offline.OfflineFolderInfo
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import java.time.Instant
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
@@ -76,7 +77,8 @@ internal fun OfflineFileInfoScreen(
                 iconResource = iconResource,
                 accessPermissionDescription = null,
             )
-        }
+        },
+        headerSpacerHeight = if (iconResource != null) (MAX_HEADER_HEIGHT + APP_BAR_HEIGHT).dp else MAX_HEADER_HEIGHT.dp,
     ) {
         OfflineFileInfoContent(uiState = uiState, onRemoveFromOffline = {
             showRemoveFromOfflineDialog = true
@@ -102,7 +104,7 @@ private fun OfflineFileInfoScreenPreview(
     @PreviewParameter(OfflineFileInfoViewStatePreviewsProvider::class) state: OfflineFileInfoUiState,
 ) {
     val uiState by mutableStateOf(state) // Not remembered to allow multiple states in the device, don't do that in real code, just in previews
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         OfflineFileInfoScreen(
             uiState = uiState,
             modifier = Modifier.background(color = MaterialTheme.colors.background),
@@ -154,3 +156,6 @@ internal class OfflineFileInfoViewStatePreviewsProvider :
         )
     }
 }
+
+private const val MAX_HEADER_HEIGHT = 96
+private const val APP_BAR_HEIGHT = 56

@@ -1,8 +1,10 @@
 package mega.privacy.android.data.repository.chat
 
 import android.content.res.Resources.NotFoundException
+import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.data.cache.Cache
@@ -19,6 +21,7 @@ import mega.privacy.android.data.mapper.chat.messages.PendingMessageMapper
 import mega.privacy.android.data.mapper.chat.paging.TypedMessagePagingSourceMapper
 import mega.privacy.android.data.mapper.handles.HandleListMapper
 import mega.privacy.android.data.mapper.handles.MegaHandleListMapper
+import mega.privacy.android.domain.entity.Progress
 import mega.privacy.android.domain.entity.chat.ChatMessage
 import mega.privacy.android.domain.entity.chat.ChatMessageType
 import mega.privacy.android.domain.entity.chat.PendingMessage
@@ -66,6 +69,7 @@ class ChatMessageRepositoryImplTest {
     private val pendingMessageMapper = mock<PendingMessageMapper>()
     private val typedMessageEntityConverters = mock<TypedMessageEntityConverters>()
     private val originalPathCache = mock<Cache<Map<NodeId, String>>>()
+    private val originalPathForPendingMessageCache = mock<Cache<Map<Long, String>>>()
     private val typedMessagePagingSourceMapper = mock<TypedMessagePagingSourceMapper>()
     private val megaChatErrorSuccess = mock<MegaChatError> {
         on { errorCode }.thenReturn(MegaChatError.ERROR_OK)
@@ -89,6 +93,7 @@ class ChatMessageRepositoryImplTest {
             pendingMessageMapper = pendingMessageMapper,
             typedMessageEntityConverters = typedMessageEntityConverters,
             originalPathCache = originalPathCache,
+            originalPathForPendingMessageCache = originalPathForPendingMessageCache,
             typedMessagePagingSourceMapper = typedMessagePagingSourceMapper,
         )
     }
@@ -329,6 +334,21 @@ class ChatMessageRepositoryImplTest {
     }
 
     @Test
+    fun `test that updatePendingMessage invokes gateway update when there are multiple updates`() =
+        runTest {
+            val updatePendingMessageRequest1 = mock<UpdatePendingMessageStateRequest>()
+            val updatePendingMessageRequest2 = mock<UpdatePendingMessageStateRequest>()
+            underTest.updatePendingMessage(
+                updatePendingMessageRequest1,
+                updatePendingMessageRequest2
+            )
+            verify(chatStorageGateway).updatePendingMessage(
+                updatePendingMessageRequest1,
+                updatePendingMessageRequest2
+            )
+        }
+
+    @Test
     fun `test that forward contact invokes api and returns the message`() = runTest {
         val chatMessage = mock<MegaChatMessage>()
         val message = mock<ChatMessage>()
@@ -495,6 +515,27 @@ class ChatMessageRepositoryImplTest {
     }
 
     @Test
+    fun `test that original path for pending message is added to the cache`() {
+        val newId = 2L
+        val newPath = "someInterestingPath/image.jpg"
+        whenever(originalPathForPendingMessageCache.get()).thenReturn(emptyMap())
+        underTest.cacheOriginalPathForPendingMessage(newId, newPath)
+        verify(originalPathForPendingMessageCache).set(eq(mapOf(newId to newPath)))
+    }
+
+    @Test
+    fun `test that original path for pending message is added to the cache when it's not empty`() {
+        val originalId = 1L
+        val originalPath = "originalPath/video.mp4"
+        val previousCache = mapOf(originalId to originalPath)
+        val newId = 2L
+        val newPath = "someInterestingPath/image.jpg"
+        whenever(originalPathForPendingMessageCache.get()).thenReturn(previousCache)
+        underTest.cacheOriginalPathForPendingMessage(newId, newPath)
+        verify(originalPathForPendingMessageCache).set(eq(previousCache + (newId to newPath)))
+    }
+
+    @Test
     internal fun `test that truncate messages calls the function on the message gateway`() =
         runTest {
             val truncateTimestamp = 23456L
@@ -548,4 +589,92 @@ class ChatMessageRepositoryImplTest {
 
         verify(chatStorageGateway).clearAllData()
     }
+
+    @ParameterizedTest
+    @EnumSource(PendingMessageState::class)
+    fun `test that monitorPendingMessagesByState returns mapped entities from gateway`(
+        state: PendingMessageState,
+    ) = runTest {
+        val idsRange = (0..10)
+        val expected = idsRange.map { mock<PendingMessage>() }
+        val entities = idsRange.map { mock<PendingMessageEntity>() }
+        idsRange.forEach { index ->
+            whenever(pendingMessageMapper(entities[index])).thenReturn(expected[index])
+        }
+
+        whenever(chatStorageGateway.fetchPendingMessages(state)).thenReturn(flowOf(entities))
+
+        underTest.monitorPendingMessagesByState(state).test {
+            val actual = awaitItem()
+            assertThat(actual).isEqualTo(expected)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `test that monitorPendingMessagesByState returns mapped entities from gateway when there are multiple states`() =
+        runTest {
+            val states = arrayOf(PendingMessageState.PREPARING, PendingMessageState.READY_TO_UPLOAD)
+            val idsRange = (0..10)
+            val expected = idsRange.map { mock<PendingMessage>() }
+            val entities = idsRange.map { mock<PendingMessageEntity>() }
+            idsRange.forEach { index ->
+                whenever(pendingMessageMapper(entities[index])).thenReturn(expected[index])
+            }
+
+            whenever(chatStorageGateway.fetchPendingMessages(states = states)).thenReturn(
+                flowOf(
+                    entities
+                )
+            )
+
+            underTest.monitorPendingMessagesByState(states = states).test {
+                val actual = awaitItem()
+                assertThat(actual).isEqualTo(expected)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `test that clearPendingMessagesCompressionProgress clears the flow`() =
+        runTest {
+            underTest.clearPendingMessagesCompressionProgress() // to be sure we start with an empty flow
+
+            val pendingMessage = mock<PendingMessage> {
+                on { this.state } doReturn PendingMessageState.COMPRESSING.value
+                on { this.id } doReturn 15L
+            }
+
+            underTest.monitorPendingMessagesCompressionProgress().test {
+                assertThat(awaitItem()).isEmpty()
+                underTest.updatePendingMessagesCompressionProgress(
+                    Progress(0.5f),
+                    listOf(pendingMessage)
+                )
+                assertThat(awaitItem()).isNotEmpty()
+                underTest.clearPendingMessagesCompressionProgress()
+                assertThat(awaitItem()).isEmpty()
+            }
+        }
+
+    fun `test that updatePendingMessagesCompressionProgress emits a new flow value with the new updated progress`() =
+        runTest {
+            underTest.clearPendingMessagesCompressionProgress() // to be sure we start with an empty flow
+
+            val expected = Progress(0.5f)
+            val id = 15L
+            val pendingMessage = mock<PendingMessage> {
+                on { this.state } doReturn PendingMessageState.COMPRESSING.value
+                on { this.id } doReturn id
+            }
+
+
+            underTest.monitorPendingMessagesCompressionProgress().test {
+                assertThat(awaitItem()).isEmpty()
+                underTest.updatePendingMessagesCompressionProgress(expected, listOf(pendingMessage))
+                assertThat(awaitItem()[id]).isEqualTo(expected)
+            }
+
+            underTest.clearPendingMessagesCompressionProgress() // to don't affect next tests
+        }
 }

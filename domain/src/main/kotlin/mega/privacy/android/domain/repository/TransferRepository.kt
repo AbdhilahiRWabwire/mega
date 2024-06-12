@@ -556,4 +556,24 @@ interface TransferRepository {
      * @return true if the user can choose download's destination. False means downloads will be saved to default destination. See [settingsRepository.setDefaultStorageDownloadLocation()]
      */
     suspend fun allowUserToSetDownloadDestination(): Boolean
+
+    /**
+     * Monitors ask resume transfers.
+     */
+    fun monitorAskedResumeTransfers(): StateFlow<Boolean>
+
+    /**
+     * Set ask resume transfers.
+     */
+    suspend fun setAskedResumeTransfers()
+
+    /**
+     * Starts the uploads worker to monitor the uploads transfers as a foreground service
+     */
+    suspend fun startUploadsWorker()
+
+    /**
+     * @return a flow that emits true if UploadsWorker is enqueued. false otherwise
+     */
+    fun isUploadsWorkerEnqueuedFlow(): Flow<Boolean>
 }

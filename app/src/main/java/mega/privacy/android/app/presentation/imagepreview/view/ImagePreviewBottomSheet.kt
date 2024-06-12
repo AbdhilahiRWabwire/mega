@@ -43,14 +43,14 @@ import kotlinx.coroutines.flow.collectLatest
 import mega.privacy.android.app.R
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.app.utils.MegaNodeUtil.getInfoText
-import mega.privacy.android.core.ui.controls.lists.MenuActionListTile
-import mega.privacy.android.core.ui.controls.sheets.BottomSheet
-import mega.privacy.android.core.ui.controls.text.MiddleEllipsisText
-import mega.privacy.android.core.ui.theme.grey_alpha_070
-import mega.privacy.android.core.ui.theme.teal_200
-import mega.privacy.android.core.ui.theme.teal_300
-import mega.privacy.android.core.ui.theme.tokens.TextColor
-import mega.privacy.android.core.ui.theme.white_alpha_070
+import mega.privacy.android.shared.original.core.ui.controls.lists.MenuActionListTile
+import mega.privacy.android.shared.original.core.ui.controls.sheets.BottomSheet
+import mega.privacy.android.shared.original.core.ui.controls.text.MiddleEllipsisText
+import mega.privacy.android.shared.original.core.ui.theme.grey_alpha_070
+import mega.privacy.android.shared.original.core.ui.theme.teal_200
+import mega.privacy.android.shared.original.core.ui.theme.teal_300
+import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
+import mega.privacy.android.shared.original.core.ui.theme.white_alpha_070
 import mega.privacy.android.domain.entity.account.AccountDetail
 import mega.privacy.android.domain.entity.imageviewer.ImageResult
 import mega.privacy.android.domain.entity.node.ImageNode
@@ -76,6 +76,7 @@ internal fun ImagePreviewBottomSheet(
     showRenameMenu: suspend (ImageNode) -> Boolean,
     showHideMenu: suspend (ImageNode) -> Boolean,
     showUnhideMenu: suspend (ImageNode) -> Boolean,
+    forceHideHiddenMenus: () -> Boolean,
     showMoveMenu: suspend (ImageNode) -> Boolean,
     showCopyMenu: suspend (ImageNode) -> Boolean,
     showRestoreMenu: suspend (ImageNode) -> Boolean,
@@ -412,7 +413,7 @@ internal fun ImagePreviewBottomSheet(
                     )
                 }
 
-                if (isHiddenNodesEnabled && accountType != null && (!accountType.isPaid || isHideMenuVisible && isHiddenNodesOnboarded != null)) {
+                if (isHiddenNodesEnabled && !forceHideHiddenMenus() && accountType != null && (!accountType.isPaid || (isHideMenuVisible && isHiddenNodesOnboarded != null))) {
                     MenuActionListTile(
                         icon = painterResource(id = Rpack.drawable.ic_eye_off_medium_regular_outline),
                         text = stringResource(id = R.string.general_hide_node),
@@ -442,7 +443,7 @@ internal fun ImagePreviewBottomSheet(
                     )
                 }
 
-                if (isHiddenNodesEnabled && accountType?.isPaid == true && isUnhideMenuVisible) {
+                if (isHiddenNodesEnabled && !forceHideHiddenMenus() && accountType?.isPaid == true && isUnhideMenuVisible) {
                     MenuActionListTile(
                         icon = painterResource(id = Rpack.drawable.ic_eye_medium_regular_outline),
                         text = stringResource(id = R.string.general_unhide_node),

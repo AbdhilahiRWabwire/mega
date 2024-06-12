@@ -3,6 +3,8 @@ package mega.privacy.android.domain.usecase.node
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import mega.privacy.android.domain.entity.node.MoveRequestResult
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.exception.extension.shouldEmitErrorForNodeMovement
@@ -25,13 +27,16 @@ class CopyNodesUseCase @Inject constructor(
      */
     suspend operator fun invoke(nodes: Map<Long, Long>): MoveRequestResult {
         val results = coroutineScope {
+            val semaphore = Semaphore(10)
             nodes.map { (nodeHandle, destinationHandle) ->
                 async {
-                    runCatching {
-                        copyNodeUseCase(NodeId(nodeHandle), NodeId(destinationHandle), null)
-                    }.recover {
-                        if (it.shouldEmitErrorForNodeMovement()) throw it
-                        return@async Result.failure(it)
+                    semaphore.withPermit {
+                        runCatching {
+                            copyNodeUseCase(NodeId(nodeHandle), NodeId(destinationHandle), null)
+                        }.recover {
+                            if (it.shouldEmitErrorForNodeMovement()) throw it
+                            return@async Result.failure(it)
+                        }
                     }
                 }
             }

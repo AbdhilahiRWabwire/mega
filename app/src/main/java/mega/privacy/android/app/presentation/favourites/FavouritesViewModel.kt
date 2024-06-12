@@ -3,6 +3,7 @@ package mega.privacy.android.app.presentation.favourites
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,9 +14,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import mega.privacy.android.app.MimeTypeList
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.favourites.facade.StringUtilWrapper
 import mega.privacy.android.app.presentation.favourites.model.Favourite
+import mega.privacy.android.app.presentation.favourites.model.FavouriteItem
 import mega.privacy.android.app.presentation.favourites.model.FavouriteListItem
 import mega.privacy.android.app.presentation.favourites.model.FavouriteLoadState
 import mega.privacy.android.app.presentation.favourites.model.mapper.FavouriteMapper
@@ -27,15 +31,19 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
+import mega.privacy.android.domain.qualifier.DefaultDispatcher
 import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsHidingActionAllowedUseCase
 import mega.privacy.android.domain.usecase.favourites.GetAllFavoritesUseCase
 import mega.privacy.android.domain.usecase.favourites.GetFavouriteSortOrderUseCase
 import mega.privacy.android.domain.usecase.favourites.IsAvailableOfflineUseCase
 import mega.privacy.android.domain.usecase.favourites.MapFavouriteSortOrderUseCase
 import mega.privacy.android.domain.usecase.favourites.RemoveFavouritesUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
+import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -68,9 +76,14 @@ class FavouritesViewModel @Inject constructor(
     private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase,
     private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
     private val isHiddenNodesOnboardedUseCase: IsHiddenNodesOnboardedUseCase,
+    private val monitorShowHiddenItemsUseCase: MonitorShowHiddenItemsUseCase,
+    @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
+    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
+    private val isHidingActionAllowedUseCase: IsHidingActionAllowedUseCase,
 ) : ViewModel() {
 
     private val query = MutableStateFlow<String?>(null)
+    private var isConnected: Boolean = true
     private lateinit var order: MutableStateFlow<FavouriteSortOrder>
     private val selected = MutableStateFlow<Set<NodeId>>(emptySet())
     private val _state =
@@ -85,7 +98,7 @@ class FavouritesViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            combineInitFlows()
+            getFavouriteLoadStateFlow()
                 .catch { Timber.e(it) }
                 .collectLatest { newState ->
                     _state.update { newState }
@@ -93,11 +106,9 @@ class FavouritesViewModel @Inject constructor(
         }
     }
 
-    private suspend fun combineInitFlows(): Flow<FavouriteLoadState> {
-        val accountDetailFlow = monitorAccountDetailUseCase()
-        val isHiddenNodesOnboardedFlow = flowOf(isHiddenNodesOnboardedUseCase())
+    private suspend fun combineFavouriteLoadStateFlow(): Flow<FavouriteLoadState> {
         order = MutableStateFlow(getFavouriteSortOrderUseCase())
-        val favouritesFlow = combine(
+        return combine(
             order,
             query,
             getAllFavoritesUseCase(),
@@ -105,19 +116,59 @@ class FavouritesViewModel @Inject constructor(
             monitorConnectivityUseCase(),
             ::mapToFavourite
         )
+    }
 
-        return combine(
-            accountDetailFlow,
-            isHiddenNodesOnboardedFlow,
+    private suspend fun getFavouriteLoadStateFlow(): Flow<FavouriteLoadState> {
+        val favouritesFlow = combineFavouriteLoadStateFlow()
+        return if (getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)) {
+            val accountDetailFlow = monitorAccountDetailUseCase()
+            val isHiddenNodesOnboardedFlow = flowOf(isHiddenNodesOnboardedUseCase())
+            combine(
+                accountDetailFlow,
+                isHiddenNodesOnboardedFlow,
+                favouritesFlow,
+                monitorShowHiddenItemsUseCase(),
+                query,
+            ) { accountDetail, isHiddenNodesOnboarded, favouritesState, showHiddenItems, search ->
+                if (favouritesState is FavouriteLoadState.Success) {
+                    val filteredItems = filterNonSensitiveItems(
+                        items = favouritesState.favourites,
+                        showHiddenItems = showHiddenItems,
+                        isPaid = accountDetail.levelDetail?.accountType?.isPaid,
+                    )
+                    if (filteredItems.any { it is FavouriteListItem }) {
+                        favouritesState.copy(
+                            favourites = filteredItems,
+                            accountDetail = accountDetail,
+                            isHiddenNodesOnboarded = isHiddenNodesOnboarded
+                        )
+                    } else {
+                        FavouriteLoadState.Empty(search != null, isConnected)
+                    }
+                } else {
+                    favouritesState
+                }
+            }
+        } else {
             favouritesFlow
-        ) { accountDetail, isHiddenNodesOnboarded, favouritesState ->
-            if (favouritesState is FavouriteLoadState.Success) {
-                favouritesState.copy(
-                    accountDetail = accountDetail,
-                    isHiddenNodesOnboarded = isHiddenNodesOnboarded
-                )
-            } else {
-                favouritesState
+        }
+    }
+
+    private suspend fun filterNonSensitiveItems(
+        items: List<FavouriteItem>,
+        showHiddenItems: Boolean?,
+        isPaid: Boolean?,
+    ) = withContext(defaultDispatcher) {
+        showHiddenItems ?: return@withContext items
+        isPaid ?: return@withContext items
+
+        return@withContext if (showHiddenItems || !isPaid) {
+            items
+        } else {
+            items.filter {
+                it.favourite?.typedNode?.let { typedNode ->
+                    !typedNode.isMarkedSensitive && !typedNode.isSensitiveInherited
+                } ?: true
             }
         }
     }
@@ -129,6 +180,7 @@ class FavouritesViewModel @Inject constructor(
         selectedNodes: Set<NodeId>,
         isConnected: Boolean,
     ): FavouriteLoadState {
+        this@FavouritesViewModel.isConnected = isConnected
         return if (nodes.isEmpty()) FavouriteLoadState.Empty(search != null, isConnected)
         else FavouriteLoadState.Success(
             favourites = createFavouriteItemsList(order, nodes, search, selectedNodes),
@@ -342,4 +394,10 @@ class FavouritesViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Check if the current node can be hidden
+     */
+    suspend fun isHidingActionAllowed(nodeId: NodeId): Boolean =
+        isHidingActionAllowedUseCase(nodeId)
 }

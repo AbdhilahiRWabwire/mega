@@ -1,10 +1,12 @@
 package mega.privacy.android.app.presentation.fileinfo.view
 
+import mega.privacy.android.shared.resources.R as sharedR
 import android.annotation.SuppressLint
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -28,10 +30,10 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.fileinfo.model.FileInfoViewState
 import mega.privacy.android.app.presentation.fileinfo.view.sharedinfo.SharedInfoView
 import mega.privacy.android.app.utils.Util
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.grey_alpha_012_white_alpha_012
 import mega.privacy.android.domain.entity.contacts.ContactPermission
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_alpha_012_white_alpha_012
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * Content for FileInfo screen, all except toolbar, bottom sheets, dialogs
@@ -51,6 +53,7 @@ internal fun FileInfoContent(
     onShowMoreContactsClick: () -> Unit,
     onPublicLinkCopyClick: () -> Unit,
     onVerifyContactClick: (String) -> Unit,
+    onSetDescriptionClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var isShareContactExpanded by remember { mutableStateOf(false) }
@@ -58,7 +61,7 @@ internal fun FileInfoContent(
         modifier = modifier
     ) {
         val paddingEnd = Modifier.padding(end = 16.dp)
-        val paddingHorizontal = Modifier.padding(start = 72.dp, end = 16.dp)
+        val paddingHorizontal = Modifier.padding(start = paddingStartDefault.dp, end = 16.dp)
         with(viewState) {
             //take down alert
             var showTakeDownWarning by remember(isTakenDown) { mutableStateOf(isTakenDown) }
@@ -86,7 +89,7 @@ internal fun FileInfoContent(
                             .testTag(TEST_TAG_LOCATION)
                     )
                 }
-                FileInfoContentDivider(16.dp)
+                FileInfoContentDivider()
             }
 
             //available offline
@@ -190,9 +193,22 @@ internal fun FileInfoContent(
                 )
             }
 
+            //description
+            if (nodeDescriptionEnabled) {
+                FileInfoDescriptionField(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    descriptionText = descriptionText,
+                    labelId = sharedR.string.file_info_information_description_label,
+                    placeholderId = sharedR.string.file_info_information_description_placeholder.takeIf { isDescriptionEnabled() },
+                    isEditable = isDescriptionEnabled(),
+                    onConfirmDescription = onSetDescriptionClick,
+                )
+            }
+
             //link
             if (showLink && publicLink != null) {
-                FileInfoContentDivider(paddingBottom = 8.dp)
                 ShareLinkView(
                     link = publicLink,
                     date = publicLinkCreationTime ?: 0,
@@ -231,7 +247,7 @@ private fun FileInfoContentPreview(
 ) {
     val scrollState = rememberScrollState()
     var state by mutableStateOf(viewState) //not remembered to allow multiple states in device, don't do that in real code, just in previews
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         FileInfoContent(
             viewState = state,
             onTakeDownLinkClick = {},
@@ -248,6 +264,7 @@ private fun FileInfoContentPreview(
             onPublicLinkCopyClick = {},
             onLocationClick = {},
             onVerifyContactClick = {},
+            onSetDescriptionClick = {},
             modifier = Modifier.verticalScroll(scrollState)
         )
     }

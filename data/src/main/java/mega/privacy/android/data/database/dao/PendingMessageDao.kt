@@ -4,11 +4,14 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import mega.privacy.android.data.database.entity.chat.PendingMessageEntity
 import mega.privacy.android.domain.entity.chat.PendingMessageState
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageRequest
 import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateAndNodeHandleRequest
+import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateAndPathRequest
 import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateRequest
 import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageTransferTagRequest
 
@@ -45,6 +48,30 @@ interface PendingMessageDao {
     suspend fun update(updatePendingMessageStateRequest: UpdatePendingMessageStateRequest)
 
     /**
+     * Update multiple pending messages in a single transaction
+     *
+     * @param updatePendingMessageStateRequests
+     */
+    @Transaction
+    suspend fun updateMultiple(updatePendingMessageStateRequests: List<UpdatePendingMessageRequest>) {
+        for (request in updatePendingMessageStateRequests) {
+            when (request) {
+                is UpdatePendingMessageStateRequest ->
+                    update(request)
+
+                is UpdatePendingMessageStateAndNodeHandleRequest ->
+                    update(request)
+
+                is UpdatePendingMessageTransferTagRequest ->
+                    update(request)
+
+                is UpdatePendingMessageStateAndPathRequest ->
+                    update(request)
+            }
+        }
+    }
+
+    /**
      * Update the pending message
      *
      * @param updatePendingMessageStateAndNodeHandleRequest
@@ -59,6 +86,14 @@ interface PendingMessageDao {
      */
     @Update(entity = PendingMessageEntity::class)
     suspend fun update(updatePendingMessageTransferTagRequest: UpdatePendingMessageTransferTagRequest)
+
+    /**
+     * Update the pending message
+     *
+     * @param updatePendingMessageStateAndPathRequest
+     */
+    @Update(entity = PendingMessageEntity::class)
+    suspend fun update(updatePendingMessageStateAndPathRequest: UpdatePendingMessageStateAndPathRequest)
 
     /**
      * Delete
@@ -92,6 +127,15 @@ interface PendingMessageDao {
     @Query("SELECT * FROM pending_messages WHERE chatId = :chatId")
     fun fetchPendingMessagesForChat(chatId: Long): Flow<List<PendingMessageEntity>>
 
+
+    /**
+     * Fetch pending messages of a specific state
+     *
+     * @param state
+     * @return flow of pending messages of the specific state
+     */
+    @Query("SELECT * FROM pending_messages WHERE state in (:states)")
+    fun fetchPendingMessagesByState(states: List<PendingMessageState>): Flow<List<PendingMessageEntity>>
 
     /**
      * Delete

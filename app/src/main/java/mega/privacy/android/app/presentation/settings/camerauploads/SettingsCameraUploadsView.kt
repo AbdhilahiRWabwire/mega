@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.settings.camerauploads
 
+import android.app.Activity.RESULT_OK
 import android.widget.Toast
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -33,7 +34,7 @@ import androidx.lifecycle.LifecycleOwner
 import de.palm.composestateevents.EventEffect
 import de.palm.composestateevents.StateEvent
 import mega.privacy.android.app.R
-import mega.privacy.android.app.constants.SettingsConstants.SELECTED_MEGA_FOLDER
+import mega.privacy.android.app.main.FileExplorerActivity
 import mega.privacy.android.app.main.FileStorageActivity
 import mega.privacy.android.app.presentation.settings.camerauploads.business.BusinessAccountPromptHandler
 import mega.privacy.android.app.presentation.settings.camerauploads.dialogs.FileUploadDialog
@@ -61,12 +62,12 @@ import mega.privacy.android.app.presentation.settings.camerauploads.tiles.Requir
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.UploadOnlyWhileChargingTile
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.VideoCompressionTile
 import mega.privacy.android.app.presentation.settings.camerauploads.tiles.VideoQualityTile
-import mega.privacy.android.core.ui.controls.appbar.AppBarType
-import mega.privacy.android.core.ui.controls.appbar.MegaAppBar
-import mega.privacy.android.core.ui.controls.layouts.MegaScaffold
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.controls.appbar.AppBarType
+import mega.privacy.android.shared.original.core.ui.controls.appbar.MegaAppBar
+import mega.privacy.android.shared.original.core.ui.controls.layouts.MegaScaffold
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.domain.entity.node.NodeId
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * A Composable that holds views displaying the main Settings Camera Uploads screen
@@ -147,26 +148,38 @@ internal fun SettingsCameraUploadsView(
     val cameraUploadsLocalFolderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
     ) {
-        val primaryFolderLocalPath = it.data?.getStringExtra(FileStorageActivity.EXTRA_PATH)
-        onLocalPrimaryFolderSelected.invoke(primaryFolderLocalPath)
+        if (it.resultCode == RESULT_OK) {
+            val primaryFolderLocalPath = it.data?.getStringExtra(FileStorageActivity.EXTRA_PATH)
+            onLocalPrimaryFolderSelected.invoke(primaryFolderLocalPath)
+        }
     }
     val mediaUploadsLocalFolderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
     ) {
-        val secondaryFolderLocalPath = it.data?.getStringExtra(FileStorageActivity.EXTRA_PATH)
-        onLocalSecondaryFolderSelected.invoke(secondaryFolderLocalPath)
+        if (it.resultCode == RESULT_OK) {
+            val secondaryFolderLocalPath = it.data?.getStringExtra(FileStorageActivity.EXTRA_PATH)
+            onLocalSecondaryFolderSelected.invoke(secondaryFolderLocalPath)
+        }
     }
     val cameraUploadsFolderNodeLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
     ) {
-        val primaryFolderNodeId = NodeId(it.data?.getLongExtra(SELECTED_MEGA_FOLDER, -1L) ?: -1L)
-        onPrimaryFolderNodeSelected.invoke(primaryFolderNodeId)
+        if (it.resultCode == RESULT_OK) {
+            val primaryFolderNodeId = NodeId(
+                it.data?.getLongExtra(FileExplorerActivity.EXTRA_MEGA_SELECTED_FOLDER, -1L) ?: -1L
+            )
+            onPrimaryFolderNodeSelected.invoke(primaryFolderNodeId)
+        }
     }
     val mediaUploadsFolderNodeLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
-        val secondaryFolderNodeId = NodeId(it.data?.getLongExtra(SELECTED_MEGA_FOLDER, -1L) ?: -1L)
-        onSecondaryFolderNodeSelected.invoke(secondaryFolderNodeId)
+        if (it.resultCode == RESULT_OK) {
+            val secondaryFolderNodeId = NodeId(
+                it.data?.getLongExtra(FileExplorerActivity.EXTRA_MEGA_SELECTED_FOLDER, -1L) ?: -1L
+            )
+            onSecondaryFolderNodeSelected.invoke(secondaryFolderNodeId)
+        }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -373,7 +386,7 @@ internal fun SettingsCameraUploadsView(
 private fun SettingsCameraUploadsViewPreview(
     @PreviewParameter(SettingsCameraUploadsViewParameterProvider::class) uiState: SettingsCameraUploadsUiState,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         SettingsCameraUploadsView(
             uiState = uiState,
             onBusinessAccountPromptDismissed = {},

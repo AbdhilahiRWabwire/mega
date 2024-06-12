@@ -34,7 +34,6 @@ import com.google.android.material.switchmaterial.SwitchMaterial
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
-import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.MimeTypeList.Companion.typeForName
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.WebViewActivity
@@ -64,13 +63,11 @@ import mega.privacy.android.app.presentation.contact.authenticitycredendials.Aut
 import mega.privacy.android.app.presentation.fileinfo.FileInfoActivity
 import mega.privacy.android.app.presentation.hidenode.HiddenNodesOnboardingActivity
 import mega.privacy.android.app.presentation.manager.model.SharesTab
-import mega.privacy.android.app.presentation.search.SearchViewModel
 import mega.privacy.android.app.presentation.transfers.starttransfer.StartDownloadViewModel
 import mega.privacy.android.app.utils.AlertDialogUtil.dismissAlertDialogIfExists
 import mega.privacy.android.app.utils.AlertDialogUtil.isAlertDialogShown
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.ContactUtil
-import mega.privacy.android.app.utils.FileUtil
 import mega.privacy.android.app.utils.MegaApiUtils
 import mega.privacy.android.app.utils.MegaNodeDialogUtil.BACKUP_NONE
 import mega.privacy.android.app.utils.MegaNodeUtil.checkBackupNodeTypeByHandle
@@ -94,14 +91,9 @@ import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
-import mega.privacy.mobile.analytics.event.SearchResultGetLinkMenuItemEvent
-import mega.privacy.mobile.analytics.event.SearchResultOpenWithMenuItemEvent
-import mega.privacy.mobile.analytics.event.SearchResultSaveToDeviceMenuItemEvent
-import mega.privacy.mobile.analytics.event.SearchResultShareMenuItemEvent
 import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaShare
 import timber.log.Timber
-import java.io.File
 import javax.inject.Inject
 
 /**
@@ -117,7 +109,6 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
     private var isHiddenNodesEnabled: Boolean = false
 
     private val nodeOptionsViewModel: NodeOptionsViewModel by viewModels()
-    private val searchViewModel: SearchViewModel by activityViewModels()
     private val startDownloadViewModel: StartDownloadViewModel by activityViewModels()
 
     /**
@@ -287,18 +278,12 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                 optionInfo.setOnClickListener { onClick { onInfoClicked(node) } }
                 optionLink.setOnClickListener {
                     onClick {
-                        if (drawerItem == DrawerItem.SEARCH) {
-                            Analytics.tracker.trackEvent(SearchResultGetLinkMenuItemEvent)
-                        }
                         onLinkClicked(node)
                     }
                 }
                 optionRemoveLink.setOnClickListener { onClick { onRemoveLinkClicked(node) } }
                 optionShare.setOnClickListener {
                     onClick {
-                        if (drawerItem == DrawerItem.SEARCH) {
-                            Analytics.tracker.trackEvent(SearchResultShareMenuItemEvent)
-                        }
                         shareNode(requireActivity(), node)
                     }
                 }
@@ -322,9 +307,6 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                 optionSlideshow.setOnClickListener { onClick { onSlideShowClicked(node) } }
                 optionOpenWith.setOnClickListener {
                     onClick {
-                        if (drawerItem == DrawerItem.SEARCH) {
-                            Analytics.tracker.trackEvent(SearchResultOpenWithMenuItemEvent)
-                        }
                         onOpenWithClicked(node)
                     }
                 }
@@ -429,7 +411,7 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                 optionLabel.visibility = if (isTakenDown) View.GONE else View.VISIBLE
                 optionFavourite.visibility = if (isTakenDown) View.GONE else View.VISIBLE
                 optionHideLayout.visibility =
-                    if (isHiddenNodesEnabled && accountType != null && isHiddenNodesOnboarded != null && state.isHidingActionAllowed)
+                    if (isHiddenNodesEnabled && mode != SHARED_ITEMS_MODE && accountType != null && isHiddenNodesOnboarded != null && state.isHidingActionAllowed)
                         View.VISIBLE
                     else
                         View.GONE
@@ -767,11 +749,9 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                     ) == true
                 ) {
                     contentView.post {
-                        cannotOpenFileDialog = this.showCannotOpenFileDialog(
-                            requireActivity(),
-                            node,
-                            (requireActivity() as ManagerActivity)::saveNodeByTap
-                        )
+                        cannotOpenFileDialog = this.showCannotOpenFileDialog(requireActivity()) {
+                            (requireActivity() as ManagerActivity).saveNodeByTap(node)
+                        }
                     }
                 }
             }
@@ -1241,22 +1221,7 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
      * @param node The [MegaNode] to be downloaded
      */
     private fun onDownloadClicked(node: MegaNode) {
-        if (drawerItem == DrawerItem.SEARCH) {
-            Analytics.tracker.trackEvent(SearchResultSaveToDeviceMenuItemEvent)
-        }
-        lifecycleScope.launch {
-            if (startDownloadViewModel.shouldDownloadWithDownloadWorker()) {
-                startDownloadViewModel.onDownloadClicked(NodeId(node.handle))
-            } else {
-                (activity as? ManagerActivity)?.saveNodesToDevice(
-                    nodes = listOf(node),
-                    highPriority = false,
-                    isFolderLink = false,
-                    fromMediaViewer = false,
-                    fromChat = false,
-                )
-            }
-        }
+        startDownloadViewModel.onDownloadClicked(NodeId(node.handle))
         setStateBottomSheetBehaviorHidden()
     }
 
@@ -1324,16 +1289,7 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
             refreshView()
             Util.showSnackbar(activity, resources.getString(R.string.file_removed_offline))
         } else {
-            lifecycleScope.launch {
-                if (startDownloadViewModel.shouldDownloadWithDownloadWorker()) {
-                    startDownloadViewModel.onSaveOfflineClicked(NodeId(node.handle))
-                } else {
-                    saveForOffline(
-                        node = node,
-                        nodeDeviceCenterInformation = nodeDeviceCenterInformation,
-                    )
-                }
-            }
+            startDownloadViewModel.onSaveOfflineClicked(NodeId(node.handle))
         }
         setStateBottomSheetBehaviorHidden()
     }
@@ -1442,7 +1398,6 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
     }
 
     private fun onOpenFolderClicked(node: MegaNode) {
-        searchViewModel.setTextSubmitted(true)
         nodeController.openFolderFromSearch(node.handle)
         dismissAllowingStateLoss()
         setStateBottomSheetBehaviorHidden()
@@ -1452,9 +1407,10 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
         if (nodeOptionsViewModel.isFilePreviewOnline(node = node)) {
             openWith(
                 context = requireActivity(),
-                node = node,
-                (requireActivity() as ManagerActivity)::saveNodeByOpenWith
-            )
+                node = node
+            ) {
+                (requireActivity() as ManagerActivity).saveNodeByOpenWith(node)
+            }
         } else {
             onNodeTapped(
                 requireActivity(),
@@ -1510,65 +1466,9 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
             DrawerItem.CLOUD_DRIVE, DrawerItem.RUBBISH_BIN -> (requireActivity() as ManagerActivity).onNodesCloudDriveUpdate()
             DrawerItem.BACKUPS -> (requireActivity() as ManagerActivity).onNodesBackupsUpdate()
             DrawerItem.SHARED_ITEMS -> (requireActivity() as ManagerActivity).refreshSharesFragments()
-            DrawerItem.SEARCH -> (requireActivity() as ManagerActivity).onNodesSearchUpdate()
 
             else -> {}
         }
-    }
-
-    /**
-     * Saves the selected [MegaNode] Offline, causing it to appear in the "Offline" section
-     *
-     * @param node A potentially nullable [MegaNode]
-     * @param nodeDeviceCenterInformation Contains specific information of a Device Center Node to
-     * be displayed
-     */
-    private fun saveForOffline(
-        node: MegaNode?,
-        nodeDeviceCenterInformation: NodeDeviceCenterInformation?,
-    ) {
-        val originatingFeature = when (drawerItem) {
-            DrawerItem.BACKUPS -> Constants.FROM_BACKUPS
-            DrawerItem.DEVICE_CENTER -> {
-                if (nodeDeviceCenterInformation?.isBackupsFolder == true) {
-                    Constants.FROM_BACKUPS
-                } else {
-                    Constants.FROM_OTHERS
-                }
-            }
-
-            DrawerItem.SHARED_ITEMS -> {
-                if ((requireActivity() as? ManagerActivity)?.tabItemShares === SharesTab.INCOMING_TAB) {
-                    Constants.FROM_INCOMING_SHARES
-                } else {
-                    Constants.FROM_OTHERS
-                }
-            }
-
-            else -> Constants.FROM_OTHERS
-        }
-        val offlineParent =
-            OfflineUtils.getOfflineParentFile(requireActivity(), originatingFeature, node, megaApi)
-        if (FileUtil.isFileAvailable(offlineParent)) {
-            val offlineFile = node?.name?.let { File(offlineParent, it) }
-            if (FileUtil.isFileAvailable(offlineFile)) {
-                if (FileUtil.isFileDownloadedLatest(offlineFile, node)
-                    && offlineFile?.length() == node?.size
-                ) {
-                    // if the file matches to the latest on the cloud, do nothing
-                    return
-                } else {
-                    // if the file does not match the latest on the cloud, delete the old file offline database record
-                    node?.let {
-                        nodeOptionsViewModel.removeOfflineNode(it.handle)
-                        refreshView()
-                    }
-                }
-            }
-        }
-
-        // Save the new file to offline
-        OfflineUtils.saveOffline(offlineParent, node, requireActivity())
     }
 
     /**
@@ -1597,7 +1497,6 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
             }
 
             DrawerItem.SHARED_ITEMS -> mode = SHARED_ITEMS_MODE
-            DrawerItem.SEARCH -> mode = SEARCH_MODE
             else -> Unit
         }
     }

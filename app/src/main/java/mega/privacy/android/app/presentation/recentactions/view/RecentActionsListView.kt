@@ -14,15 +14,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.distinctUntilChanged
 import mega.privacy.android.app.presentation.recentactions.model.RecentActionBucketUiEntity
 import mega.privacy.android.app.presentation.recentactions.view.previewdataprovider.SampleRecentActionDataProvider
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.controls.lists.RecentActionListViewItem
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.RecentActionBucket
+import mega.privacy.android.domain.entity.RecentActionsSharesType
 import mega.privacy.android.domain.entity.node.TypedFileNode
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 
 /**
@@ -38,6 +42,8 @@ import mega.privacy.android.shared.theme.MegaAppTheme
 @Composable
 fun RecentActionsListView(
     groupedRecentActions: Map<String, List<RecentActionBucketUiEntity>>,
+    accountType: AccountType? = null,
+    showHiddenItems: Boolean = false,
     onMenuClick: (TypedFileNode) -> Unit = {},
     onItemClick: (RecentActionBucket) -> Unit = {},
     onScrollStateChanged: (isScrolling: Boolean) -> Unit = {},
@@ -69,6 +75,10 @@ fun RecentActionsListView(
             }
 
             items(list) { item ->
+                val isSensitive = item.bucket.nodes.firstOrNull()?.let { node ->
+                    (node.isMarkedSensitive || node.isSensitiveInherited) && item.bucket.parentFolderSharesType != RecentActionsSharesType.INCOMING_SHARES
+                }?.takeIf { item.showMenuButton } ?: false
+
                 RecentActionListViewItem(
                     firstLineText = item.firstLineText,
                     icon = item.icon,
@@ -79,7 +89,8 @@ fun RecentActionsListView(
                     time = item.time,
                     updatedByText = item.updatedByText,
                     isFavourite = item.isFavourite,
-                    labelColor = item.labelColor,
+                    labelColor = item.labelColorId?.let { colorResource(id = it) },
+                    isSensitive = accountType?.isPaid == true && isSensitive && showHiddenItems,
                     onItemClick = { onItemClick(item.bucket) },
                     onMenuClick = { onMenuClick(item.bucket.nodes.first()) }
                 )
@@ -93,7 +104,7 @@ fun RecentActionsListView(
 private fun RecentActionListViewPreview(
     @PreviewParameter(SampleRecentActionDataProvider::class) items: List<RecentActionBucketUiEntity>,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         RecentActionsListView(groupedRecentActions = items.groupBy { it.date })
     }
 }

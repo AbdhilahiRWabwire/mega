@@ -26,8 +26,8 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -51,18 +51,19 @@ import mega.privacy.android.app.presentation.transfers.starttransfer.model.Start
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.StartTransferJobInProgress
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.StartTransferViewState
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
+import mega.privacy.android.app.presentation.transfers.starttransfer.view.dialog.ResumeTransfersDialog
 import mega.privacy.android.app.presentation.transfers.view.TransferInProgressDialog
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.usecase.exception.NotEnoughQuotaMegaException
 import mega.privacy.android.app.usecase.exception.QuotaExceededMegaException
 import mega.privacy.android.app.utils.AlertsAndWarnings
 import mega.privacy.android.app.utils.Util
-import mega.privacy.android.core.ui.controls.dialogs.ConfirmationDialog
-import mega.privacy.android.core.ui.controls.dialogs.MegaAlertDialog
-import mega.privacy.android.core.ui.navigation.launchFolderPicker
-import mega.privacy.android.core.ui.utils.MinimumTimeVisibility
 import mega.privacy.android.domain.entity.StorageState
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.controls.dialogs.ConfirmationDialog
+import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDialog
+import mega.privacy.android.shared.original.core.ui.navigation.launchFolderPicker
+import mega.privacy.android.shared.original.core.ui.utils.MinimumTimeVisibility
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
 
 /**
@@ -75,7 +76,7 @@ internal fun StartTransferComponent(
     event: StateEventWithContent<TransferTriggerEvent>,
     onConsumeEvent: () -> Unit,
     snackBarHostState: SnackbarHostState,
-    viewModel: StartTransfersComponentViewModel = viewModel(),
+    viewModel: StartTransfersComponentViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -142,6 +143,8 @@ internal fun StartTransferComponent(
         onPromptSaveDestinationConsumed = viewModel::consumePromptSaveDestination,
         onSaveDestination = viewModel::saveDestination,
         onDoNotPromptToSaveDestinationAgain = viewModel::doNotPromptToSaveDestinationAgain,
+        onResumeTransfers = viewModel::resumeTransfers,
+        onAskedResumeTransfers = viewModel::setAskedResumeTransfers,
         snackBarHostState = snackBarHostState,
     )
 }
@@ -162,7 +165,7 @@ fun createStartTransferView(
         val downloadEvent by transferEventState.collectAsStateWithLifecycle(
             (transferEventState as? StateFlow)?.value ?: consumed()
         )
-        MegaAppTheme(isDark = isSystemInDarkTheme()) {
+        OriginalTempTheme(isDark = isSystemInDarkTheme()) {
             val snackbarHostState = remember { SnackbarHostState() }
             //if we need this view is because we are not using compose views, so we don't have a scaffold to show snack bars and need to launch a View snackbar
             LaunchedEffect(snackbarHostState.currentSnackbarData) {
@@ -191,10 +194,13 @@ private fun StartTransferComponent(
     onPromptSaveDestinationConsumed: () -> Unit,
     onSaveDestination: (String) -> Unit,
     onDoNotPromptToSaveDestinationAgain: () -> Unit,
+    onResumeTransfers: () -> Unit,
+    onAskedResumeTransfers: () -> Unit,
     snackBarHostState: SnackbarHostState,
 ) {
     val context = LocalContext.current
     var showOfflineAlertDialog by rememberSaveable { mutableStateOf(false) }
+    var showResumeTransfersAlertDialog by rememberSaveable { mutableStateOf(false) }
     val showQuotaExceededDialog = remember { mutableStateOf<StorageState?>(null) }
     var showConfirmLargeTransfer by remember {
         mutableStateOf<StartTransferEvent.ConfirmLargeDownload?>(null)
@@ -214,7 +220,7 @@ private fun StartTransferComponent(
         onConsumed = onOneOffEventConsumed,
         action = {
             when (it) {
-                is StartTransferEvent.FinishProcessing ->
+                is StartTransferEvent.FinishDownloadProcessing ->
                     consumeFinishProcessing(
                         event = it,
                         snackBarHostState = snackBarHostState,
@@ -222,6 +228,15 @@ private fun StartTransferComponent(
                         context = context,
                         transferTriggerEvent = it.triggerEvent,
                     )
+
+                is StartTransferEvent.FinishUploadProcessing -> {
+                    val message = context.resources.getQuantityString(
+                        R.plurals.upload_began,
+                        it.totalFiles,
+                        it.totalFiles,
+                    )
+                    snackBarHostState.showSnackbar(message)
+                }
 
                 is StartTransferEvent.Message ->
                     consumeMessage(it, snackBarHostState, context)
@@ -231,6 +246,10 @@ private fun StartTransferComponent(
 
                 StartTransferEvent.NotConnected -> {
                     showOfflineAlertDialog = true
+                }
+
+                StartTransferEvent.PausedTransfers -> {
+                    showResumeTransfersAlertDialog = true
                 }
 
                 is StartTransferEvent.ConfirmLargeDownload -> {
@@ -329,10 +348,19 @@ private fun StartTransferComponent(
             }
         )
     }
+    if (showResumeTransfersAlertDialog) {
+        ResumeTransfersDialog(onResume = {
+            onResumeTransfers()
+            showResumeTransfersAlertDialog = false
+        }, onDismiss = {
+            onAskedResumeTransfers()
+            showResumeTransfersAlertDialog = false
+        })
+    }
 }
 
 private suspend fun consumeFinishProcessing(
-    event: StartTransferEvent.FinishProcessing,
+    event: StartTransferEvent.FinishDownloadProcessing,
     snackBarHostState: SnackbarHostState,
     showQuotaExceededDialog: MutableState<StorageState?>,
     context: Context,

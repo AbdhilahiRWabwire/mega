@@ -2,6 +2,7 @@ package mega.privacy.android.app.mediaplayer
 
 import mega.privacy.android.shared.resources.R as sharedR
 import android.app.Activity
+import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -125,6 +126,7 @@ class AudioPlayerActivity : MediaPlayerActivity() {
     private val dragToExit by lazy {
         DragToExitSupport(
             context = this,
+            coroutineScope = lifecycleScope,
             dragActivated = this::onDragActivated
         ) {
             finish()
@@ -151,7 +153,8 @@ class AudioPlayerActivity : MediaPlayerActivity() {
                 collectFlow(service.serviceGateway.metadataUpdate()) { metadata ->
                     viewModel.updateMetaData(metadata)
                     dragToExit.nodeChanged(
-                        service.playerServiceViewModelGateway.getCurrentPlayingHandle()
+                        lifecycleOwner = this@AudioPlayerActivity,
+                        handle = service.playerServiceViewModelGateway.getCurrentPlayingHandle()
                     )
                 }
 
@@ -239,8 +242,8 @@ class AudioPlayerActivity : MediaPlayerActivity() {
         val playerServiceIntent = Intent(this, AudioPlayerService::class.java).putExtras(extras)
 
         if (savedInstanceState == null) {
-            PermissionUtils.checkNotificationsPermission(this)
-            if (rebuildPlaylist) {
+            if (rebuildPlaylist && !isServiceRunning()) {
+                PermissionUtils.checkNotificationsPermission(this)
                 playerServiceIntent.setDataAndType(intent.data, intent.type)
                 Util.startForegroundService(this, playerServiceIntent)
             }
@@ -255,6 +258,14 @@ class AudioPlayerActivity : MediaPlayerActivity() {
             showNotAllowPlayAlert()
         }
     }
+
+    @Suppress("DEPRECATION")
+    private fun isServiceRunning() =
+        (getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.let { activityManager ->
+            activityManager.getRunningServices(Int.MAX_VALUE)?.any {
+                it.service.className == AudioPlayerService::class.java.name
+            }
+        } ?: false
 
     @OptIn(FlowPreview::class)
     private fun setupObserver() {
@@ -992,13 +1003,14 @@ class AudioPlayerActivity : MediaPlayerActivity() {
                                         isHiddenNodesEnabled
                                                 && !isInSharedItems
                                                 && !megaApi.getRootParentNode(node).isInShare
-                                                && !node.isMarkedSensitive
+                                                && (!node.isMarkedSensitive || viewModel.state.value.accountType?.isPaid == false)
 
                                     val shouldShowUnhideNode =
                                         isHiddenNodesEnabled
                                                 && !isInSharedItems
                                                 && !megaApi.getRootParentNode(node).isInShare
                                                 && node.isMarkedSensitive
+                                                && viewModel.state.value.accountType?.isPaid == true
 
                                     menu.findItem(R.id.hide).isVisible = shouldShowHideNode
 

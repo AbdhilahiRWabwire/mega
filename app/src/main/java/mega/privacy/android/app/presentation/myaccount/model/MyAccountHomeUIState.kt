@@ -3,6 +3,7 @@ package mega.privacy.android.app.presentation.myaccount.model
 import de.palm.composestateevents.StateEvent
 import de.palm.composestateevents.StateEventWithContent
 import de.palm.composestateevents.consumed
+import mega.privacy.android.app.R
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.account.AccountDetail
 import mega.privacy.android.domain.entity.account.business.BusinessAccountStatus
@@ -19,8 +20,9 @@ import java.io.File
  * @property accountType
  * @property isBusinessAccount
  * @property isMasterBusinessAccount
- * @property isBusinessStatusActive
- * @property businessStatus
+ * @property isProFlexiAccount
+ * @property isBusinessProFlexiStatusActive  shows if account is active for Business or Pro Flexi
+ * @property businessProFlexiStatus          shows account status for Business or Pro Flexi
  * @property visibleContacts
  * @property accountDetail
  * @property avatarFileLastModified
@@ -50,8 +52,9 @@ data class MyAccountHomeUIState(
     val accountType: AccountType? = null,
     val isBusinessAccount: Boolean = false,
     val isMasterBusinessAccount: Boolean = false,
-    val isBusinessStatusActive: Boolean = false,
-    val businessStatus: BusinessAccountStatus? = null,
+    val isProFlexiAccount: Boolean = false,
+    val isBusinessProFlexiStatusActive: Boolean = false,
+    val businessProFlexiStatus: BusinessAccountStatus? = null,
     val visibleContacts: Int? = null,
     val accountDetail: AccountDetail? = null,
     val hasRenewableSubscription: Boolean = false,
@@ -67,5 +70,5 @@ data class MyAccountHomeUIState(
     val proExpirationTime: Long = 0,
     val isConnectedToNetwork: Boolean = true,
     val navigateToAchievements: StateEvent = consumed,
-    val userMessage: StateEventWithContent<Int> = consumed()
+    val userMessage: StateEventWithContent<Int> = consumed(),
 )

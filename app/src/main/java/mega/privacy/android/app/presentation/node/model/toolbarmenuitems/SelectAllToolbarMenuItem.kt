@@ -1,7 +1,7 @@
 package mega.privacy.android.app.presentation.node.model.toolbarmenuitems
 
 import mega.privacy.android.app.presentation.node.model.menuaction.SelectAllMenuAction
-import mega.privacy.android.core.ui.model.MenuAction
+import mega.privacy.android.shared.original.core.ui.model.MenuAction
 import mega.privacy.android.domain.entity.node.TypedNode
 import javax.inject.Inject
 
@@ -15,7 +15,7 @@ class SelectAllToolbarMenuItem @Inject constructor(
     override val menuAction: SelectAllMenuAction,
 ) : NodeToolbarMenuItem<MenuAction> {
 
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         hasNodeAccessPermission: Boolean,
         selectedNodes: List<TypedNode>,
         canBeMovedToTarget: Boolean,

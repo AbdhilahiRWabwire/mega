@@ -71,27 +71,27 @@ import mega.privacy.android.app.upgradeAccount.view.components.SaveUpToLabel
 import mega.privacy.android.app.upgradeAccount.view.components.SubscriptionDetails
 import mega.privacy.android.app.utils.Constants.INVALID_VALUE
 import mega.privacy.android.app.utils.Constants.PRICING_PAGE_URL
-import mega.privacy.android.core.ui.controls.text.MegaSpannedClickableText
-import mega.privacy.android.core.ui.controls.text.MegaText
-import mega.privacy.android.core.ui.model.MegaSpanStyle
-import mega.privacy.android.core.ui.model.MegaSpanStyleWithAnnotation
-import mega.privacy.android.core.ui.model.SpanIndicator
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.Typography
-import mega.privacy.android.core.ui.theme.extensions.black_yellow_700
-import mega.privacy.android.core.ui.theme.extensions.grey_020_grey_800
-import mega.privacy.android.core.ui.theme.extensions.grey_100_alpha_060_dark_grey
-import mega.privacy.android.core.ui.theme.extensions.grey_alpha_012_white_alpha_012
-import mega.privacy.android.core.ui.theme.extensions.subtitle1medium
-import mega.privacy.android.core.ui.theme.extensions.teal_300_teal_200
-import mega.privacy.android.core.ui.theme.extensions.yellow_100_yellow_700_alpha_015
-import mega.privacy.android.core.ui.theme.subtitle1
-import mega.privacy.android.core.ui.theme.tokens.TextColor
+import mega.privacy.android.shared.original.core.ui.controls.text.MegaSpannedClickableText
+import mega.privacy.android.shared.original.core.ui.controls.text.MegaText
+import mega.privacy.android.shared.original.core.ui.model.MegaSpanStyle
+import mega.privacy.android.shared.original.core.ui.model.MegaSpanStyleWithAnnotation
+import mega.privacy.android.shared.original.core.ui.model.SpanIndicator
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.Typography
+import mega.privacy.android.shared.original.core.ui.theme.extensions.black_yellow_700
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_020_grey_800
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_100_alpha_060_dark_grey
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_alpha_012_white_alpha_012
+import mega.privacy.android.shared.original.core.ui.theme.extensions.subtitle1medium
+import mega.privacy.android.shared.original.core.ui.theme.extensions.teal_300_teal_200
+import mega.privacy.android.shared.original.core.ui.theme.extensions.yellow_100_yellow_700_alpha_015
+import mega.privacy.android.shared.original.core.ui.theme.subtitle1
+import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.Currency
 import mega.privacy.android.domain.entity.account.CurrencyAmount
 import mega.privacy.android.legacy.core.ui.controls.appbar.SimpleNoTitleTopAppBar
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 internal const val UPGRADE_ACCOUNT_SCREEN_TAG = "upgrade_account_screen:"
 internal const val BILLING_WARNING_TAG = "upgrade_account_screen:box_warning_unavailable_payments"
@@ -231,7 +231,18 @@ fun UpgradeAccountView(
                         derivedStateOf { state.currentSubscriptionPlan == it.accountType }
                     }
                     val isRecommended = remember {
-                        derivedStateOf { (((state.currentSubscriptionPlan == AccountType.FREE || state.currentSubscriptionPlan == AccountType.PRO_LITE) && it.accountType == AccountType.PRO_I) || (state.currentSubscriptionPlan == AccountType.PRO_I && it.accountType == AccountType.PRO_II) || (state.currentSubscriptionPlan == AccountType.PRO_II && it.accountType == AccountType.PRO_III)) }
+                        derivedStateOf {
+                            (((state.currentSubscriptionPlan == AccountType.STARTER ||
+                                    state.currentSubscriptionPlan == AccountType.BASIC ||
+                                    state.currentSubscriptionPlan == AccountType.ESSENTIAL ||
+                                    state.currentSubscriptionPlan == AccountType.FREE ||
+                                    state.currentSubscriptionPlan == AccountType.PRO_LITE) &&
+                                    it.accountType == AccountType.PRO_I) ||
+                                    (state.currentSubscriptionPlan == AccountType.PRO_I &&
+                                            it.accountType == AccountType.PRO_II) ||
+                                    (state.currentSubscriptionPlan == AccountType.PRO_II &&
+                                            it.accountType == AccountType.PRO_III))
+                        }
                     }
                     val showCurrentPlanLabel =
                         isCurrentPlan && ((userSubscription == UserSubscription.NOT_SUBSCRIBED) || (isMonthly && userSubscription == UserSubscription.MONTHLY_SUBSCRIBED) || (!isMonthly && userSubscription == UserSubscription.YEARLY_SUBSCRIBED))
@@ -645,7 +656,7 @@ private fun PricingPageLinkText(
 fun PreviewUpgradeAccountView(
     @PreviewParameter(UpgradeAccountPreviewProvider::class) state: UpgradeAccountState,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         UpgradeAccountView(
             state = state,
             onBackPressed = {},

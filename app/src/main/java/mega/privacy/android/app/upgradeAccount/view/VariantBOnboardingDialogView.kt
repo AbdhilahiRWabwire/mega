@@ -21,6 +21,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -39,13 +43,13 @@ import mega.privacy.android.app.upgradeAccount.view.components.MonthlyYearlyTabs
 import mega.privacy.android.app.upgradeAccount.view.components.ProPlanInfoCard
 import mega.privacy.android.app.upgradeAccount.view.components.SaveUpToLabel
 import mega.privacy.android.app.upgradeAccount.view.components.SubscriptionDetails
-import mega.privacy.android.core.ui.controls.appbar.AppBarType
-import mega.privacy.android.core.ui.controls.appbar.MegaAppBar
-import mega.privacy.android.core.ui.controls.buttons.RaisedDefaultMegaButton
-import mega.privacy.android.core.ui.controls.layouts.MegaScaffold
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.controls.appbar.AppBarType
+import mega.privacy.android.shared.original.core.ui.controls.appbar.MegaAppBar
+import mega.privacy.android.shared.original.core.ui.controls.buttons.RaisedDefaultMegaButton
+import mega.privacy.android.shared.original.core.ui.controls.layouts.MegaScaffold
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.domain.entity.AccountType
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 
 /**
@@ -61,6 +65,7 @@ fun VariantBOnboardingDialogView(
     onChoosingPlanType: (chosenPlan: AccountType) -> Unit,
     onPlayStoreLinkClicked: (String) -> Unit,
     onProIIIVisible: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()
 
@@ -81,6 +86,7 @@ fun VariantBOnboardingDialogView(
                 onChoosingPlanType = onChoosingPlanType,
                 onPlayStoreLinkClicked = onPlayStoreLinkClicked,
                 onProIIIVisible = onProIIIVisible,
+                modifier = modifier,
             )
         }
     )
@@ -95,6 +101,7 @@ internal fun VariantBOnboardingDialogColumn(
     onChoosingPlanType: (chosenPlan: AccountType) -> Unit,
     onPlayStoreLinkClicked: (String) -> Unit,
     onProIIIVisible: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var isMonthly by rememberSaveable { mutableStateOf(false) }
     val cheapestSubscriptionAvailable = uiState.cheapestSubscriptionAvailable
@@ -106,15 +113,18 @@ internal fun VariantBOnboardingDialogColumn(
     var isPreselectedPlanOnce by rememberSaveable { mutableStateOf(false) }
     val isPaymentMethodAvailable = uiState.isPaymentMethodAvailable
     val coroutineScope = rememberCoroutineScope()
+    val configuration = LocalConfiguration.current
+    var isProIIIPlanCardViewed by rememberSaveable { mutableStateOf(false) }
+    val density = LocalDensity.current
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .verticalScroll(state = scrollState),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row {
             Column(
-                modifier = Modifier
+                modifier = modifier
                     .width(390.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -153,29 +163,23 @@ internal fun VariantBOnboardingDialogColumn(
                     testTag = BACKUP_DESCRIPTION_ROW,
                     isLoading = isLoading,
                 )
-                //MEGA VPN
+                //Extra features
                 FeatureRow(
-                    drawableID = painterResource(id = R.drawable.ic_vpn_onboarding_dialog),
-                    title = stringResource(id = sharedR.string.dialog_onboarding_feature_title_vpn),
-                    description = stringResource(id = sharedR.string.dialog_onboarding_feature_description_vpn),
-                    testTag = VPN_DESCRIPTION_ROW,
-                    isLoading = isLoading,
-                )
-                //Chat and meetings
-                FeatureRow(
-                    drawableID = painterResource(id = R.drawable.ic_chat_onboarding_dialog),
-                    title = stringResource(id = sharedR.string.dialog_onboarding_feature_title_chat),
-                    description = stringResource(id = sharedR.string.dialog_onboarding_feature_description_chat),
-                    testTag = CHAT_DESCRIPTION_ROW,
+                    drawableID = painterResource(id = R.drawable.ic_mega_onboarding_dialog),
+                    title = stringResource(id = sharedR.string.dialog_onboarding_feature_title_additional_features),
+                    description = stringResource(
+                        id = if (uiState.showAdsFeature) sharedR.string.dialog_onboarding_feature_description_additional_features_with_ads else sharedR.string.dialog_onboarding_feature_description_additional_features_without_ads
+                    ),
+                    testTag = ADDITIONAL_FEATURES_DESCRIPTION_ROW,
                     isLoading = isLoading,
                 )
             }
         }
         Row(
-            modifier = Modifier.padding(top = 16.dp),
+            modifier = modifier.padding(top = 16.dp),
         ) {
             Column(
-                modifier = Modifier.width(390.dp)
+                modifier = modifier.width(390.dp)
             ) {
                 ChoosePlanTitleText(testTag = ONBOARDING_SCREEN_VARIANT_B)
                 MonthlyYearlyTabs(
@@ -247,6 +251,29 @@ internal fun VariantBOnboardingDialogColumn(
                             isClicked = isClicked,
                             showCurrentPlanLabel = false,
                             testTag = PRO_PLAN_CARD_VARIANT_B,
+                            modifier = Modifier
+                                .onGloballyPositioned { layoutCoordinates ->
+                                    if (localisedSubscription.accountType == AccountType.PRO_III && !isProIIIPlanCardViewed) {
+                                        with(density) {
+                                            // height of the Pro III plan card
+                                            val proIIIPlanCardHeight = layoutCoordinates.size.height
+                                            // vertical position of the Pro III plan card in Compose
+                                            val proIIIPlanCardVerticalPosition =
+                                                layoutCoordinates.positionInRoot().y
+                                            // vertical position Pro III plan card in Compose including its height
+                                            val proIIICardFullVerticalPosition =
+                                                proIIIPlanCardVerticalPosition.toDp().value.toInt() + proIIIPlanCardHeight.toDp().value.toInt()
+                                            val screenHeight =
+                                                configuration.screenHeightDp
+                                            val isFullyVisible =
+                                                proIIICardFullVerticalPosition <= screenHeight
+                                            if (isFullyVisible && !isProIIIPlanCardViewed) {
+                                                onProIIIVisible()
+                                                isProIIIPlanCardViewed = true
+                                            }
+                                        }
+                                    }
+                                }
                         )
                     }
                     RaisedDefaultMegaButton(
@@ -277,7 +304,7 @@ internal fun VariantBOnboardingDialogColumn(
 private fun PreviewVariantBOnboardingDialogView(
     @PreviewParameter(VariantBOnboardingDialogPreviewProvider::class) state: ChooseAccountState,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VariantBOnboardingDialogView(
             state = state,
             onBackPressed = {},

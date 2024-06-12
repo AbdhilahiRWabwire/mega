@@ -13,16 +13,15 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.extensions.updateItemAt
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.clouddrive.OptionItems
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.mapper.HandleOptionClickMapper
 import mega.privacy.android.app.presentation.shares.incoming.model.IncomingSharesState
 import mega.privacy.android.app.presentation.time.mapper.DurationInSecondsTextMapper
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
-import mega.privacy.android.core.ui.utils.pop
-import mega.privacy.android.core.ui.utils.push
-import mega.privacy.android.core.ui.utils.toMutableArrayDeque
+import mega.privacy.android.shared.original.core.ui.utils.pop
+import mega.privacy.android.shared.original.core.ui.utils.push
+import mega.privacy.android.shared.original.core.ui.utils.toMutableArrayDeque
 import mega.privacy.android.data.mapper.FileDurationMapper
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.FolderNode
@@ -41,7 +40,6 @@ import mega.privacy.android.domain.usecase.MonitorContactUpdates
 import mega.privacy.android.domain.usecase.account.MonitorRefreshSessionUseCase
 import mega.privacy.android.domain.usecase.contact.AreCredentialsVerifiedUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactVerificationWarningUseCase
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
@@ -71,7 +69,6 @@ import javax.inject.Inject
  * @param fileDurationMapper [FileDurationMapper] To map file duration
  * @param monitorOfflineNodeUpdatesUseCase [MonitorOfflineNodeUpdatesUseCase] Monitor offline node updates
  * @param monitorConnectivityUseCase [MonitorConnectivityUseCase] Monitor connectivity
- * @param getFeatureFlagValueUseCase [GetFeatureFlagValueUseCase] Get feature flag value
  * @param durationInSecondsTextMapper [DurationInSecondsTextMapper] To map duration in seconds to text
  * @param getContactVerificationWarningUseCase [GetContactVerificationWarningUseCase] Get contact verification warning
  * @param areCredentialsVerifiedUseCase [AreCredentialsVerifiedUseCase] Check if credentials are verified
@@ -95,7 +92,6 @@ class IncomingSharesComposeViewModel @Inject constructor(
     private val fileDurationMapper: FileDurationMapper,
     private val monitorOfflineNodeUpdatesUseCase: MonitorOfflineNodeUpdatesUseCase,
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
-    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val durationInSecondsTextMapper: DurationInSecondsTextMapper,
     private val getContactVerificationWarningUseCase: GetContactVerificationWarningUseCase,
     private val areCredentialsVerifiedUseCase: AreCredentialsVerifiedUseCase,
@@ -614,7 +610,7 @@ class IncomingSharesComposeViewModel @Inject constructor(
                 item = item,
                 selectedNodeHandle = state.value.selectedNodeHandles
             )
-            if (getFeatureFlagValueUseCase(AppFeatures.DownloadWorker) && optionsItemInfo.optionClickedType == OptionItems.DOWNLOAD_CLICKED) {
+            if (optionsItemInfo.optionClickedType == OptionItems.DOWNLOAD_CLICKED) {
                 _state.update {
                     it.copy(
                         downloadEvent = triggered(

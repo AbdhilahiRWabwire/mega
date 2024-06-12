@@ -4,6 +4,7 @@ import mega.privacy.android.build.shouldApplyDefaultConfiguration
 plugins {
     alias(convention.plugins.mega.android.library)
     alias(convention.plugins.mega.android.test)
+    alias(convention.plugins.mega.android.library.jacoco)
     id("kotlin-android")
     id("kotlin-kapt")
     id("de.mannodermaus.android-junit5")
@@ -16,19 +17,6 @@ android {
 
     composeOptions {
         kotlinCompilerExtensionVersion = androidx.versions.compose.compiler.get()
-    }
-
-    kotlin {
-        val jdk: String by rootProject.extra
-        jvmToolchain(jdk.toInt())
-    }
-
-    kotlinOptions {
-        val jdk: String by rootProject.extra
-        jvmTarget = jdk
-        val shouldSuppressWarnings: Boolean by rootProject.extra
-        suppressWarnings = shouldSuppressWarnings
-        freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
     }
 
     lint {
@@ -48,8 +36,7 @@ dependencies {
     implementation(project(":domain"))
     implementation(project(":navigation"))
     implementation(project(":data"))
-    implementation(project(":core-ui"))
-    implementation(project(":shared:theme"))
+    implementation(project(":shared:original-core-ui"))
     implementation(project(":shared:sync"))
     implementation(project(":shared:resources"))
     implementation(project(":legacy-core-ui"))

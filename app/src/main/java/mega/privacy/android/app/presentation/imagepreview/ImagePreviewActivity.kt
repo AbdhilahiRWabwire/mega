@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
@@ -50,18 +49,16 @@ import mega.privacy.android.app.utils.LinksUtil
 import mega.privacy.android.app.utils.MegaNodeDialogUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.app.utils.MegaNodeUtil.onNodeTapped
-import mega.privacy.android.app.utils.permission.PermissionUtils
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.account.AccountDetail
 import mega.privacy.android.domain.entity.node.ImageNode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.GetThemeMode
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.mobile.analytics.event.PhotoPreviewSaveToDeviceMenuToolbarEvent
 import mega.privacy.mobile.analytics.event.PhotoPreviewScreenEvent
 import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaNode
-import java.lang.ref.WeakReference
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -106,20 +103,11 @@ class ImagePreviewActivity : BaseActivity() {
         )
     }
     private val nodeAttacher: MegaAttacher by lazy { MegaAttacher(this) }
-    private val showScreenLabel: Boolean by lazy {
-        intent.getBooleanExtra("show_screen_label", false)
-    }
-    private val isForeign: Boolean by lazy {
-        intent.getBooleanExtra(IMAGE_PREVIEW_IS_FOREIGN, false)
-    }
 
     private var tempNodeId: NodeId? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (showScreenLabel) {
-            Toast.makeText(this, "New Image Preview", Toast.LENGTH_SHORT).show()
-        }
         Analytics.tracker.trackEvent(PhotoPreviewScreenEvent)
         if (savedInstanceState != null) {
             nodeSaver.restoreState(savedInstanceState)
@@ -127,7 +115,7 @@ class ImagePreviewActivity : BaseActivity() {
         }
         setContent {
             val themeMode by getThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.System)
-            MegaAppTheme(isDark = themeMode.isDarkMode()) {
+            OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                 PasscodeContainer(
                     passcodeCryptObjectFactory = passcodeCryptObjectFactory,
                     content = {
@@ -236,7 +224,7 @@ class ImagePreviewActivity : BaseActivity() {
         onNodeTapped(
             this,
             MegaNode.unserialize(imageNode.serializedData),
-            this::saveNodeByOpenWith,
+            { this.saveNodeByOpenWith() },
             this,
             this,
             true
@@ -245,9 +233,7 @@ class ImagePreviewActivity : BaseActivity() {
 
     private fun saveNodeToDevice(imageNode: ImageNode) {
         Analytics.tracker.trackEvent(PhotoPreviewSaveToDeviceMenuToolbarEvent)
-        viewModel.executeTransfer(transferMessage = getString(R.string.resume_paused_transfers_text)) {
-            saveNode(MegaNode.unserialize(imageNode.serializedData))
-        }
+        viewModel.executeTransfer(transferMessage = getString(R.string.resume_paused_transfers_text))
     }
 
     private fun importNode(imageNode: ImageNode) {
@@ -256,7 +242,6 @@ class ImagePreviewActivity : BaseActivity() {
 
     private fun setAvailableOffline(checked: Boolean, imageNode: ImageNode) {
         viewModel.setNodeAvailableOffline(
-            activity = WeakReference(this@ImagePreviewActivity),
             setOffline = checked,
             imageNode = imageNode
         )
@@ -359,11 +344,6 @@ class ImagePreviewActivity : BaseActivity() {
         }
     }
 
-    private fun saveNode(node: MegaNode) {
-        PermissionUtils.checkNotificationsPermission(this)
-        viewModel.saveToDevice(nodeSaver = nodeSaver, node = node, isForeign = isForeign)
-    }
-
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         nodeSaver.saveState(outState)
@@ -400,18 +380,11 @@ class ImagePreviewActivity : BaseActivity() {
      * Upon a node is open with, if it cannot be previewed in-app,
      * then download it first, this download will be marked as "download by open with".
      *
-     * @param node Node to be downloaded.
      */
-    private fun saveNodeByOpenWith(node: MegaNode) {
-        PermissionUtils.checkNotificationsPermission(this)
-        nodeSaver.saveNodes(
-            nodes = listOf(node),
-            highPriority = true,
-            isFolderLink = false,
-            fromMediaViewer = false,
-            needSerialize = false,
+    private fun saveNodeByOpenWith() {
+        viewModel.executeTransfer(
+            transferMessage = getString(R.string.resume_paused_transfers_text),
             downloadForPreview = true,
-            downloadByOpenWith = true
         )
     }
 
@@ -435,7 +408,6 @@ class ImagePreviewActivity : BaseActivity() {
             anchorImageNodeId: NodeId? = null,
             params: Map<String, Any> = mapOf(),
             isForeign: Boolean = false,
-            showScreenLabel: Boolean = true,
         ): Intent {
             return Intent(context, ImagePreviewActivity::class.java).apply {
                 putExtra(IMAGE_NODE_FETCHER_SOURCE, imageSource)
@@ -443,8 +415,6 @@ class ImagePreviewActivity : BaseActivity() {
                 putExtra(PARAMS_CURRENT_IMAGE_NODE_ID_VALUE, anchorImageNodeId?.longValue)
                 putExtra(FETCHER_PARAMS, bundleOf(*params.toList().toTypedArray()))
                 putExtra(IMAGE_PREVIEW_IS_FOREIGN, isForeign)
-                // For QA & Dev purpose: To remove once new Image Preview migration is done
-                putExtra("show_screen_label", showScreenLabel)
             }
         }
 
@@ -455,7 +425,6 @@ class ImagePreviewActivity : BaseActivity() {
             anchorImageNodeId: Long? = null,
             params: Map<String, Any> = mapOf(),
             isForeign: Boolean = false,
-            showScreenLabel: Boolean = true,
         ): Intent {
             return createIntent(
                 context = context,
@@ -464,7 +433,6 @@ class ImagePreviewActivity : BaseActivity() {
                 anchorImageNodeId = anchorImageNodeId?.let { NodeId(it) },
                 params = params,
                 isForeign = isForeign,
-                showScreenLabel = showScreenLabel,
             )
         }
     }

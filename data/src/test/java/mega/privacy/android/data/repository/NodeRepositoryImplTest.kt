@@ -2,9 +2,12 @@ package mega.privacy.android.data.repository
 
 import android.content.Context
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import mega.privacy.android.data.gateway.CacheGateway
 import mega.privacy.android.data.gateway.FileGateway
 import mega.privacy.android.data.gateway.MegaLocalRoomGateway
@@ -21,6 +24,7 @@ import mega.privacy.android.data.mapper.NodeUpdateMapper
 import mega.privacy.android.data.mapper.OfflineInformationMapper
 import mega.privacy.android.data.mapper.OfflineNodeInformationMapper
 import mega.privacy.android.data.mapper.SortOrderIntMapper
+import mega.privacy.android.data.mapper.StringListMapper
 import mega.privacy.android.data.mapper.node.FetchChildrenMapper
 import mega.privacy.android.data.mapper.node.FileNodeMapper
 import mega.privacy.android.data.mapper.node.FolderNodeMapper
@@ -29,6 +33,7 @@ import mega.privacy.android.data.mapper.node.NodeMapper
 import mega.privacy.android.data.mapper.node.NodeShareKeyResultMapper
 import mega.privacy.android.data.mapper.node.OfflineAvailabilityMapper
 import mega.privacy.android.data.mapper.node.label.NodeLabelIntMapper
+import mega.privacy.android.data.mapper.search.MegaSearchFilterMapper
 import mega.privacy.android.data.mapper.shares.AccessPermissionIntMapper
 import mega.privacy.android.data.mapper.shares.AccessPermissionMapper
 import mega.privacy.android.data.mapper.shares.ShareDataMapper
@@ -47,6 +52,7 @@ import mega.privacy.android.domain.entity.shares.AccessPermission
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.node.ForeignNodeException
 import mega.privacy.android.domain.repository.NodeRepository
+import nz.mega.sdk.MegaCancelToken
 import nz.mega.sdk.MegaChatMessage
 import nz.mega.sdk.MegaChatRoom
 import nz.mega.sdk.MegaError
@@ -55,9 +61,11 @@ import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaNodeList
 import nz.mega.sdk.MegaRequest
 import nz.mega.sdk.MegaRequestListenerInterface
+import nz.mega.sdk.MegaSearchFilter
 import nz.mega.sdk.MegaShare
 import nz.mega.sdk.MegaShare.ACCESS_READ
 import nz.mega.sdk.MegaUser
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -111,11 +119,15 @@ class NodeRepositoryImplTest {
     private val megaLocalRoomGateway: MegaLocalRoomGateway = mock()
     private val offlineAvailabilityMapper: OfflineAvailabilityMapper = mock()
     private val megaNodeMapper = mock<MegaNodeMapper>()
+    private val cancelTokenProvider = mock<CancelTokenProvider>()
+    private val megaSearchFilterMapper = mock<MegaSearchFilterMapper>()
+    private val stringListMapper = mock<StringListMapper>()
     private val fileNodeMapper = FileNodeMapper(
         cacheGateway = cacheGateway,
         megaApiGateway = megaApiGateway,
         fileTypeInfoMapper = fileTypeInfoMapper,
         offlineAvailabilityMapper = offlineAvailabilityMapper,
+        stringListMapper = stringListMapper,
     )
 
     private val nodeMapper: NodeMapper = NodeMapper(
@@ -124,15 +136,17 @@ class NodeRepositoryImplTest {
             megaApiGateway = megaApiGateway,
             megaApiFolderGateway = megaApiFolderGateway,
             fetChildrenMapper = fetChildrenMapper,
+            stringListMapper = stringListMapper,
         )
     )
 
     val offline: Offline = mock()
-
+    private val tag = "tag"
     private val nodeLabelIntMapper = NodeLabelIntMapper()
 
     @BeforeAll
     fun setup() {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
         underTest = NodeRepositoryImpl(
             context = context,
             megaApiGateway = megaApiGateway,
@@ -157,8 +171,15 @@ class NodeRepositoryImplTest {
             accessPermissionIntMapper = accessPermissionIntMapper,
             megaLocalRoomGateway = megaLocalRoomGateway,
             megaNodeMapper = megaNodeMapper,
-            nodeLabelIntMapper = nodeLabelIntMapper
+            nodeLabelIntMapper = nodeLabelIntMapper,
+            cancelTokenProvider = cancelTokenProvider,
+            megaSearchFilterMapper = megaSearchFilterMapper,
         )
+    }
+
+    @AfterAll
+    fun tearDown() {
+        Dispatchers.resetMain()
     }
 
     @BeforeEach
@@ -425,37 +446,6 @@ class NodeRepositoryImplTest {
 
             val expected = listOf(share2)
             val actual = underTest.getUnverifiedOutgoingShares(any())
-
-            assertThat(actual).isEqualTo(expected)
-        }
-
-    @Test
-    fun `test that getVerifiedIncomingShares calls api gateway getVerifiedIncomingShares with mapped sort order`() =
-        runTest {
-            val sortOrder = SortOrder.ORDER_NONE
-            whenever(sortOrderIntMapper(any())).thenReturn(0)
-            whenever(megaApiGateway.getVerifiedIncomingShares(any())).thenReturn(listOf(mock()))
-
-            underTest.getVerifiedIncomingShares(sortOrder)
-
-            verify(megaApiGateway).getVerifiedIncomingShares(sortOrderIntMapper(sortOrder))
-        }
-
-    @Test
-    fun `test that getVerifiedIncomingShares returns mapped result from api gateway`() =
-        runTest {
-            whenever(sortOrderIntMapper(any())).thenReturn(0)
-            val megaShare1 = mock<MegaShare>()
-            val megaShare2 = mock<MegaShare>()
-            val megaShares = listOf(megaShare1, megaShare2)
-            whenever(megaApiGateway.getVerifiedIncomingShares(any())).thenReturn(megaShares)
-            val share1 = mock<ShareData>()
-            val share2 = mock<ShareData>()
-            whenever(shareDataMapper(megaShare1)).thenReturn(share1)
-            whenever(shareDataMapper(megaShare2)).thenReturn(share2)
-
-            val expected = listOf(share1, share2)
-            val actual = underTest.getVerifiedIncomingShares(any())
 
             assertThat(actual).isEqualTo(expected)
         }
@@ -989,6 +979,80 @@ class NodeRepositoryImplTest {
     }
 
     @Test
+    fun `test that getNodesFromChatMessage returns correct nodes from gateway`() = runTest {
+        val chatId = 11L
+        val messageId = 22L
+        val megaNode = mockMegaNodeForConversion()
+        val megaChatMessage = mock<MegaChatMessage>()
+        val megaNodeList = mock<MegaNodeList>()
+        whenever(megaNodeList.get(0)).thenReturn(megaNode)
+        whenever(megaNodeList.size()).thenReturn(1)
+        whenever(megaChatMessage.megaNodeList).thenReturn(megaNodeList)
+        whenever(megaChatApiGateway.getMessage(chatId, messageId)).thenReturn(megaChatMessage)
+        val result = underTest.getNodesFromChatMessage(chatId, messageId)
+        assertThat(result.firstOrNull()?.id?.longValue).isEqualTo(megaNode.handle)
+    }
+
+    @Test
+    fun `test that getNodesFromChatMessage returns non-null nodes from gateway`() = runTest {
+        val chatId = 11L
+        val messageId = 22L
+        val megaNode = mockMegaNodeForConversion()
+        val megaChatMessage = mock<MegaChatMessage>()
+        val megaNodeList = mock<MegaNodeList>()
+        whenever(megaNodeList.get(0)).thenReturn(megaNode)
+        whenever(megaNodeList.get(1)).thenReturn(null)
+        whenever(megaNodeList.size()).thenReturn(2)
+        whenever(megaChatMessage.megaNodeList).thenReturn(megaNodeList)
+        whenever(megaChatApiGateway.getMessage(chatId, messageId)).thenReturn(megaChatMessage)
+        val result = underTest.getNodesFromChatMessage(chatId, messageId)
+        assertThat(result.size).isEqualTo(1)
+    }
+
+    @Test
+    fun `test that chat node history is used as a fallback when nodes are not found`() = runTest {
+        val chatId = 11L
+        val messageId = 22L
+        val megaNode = mockMegaNodeForConversion()
+        val megaChatMessage = mock<MegaChatMessage>()
+        val megaNodeList = mock<MegaNodeList>()
+        whenever(megaNodeList.get(0)).thenReturn(megaNode)
+        whenever(megaNodeList.size()).thenReturn(1)
+        whenever(megaChatMessage.megaNodeList).thenReturn(megaNodeList)
+        whenever(megaChatApiGateway.getMessage(chatId, messageId)).thenReturn(null)
+        whenever(megaChatApiGateway.getMessageFromNodeHistory(chatId, messageId))
+            .thenReturn(megaChatMessage)
+        assertThat(
+            underTest.getNodesFromChatMessage(chatId, messageId).firstOrNull()?.id?.longValue
+        ).isEqualTo(megaNode.handle)
+    }
+
+    @Test
+    fun `test that chat nodes are authorized if nodes are in chat preview`() = runTest {
+        val chatId = 11L
+        val messageId = 22L
+        val authorizationToken = "authorizationToken"
+        val megaNode = mockMegaNodeForConversion()
+        val megaNode2 = mock<MegaNode>()
+        val megaChatMessage = mock<MegaChatMessage>()
+        val megaNodeList = mock<MegaNodeList>()
+        val chat = mock<MegaChatRoom>()
+        whenever(megaNodeList.get(0)).thenReturn(megaNode2)
+        whenever(megaNodeList.size()).thenReturn(1)
+        whenever(megaChatMessage.megaNodeList).thenReturn(megaNodeList)
+        whenever(megaChatApiGateway.getMessage(chatId, messageId)).thenReturn(megaChatMessage)
+        whenever(megaChatApiGateway.getChatRoom(chatId)).thenReturn(chat)
+        whenever(chat.isPreview).thenReturn(true)
+        whenever(chat.authorizationToken).thenReturn(authorizationToken)
+        whenever(megaApiGateway.authorizeChatNode(megaNode2, chat.authorizationToken))
+            .thenReturn(megaNode)
+        assertThat(
+            underTest.getNodesFromChatMessage(chatId, messageId).firstOrNull()?.id?.longValue
+        ).isEqualTo(megaNode.handle)
+        verify(megaApiGateway).authorizeChatNode(megaNode2, chat.authorizationToken)
+    }
+
+    @Test
     fun `test that getOfflineFolderInfo should return correct OfflineFolderInfo`() = runTest {
         val parentId = 1
         val offlineNodes = listOf(
@@ -1127,16 +1191,153 @@ class NodeRepositoryImplTest {
             on { isFolder }.thenReturn(true)
         }
         val childNodes = listOf(childNode1, childNode2)
+        val parentFilter = mock<MegaSearchFilter>()
+        val childFilter1 = mock<MegaSearchFilter>()
+        val childFilter2 = mock<MegaSearchFilter>()
+        val token = mock<MegaCancelToken>()
+        whenever(cancelTokenProvider.getOrCreateCancelToken()).thenReturn(token)
+        whenever(megaSearchFilterMapper(NodeId(parentNode.handle))).thenReturn(parentFilter)
+        whenever(megaSearchFilterMapper(NodeId(childNode1.handle))).thenReturn(childFilter1)
+        whenever(megaSearchFilterMapper(NodeId(childNode2.handle))).thenReturn(childFilter2)
         whenever(megaApiGateway.getMegaNodeByHandle(1L)).thenReturn(parentNode)
-        whenever(megaApiGateway.getMegaNodeByHandle(2L)).thenReturn(null)
-        whenever(megaApiGateway.getMegaNodeByHandle(3L)).thenReturn(null)
-        whenever(megaApiGateway.getChildrenByNode(parentNode)).thenReturn(childNodes)
-        whenever(megaApiGateway.getChildrenByNode(childNode1)).thenReturn(emptyList())
-        whenever(megaApiGateway.getChildrenByNode(childNode2)).thenReturn(emptyList())
+        whenever(megaApiGateway.getMegaNodeByHandle(2L)).thenReturn(childNode1)
+        whenever(megaApiGateway.getMegaNodeByHandle(3L)).thenReturn(childNode2)
+        whenever(
+            megaApiGateway.getChildren(
+                parentFilter,
+                sortOrderIntMapper(SortOrder.ORDER_NONE),
+                token
+            )
+        ).thenReturn(childNodes)
+        whenever(
+            megaApiGateway.getChildren(
+                childFilter1,
+                sortOrderIntMapper(SortOrder.ORDER_NONE),
+                token
+            )
+        ).thenReturn(emptyList())
+        whenever(
+            megaApiGateway.getChildren(
+                childFilter2,
+                sortOrderIntMapper(SortOrder.ORDER_NONE),
+                token
+            )
+        ).thenReturn(emptyList())
 
         val actual = underTest.isEmptyFolder(typedNode)
         assertThat(actual).isTrue()
     }
+
+    @Test
+    fun `test when addNodeTag is called then api gateway addNodeTag is called`() =
+        runTest {
+            val megaNode = mock<MegaNode>()
+            whenever(folderNode.id).thenReturn(nodeId)
+            whenever(megaApiGateway.getMegaNodeByHandle(nodeId.longValue)).thenReturn(megaNode)
+            whenever(megaApiGateway.addNodeTag(eq(megaNode), eq(tag), any())).thenAnswer {
+                ((it.arguments[2]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    api = mock(),
+                    request = mock(),
+                    error = mock {
+                        on { errorCode }.thenReturn(
+                            MegaError.API_OK
+                        )
+                    },
+                )
+            }
+
+            underTest.addNodeTag(nodeHandle = folderNode.id, tag = tag)
+            verify(megaApiGateway).addNodeTag(eq(megaNode), eq(tag), any())
+        }
+
+    @Test
+    fun `test when removeNodeTag is called then api gateway removeNodeTag is called`() =
+        runTest {
+            val megaNode = mock<MegaNode>()
+            whenever(folderNode.id).thenReturn(nodeId)
+            whenever(megaApiGateway.getMegaNodeByHandle(nodeId.longValue)).thenReturn(megaNode)
+            whenever(megaApiGateway.removeNodeTag(eq(megaNode), eq(tag), any())).thenAnswer {
+                ((it.arguments[2]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    api = mock(),
+                    request = mock(),
+                    error = mock {
+                        on { errorCode }.thenReturn(
+                            MegaError.API_OK
+                        )
+                    },
+                )
+            }
+
+            underTest.removeNodeTag(nodeHandle = folderNode.id, tag = tag)
+            verify(megaApiGateway).removeNodeTag(eq(megaNode), eq(tag), any())
+        }
+
+    @Test
+    fun `test that when updateNodeTag is called then api gateway updateNodeTag is called`() =
+        runTest {
+            val megaNode = mock<MegaNode>()
+            whenever(folderNode.id).thenReturn(nodeId)
+            whenever(megaApiGateway.getMegaNodeByHandle(nodeId.longValue)).thenReturn(megaNode)
+            val oldTag = "oldTag"
+            val newTag = "newTag"
+            whenever(
+                megaApiGateway.updateNodeTag(
+                    eq(megaNode),
+                    eq(oldTag),
+                    eq(newTag),
+                    any()
+                )
+            ).thenAnswer {
+                ((it.arguments[3]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    api = mock(),
+                    request = mock(),
+                    error = mock {
+                        on { errorCode }.thenReturn(
+                            MegaError.API_OK
+                        )
+                    },
+                )
+            }
+
+            underTest.updateNodeTag(
+                nodeHandle = folderNode.id,
+                oldTag = oldTag,
+                newTag = newTag
+            )
+            verify(megaApiGateway).updateNodeTag(eq(megaNode), eq(oldTag), eq(newTag), any())
+        }
+
+    @Test
+    fun `test that when setNodeDescription is called then api gateway setNodeDescription is called`() =
+        runTest {
+            val megaNode = mock<MegaNode>()
+            val description = "description"
+            whenever(folderNode.id).thenReturn(nodeId)
+            whenever(megaApiGateway.getMegaNodeByHandle(nodeId.longValue)).thenReturn(megaNode)
+            whenever(
+                megaApiGateway.setNodeDescription(
+                    eq(megaNode),
+                    eq(description),
+                    any()
+                )
+            ).thenAnswer {
+                ((it.arguments[2]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    api = mock(),
+                    request = mock(),
+                    error = mock {
+                        on { errorCode }.thenReturn(
+                            MegaError.API_OK
+                        )
+                    },
+                )
+            }
+
+            underTest.setNodeDescription(
+                nodeHandle = folderNode.id,
+                description = description
+            )
+            verify(megaApiGateway).setNodeDescription(eq(megaNode), eq(description), any())
+        }
 
     private fun provideNodeId() = Stream.of(
         Arguments.of(null),

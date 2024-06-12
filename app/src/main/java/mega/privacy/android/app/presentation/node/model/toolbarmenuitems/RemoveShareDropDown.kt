@@ -5,7 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import mega.privacy.android.app.presentation.extensions.isOutShare
 import mega.privacy.android.app.presentation.node.model.menuaction.RemoveShareDropdownMenuAction
 import mega.privacy.android.app.presentation.search.navigation.searchRemoveFolderShareDialog
-import mega.privacy.android.core.ui.model.MenuAction
+import mega.privacy.android.shared.original.core.ui.model.MenuAction
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.feature.sync.data.mapper.ListToStringWithDelimitersMapper
 import timber.log.Timber
@@ -20,7 +20,7 @@ class RemoveShareDropDown @Inject constructor(
     private val stringWithDelimitersMapper: ListToStringWithDelimitersMapper,
 ) : NodeToolbarMenuItem<MenuAction> {
 
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         hasNodeAccessPermission: Boolean,
         selectedNodes: List<TypedNode>,
         canBeMovedToTarget: Boolean,

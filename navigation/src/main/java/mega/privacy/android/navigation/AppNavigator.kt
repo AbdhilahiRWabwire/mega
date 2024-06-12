@@ -79,4 +79,27 @@ interface AppNavigator {
      * This screen allows users to upgrade to a paid plan
      */
     fun openUpgradeAccount(context: Context)
+
+    /**
+     * Navigates to the Syncs page
+     *
+     * @param activity      The Activity
+     * @param deviceName    The device name
+     */
+    fun openSyncs(activity: Activity, deviceName: String? = null)
+
+    /**
+     * Open zip browser
+     *
+     * @param context Context
+     * @param zipFilePath zip file path
+     * @param nodeHandle the node handle of zip file
+     * @param onError Callback called when zip file format check is not passed
+     */
+    fun openZipBrowserActivity(
+        context: Context,
+        zipFilePath: String,
+        nodeHandle: Long? = null,
+        onError: () -> Unit,
+    )
 }

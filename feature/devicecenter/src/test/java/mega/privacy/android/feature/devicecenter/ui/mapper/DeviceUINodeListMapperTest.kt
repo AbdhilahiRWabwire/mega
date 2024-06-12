@@ -129,9 +129,19 @@ internal class DeviceUINodeListMapperTest {
         whenever(deviceCenterUINodeStatusMapper(DeviceCenterNodeStatus.UpToDate)).thenReturn(
             expectedUINodeStatus
         )
-        whenever(deviceFolderUINodeListMapper(deviceFolders)).thenReturn(expectedFolderUINodeList)
+        whenever(
+            deviceFolderUINodeListMapper(
+                folders = deviceFolders,
+                isSyncFeatureFlagEnabled = false,
+            )
+        ).thenReturn(expectedFolderUINodeList)
         whenever(deviceUINodeIconMapper(deviceFolders)).thenReturn(expectedDeviceUINodeIcon)
 
-        assertThat(underTest(deviceList)).isEqualTo(expectedDeviceUINodeList)
+        assertThat(
+            underTest(
+                deviceNodes = deviceList,
+                isSyncFeatureFlagEnabled = false,
+            )
+        ).isEqualTo(expectedDeviceUINodeList)
     }
 }

@@ -4,7 +4,7 @@ import androidx.navigation.NavHostController
 import kotlinx.coroutines.CoroutineScope
 import mega.privacy.android.app.presentation.node.model.menuaction.RenameDropdownMenuAction
 import mega.privacy.android.app.presentation.search.navigation.searchRenameDialog
-import mega.privacy.android.core.ui.model.MenuAction
+import mega.privacy.android.shared.original.core.ui.model.MenuAction
 import mega.privacy.android.domain.entity.node.TypedNode
 import javax.inject.Inject
 
@@ -14,7 +14,7 @@ import javax.inject.Inject
 class RenameDropdownMenuItem @Inject constructor() : NodeToolbarMenuItem<MenuAction> {
 
     override val menuAction = RenameDropdownMenuAction()
-    override fun shouldDisplay(
+    override suspend fun shouldDisplay(
         hasNodeAccessPermission: Boolean,
         selectedNodes: List<TypedNode>,
         canBeMovedToTarget: Boolean,

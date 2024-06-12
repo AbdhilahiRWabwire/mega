@@ -4,14 +4,13 @@ import androidx.annotation.StringRes
 import mega.privacy.android.app.presentation.data.NodeUIItem
 import mega.privacy.android.app.presentation.mapper.OptionsItemInfo
 import mega.privacy.android.app.presentation.node.view.ToolbarMenuItem
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.MoveRequestResult
 import mega.privacy.android.domain.entity.node.NodeNameCollisionResult
 import mega.privacy.android.domain.entity.node.NodeSourceType
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
-import mega.privacy.android.domain.entity.search.DateFilterOption
-import mega.privacy.android.domain.entity.search.TypeFilterOption
 
 /**
  * State for SearchActivity
@@ -59,4 +58,5 @@ data class SearchActivityState(
     val moveRequestResult: Result<MoveRequestResult>? = null,
     val navigationLevel: List<Pair<Long, String>> = emptyList(),
     val resetScroll: Boolean = false,
+    val accountType: AccountType? = null,
 )

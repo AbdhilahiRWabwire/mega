@@ -10,11 +10,11 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.settings.camerauploads.model.UploadOptionUiItem
-import mega.privacy.android.core.ui.controls.dividers.DividerType
-import mega.privacy.android.core.ui.controls.dividers.MegaDivider
-import mega.privacy.android.core.ui.controls.lists.GenericTwoLineListItem
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.controls.dividers.DividerType
+import mega.privacy.android.shared.original.core.ui.controls.dividers.MegaDivider
+import mega.privacy.android.shared.original.core.ui.controls.lists.GenericTwoLineListItem
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * A [Composable] that shows the type of content that can be uploaded by Camera Uploads
@@ -53,7 +53,7 @@ internal fun FileUploadTile(
 private fun FileUploadTilePreview(
     @PreviewParameter(UploadOptionUiItemParameterProvider::class) uploadOptionUiItem: UploadOptionUiItem,
 ) {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         FileUploadTile(
             uploadOptionUiItem = uploadOptionUiItem,
             onItemClicked = {},

@@ -28,22 +28,24 @@ import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.unit.dp
 import mega.privacy.android.core.formatter.formatFileSize
 import mega.privacy.android.core.formatter.formatModifiedDate
-import mega.privacy.android.core.ui.controls.banners.WarningBanner
-import mega.privacy.android.core.ui.controls.buttons.MegaButtonWithIconAndText
-import mega.privacy.android.core.ui.controls.cards.MegaCard
-import mega.privacy.android.core.ui.controls.dividers.DividerType
-import mega.privacy.android.core.ui.controls.dividers.MegaDivider
-import mega.privacy.android.core.ui.controls.status.MegaStatusIndicator
-import mega.privacy.android.core.ui.controls.status.StatusColor
-import mega.privacy.android.core.ui.controls.text.MegaText
-import mega.privacy.android.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.core.ui.theme.extensions.textColorPrimary
-import mega.privacy.android.core.ui.theme.tokens.TextColor
+import mega.privacy.android.shared.original.core.ui.controls.banners.WarningBanner
+import mega.privacy.android.shared.original.core.ui.controls.buttons.MegaButtonWithIconAndText
+import mega.privacy.android.shared.original.core.ui.controls.cards.MegaCard
+import mega.privacy.android.shared.original.core.ui.controls.dividers.DividerType
+import mega.privacy.android.shared.original.core.ui.controls.dividers.MegaDivider
+import mega.privacy.android.shared.original.core.ui.controls.status.MegaStatusIndicator
+import mega.privacy.android.shared.original.core.ui.controls.status.StatusColor
+import mega.privacy.android.shared.original.core.ui.controls.status.getStatusIconColor
+import mega.privacy.android.shared.original.core.ui.controls.status.getStatusTextColor
+import mega.privacy.android.shared.original.core.ui.controls.text.MegaText
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorPrimary
+import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.feature.sync.R
 import mega.privacy.android.feature.sync.domain.entity.SyncStatus
 import mega.privacy.android.feature.sync.ui.model.SyncUiItem
-import mega.privacy.android.shared.theme.MegaAppTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 @Composable
 internal fun SyncCard(
@@ -65,7 +67,7 @@ internal fun SyncCard(
                 method = stringResource(id = sync.method)
             )
 
-            if (errorRes != null) {
+            if (errorRes != null && errorRes != sharedR.string.general_sync_storage_overquota) {
                 WarningBanner(
                     textString = stringResource(errorRes),
                     onCloseClick = null,
@@ -234,7 +236,7 @@ private fun SyncCardDetailedInfo(
 private fun InfoRow(
     title: String,
     info: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
         MegaText(
@@ -280,8 +282,8 @@ private fun SyncCardFooter(
                     modifier = Modifier.padding(end = 8.dp),
                     onClick = issuesInfoClicked,
                     icon = coreR.drawable.ic_info,
-                    iconColor = MaterialTheme.colors.error,
-                    textColor = MaterialTheme.colors.error,
+                    iconColor = StatusColor.Error.getStatusIconColor(),
+                    textColor = StatusColor.Error.getStatusTextColor(),
                     text = stringResource(id = R.string.sync_card_sync_issues_info)
                 )
             }
@@ -314,7 +316,7 @@ private fun SyncCardFooter(
 @CombinedThemePreviews
 @Composable
 private fun SyncCardExpandedPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         SyncCard(
             SyncUiItem(
                 id = 1234L,
@@ -343,7 +345,7 @@ private fun SyncCardExpandedPreview() {
 @CombinedThemePreviews
 @Composable
 private fun SyncCardExpandedWithBannerPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         SyncCard(
             SyncUiItem(
                 id = 1234L,
@@ -372,7 +374,7 @@ private fun SyncCardExpandedWithBannerPreview() {
 @CombinedThemePreviews
 @Composable
 private fun SyncCardCollapsedPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         SyncCard(
             SyncUiItem(
                 id = 1234L,
@@ -401,7 +403,7 @@ private fun SyncCardCollapsedPreview() {
 @CombinedThemePreviews
 @Composable
 private fun SyncCardCollapsedWithBannerPreview() {
-    MegaAppTheme(isDark = isSystemInDarkTheme()) {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         SyncCard(
             SyncUiItem(
                 id = 1234L,

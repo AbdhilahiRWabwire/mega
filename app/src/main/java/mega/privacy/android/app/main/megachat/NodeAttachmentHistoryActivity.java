@@ -70,7 +70,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -742,7 +741,6 @@ public class NodeAttachmentHistoryActivity extends PasscodeActivity implements
                 ImagePreviewMenuSource.CHAT,
                 currentNodeHandle,
                 previewParams,
-                false,
                 false
         );
         startActivity(intent);
@@ -850,19 +848,9 @@ public class NodeAttachmentHistoryActivity extends PasscodeActivity implements
                     Long megaNodeHandle = message.getMsgId();
                     messageIds.add(megaNodeHandle);
                 }
-                startDownloadViewModel.downloadChatNodesOnlyIfFeatureFlagIsTrue(
+                startDownloadViewModel.onDownloadClicked(
                         chatId,
-                        messageIds,
-                        () -> {
-                            ArrayList<MegaNodeList> list = new ArrayList<>();
-                            for (MegaChatMessage message : messagesSelected) {
-                                MegaNodeList megaNodeList = message.getMegaNodeList();
-                                list.add(megaNodeList);
-                            }
-                            PermissionUtils.checkNotificationsPermission(nodeAttachmentHistoryActivity);
-                            nodeSaver.saveNodeLists(list, false, false, false, true);
-                            return Unit.INSTANCE;
-                        });
+                        messageIds);
             } else if (itemId == R.id.chat_cab_menu_import) {
                 clearSelections();
                 hideMultipleSelect();
@@ -1419,17 +1407,15 @@ public class NodeAttachmentHistoryActivity extends PasscodeActivity implements
         this.myChatFilesFolder = myChatFilesFolder;
     }
 
-    public void downloadMessageNode(MegaNodeList nodeList, Long msgId) {
-        ArrayList<Long> msgIds = new ArrayList<>();
-        msgIds.add(msgId);
-        startDownloadViewModel.downloadChatNodesOnlyIfFeatureFlagIsTrue(
-                chatId,
-                msgIds,
-                () -> {
-                    PermissionUtils.checkNotificationsPermission(this);
-                    nodeSaver.saveNodeLists(Collections.singletonList(nodeList), false, false, false, true);
-                    return Unit.INSTANCE;
-                });
+    public void downloadMessageNode(Long msgId) {
+        if (msgId != null) {
+            ArrayList<Long> msgIds = new ArrayList<>();
+            msgIds.add(msgId);
+            startDownloadViewModel.onDownloadClicked(
+                    chatId,
+                    msgIds
+            );
+        }
     }
 }
 
