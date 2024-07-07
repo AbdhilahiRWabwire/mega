@@ -3,29 +3,18 @@ import mega.privacy.android.build.shouldApplyDefaultConfiguration
 
 plugins {
     alias(convention.plugins.mega.android.library)
+    alias(convention.plugins.mega.android.library.compose)
     alias(convention.plugins.mega.android.room)
     alias(convention.plugins.mega.android.test)
     alias(convention.plugins.mega.android.library.jacoco)
+    alias(convention.plugins.mega.lint)
+    alias(convention.plugins.mega.android.hilt)
     id("kotlin-android")
-    id("kotlin-kapt")
     id("de.mannodermaus.android-junit5")
 }
 
 android {
     namespace = "mega.privacy.android.feature.sync"
-
-    buildFeatures {
-        compose = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = androidx.versions.compose.compiler.get()
-    }
-
-    lint {
-        abortOnError = false
-        xmlOutput = file("build/reports/lint-results.xml")
-    }
 }
 
 dependencies {
@@ -49,17 +38,9 @@ dependencies {
     implementation(lib.logging.timber)
     implementation(lib.mega.analytics)
 
-    implementation(google.hilt.android)
     implementation(google.gson)
     implementation(androidx.datastore.preferences)
     implementation(androidx.hilt.navigation)
-
-    if (shouldApplyDefaultConfiguration(project)) {
-        apply(plugin = "dagger.hilt.android.plugin")
-
-        kapt(google.hilt.android.compiler)
-        kapt(androidx.hilt.compiler)
-    }
 
     implementation(androidx.appcompat)
     implementation(androidx.fragment)
@@ -69,11 +50,9 @@ dependencies {
     implementation(androidx.lifecycle.runtime.compose)
     implementation(androidx.lifecycle.service)
     implementation(androidx.compose.activity)
-    implementation(platform(androidx.compose.bom))
     implementation(androidx.bundles.compose.bom)
     implementation(lib.compose.state.events)
 
-    testImplementation(testlib.compose.junit)
     testImplementation(testlib.bundles.ui.test)
     testImplementation(testlib.bundles.unit.test)
     testImplementation(testlib.bundles.junit5.api)

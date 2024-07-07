@@ -1,11 +1,12 @@
 import mega.privacy.android.build.isServerBuild
-import mega.privacy.android.build.shouldUsePrebuiltSdk
 
 plugins {
     alias(plugin.plugins.ksp) apply false
-    id("org.jetbrains.kotlin.android") version "1.9.22" apply false
-    id("mega.android.release") version lib.versions.megagradle.get()
-    id("mega.android.cicd") version lib.versions.megagradle.get()
+    alias(plugin.plugins.mega.android.cicd)
+    alias(plugin.plugins.mega.android.release)
+    alias(plugin.plugins.jfrog.artifactory) apply false
+    alias(plugin.plugins.mega.artifactory.publish.convention) apply false
+    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
 }
 
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
@@ -30,6 +31,7 @@ buildscript {
         classpath(plugin.junit5)
         classpath(plugin.kotlin.gradle)
         classpath("androidx.benchmark:benchmark-baseline-profile-gradle-plugin:1.2.3")
+        classpath("org.jfrog.buildinfo:build-info-extractor-gradle:${plugin.versions.jfrog.artifactory.get()}")
     }
 }
 
@@ -65,8 +67,6 @@ allprojects {
     configurations.all {
         resolutionStrategy.cacheDynamicVersionsFor(5, "minutes")
     }
-    apply(plugin = "com.jfrog.artifactory")
-    apply(plugin = "maven-publish")
 }
 
 tasks.register("clean", Delete::class) {
@@ -76,16 +76,16 @@ tasks.register("clean", Delete::class) {
 
 // Define versions in a single place
 // App
-extra["appVersion"] = "13.3"
+extra["appVersion"] = "13.5"
 
 // Sdk and tools
-extra["compileSdkVersion"] = 34
+extra["compileSdkVersion"] = 35
 extra["minSdkVersion"] = 26
 extra["targetSdkVersion"] = 34
-extra["buildTools"] = "34.0.0"
+extra["buildTools"] = "35.0.0"
 
 // Prebuilt MEGA SDK version
-extra["megaSdkVersion"] = "20240604.113356-rel"
+extra["megaSdkVersion"] = "20240626.001403-rel"
 
 //JDK and Java Version
 extra["jdk"] = "17"
@@ -98,6 +98,15 @@ val shouldSuppressWarnings by extra(
     fun(): Boolean = isServerBuild() && System.getenv("DO_NOT_SUPPRESS_WARNINGS") != "true"
 )
 
-if (!shouldUsePrebuiltSdk() || isServerBuild()) {
-    apply(from = "${project.rootDir}/tools/prebuilt-sdk.gradle")
+tasks.register("runUnitTest") {
+    group = "Verification"
+    description = "Runs all unit tests same as CI/CD pipeline"
+    dependsOn(":domain:jacocoTestReport")
+    dependsOn(":data:testDebugUnitTestCoverage")
+    dependsOn(":app:createUnitTestCoverageReport")
+    dependsOn(":feature:devicecenter:testDebugUnitTestCoverage")
+    dependsOn(":feature:sync:testDebugUnitTestCoverage")
+    dependsOn(":shared:original-core-ui:testDebugUnitTestCoverage")
+    dependsOn(":legacy-core-ui:testDebugUnitTestCoverage")
 }
+

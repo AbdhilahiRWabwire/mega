@@ -1,30 +1,23 @@
 plugins {
     alias(convention.plugins.mega.android.library)
+    alias(convention.plugins.mega.android.library.compose)
     alias(convention.plugins.mega.android.test)
     alias(convention.plugins.mega.android.library.jacoco)
+    alias(convention.plugins.mega.lint)
+    alias(convention.plugins.mega.android.hilt)
     id("kotlin-android")
-    id("kotlin-kapt")
 }
 
 android {
 
     buildFeatures {
-        compose = true
         buildConfig = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = androidx.versions.compose.compiler.get()
     }
 
     defaultConfig {
         consumerProguardFiles("consumer-rules.pro")
     }
 
-    lint {
-        abortOnError = false
-        xmlOutput = file("build/reports/lint-results.xml")
-    }
     namespace = "mega.privacy.android.legacy.core.ui"
 }
 
@@ -35,7 +28,6 @@ dependencies {
     implementation(project(":shared:original-core-ui"))
     testImplementation(project(":core-ui-test"))
 
-    implementation(platform(androidx.compose.bom))
     implementation(androidx.constraintlayout.compose)
     implementation(androidx.bundles.compose.bom)
     implementation(lib.kotlin.ktx)
@@ -53,7 +45,6 @@ dependencies {
 
     testImplementation(testlib.bundles.ui.test)
     testImplementation(testlib.bundles.unit.test)
-    testImplementation(testlib.compose.junit)
 
     debugImplementation(lib.kotlinpoet)
     debugImplementation(google.gson)

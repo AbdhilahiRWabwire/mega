@@ -19,9 +19,9 @@ import mega.privacy.android.domain.entity.transfer.Transfer
 import mega.privacy.android.domain.entity.transfer.TransferAppData
 import mega.privacy.android.domain.entity.transfer.TransferEvent
 import mega.privacy.android.domain.repository.FileSystemRepository
-import mega.privacy.android.domain.repository.chat.ChatMessageRepository
 import mega.privacy.android.domain.usecase.canceltoken.CancelCancelTokenUseCase
 import mega.privacy.android.domain.usecase.chat.message.UpdatePendingMessageUseCase
+import mega.privacy.android.domain.usecase.chat.message.pendingmessages.GetPendingMessageUseCase
 import mega.privacy.android.domain.usecase.transfers.uploads.UploadFilesUseCase
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
@@ -45,25 +45,26 @@ class StartChatUploadsWithWorkerUseCaseTest {
 
     private val uploadFilesUseCase = mock<UploadFilesUseCase>()
     private val cancelCancelTokenUseCase = mock<CancelCancelTokenUseCase>()
-    private val startChatUploadsWorkerAndWaitUntilIsStartedUseCase = mock<StartChatUploadsWorkerAndWaitUntilIsStartedUseCase>()
-    private val chatMessageRepository = mock<ChatMessageRepository>()
+    private val startChatUploadsWorkerAndWaitUntilIsStartedUseCase =
+        mock<StartChatUploadsWorkerAndWaitUntilIsStartedUseCase>()
     private val fileSystemRepository = mock<FileSystemRepository>()
     private val handleChatUploadTransferEventUseCase = mock<HandleChatUploadTransferEventUseCase>()
     private val chatAttachmentNeedsCompressionUseCase =
         mock<ChatAttachmentNeedsCompressionUseCase>()
     private val updatePendingMessageUseCase = mock<UpdatePendingMessageUseCase>()
+    private val getPendingMessageUseCase = mock<GetPendingMessageUseCase>()
 
     @BeforeAll
     fun setup() {
         underTest = StartChatUploadsWithWorkerUseCase(
-            uploadFilesUseCase,
-            startChatUploadsWorkerAndWaitUntilIsStartedUseCase,
-            chatAttachmentNeedsCompressionUseCase,
-            chatMessageRepository,
-            fileSystemRepository,
-            handleChatUploadTransferEventUseCase,
-            updatePendingMessageUseCase,
-            cancelCancelTokenUseCase,
+            uploadFilesUseCase = uploadFilesUseCase,
+            startChatUploadsWorkerAndWaitUntilIsStartedUseCase = startChatUploadsWorkerAndWaitUntilIsStartedUseCase,
+            chatAttachmentNeedsCompressionUseCase = chatAttachmentNeedsCompressionUseCase,
+            fileSystemRepository = fileSystemRepository,
+            handleChatUploadTransferEventUseCase = handleChatUploadTransferEventUseCase,
+            updatePendingMessageUseCase = updatePendingMessageUseCase,
+            getPendingMessageUseCase = getPendingMessageUseCase,
+            cancelCancelTokenUseCase = cancelCancelTokenUseCase,
         )
     }
 
@@ -73,10 +74,10 @@ class StartChatUploadsWithWorkerUseCaseTest {
             uploadFilesUseCase,
             startChatUploadsWorkerAndWaitUntilIsStartedUseCase,
             chatAttachmentNeedsCompressionUseCase,
-            chatMessageRepository,
             fileSystemRepository,
             handleChatUploadTransferEventUseCase,
             updatePendingMessageUseCase,
+            getPendingMessageUseCase,
             cancelCancelTokenUseCase,
         )
         commonStub()
@@ -222,7 +223,7 @@ class StartChatUploadsWithWorkerUseCaseTest {
         val pendingMessage = mock<PendingMessage> {
             on { name } doReturn pendingMessageName
         }
-        whenever(chatMessageRepository.getPendingMessage(1L)) doReturn pendingMessage
+        whenever(getPendingMessageUseCase(1L)) doReturn pendingMessage
         underTest(file, NodeId(11L), pendingMessageId).test {
             verify(uploadFilesUseCase).invoke(
                 eq(mapOf(file to pendingMessageName)), NodeId(any()), any(), any(), any()

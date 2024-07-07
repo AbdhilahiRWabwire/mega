@@ -16,7 +16,9 @@ import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.Feature
+import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsEnabledUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
@@ -28,7 +30,7 @@ import mega.privacy.android.feature.devicecenter.ui.model.DeviceUINode
 import mega.privacy.android.feature.devicecenter.ui.model.NonBackupDeviceFolderUINode
 import mega.privacy.android.feature.devicecenter.ui.model.OwnDeviceUINode
 import mega.privacy.android.legacy.core.ui.model.SearchWidgetState
-import mega.privacy.android.shared.sync.featuretoggle.SyncFeatures
+import mega.privacy.android.shared.sync.featuretoggle.SyncABTestFeatures
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -40,6 +42,7 @@ import javax.inject.Inject
  * @property isCameraUploadsEnabledUseCase [IsCameraUploadsEnabledUseCase]
  * @property deviceUINodeListMapper [DeviceUINodeListMapper]
  * @property monitorConnectivityUseCase [MonitorConnectivityUseCase]
+ * @property monitorAccountDetailUseCase [MonitorAccountDetailUseCase]
  * @property getFeatureFlagValueUseCase [GetFeatureFlagValueUseCase]
  */
 @HiltViewModel
@@ -48,6 +51,7 @@ internal class DeviceCenterViewModel @Inject constructor(
     private val isCameraUploadsEnabledUseCase: IsCameraUploadsEnabledUseCase,
     private val deviceUINodeListMapper: DeviceUINodeListMapper,
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
+    private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
 ) : ViewModel() {
 
@@ -63,6 +67,7 @@ internal class DeviceCenterViewModel @Inject constructor(
     init {
         monitorNetworkConnectivity()
         loadFeatureFlags()
+        monitorAccountDetail()
     }
 
     private fun monitorNetworkConnectivity() {
@@ -74,6 +79,16 @@ internal class DeviceCenterViewModel @Inject constructor(
                         it.copy(isNetworkConnected = isNetworkConnected)
                     }
                 }
+        }
+    }
+
+    private fun monitorAccountDetail() {
+        viewModelScope.launch {
+            monitorAccountDetailUseCase().collect { accountDetail ->
+                _state.update {
+                    it.copy(isFreeAccount = accountDetail.levelDetail?.accountType == AccountType.FREE)
+                }
+            }
         }
     }
 
@@ -95,7 +110,7 @@ internal class DeviceCenterViewModel @Inject constructor(
         runCatching {
             val isCameraUploadsEnabled = isCameraUploadsEnabledUseCase()
             val isSyncFeatureFlagEnabled = runBlocking {
-                getEnabledFeatures().contains(SyncFeatures.AndroidSync)
+                getEnabledFeatures().contains(SyncABTestFeatures.asyc)
             }
             val devices = deviceUINodeListMapper(
                 deviceNodes = getDevicesUseCase(
@@ -148,7 +163,7 @@ internal class DeviceCenterViewModel @Inject constructor(
     }
 
     fun shouldNavigateToSyncs(deviceUINode: DeviceUINode) =
-        _state.value.enabledFlags.contains(SyncFeatures.AndroidSync) && deviceUINode is OwnDeviceUINode
+        _state.value.enabledFlags.contains(SyncABTestFeatures.asyc) && deviceUINode is OwnDeviceUINode
 
     /**
      * Handles specific Back Press behavior
@@ -277,7 +292,7 @@ internal class DeviceCenterViewModel @Inject constructor(
 
     private suspend fun getEnabledFeatures(): Set<Feature> {
         return setOfNotNull(
-            SyncFeatures.AndroidSync.takeIf { getFeatureFlagValueUseCase(it) },
+            SyncABTestFeatures.asyc.takeIf { getFeatureFlagValueUseCase(it) },
         )
     }
 

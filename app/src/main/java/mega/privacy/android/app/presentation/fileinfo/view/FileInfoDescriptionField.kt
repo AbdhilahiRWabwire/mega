@@ -11,7 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +27,7 @@ import mega.privacy.android.shared.original.core.ui.controls.textfields.GenericD
 import mega.privacy.android.shared.original.core.ui.preview.CombinedTextAndThemePreviews
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
+import mega.privacy.mobile.analytics.event.NodeInfoDescriptionCharacterLimitEvent
 import mega.privacy.mobile.analytics.event.NodeInfoDescriptionConfirmedEvent
 import mega.privacy.mobile.analytics.event.NodeInfoDescriptionEnteredEvent
 
@@ -35,7 +36,7 @@ import mega.privacy.mobile.analytics.event.NodeInfoDescriptionEnteredEvent
  *
  * @param descriptionText       Description text value
  * @param labelId               Label string resource Id
- * @param placeholderId         Placeholder string resource Id
+ * @param placeholder           Placeholder string
  * @param descriptionLimit      Description text character limit
  * @param isEditable            If user can change the description
  * @param onConfirmDescription  Description is confirmed by keyboard interaction
@@ -45,14 +46,14 @@ fun FileInfoDescriptionField(
     descriptionText: String,
     modifier: Modifier = Modifier,
     @StringRes labelId: Int? = null,
-    @StringRes placeholderId: Int? = null,
+    placeholder: String? = null,
     descriptionLimit: Int = DESCRIPTION_LIMIT,
     isEditable: Boolean = true,
     onConfirmDescription: (String) -> Unit = {},
 ) {
     val focusManager = LocalFocusManager.current
-    var isFocused by remember { mutableStateOf(false) }
-    var description by remember { mutableStateOf(descriptionText) }
+    var isFocused by rememberSaveable { mutableStateOf(false) }
+    var description by rememberSaveable { mutableStateOf(descriptionText) }
 
     LaunchedEffect(descriptionText) {
         description = descriptionText
@@ -75,7 +76,6 @@ fun FileInfoDescriptionField(
                     }
                 },
             value = description,
-            charLimit = descriptionLimit,
             initiallyFocused = false,
             isEnabled = isEditable,
             maxLines = 5,
@@ -88,8 +88,11 @@ fun FileInfoDescriptionField(
                 }
             ),
             showUnderline = true,
-            placeholderId = placeholderId,
+            placeholder = placeholder,
             onValueChange = {
+                if (it.length > descriptionLimit) {
+                    Analytics.tracker.trackEvent(NodeInfoDescriptionCharacterLimitEvent)
+                }
                 val isOverLimit =
                     description.length >= descriptionLimit && it.length >= description.length
                 if (!isOverLimit) {
@@ -132,7 +135,7 @@ private fun FileInfoDescriptionFieldPreview() {
         FileInfoDescriptionField(
             descriptionText = "This is a description",
             labelId = sharedR.string.file_info_information_description_label,
-            placeholderId = sharedR.string.file_info_information_description_placeholder,
+            placeholder = stringResource(id = sharedR.string.file_info_information_description_placeholder),
         )
     }
 }

@@ -2,46 +2,27 @@ import mega.privacy.android.build.shouldApplyDefaultConfiguration
 
 plugins {
     alias(convention.plugins.mega.android.library)
+    alias(convention.plugins.mega.android.library.compose)
     alias(convention.plugins.mega.android.test)
+    alias(convention.plugins.mega.lint)
+    alias(convention.plugins.mega.android.hilt)
     id("kotlin-android")
-    id("kotlin-kapt")
     id("de.mannodermaus.android-junit5")
 }
 
 android {
     namespace = "mega.privacy.android.shared.sync"
 
-    buildFeatures {
-        compose = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = androidx.versions.compose.compiler.get()
-    }
-
-    lint {
-        abortOnError = false
-        xmlOutput = file("build/reports/lint-results.xml")
-    }
     dependencies {
         lintChecks(project(":lint"))
         implementation(project(":shared:original-core-ui"))
 
-        implementation(platform(androidx.compose.bom))
         implementation(androidx.bundles.compose.bom)
     }
 }
 dependencies {
     implementation(project(":domain"))
     implementation(project(":shared:resources"))
-    implementation(google.hilt.android)
-
-    if (shouldApplyDefaultConfiguration(project)) {
-        apply(plugin = "dagger.hilt.android.plugin")
-
-        kapt(google.hilt.android.compiler)
-        kapt(androidx.hilt.compiler)
-    }
 
     testImplementation(testlib.junit)
     testImplementation(testlib.junit.test.ktx)

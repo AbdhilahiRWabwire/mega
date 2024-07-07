@@ -18,7 +18,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.view.ActionMode
-import androidx.compose.material.SnackbarHostState
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -177,8 +176,8 @@ class FileBrowserComposeFragment : Fragment() {
                     .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
                 val uiState by fileBrowserViewModel.state.collectAsStateWithLifecycle()
                 val nodeActionState by nodeActionsViewModel.state.collectAsStateWithLifecycle()
-                val snackbarHostState = remember { SnackbarHostState() }
                 val scaffoldState = rememberScaffoldState()
+                val snackbarHostState = scaffoldState.snackbarHostState
                 val coroutineScope = rememberCoroutineScope()
                 var clickedFile: TypedFileNode? by remember {
                     mutableStateOf(null)
@@ -248,14 +247,6 @@ class FileBrowserComposeFragment : Fragment() {
                             },
                             fileTypeIconMapper = fileTypeIconMapper
                         )
-
-                        // Snackbar host state should be attached to snackbar host in the scaffold, but we don't have a scaffold yet
-                        LaunchedEffect(snackbarHostState.currentSnackbarData) {
-                            snackbarHostState.currentSnackbarData?.message?.let {
-                                Util.showSnackbar(activity, it)
-                            }
-                            snackbarHostState.currentSnackbarData?.dismiss()
-                        }
                         StartTransferComponent(
                             uiState.downloadEvent,
                             {
@@ -518,30 +509,34 @@ class FileBrowserComposeFragment : Fragment() {
             nodeList: List<NodeUIItem<TypedNode>>,
             menu: Menu,
         ) {
-            val isHiddenNodesEnabled =
-                getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)
+            val isHiddenNodesEnabled = getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)
+            if (!isHiddenNodesEnabled) {
+                menu.findItem(R.id.cab_menu_hide)?.isVisible = false
+                menu.findItem(R.id.cab_menu_unhide)?.isVisible = false
+                return
+            }
+
+            val selectedNodes = selected.mapNotNull { nodeId ->
+                nodeList.find { it.id.longValue == nodeId }
+            }
+
             val isHidingActionAllowed = selected.all {
                 fileBrowserViewModel.isHidingActionAllowed(NodeId(it))
             }
-            if (isHiddenNodesEnabled && isHidingActionAllowed) {
-                val selectedNodes = selected.mapNotNull { nodeId ->
-                    nodeList.find { it.id.longValue == nodeId }
-                }
-                val hasNonSensitiveNode =
-                    selectedNodes.any { !it.isMarkedSensitive }
-                val isPaid =
-                    fileBrowserViewModel.state.value.accountType?.isPaid
-                        ?: false
 
-                menu.findItem(R.id.cab_menu_hide)?.isVisible =
-                    (hasNonSensitiveNode || !isPaid)
+            val includeSensitiveInheritedNode = selectedNodes.any { it.isSensitiveInherited }
 
-                menu.findItem(R.id.cab_menu_unhide)?.isVisible =
-                    !hasNonSensitiveNode && isPaid
-            } else {
+            if (!isHidingActionAllowed || includeSensitiveInheritedNode) {
                 menu.findItem(R.id.cab_menu_hide)?.isVisible = false
                 menu.findItem(R.id.cab_menu_unhide)?.isVisible = false
+                return
             }
+
+            val hasNonSensitiveNode = selectedNodes.any { !it.isMarkedSensitive }
+            val isPaid = fileBrowserViewModel.state.value.accountType?.isPaid ?: false
+
+            menu.findItem(R.id.cab_menu_hide)?.isVisible = hasNonSensitiveNode || !isPaid
+            menu.findItem(R.id.cab_menu_unhide)?.isVisible = !hasNonSensitiveNode && isPaid
         }
 
         override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {

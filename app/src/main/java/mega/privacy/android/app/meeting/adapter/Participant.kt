@@ -56,7 +56,7 @@ data class Participant(
     var isScreenShared: Boolean = false,
     var isCameraOn: Boolean = false,
     var isScreenShareOn: Boolean = false,
-    var isRaisedHand: Boolean = false,
+    val isRaisedHand: Boolean = false,
 ) : Serializable {
 
     /**

@@ -18,7 +18,6 @@ import mega.privacy.android.build.readVersionNameChannel
 import mega.privacy.android.build.readVersionNameTag
 import mega.privacy.android.build.shouldActivateGreeter
 import mega.privacy.android.build.shouldActivateNocturn
-import mega.privacy.android.build.shouldActivateTestLite
 import mega.privacy.android.build.shouldApplyDefaultConfiguration
 import mega.privacy.android.build.shouldCombineLintReports
 import mega.privacy.android.build.shouldUsePrebuiltSdk
@@ -26,16 +25,16 @@ import mega.privacy.android.build.shouldUsePrebuiltSdk
 
 plugins {
     alias(convention.plugins.mega.android.app)
+    alias(convention.plugins.mega.android.application.compose)
     alias(convention.plugins.mega.android.test)
     alias(convention.plugins.mega.android.application.jacoco)
+    alias(convention.plugins.mega.android.application.firebase)
+    alias(convention.plugins.mega.lint)
+    alias(convention.plugins.mega.android.hilt)
     id("kotlin-parcelize")
-    id("kotlin-kapt")
     id("androidx.navigation.safeargs.kotlin")
     id("com.google.firebase.appdistribution")
-    id("com.google.gms.google-services")
     id("de.mannodermaus.android-junit5")
-    id("com.google.firebase.crashlytics")
-    id("com.google.firebase.firebase-perf")
     id("androidx.baselineprofile")
 }
 
@@ -132,8 +131,6 @@ android {
             htmlReport = true
             htmlOutput = file("build/reports/combined.html")
         }
-        abortOnError = false
-        xmlOutput = file("build/reports/lint-results.xml")
     }
     namespace = "mega.privacy.android.app"
     packaging {
@@ -214,7 +211,6 @@ dependencies {
     implementation(androidx.sqlite.ktx)
 
     // Compose
-    implementation(platform(androidx.compose.bom))
     implementation(androidx.bundles.compose.bom)
     implementation(androidx.compose.activity)
     implementation(androidx.compose.viewmodel)
@@ -248,11 +244,6 @@ dependencies {
     implementation(google.code.scanner)
     implementation(google.install.referrer)
 
-    // Firebase
-    implementation(platform(google.firebase.bom))
-    implementation(google.bundles.firebase.bom)
-    implementation(google.firebase.analytics)
-
     // Play Core
     implementation(google.play.core)
     implementation(google.play.core.ktx)
@@ -261,15 +252,10 @@ dependencies {
     implementation(google.protobuff)
 
     // Hilt
-    implementation(google.hilt.android)
     implementation(androidx.hilt.work)
     implementation(androidx.hilt.navigation)
 
     if (shouldApplyDefaultConfiguration(project)) {
-        apply(plugin = "dagger.hilt.android.plugin")
-
-        kapt(google.hilt.android.compiler)
-        kapt(androidx.hilt.compiler)
         kaptTest(google.hilt.android.compiler)
     }
 
@@ -327,8 +313,8 @@ dependencies {
     }
     testImplementation(google.hilt.android.test)
     testImplementation(androidx.work.test)
-    testImplementation(testlib.compose.junit)
     testImplementation(androidx.navigation.testing)
+    testImplementation(lib.rx.coroutines)
 
     //jUnit 5
     testImplementation(platform(testlib.junit5.bom))
@@ -432,7 +418,7 @@ fun applyTestLiteForTasks() {
         for (task in allTasks) {
             if (task.name.lowercase().startsWith("test")) {
                 tasks.matching { activeTask ->
-                    excludedTasks.any { it(activeTask) } && shouldActivateTestLite()
+                    excludedTasks.any { it(activeTask) }
                 }.configureEach {
                     enabled = false
                 }

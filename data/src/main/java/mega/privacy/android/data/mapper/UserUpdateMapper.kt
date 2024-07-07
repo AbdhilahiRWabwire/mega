@@ -3,29 +3,48 @@ package mega.privacy.android.data.mapper
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.entity.user.UserId
 import mega.privacy.android.domain.entity.user.UserUpdate
+import mega.privacy.android.domain.entity.user.UserVisibility
 import nz.mega.sdk.MegaUser
+import javax.inject.Inject
 
 /**
  * Mapper to convert list of updated users from sdk into a [UserUpdate] entity
  */
-typealias UserUpdateMapper = (@JvmSuppressWildcards List<@JvmSuppressWildcards MegaUser>) -> UserUpdate
+internal class UserUpdateMapper @Inject constructor() {
 
+    /**
+     * Maps from mega user list to UserUpdate
+     *
+     * @param userList
+     */
+    operator fun invoke(userList: List<MegaUser>) = UserUpdate(
+        changes = userList.groupBy { user -> UserId(user.handle) }
+            .mapValues { (_, users) ->
+                users.map { i -> fromMegaUserChangeFlags(i.changes, i.visibility) }.flatten()
+                    .distinct()
+            },
+        emailMap = userList.associate { user -> UserId(user.handle) to user.email },
+    )
+}
 
-/**
- * Maps from mega user list to UserUpdate
- *
- * @param userList
- */
-internal fun mapMegaUserListToUserUpdate(userList: List<MegaUser>) = UserUpdate(
-    userList.groupBy { user -> UserId(user.handle) }
-        .mapValues { (_, users) ->
-            users.map { i -> fromMegaUserChangeFlags(i.changes) }.flatten()
-        }
-)
+private fun fromMegaUserChangeFlags(changeFlags: Long, visibility: Int) =
+    userChangesMap.filter { (it.key.toLong() and changeFlags) != 0L }.values.toList() + mapVisibility(
+        visibility
+    )
 
-private fun fromMegaUserChangeFlags(changeFlags: Long) =
-    if (changeFlags == 0L) emptyList() // MegaUser visibility change
-    else userChangesMap.filter { (it.key.toLong() and changeFlags) != 0L }.values.toList()
+private fun mapVisibility(visibility: Int): List<UserChanges> =
+    listOf(
+        UserChanges.Visibility(
+            when (visibility) {
+                MegaUser.VISIBILITY_HIDDEN -> UserVisibility.Hidden
+                MegaUser.VISIBILITY_VISIBLE -> UserVisibility.Visible
+                MegaUser.VISIBILITY_BLOCKED -> UserVisibility.Blocked
+                MegaUser.VISIBILITY_UNKNOWN -> UserVisibility.Unknown
+                MegaUser.VISIBILITY_INACTIVE -> UserVisibility.Inactive
+                else -> UserVisibility.Unknown
+            }
+        )
+    )
 
 private val userChangesMap = mapOf(
     MegaUser.CHANGE_TYPE_AUTHRING to UserChanges.AuthenticationInformation,

@@ -124,7 +124,7 @@ open class TransfersManagementActivity : PasscodeActivity() {
         }
 
         collectFlow(monitorTransferOverQuotaUseCase(), Lifecycle.State.CREATED) {
-            updateTransfersWidget(TransferType.NONE)
+            updateTransfersWidget()
         }
 
         collectFlow(
@@ -307,22 +307,6 @@ open class TransfersManagementActivity : PasscodeActivity() {
     }
 
     /**
-     * Updates the state of the transfers widget.
-     *
-     * @param transferType Type of the transfer.
-     */
-    private fun updateTransfersWidget(transferType: TransferType) {
-        if (transfersManagement.isProcessingTransfers || transfersManagement.isProcessingFolders) {
-            return
-        }
-
-        transfersManagementViewModel.checkTransfersInfo(
-            transferType,
-            isOnFileManagementManagerSection
-        )
-    }
-
-    /**
      * Shows a scanning transfers dialog.
      */
     private fun showScanningTransfersDialog() {
@@ -414,20 +398,10 @@ open class TransfersManagementActivity : PasscodeActivity() {
      */
     fun updateTransfersWidget() {
         if (isOnFileManagementManagerSection) {
-            transfersManagementViewModel.checkTransfersInfo(
-                TransferType.NONE,
-                true
-            )
+            transfersManagementViewModel.checkTransfersInfo(true)
         } else {
             hideTransfersWidget()
         }
-    }
-
-    /**
-     * Updates the state of the transfers widget.
-     */
-    fun updateTransfersWidgetState() {
-        transfersManagementViewModel.checkTransfersState()
     }
 
     /**

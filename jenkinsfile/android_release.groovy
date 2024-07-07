@@ -74,15 +74,15 @@ pipeline {
                 common.downloadJenkinsConsoleLog(CONSOLE_LOG_FILE)
 
                 if (hasGitLabMergeRequest()) {
-                    String link = common.uploadFileToGitLab(CONSOLE_LOG_FILE)
+                    String jenkinsLog = common.uploadFileToArtifactory(CONSOLE_LOG_FILE)
 
                     def message = ""
                     if (triggeredByDeliverAppStore()) {
                         message = common.releaseFailureMessage("<br/>") +
-                                "<br/>Build Log:\t${link}"
+                                "<br/>Build Log:\t[$CONSOLE_LOG_FILE](${jenkinsLog})"
                     } else if (triggeredByUploadSymbol()) {
                         message = common.uploadSymbolFailureMessage("<br/>") +
-                                "<br/>Build Log:\t${link}"
+                                "<br/>Build Log:\t[$CONSOLE_LOG_FILE](${jenkinsLog})"
                     }
                     common.sendToMR(message)
                 } else {
@@ -97,11 +97,11 @@ pipeline {
                     common.sendToMR(skipMessage("<br/>"))
                 } else if (hasGitLabMergeRequest()) {
                     common.downloadJenkinsConsoleLog(CONSOLE_LOG_FILE)
-                    String link = common.uploadFileToGitLab(CONSOLE_LOG_FILE)
+                    String link = common.uploadFileToArtifactory(CONSOLE_LOG_FILE)
 
                     if (triggeredByDeliverAppStore()) {
                         def message = releaseSuccessMessage("<br/>", common) +
-                                "<br/>Build Log:\t${link}"
+                                "<br/>Build Log:\t[$CONSOLE_LOG_FILE](${link})"
                         common.sendToMR(message)
 
                         // send to android slack channel
@@ -120,25 +120,37 @@ pipeline {
                         }
 
                         def slackChannelId = ""
+                        def qaSlackChannelId = ""
                         if (fileExists(WORKSPACE + "/" + slackInfoFileName)) {
-                            slackChannelId = readFile(WORKSPACE + "/" + slackInfoFileName).trim()
+                            def content = readFile(WORKSPACE + "/" + slackInfoFileName).trim()
+                            def slackInfo = content.split(",")
+                            if (slackInfo.size() > 0) {
+                                slackChannelId = slackInfo[0]
+                            }
+                            if (slackInfo.size() > 1) {
+                                qaSlackChannelId = slackInfo[1]
+                            }
                         }
 
                         if (slackChannelId == "") {
                             def slackResponse = slackSend(channel: "android", message: slackVersionInfo)
+                            def qaSlackResponse = slackSend(channel: "qa", message: slackVersionInfo)
                             // write slackResponse.threadId to local file and upload to slackInfoPath
                             slackChannelId = slackResponse.threadId
+                            qaSlackChannelId = qaSlackResponse.threadId
                             sh """
                                cd ${WORKSPACE}
-                               echo ${slackChannelId} > ${slackInfoFileName}
+                               echo ${slackChannelId},${qaSlackChannelId} > ${slackInfoFileName}
                             """
                             common.uploadToArtifactory(slackInfoFileName, slackInfoPath)
                         } else {
                             slackSend channel: slackChannelId, message: slackVersionInfo, replyBroadcast: true
+                            if (qaSlackChannelId != "") {
+                                slackSend channel: qaSlackChannelId, message: slackVersionInfo, replyBroadcast: true
+                            } else {
+                                slackSend channel: "qa", message: slackVersionInfo
+                            }
                         }
-
-                        // always send new message to QA channel
-                        slackSend channel: "qa", message: slackVersionInfo
 
                         // send to MR
                         common.sendToMR(getBuildVersionInfo(common))
@@ -146,7 +158,7 @@ pipeline {
                         slackSend color: "good", message: releaseSuccessMessage("\n", common)
                     } else if (triggeredByUploadSymbol()) {
                         def message = common.uploadSymbolSuccessMessage("<br/>") +
-                                "<br/>Build Log:\t${link}"
+                                "<br/>Build Log:\t[$CONSOLE_LOG_FILE](${link})"
                         common.sendToMR(message)
 
                         slackSend color: "good", message: common.uploadSymbolSuccessMessage("\n")
@@ -171,9 +183,6 @@ pipeline {
             }
         }
         stage('Clone transifex') {
-            when {
-                expression { isMajorRelease(common) }
-            }
             steps {
                 script {
                     BUILD_STEP = 'Clone transifex'
@@ -388,6 +397,32 @@ pipeline {
             }
         }
 
+        stage('Delete old strings') {
+            when {
+                expression { triggeredByDeliverAppStore() || triggeredByDeleteOldString() }
+            }
+            steps {
+                script {
+                    withCredentials([
+                            string(credentialsId: 'ANDROID_TRANSIFEX_BOT_TOKEN', variable: 'TRANSIFEX_BOT_TOKEN'),
+                            string(credentialsId: 'ANDROID_TRANSIFEX_BOT_URL', variable: 'TRANSIFEX_BOT_URL'),
+                            string(credentialsId: 'ANDROID_TRANSIFEX_TOKEN', variable: 'ANDROID_TRANSIFEX_TOKEN'),
+                            gitUsernamePassword(credentialsId: 'Gitlab-Access-Token', gitToolName: 'Default')
+                    ]) {
+                        withEnv([
+                                "TRANSIFEX_BOT_TOKEN=${TRANSIFEX_BOT_TOKEN}",
+                                "TRANSIFEX_BOT_URL=${TRANSIFEX_BOT_URL}",
+                                "TRANSIFEX_TOKEN=${ANDROID_TRANSIFEX_TOKEN}"
+                        ]) {
+                            sh 'echo $TRANSIFEX_BOT_TOKEN'
+                            sh 'echo $TRANSIFEX_BOT_URL'
+                            sh './gradlew deleteOldStrings'
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Deploy to Google Play Alpha') {
             when {
                 expression { triggeredByDeliverAppStore() }
@@ -555,4 +590,15 @@ private boolean triggeredByUploadSymbol() {
     return isOnReleaseBranch() &&
             env.gitlabTriggerPhrase != null &&
             env.gitlabTriggerPhrase == "upload_symbol"
+}
+
+
+/**
+ * Check if build is triggered by 'upload_symbol' command.
+ * @return true if build is triggered by 'upload_symbol' command. Otherwise return false.
+ */
+private boolean triggeredByDeleteOldString() {
+    return isOnReleaseBranch() &&
+            env.gitlabTriggerPhrase != null &&
+            env.gitlabTriggerPhrase == "delete_oldStrings"
 }

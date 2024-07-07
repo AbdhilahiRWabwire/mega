@@ -1,6 +1,8 @@
 package mega.privacy.android.feature.sync.navigation
 
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
@@ -12,6 +14,7 @@ import mega.privacy.android.feature.sync.ui.megapicker.MegaPickerRoute
 import mega.privacy.android.feature.sync.ui.newfolderpair.SyncNewFolderScreenRoute
 import mega.privacy.android.feature.sync.ui.permissions.SyncPermissionsManager
 import mega.privacy.android.feature.sync.ui.synclist.SyncListRoute
+import mega.privacy.android.shared.original.core.ui.utils.findFragmentActivity
 import mega.privacy.mobile.analytics.event.AddSyncScreenEvent
 import mega.privacy.mobile.analytics.event.AndroidSyncFABButtonEvent
 import mega.privacy.mobile.analytics.event.AndroidSyncGetStartedButtonEvent
@@ -24,18 +27,17 @@ private const val syncMegaPicker = "sync/mega-picker"
 private const val syncList = "sync/list"
 
 internal fun NavGraphBuilder.syncNavGraph(
-    showOnboardingScreen: Boolean,
     navController: NavController,
     fileTypeIconMapper: FileTypeIconMapper,
     syncPermissionsManager: SyncPermissionsManager,
     openUpgradeAccountPage: () -> Unit,
     title: String? = null,
+    openNewSync: Boolean = false,
 ) {
     navigation(
-        startDestination = if (showOnboardingScreen) {
-            syncEmptyRoute
-        } else {
-            syncList
+        startDestination = when {
+            openNewSync -> syncNewFolderRoute
+            else -> syncList
         },
         route = syncRoute
     ) {
@@ -58,7 +60,15 @@ internal fun NavGraphBuilder.syncNavGraph(
                     openUpgradeAccountPage()
                 },
                 onBackClicked = {
-                    navController.popBackStack()
+                    if (openNewSync) {
+                        navController.navigate(syncList) {
+                            popUpTo(syncNewFolderRoute) {
+                                inclusive = true
+                            }
+                        }
+                    } else {
+                        navController.popBackStack()
+                    }
                 }
             )
         }
@@ -75,6 +85,10 @@ internal fun NavGraphBuilder.syncNavGraph(
             )
         }
         composable(route = syncList) {
+            val fragmentActivity = LocalContext.current.findFragmentActivity()
+            val viewModelStoreOwner =
+                fragmentActivity ?: checkNotNull(LocalViewModelStoreOwner.current)
+
             SyncListRoute(
                 hiltViewModel(),
                 syncPermissionsManager,
@@ -84,6 +98,9 @@ internal fun NavGraphBuilder.syncNavGraph(
                 },
                 onOpenUpgradeAccountClicked = { openUpgradeAccountPage() },
                 title = title,
+                syncFoldersViewModel = hiltViewModel(viewModelStoreOwner = viewModelStoreOwner),
+                syncStalledIssuesViewModel = hiltViewModel(viewModelStoreOwner = viewModelStoreOwner),
+                syncSolvedIssuesViewModel = hiltViewModel(viewModelStoreOwner = viewModelStoreOwner),
             )
         }
     }

@@ -32,8 +32,8 @@ import mega.privacy.android.app.presentation.fileinfo.view.sharedinfo.SharedInfo
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.domain.entity.contacts.ContactPermission
 import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_alpha_012_white_alpha_012
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_alpha_012_white_alpha_012
 
 /**
  * Content for FileInfo screen, all except toolbar, bottom sheets, dialogs
@@ -54,7 +54,9 @@ internal fun FileInfoContent(
     onPublicLinkCopyClick: () -> Unit,
     onVerifyContactClick: (String) -> Unit,
     onSetDescriptionClick: (String) -> Unit,
+    onAddTagClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onUpgradeAccountClick: () -> Unit,
 ) {
     var isShareContactExpanded by remember { mutableStateOf(false) }
     Column(
@@ -201,9 +203,24 @@ internal fun FileInfoContent(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     descriptionText = descriptionText,
                     labelId = sharedR.string.file_info_information_description_label,
-                    placeholderId = sharedR.string.file_info_information_description_placeholder.takeIf { isDescriptionEnabled() },
+                    placeholder = if (isDescriptionEnabled()) stringResource(id = sharedR.string.file_info_information_description_placeholder) else stringResource(
+                        id = sharedR.string.file_info_information_no_description_placeholder
+                    ),
                     isEditable = isDescriptionEnabled(),
                     onConfirmDescription = onSetDescriptionClick,
+                )
+            }
+
+            //tags
+            if (canEnableTags()) {
+                FileInfoTagsView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    tags = tags,
+                    isProAccount = isProAccount,
+                    onAddTagClick = onAddTagClick,
+                    onUpgradeAccountClick = onUpgradeAccountClick
                 )
             }
 
@@ -265,6 +282,8 @@ private fun FileInfoContentPreview(
             onLocationClick = {},
             onVerifyContactClick = {},
             onSetDescriptionClick = {},
+            onAddTagClick = {},
+            onUpgradeAccountClick = {},
             modifier = Modifier.verticalScroll(scrollState)
         )
     }

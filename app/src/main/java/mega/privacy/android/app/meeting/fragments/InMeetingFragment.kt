@@ -42,13 +42,14 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.jeremyliao.liveeventbus.LiveEventBus
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.components.twemoji.EmojiTextView
 import mega.privacy.android.app.constants.EventConstants.EVENT_CALL_COMPOSITION_CHANGE
-import mega.privacy.android.app.constants.EventConstants.EVENT_CALL_ON_HOLD_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_CALL_STATUS_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_CHAT_CONNECTION_STATUS
 import mega.privacy.android.app.constants.EventConstants.EVENT_CONTACT_NAME_CHANGE
@@ -59,7 +60,6 @@ import mega.privacy.android.app.constants.EventConstants.EVENT_PRIVILEGES_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_REMOTE_AUDIO_LEVEL_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_REMOTE_AVFLAGS_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_SESSION_ON_HIRES_CHANGE
-import mega.privacy.android.app.constants.EventConstants.EVENT_SESSION_ON_HOLD_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_SESSION_ON_LOWRES_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_SESSION_STATUS_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_USER_VISIBILITY_CHANGE
@@ -129,6 +129,7 @@ import mega.privacy.android.data.qualifier.MegaApi
 import mega.privacy.android.domain.entity.meeting.AnotherCallType
 import mega.privacy.android.domain.entity.meeting.CallUIStatusType
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
+import mega.privacy.android.domain.entity.meeting.ChatSession
 import mega.privacy.android.domain.entity.meeting.ParticipantsSection
 import mega.privacy.android.domain.entity.meeting.SubtitleCallType
 import mega.privacy.android.domain.entity.meeting.TypeRemoteAVFlagChange
@@ -230,9 +231,6 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
     // Only me in the call Dialog
     private var onlyMeDialog: Dialog? = null
 
-    // Free limit upgrade dialog
-    private var freeLimitUpgradeDialog: Dialog? = null
-
 
     private var countDownTimerToEndCall: CountDownTimer? = null
 
@@ -288,12 +286,12 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
                             )
                         }
 
-                        inMeetingViewModel.updateOwnPrivileges(requireContext())
+                        inMeetingViewModel.updateOwnPrivileges()
                     }
 
                     if (item.hasChanged(MegaChatListItem.CHANGE_TYPE_PARTICIPANTS)) {
                         Timber.d("Change in the privileges of a participant")
-                        inMeetingViewModel.updateParticipantsPrivileges(requireContext())
+                        inMeetingViewModel.updateParticipantsPrivileges()
                     }
                 }
             }
@@ -366,30 +364,6 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
         }
     }
 
-    private val callOnHoldObserver = Observer<MegaChatCall> {
-        if (inMeetingViewModel.isSameCall(it.callId)) {
-            Timber.d("Change in call on hold status")
-            isCallOnHold(it.isOnHold)
-            checkSwapCameraMenuItemVisibility()
-        }
-    }
-
-    private val sessionOnHoldObserver =
-        Observer<Pair<Long, MegaChatSession>> { callAndSession ->
-            if (inMeetingViewModel.isSameCall(callAndSession.first)) {
-                showMuteBanner()
-                val call = inMeetingViewModel.getCall()
-                call?.let {
-                    Timber.d("Change in session on hold status")
-                    if (!inMeetingViewModel.isOneToOneCall()) {
-                        updateOnHoldRemote(callAndSession.second)
-                    } else if (it.hasLocalVideo() && callAndSession.second.isOnHold) {
-                        sharedModel.clickCamera(false)
-                    }
-                }
-            }
-        }
-
     private val sessionStatusObserver =
         Observer<Pair<MegaChatCall, MegaChatSession>> { callAndSession ->
             if (!inMeetingViewModel.isOneToOneCall()) {
@@ -397,7 +371,7 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
                     MegaChatSession.SESSION_STATUS_IN_PROGRESS -> {
                         Timber.d("Session in progress, clientID = ${callAndSession.second.clientid}")
                         inMeetingViewModel.addParticipant(
-                            callAndSession.second.clientid, requireContext()
+                            callAndSession.second.clientid
                         )?.let { position ->
                             if (position != INVALID_POSITION) {
                                 checkChildFragments()
@@ -410,7 +384,6 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
                         Timber.d("Session destroyed, clientID = ${callAndSession.second.clientid}")
                         inMeetingViewModel.removeParticipant(
                             callAndSession.second,
-                            requireContext()
                         ).let { position ->
                             if (position != INVALID_POSITION) {
                                 checkChildFragments()
@@ -891,14 +864,9 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
         LiveEventBus.get(EVENT_CALL_COMPOSITION_CHANGE, MegaChatCall::class.java)
             .observe(this, callCompositionObserver)
 
-        LiveEventBus.get(EVENT_CALL_ON_HOLD_CHANGE, MegaChatCall::class.java)
-            .observe(this, callOnHoldObserver)
-
         //Sessions Level
         LiveEventBus.get<Pair<MegaChatCall, MegaChatSession>>(EVENT_SESSION_STATUS_CHANGE)
             .observe(this, sessionStatusObserver)
-        LiveEventBus.get<Pair<Long, MegaChatSession>>(EVENT_SESSION_ON_HOLD_CHANGE)
-            .observe(this, sessionOnHoldObserver)
         LiveEventBus.get<Pair<Long, MegaChatSession>>(EVENT_REMOTE_AVFLAGS_CHANGE)
             .observe(this, remoteAVFlagsObserver)
         LiveEventBus.get<Pair<Long, MegaChatSession>>(EVENT_REMOTE_AUDIO_LEVEL_CHANGE)
@@ -994,36 +962,33 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
 
     private fun collectFlows() {
         viewLifecycleOwner.collectFlow(inMeetingViewModel.state) { state: InMeetingUiState ->
+            if (state.shouldFinish) {
+                finishActivity()
+            }
 
-            when {
-                state.shouldFinish -> finishActivity()
-                state.joinedAsGuest -> {
-                    inMeetingViewModel.onJoinedAsGuestConsumed()
-                    controlWhenJoinedAChat(state.currentChatId)
-                }
+            if (state.joinedAsGuest) {
+                inMeetingViewModel.onJoinedAsGuestConsumed()
+                controlWhenJoinedAChat(state.currentChatId)
+            }
 
-                state.error != null -> sharedModel.showSnackBar(getString(state.error))
-                state.updateListUi -> {
-                    inMeetingViewModel.onUpdateListConsumed()
-                    speakerViewCallFragment?.let {
-                        if (it.isAdded) {
-                            it.updateFullList()
-                        }
+            if (state.error != null) {
+                sharedModel.showSnackBar(getString(state.error))
+            }
+
+            if (state.updateListUi) {
+                inMeetingViewModel.onUpdateListConsumed()
+                speakerViewCallFragment?.let {
+                    if (it.isAdded) {
+                        it.updateFullList()
                     }
                 }
+            }
 
-                state.chatTitle.isNotEmpty() -> toolbarTitle?.apply {
+            if (state.chatTitle.isNotEmpty()) {
+                toolbarTitle?.apply {
                     text = state.chatTitle
                 }
             }
-
-            state.userIdsWithChangesInRaisedHand.takeIf { it.isNotEmpty() }?.let {
-                updateParticipantsWithHandRaised(it)
-            }
-
-            floatingBottomSheet.isVisible =
-                !state.showEndMeetingAsOnlyHostBottomPanel && !state.showCallOptionsBottomSheet
-
 
             state.call?.let {
                 if (callStatus != it.status) {
@@ -1155,6 +1120,69 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
             bottomFloatingPanelViewHolder?.setRaiseHandToolTipShown(state.isRaiseToHandSuggestionShown)
         }
 
+        viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.userIdsWithChangesInRaisedHand }
+            .distinctUntilChanged()) {
+            if (it.isNotEmpty()) {
+                updateParticipantsWithHandRaised(it)
+            }
+        }
+
+        viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.isCallOnHold }
+            .distinctUntilChanged()) {
+            it?.let { isOnHold ->
+                isCallOnHold(isOnHold)
+                checkSwapCameraMenuItemVisibility()
+            }
+        }
+
+        viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.sessionOnHoldChanges }
+            .distinctUntilChanged()) { session ->
+            session?.let {
+                showMuteBanner()
+                when (inMeetingViewModel.state.value.isOneToOneCall) {
+                    true -> if (inMeetingViewModel.state.value.hasLocalVideo && inMeetingViewModel.state.value.isCallOnHold == true) {
+                        sharedModel.clickCamera(false)
+                    }
+
+                    false -> updateOnHoldRemote(session = it)
+                }
+            }
+        }
+
+        viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.showEndMeetingAsOnlyHostBottomPanel }
+            .distinctUntilChanged()) { showedEndMeetingBottomPanel ->
+            when {
+                showedEndMeetingBottomPanel &&
+                        floatingBottomSheet.isVisible -> {
+                    floatingBottomSheet.isVisible = false
+                }
+
+                !showedEndMeetingBottomPanel &&
+                        !inMeetingViewModel.state.value.showCallOptionsBottomSheet &&
+                        !floatingBottomSheet.isVisible &&
+                        toolbar.isVisible -> {
+                    floatingBottomSheet.isVisible = true
+                }
+            }
+        }
+
+        viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.showCallOptionsBottomSheet }
+            .distinctUntilChanged()) { showedCallOptionsBottomPanel ->
+            when {
+                showedCallOptionsBottomPanel &&
+                        floatingBottomSheet.isVisible -> {
+                    floatingBottomSheet.isVisible = false
+                }
+
+                !showedCallOptionsBottomPanel &&
+                        !inMeetingViewModel.state.value.showEndMeetingAsOnlyHostBottomPanel &&
+                        !floatingBottomSheet.isVisible &&
+                        toolbar.isVisible -> {
+                    floatingBottomSheet.isVisible = true
+                }
+            }
+        }
+
         viewLifecycleOwner.collectFlow(sharedModel.state) { state: MeetingState ->
             Timber.d("Chat has changed")
             inMeetingViewModel.setChatId(state.chatId)
@@ -1208,6 +1236,11 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
             }
 
             setRecIndicatorVisibility()
+        }
+
+        viewLifecycleOwner.collectFlow(sharedModel.state.map { it.isMyHandRaisedToSpeak }
+            .distinctUntilChanged()) {
+            updateParticipantsBottomPanel()
         }
 
         viewLifecycleOwner.collectFlow(callRecordingViewModel.state) { state: CallRecordingUIState ->
@@ -1559,6 +1592,18 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
 
     private fun setPageOnClickListener(view: View) = view.setOnClickListener {
         onPageClick()
+    }
+
+    /**
+     * This method is triggered when the Picture-in-Picture mode is changed.
+     */
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode)
+        if (inMeetingViewModel.state.value.isPictureInPictureFeatureFlagEnabled) {
+            inMeetingViewModel.updateIsInPipMode(isInPipMode = isInPictureInPictureMode)
+            onPageClick()
+            Timber.d("Currently Picture in Picture Mode is $isInPictureInPictureMode")
+        }
     }
 
     fun onPageClick() {
@@ -2245,7 +2290,7 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
                     it.toMutableList(),
                     inMeetingViewModel.getMyOwnInfo(
                         sharedModel.micLiveData.value ?: false,
-                        sharedModel.cameraLiveData.value ?: false
+                        sharedModel.cameraLiveData.value ?: false,
                     )
                 )
             }
@@ -2448,7 +2493,7 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
                 participants.toMutableList(),
                 inMeetingViewModel.getMyOwnInfo(
                     sharedModel.micLiveData.value ?: false,
-                    sharedModel.cameraLiveData.value ?: false
+                    sharedModel.cameraLiveData.value ?: false,
                 )
             )
         }
@@ -2459,7 +2504,7 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
      *
      * @param session The session of a participant
      */
-    private fun updateOnHoldRemote(session: MegaChatSession) {
+    private fun updateOnHoldRemote(session: ChatSession) {
         Timber.d("Changes to the on hold status of the session")
         gridViewCallFragment?.let {
             if (it.isAdded) {
@@ -2585,7 +2630,7 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
     private fun updateParticipantInfo(peerId: Long, type: Int) {
         Timber.d("Participant's name has changed")
         val listParticipants =
-            inMeetingViewModel.updateParticipantsNameOrAvatar(peerId, type, requireContext())
+            inMeetingViewModel.updateParticipantsNameOrAvatar(peerId, type)
         if (listParticipants.isNotEmpty()) {
             gridViewCallFragment?.let {
                 if (it.isAdded) {

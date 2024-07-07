@@ -12,8 +12,11 @@ pluginManagement {
     resolutionStrategy {
         eachPlugin {
             when (requested.id.id) {
-                "mega.android.release" -> useModule("mega.privacy:megagradle:${requested.version}")
-                "mega.android.cicd" -> useModule("mega.privacy:megagradle:${requested.version}")
+                "mega.android.release",
+                "mega.android.cicd",
+                "mega.artifactory.publish.convention",
+                -> useModule("mega.privacy:megagradle:${requested.version}")
+
                 else -> {}
             }
         }
@@ -54,6 +57,7 @@ include(":legacy-core-ui")
 include(":icon-pack")
 include(":shared:resources")
 include(":shared:sync")
+include(":feature:example-new-components")
 
 println("isServerBuild = ${isServerBuild()}")
 buildCache {

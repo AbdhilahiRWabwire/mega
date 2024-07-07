@@ -3,7 +3,6 @@ package mega.privacy.android.domain.usecase.camerauploads
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadFolderType
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsState
 import mega.privacy.android.domain.entity.camerauploads.HeartbeatStatus
-import mega.privacy.android.domain.usecase.IsSecondaryFolderEnabled
 import javax.inject.Inject
 
 /**
@@ -13,7 +12,7 @@ import javax.inject.Inject
  */
 class UpdateCameraUploadsBackupHeartbeatStatusUseCase @Inject constructor(
     private val isCameraUploadsEnabledUseCase: IsCameraUploadsEnabledUseCase,
-    private val isSecondaryFolderEnabled: IsSecondaryFolderEnabled,
+    private val isMediaUploadsEnabledUseCase: IsMediaUploadsEnabledUseCase,
     private val reportUploadStatusUseCase: ReportUploadStatusUseCase,
 ) {
 
@@ -38,7 +37,7 @@ class UpdateCameraUploadsBackupHeartbeatStatusUseCase @Inject constructor(
                 )
             }
 
-            if (isSecondaryFolderEnabled()) {
+            if (isMediaUploadsEnabledUseCase()) {
                 with(cameraUploadsState.secondaryCameraUploadsState) {
                     reportUploadStatusUseCase(
                         cameraUploadFolderType = CameraUploadFolderType.Secondary,

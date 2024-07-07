@@ -1,6 +1,5 @@
 package test.mega.privacy.android.app.presentation.fileinfo
 
-import android.app.Activity
 import app.cash.turbine.Event
 import app.cash.turbine.test
 import com.google.common.truth.Truth
@@ -16,7 +15,6 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.domain.usecase.CheckNameCollision
 import mega.privacy.android.app.domain.usecase.GetNodeLocationInfo
-import mega.privacy.android.app.domain.usecase.offline.RemoveAvailableOfflineUseCase
 import mega.privacy.android.app.domain.usecase.shares.GetOutShares
 import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.namecollision.data.NameCollisionType
@@ -52,15 +50,16 @@ import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.VersionsNotDeletedException
 import mega.privacy.android.domain.usecase.GetFolderTreeInfo
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
-import mega.privacy.android.domain.usecase.IsSecondaryFolderEnabled
 import mega.privacy.android.domain.usecase.MonitorChildrenUpdates
 import mega.privacy.android.domain.usecase.MonitorContactUpdates
 import mega.privacy.android.domain.usecase.MonitorNodeUpdatesById
 import mega.privacy.android.domain.usecase.MonitorOfflineFileAvailabilityUseCase
+import mega.privacy.android.domain.usecase.account.IsProAccountUseCase
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetPrimarySyncHandleUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetSecondarySyncHandleUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsEnabledUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsMediaUploadsEnabledUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactVerificationWarningUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorChatOnlineStatusUseCase
 import mega.privacy.android.domain.usecase.favourites.IsAvailableOfflineUseCase
@@ -76,6 +75,7 @@ import mega.privacy.android.domain.usecase.node.IsNodeInBackupsUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodeUseCase
 import mega.privacy.android.domain.usecase.node.SetNodeDescriptionUseCase
+import mega.privacy.android.domain.usecase.offline.RemoveOfflineNodeUseCase
 import mega.privacy.android.domain.usecase.shares.GetContactItemFromInShareFolder
 import mega.privacy.android.domain.usecase.shares.GetNodeAccessPermission
 import mega.privacy.android.domain.usecase.shares.GetNodeOutSharesUseCase
@@ -88,6 +88,9 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.extension.ExtendWith
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
@@ -96,8 +99,8 @@ import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import java.io.File
-import java.lang.ref.WeakReference
 import java.net.URI
+import java.util.stream.Stream
 import kotlin.test.assertNull
 
 @ExtendWith(CoroutineMainDispatcherExtension::class)
@@ -132,7 +135,7 @@ internal class FileInfoViewModelTest {
     private val getNodeOutSharesUseCase: GetNodeOutSharesUseCase = mock()
     private val setNodeDescriptionUseCase: SetNodeDescriptionUseCase = mock()
     private val isAvailableOffline: IsAvailableOfflineUseCase = mock()
-    private val removeAvailableOfflineUseCase: RemoveAvailableOfflineUseCase = mock()
+    private val removeOfflineNodeUseCase: RemoveOfflineNodeUseCase = mock()
     private val getNodeAccessPermission: GetNodeAccessPermission = mock()
     private val setOutgoingPermissions: SetOutgoingPermissions = mock()
     private val stopSharingNode: StopSharingNode = mock()
@@ -144,7 +147,8 @@ internal class FileInfoViewModelTest {
     private val getPrimarySyncHandleUseCase = mock<GetPrimarySyncHandleUseCase>()
     private val getSecondarySyncHandleUseCase = mock<GetSecondarySyncHandleUseCase>()
     private val isCameraUploadsEnabledUseCase = mock<IsCameraUploadsEnabledUseCase>()
-    private val isSecondaryFolderEnabled = mock<IsSecondaryFolderEnabled>()
+    private val isMediaUploadsEnabledUseCase = mock<IsMediaUploadsEnabledUseCase>()
+    private val isProAccountUseCase = mock<IsProAccountUseCase>()
     private val monitorOfflineFileAvailabilityUseCase =
         mock<MonitorOfflineFileAvailabilityUseCase>()
     private val getContactVerificationWarningUseCase = mock<GetContactVerificationWarningUseCase>()
@@ -153,7 +157,6 @@ internal class FileInfoViewModelTest {
     private val typedFileNode: TypedFileNode = mock()
 
     private val previewFile: File = mock()
-    private val activity = WeakReference(mock<Activity>())
 
     @BeforeEach
     fun cleanUp() = runTest {
@@ -190,7 +193,7 @@ internal class FileInfoViewModelTest {
             getNodeOutSharesUseCase,
             setNodeDescriptionUseCase,
             isAvailableOffline,
-            removeAvailableOfflineUseCase,
+            removeOfflineNodeUseCase,
             getNodeAccessPermission,
             setOutgoingPermissions,
             stopSharingNode,
@@ -202,11 +205,12 @@ internal class FileInfoViewModelTest {
             getPrimarySyncHandleUseCase,
             getSecondarySyncHandleUseCase,
             isCameraUploadsEnabledUseCase,
-            isSecondaryFolderEnabled,
+            isMediaUploadsEnabledUseCase,
             monitorOfflineFileAvailabilityUseCase,
             getContactVerificationWarningUseCase,
             typedFileNode,
             previewFile,
+            isProAccountUseCase,
         )
     }
 
@@ -237,7 +241,7 @@ internal class FileInfoViewModelTest {
             getNodeOutSharesUseCase = getNodeOutSharesUseCase,
             setNodeDescriptionUseCase = setNodeDescriptionUseCase,
             isAvailableOfflineUseCase = isAvailableOffline,
-            removeAvailableOfflineUseCase = removeAvailableOfflineUseCase,
+            removeOfflineNodeUseCase = removeOfflineNodeUseCase,
             getNodeAccessPermission = getNodeAccessPermission,
             setOutgoingPermissions = setOutgoingPermissions,
             stopSharingNode = stopSharingNode,
@@ -249,9 +253,10 @@ internal class FileInfoViewModelTest {
             getPrimarySyncHandleUseCase = getPrimarySyncHandleUseCase,
             getSecondarySyncHandleUseCase = getSecondarySyncHandleUseCase,
             isCameraUploadsEnabledUseCase = isCameraUploadsEnabledUseCase,
-            isSecondaryFolderEnabled = isSecondaryFolderEnabled,
+            isMediaUploadsEnabledUseCase = isMediaUploadsEnabledUseCase,
             monitorOfflineFileAvailabilityUseCase = monitorOfflineFileAvailabilityUseCase,
             getContactVerificationWarningUseCase = getContactVerificationWarningUseCase,
+            isProAccountUseCase = isProAccountUseCase,
             fileTypeIconMapper = fileTypeIconMapper
         )
     }
@@ -716,6 +721,18 @@ internal class FileInfoViewModelTest {
         verify(getContactItemFromInShareFolder, times(2)).invoke(folderNode, true)
     }
 
+    @ParameterizedTest
+    @MethodSource("provideNodeChanges")
+    fun `test monitorNodeUpdatesById updates tag`(nodeChanges: NodeChanges) = runTest {
+        val folderNode = mockFolder()
+        whenever(monitorNodeUpdatesById.invoke(folderNode.id)).thenReturn(
+            flowOf(listOf(nodeChanges))
+        )
+        underTest.setNode(node.handle, true)
+        //check 2 invocations: first invocation when node is set, second one the update itself
+        verify(getNodeByIdUseCase, times(2)).invoke(folderNode.id)
+    }
+
     @Test
     fun `test getNodeAccessPermission is fetched if getContactItemFromInShareFolder returns ContactItem`() =
         runTest {
@@ -822,8 +839,8 @@ internal class FileInfoViewModelTest {
             mockMonitorStorageStateEvent(StorageState.PayWall)
             whenever(isAvailableOffline.invoke(typedFileNode)).thenReturn(false)
             underTest.setNode(node.handle, true)
-            underTest.availableOfflineChanged(true, activity)
-            verifyNoInteractions(removeAvailableOfflineUseCase)
+            underTest.availableOfflineChanged(true)
+            verifyNoInteractions(removeOfflineNodeUseCase)
         }
 
     @Test
@@ -913,7 +930,7 @@ internal class FileInfoViewModelTest {
         runTest {
             whenever(getPrimarySyncHandleUseCase()).thenReturn(-1L)
             whenever(getSecondarySyncHandleUseCase()).thenReturn(nodeId.longValue)
-            whenever(isSecondaryFolderEnabled()).thenReturn(true)
+            whenever(isMediaUploadsEnabledUseCase()).thenReturn(true)
             underTest.setNode(node.handle, true)
             underTest.initiateRemoveNode(true)
             underTest.uiState.mapNotNull { it.requiredExtraAction }.test {
@@ -983,10 +1000,28 @@ internal class FileInfoViewModelTest {
             mockMonitorStorageStateEvent(StorageState.Green)
             whenever(isAvailableOffline(any())).thenReturn(false)
             underTest.setNode(node.handle, true)
-            underTest.availableOfflineChanged(true, activity)
+            underTest.availableOfflineChanged(true)
             Truth.assertThat((underTest.uiState.value.downloadEvent as? StateEventWithContentTriggered)?.content)
                 .isInstanceOf(TransferTriggerEvent.StartDownloadForOffline::class.java)
         }
+
+    @Test
+    fun `test that removeOfflineNodeUseCase is invoked when availableOfflineChanged is set to false`() =
+        runTest {
+            mockMonitorStorageStateEvent(StorageState.Green)
+            whenever(isAvailableOffline(any())).thenReturn(true)
+            underTest.setNode(node.handle, true)
+            underTest.availableOfflineChanged(false)
+
+            verify(removeOfflineNodeUseCase).invoke(nodeId)
+        }
+
+    @Test
+    fun `test that isProAccount is invoked when view model is initialized`() = runTest {
+        whenever(isProAccountUseCase()).thenReturn(true)
+        underTest.setNode(node.handle, true)
+        verify(isProAccountUseCase).invoke()
+    }
 
     private fun mockMonitorStorageStateEvent(state: StorageState) {
         val storageStateEvent = StorageStateEvent(
@@ -1145,6 +1180,13 @@ internal class FileInfoViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    private fun provideNodeChanges() = Stream.of(
+        Arguments.of(NodeChanges.Description),
+        Arguments.of(NodeChanges.Name),
+        Arguments.of(NodeChanges.Tags),
+        Arguments.of(NodeChanges.Timestamp),
+    )
 
     private suspend fun mockFolder() = mock<TypedFolderNode> {
         on { id }.thenReturn(nodeId)

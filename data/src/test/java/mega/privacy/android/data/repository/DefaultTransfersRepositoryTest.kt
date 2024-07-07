@@ -703,7 +703,8 @@ class DefaultTransfersRepositoryTest {
                 timestamp = 123L,
                 error = null,
                 originalPath = "originalFilePath",
-                parentHandle = 2L
+                parentHandle = 2L,
+                appData = null,
             )
             val transfer2 = CompletedTransfer(
                 id = 1,
@@ -717,7 +718,8 @@ class DefaultTransfersRepositoryTest {
                 timestamp = 123L,
                 error = null,
                 originalPath = "originalFilePath",
-                parentHandle = 2L
+                parentHandle = 2L,
+                appData = null,
             )
             val existingTransfer1 = CompletedTransfer(
                 id = 3,
@@ -731,7 +733,8 @@ class DefaultTransfersRepositoryTest {
                 timestamp = 123L,
                 error = null,
                 originalPath = "originalFilePath",
-                parentHandle = 2L
+                parentHandle = 2L,
+                appData = null,
             )
             whenever(megaLocalRoomGateway.getAllCompletedTransfers())
                 .thenReturn(flowOf(listOf(existingTransfer1)))
@@ -1279,15 +1282,6 @@ class DefaultTransfersRepositoryTest {
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     inner class DownloadCountersTest {
 
-        @ParameterizedTest(name = " total downloads is {0}")
-        @ValueSource(ints = [0, 7, 200])
-        fun `test that getTotalDownloads returns correctly if`(
-            downloads: Int,
-        ) = runTest {
-            whenever(megaApiGateway.totalDownloads).thenReturn(downloads)
-            assertThat(underTest.getTotalDownloads()).isEqualTo(downloads)
-        }
-
         @ParameterizedTest(name = " megaApi call returns {0}")
         @ValueSource(ints = [0, 7, 200])
         fun `test that getCurrentDownloadSpeed returns correctly if`(
@@ -1295,24 +1289,6 @@ class DefaultTransfersRepositoryTest {
         ) = runTest {
             whenever(megaApiGateway.currentDownloadSpeed).thenReturn(speed)
             assertThat(underTest.getCurrentDownloadSpeed()).isEqualTo(speed)
-        }
-
-        @ParameterizedTest(name = " megaApi call returns {0}")
-        @ValueSource(longs = [0, 7, 200])
-        fun `test that getTotalDownloadedBytes returns correctly if`(
-            bytes: Long,
-        ) = runTest {
-            whenever(megaApiGateway.totalDownloadedBytes).thenReturn(bytes)
-            assertThat(underTest.getTotalDownloadedBytes()).isEqualTo(bytes)
-        }
-
-        @ParameterizedTest(name = " megaApi call returns {0}")
-        @ValueSource(longs = [0, 7, 200])
-        fun `test that getTotalDownloadBytes returns correctly if`(
-            bytes: Long,
-        ) = runTest {
-            whenever(megaApiGateway.totalDownloadBytes).thenReturn(bytes)
-            assertThat(underTest.getTotalDownloadBytes()).isEqualTo(bytes)
         }
     }
 

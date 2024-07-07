@@ -1,6 +1,7 @@
 package mega.privacy.android.app.presentation.photos.albums.getmultiplelinks
 
 import mega.privacy.android.icon.pack.R as iconPackR
+import mega.privacy.android.shared.resources.R as sharedR
 import android.text.TextUtils.TruncateAt.MIDDLE
 import android.view.View
 import android.widget.TextView
@@ -79,6 +80,7 @@ import mega.privacy.android.shared.original.core.ui.theme.white_alpha_087
 import mega.privacy.android.domain.entity.photos.AlbumId
 import mega.privacy.android.domain.entity.photos.AlbumLink
 import mega.privacy.android.domain.entity.photos.Photo
+import mega.privacy.android.shared.original.core.ui.controls.dialogs.ConfirmationDialog
 import mega.privacy.mobile.analytics.event.MultipleAlbumLinksScreenEvent
 
 private typealias ImageDownloader = (photo: Photo, callback: (Boolean) -> Unit) -> Unit
@@ -122,8 +124,10 @@ fun AlbumGetMultipleLinksScreen(
         if (isCopyrightAgreed) {
             viewModel.hideCopyright()
 
-            viewModel.fetchAlbums()
-            viewModel.fetchLinks()
+            if (!state.showSharingSensitiveWarning) {
+                viewModel.fetchAlbums()
+                viewModel.fetchLinks()
+            }
         }
     }
 
@@ -153,7 +157,9 @@ fun AlbumGetMultipleLinksScreen(
         },
         content = { contentPadding ->
             AlbumGetMultipleLinksContent(
-                modifier = Modifier.padding(paddingValues = contentPadding).fillMaxSize(),
+                modifier = Modifier
+                    .padding(paddingValues = contentPadding)
+                    .fillMaxSize(),
                 albumSummaries = albumSummaries,
                 links = albumLinks,
                 albumLinksList = state.albumLinksList,
@@ -162,6 +168,24 @@ fun AlbumGetMultipleLinksScreen(
             )
         },
     )
+
+    if (!state.showCopyright && state.showSharingSensitiveWarning) {
+        ConfirmationDialog(
+            title = stringResource(id = sharedR.string.hidden_items),
+            text = stringResource(id = R.string.hidden_nodes_sharing_album),
+            confirmButtonText = stringResource(id = R.string.button_continue),
+            cancelButtonText = stringResource(id = R.string.button_cancel),
+            dismissOnClickOutside = false,
+            dismissOnBackPress = false,
+            onConfirm = {
+                viewModel.hideSharingSensitiveWarning()
+                viewModel.fetchAlbums()
+                viewModel.fetchLinks()
+            },
+            onDismiss = {},
+            onCancel = onBack,
+        )
+    }
 
     if (state.showCopyright) {
         Surface {

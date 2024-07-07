@@ -1,32 +1,19 @@
-import groovy.lang.Closure
 import mega.privacy.android.build.shouldApplyDefaultConfiguration
 
 plugins {
     alias(convention.plugins.mega.android.library)
-    id("kotlin-kapt")
+    alias(convention.plugins.mega.android.library.compose)
+    alias(convention.plugins.mega.lint)
+    alias(convention.plugins.mega.android.hilt)
     id("de.mannodermaus.android-junit5")
 }
 
 android {
     namespace = "mega.privacy.android.analytics"
 
-    buildFeatures {
-        compose = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = androidx.versions.compose.compiler.get()
-    }
-
     defaultConfig {
         consumerProguardFiles("consumer-rules.pro")
     }
-
-    lint {
-        abortOnError = false
-        xmlOutput = file("build/reports/lint-results.xml")
-    }
-
 }
 
 dependencies {
@@ -39,15 +26,7 @@ dependencies {
     // DI
     implementation(lib.javax.inject)
 
-    if (shouldApplyDefaultConfiguration(project)) {
-        kapt(google.hilt.android.compiler)
-    }
-
-    implementation(google.hilt.core)
-    implementation(google.hilt.android)
-
     // Framework
-    implementation(platform(androidx.compose.bom))
     implementation(androidx.bundles.compose.bom)
     implementation(lib.kotlin.ktx)
     implementation(androidx.appcompat)
@@ -64,7 +43,6 @@ dependencies {
 
     testImplementation(testlib.bundles.unit.test)
 
-    testImplementation(testlib.compose.junit)
     testImplementation(testlib.mockito)
     testImplementation(testlib.mockito.kotlin)
     testImplementation(testlib.mockito.android)

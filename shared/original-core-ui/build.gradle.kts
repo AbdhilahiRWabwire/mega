@@ -1,29 +1,22 @@
 plugins {
     alias(convention.plugins.mega.android.library)
+    alias(convention.plugins.mega.android.library.compose)
     alias(convention.plugins.mega.android.test)
-    id("kotlin-android")
-    id("kotlin-kapt")
+    alias(convention.plugins.mega.lint)
     alias(convention.plugins.mega.android.library.jacoco)
+    alias(convention.plugins.mega.android.hilt)
+    id("kotlin-android")
 }
 
 android {
     buildFeatures {
-        compose = true
         buildConfig = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = androidx.versions.compose.compiler.get()
     }
 
     defaultConfig {
         consumerProguardFiles("consumer-rules.pro")
     }
 
-    lint {
-        abortOnError = false
-        xmlOutput = file("build/reports/lint-results.xml")
-    }
     namespace = "mega.privacy.android.core"
 }
 
@@ -33,7 +26,6 @@ dependencies {
     implementation(project(":icon-pack"))
     testImplementation(project(":core-ui-test"))
 
-    implementation(platform(androidx.compose.bom))
     implementation(androidx.constraintlayout.compose)
     implementation(androidx.bundles.compose.bom)
     implementation(lib.kotlin.ktx)
@@ -52,10 +44,9 @@ dependencies {
     implementation(google.accompanist.placeholder)
     implementation(lib.mega.core.ui.tokens)
 
+    debugImplementation(google.gson)
+    debugImplementation(lib.kotlinpoet)
+
     testImplementation(testlib.bundles.ui.test)
     testImplementation(testlib.bundles.unit.test)
-    testImplementation(testlib.compose.junit)
-
-    debugImplementation(lib.kotlinpoet)
-    debugImplementation(google.gson)
 }

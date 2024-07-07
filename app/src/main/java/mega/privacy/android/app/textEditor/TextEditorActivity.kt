@@ -84,7 +84,6 @@ import mega.privacy.android.app.utils.MegaNodeUtil.getRootParentNode
 import mega.privacy.android.app.utils.MegaNodeUtil.selectFolderToCopy
 import mega.privacy.android.app.utils.MegaNodeUtil.selectFolderToMove
 import mega.privacy.android.app.utils.MenuUtils.toggleAllMenuItemsVisibility
-import mega.privacy.android.app.utils.RunOnUIThreadUtils
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.Util.isDarkMode
 import mega.privacy.android.app.utils.Util.isOnline
@@ -208,7 +207,7 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
 
         setUpObservers()
         setUpView(savedInstanceState)
-        addStartDownloadTransferView()
+        addStartTransferView()
 
         if (savedInstanceState != null) {
             nodeAttacher.restoreState(savedInstanceState)
@@ -317,15 +316,6 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
                     nodeId = NodeId(viewModel.getNode()?.handle ?: 0),
                     hide = false,
                 )
-
-                RunOnUIThreadUtils.runDelay(500L) {
-                    menu?.findItem(R.id.action_hide)?.apply {
-                        isVisible = true
-                    }
-                    menu?.findItem(R.id.action_unhide)?.apply {
-                        isVisible = false
-                    }
-                }
             }
 
             R.id.action_move -> selectFolderToMove(this, longArrayOf(viewModel.getNode()!!.handle))
@@ -477,7 +467,7 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
 
                 else -> {
                     val node = viewModel.getNode()
-                    val parentNode = node?.let { megaApi.getRootParentNode(it) }
+                    val rootParentNode = node?.let { megaApi.getRootParentNode(it) }
                     val adapterType = viewModel.getAdapterType()
                     val isInSharedItems = adapterType in listOf(
                         INCOMING_SHARES_ADAPTER,
@@ -527,17 +517,31 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
                     menu.findItem(R.id.action_remove).isVisible = false
                     menu.findItem(R.id.chat_action_save_for_offline).isVisible = false
                     menu.findItem(R.id.chat_action_remove).isVisible = false
-                    val shouldShowHideNode =
-                        (isHiddenNodesEnabled
-                                && !isInSharedItems
-                                && parentNode?.isInShare == false) && !node.isMarkedSensitive || viewModel.uiState.value.accountType?.isPaid == false
 
-                    val shouldShowUnhideNode =
-                        (isHiddenNodesEnabled
-                                && !isInSharedItems
-                                && parentNode?.isInShare == false) && node.isMarkedSensitive && viewModel.uiState.value.accountType?.isPaid == true
-                    menu.findItem(R.id.action_hide).isVisible = shouldShowHideNode
-                    menu.findItem(R.id.action_unhide).isVisible = shouldShowUnhideNode
+                    val currentParentNode = megaApi.getParentNode(node)
+                    val isSensitiveInherited =
+                        currentParentNode?.let { megaApi.isSensitiveInherited(it) } == true
+                    val isInShare = rootParentNode?.isInShare == true
+                    val isPaidAccount = viewModel.uiState.value.accountType?.isPaid == true
+
+                    val isHiddenNodesEnabledAndNotInShare =
+                        isHiddenNodesEnabled && !isInSharedItems && !isInShare
+
+                    val shouldShowHideNode = node != null &&
+                            isHiddenNodesEnabledAndNotInShare &&
+                            !node.isMarkedSensitive &&
+                            !isSensitiveInherited
+                            || !isPaidAccount
+
+                    val shouldShowUnhideNode = node != null &&
+                            isHiddenNodesEnabledAndNotInShare &&
+                            node.isMarkedSensitive &&
+                            !isSensitiveInherited &&
+                            isPaidAccount
+
+                    menu.findItem(R.id.action_hide)?.isVisible = shouldShowHideNode
+                    menu.findItem(R.id.action_unhide)?.isVisible = shouldShowUnhideNode
+
                     menu.findItem(R.id.action_save).isVisible = false
                 }
             }
@@ -663,13 +667,15 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
         }
     }
 
-    private fun addStartDownloadTransferView() {
+    private fun addStartTransferView() {
         binding.root.addView(
             createStartTransferView(
                 this,
-                viewModel.uiState.map { it.downloadEvent },
-                viewModel::consumeDownloadEvent
-            )
+                viewModel.uiState.map { it.transferEvent },
+                viewModel::consumeTransferEvent
+            ) {
+                finish()
+            }
         )
     }
 
@@ -1156,10 +1162,5 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
                 1,
             )
         Util.showSnackbar(this, message)
-
-        RunOnUIThreadUtils.runDelay(500L) {
-            menu?.findItem(R.id.pdf_viewer_hide)?.isVisible = false
-            menu?.findItem(R.id.pdf_viewer_unhide)?.isVisible = true
-        }
     }
 }

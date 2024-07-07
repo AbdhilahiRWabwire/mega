@@ -32,12 +32,12 @@ import mega.privacy.android.data.gateway.api.MegaChatApiGateway
 import mega.privacy.android.domain.entity.chat.ChatCall
 import mega.privacy.android.domain.entity.chat.ChatRoomItem
 import mega.privacy.android.domain.entity.chat.ChatRoomItem.MeetingChatRoomItem
-import mega.privacy.android.domain.entity.chat.ChatRoomItemStatus
 import mega.privacy.android.domain.entity.chat.MeetingTooltipItem
 import mega.privacy.android.domain.entity.meeting.CallNotificationType
 import mega.privacy.android.domain.entity.meeting.ChatCallChanges
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
 import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
+import mega.privacy.android.domain.entity.meeting.ChatRoomItemStatus
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.usecase.SignalChatPresenceActivity
 import mega.privacy.android.domain.usecase.chat.ArchiveChatUseCase
@@ -47,6 +47,7 @@ import mega.privacy.android.domain.usecase.chat.GetChatsUseCase
 import mega.privacy.android.domain.usecase.chat.GetChatsUseCase.ChatRoomType
 import mega.privacy.android.domain.usecase.chat.GetCurrentChatStatusUseCase
 import mega.privacy.android.domain.usecase.chat.GetMeetingTooltipsUseCase
+import mega.privacy.android.domain.usecase.chat.HasArchivedChatsUseCase
 import mega.privacy.android.domain.usecase.chat.LeaveChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorLeaveChatUseCase
 import mega.privacy.android.domain.usecase.chat.SetNextMeetingTooltipUseCase
@@ -113,6 +114,7 @@ class ChatTabsViewModel @Inject constructor(
     private val startMeetingInWaitingRoomChatUseCase: StartMeetingInWaitingRoomChatUseCase,
     private val monitorLeaveChatUseCase: MonitorLeaveChatUseCase,
     private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase,
+    private val hasArchivedChatsUseCase: HasArchivedChatsUseCase,
 ) : ViewModel() {
 
     private val state = MutableStateFlow(ChatsTabState())
@@ -136,6 +138,18 @@ class ChatTabsViewModel @Inject constructor(
         viewModelScope.launch {
             monitorScheduledMeetingCanceledUseCase().conflate()
                 .collect { messageResId -> triggerSnackbarMessage(messageResId) }
+        }
+    }
+
+    /**
+     * Check has archived chats
+     *
+     */
+    fun checkHasArchivedChats() {
+        viewModelScope.launch {
+            runCatching { hasArchivedChatsUseCase() }
+                .onSuccess { hasArchivedChats -> state.update { it.copy(hasArchivedChats = hasArchivedChats) } }
+                .onFailure(Timber::e)
         }
     }
 
@@ -255,7 +269,7 @@ class ChatTabsViewModel @Inject constructor(
                     ?.let { item ->
                         val meeting = item as MeetingChatRoomItem
                         when (meeting.currentCallStatus) {
-                            is ChatRoomItemStatus.NotJoined -> {
+                            ChatRoomItemStatus.NotJoined -> {
                                 if (meeting.isWaitingRoom && !meeting.hasPermissions) {
                                     state.update { it.copy(currentWaitingRoom = chatId) }
                                 } else {
@@ -273,7 +287,7 @@ class ChatTabsViewModel @Inject constructor(
                                 }
                             }
 
-                            is ChatRoomItemStatus.NotStarted -> {
+                            ChatRoomItemStatus.NotStarted -> {
                                 if (meeting.isWaitingRoom && !meeting.hasPermissions) {
                                     state.update { it.copy(currentWaitingRoom = chatId) }
                                 } else {
@@ -297,7 +311,11 @@ class ChatTabsViewModel @Inject constructor(
                                         }
                                     } else {
                                         runCatching {
-                                            openOrStartCallUseCase(chatId = chatId, video = false)
+                                            openOrStartCallUseCase(
+                                                chatId = chatId,
+                                                audio = true,
+                                                video = false
+                                            )
                                         }.onSuccess { call ->
                                             call?.let { openCurrentCall(it) }
                                         }.onFailure {
@@ -425,6 +443,7 @@ class ChatTabsViewModel @Inject constructor(
                             intArg = intParam,
                         )
                     )
+                    checkHasArchivedChats()
                 }
                 .onFailure {
                     Timber.e(it)

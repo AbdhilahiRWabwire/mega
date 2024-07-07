@@ -17,7 +17,6 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import mega.privacy.android.app.BaseActivity
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
@@ -64,7 +63,6 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
     private var cancelledConfirmationProcess = false
 
     //Fragments
-    private var tourFragment: TourFragment? = null
     private var loginFragment: LoginFragment? = null
     private var createAccountFragment: CreateAccountFragment? = null
 
@@ -88,12 +86,11 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
         }
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
 
-        visibleFragment = intent?.getIntExtra(Constants.VISIBLE_FRAGMENT, Constants.LOGIN_FRAGMENT)
-            ?: Constants.LOGIN_FRAGMENT
+        visibleFragment = intent.getIntExtra(Constants.VISIBLE_FRAGMENT, Constants.LOGIN_FRAGMENT)
 
         if (visibleFragment == Constants.LOGIN_FRAGMENT) {
             loginFragment = LoginFragment()
@@ -226,9 +223,9 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
 
             Constants.TOUR_FRAGMENT -> {
                 Timber.d("Show TOUR_FRAGMENT")
-                // Need to make this call synchronous, otherwise the TourFragment will be shown
+                // Need to make the call first, otherwise the TourFragment will be shown
                 // before we successfully fetch the flag
-                runBlocking {
+                lifecycleScope.launch {
                     var isNewTourFragmentEnabled = false
                     runCatching { viewModel.isNewTourFragmentEnabled() }
                         .onSuccess { isNewTourFragmentEnabled = it }

@@ -2,19 +2,15 @@ package mega.privacy.android.feature.sync.ui.synclist
 
 import mega.privacy.android.shared.resources.R as sharedR
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.ModalBottomSheetValue
 import androidx.compose.material.Scaffold
-import androidx.compose.material.Snackbar
 import androidx.compose.material.SnackbarHost
 import androidx.compose.material.SnackbarHostState
-import androidx.compose.material.Text
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -28,24 +24,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
-import mega.privacy.android.shared.original.core.ui.controls.appbar.AppBarType
-import mega.privacy.android.shared.original.core.ui.controls.appbar.MegaAppBar
-import mega.privacy.android.shared.original.core.ui.controls.banners.ActionBanner
-import mega.privacy.android.shared.original.core.ui.controls.banners.WarningBanner
-import mega.privacy.android.shared.original.core.ui.controls.chip.Chip
-import mega.privacy.android.shared.original.core.ui.controls.chip.ChipBar
-import mega.privacy.android.shared.original.core.ui.controls.dividers.DividerType
-import mega.privacy.android.shared.original.core.ui.controls.dividers.MegaDivider
-import mega.privacy.android.shared.original.core.ui.controls.sheets.BottomSheet
-import mega.privacy.android.shared.original.core.ui.model.MenuAction
-import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.feature.sync.R
 import mega.privacy.android.feature.sync.domain.entity.StalledIssueResolutionAction
 import mega.privacy.android.feature.sync.ui.model.StalledIssueUiItem
@@ -64,7 +47,18 @@ import mega.privacy.android.feature.sync.ui.synclist.stalledissues.SyncStalledIs
 import mega.privacy.android.feature.sync.ui.views.ConflictDetailsDialog
 import mega.privacy.android.feature.sync.ui.views.IssuesResolutionDialog
 import mega.privacy.android.feature.sync.ui.views.SyncPermissionWarningBanner
-import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.controls.appbar.AppBarType
+import mega.privacy.android.shared.original.core.ui.controls.appbar.MegaAppBar
+import mega.privacy.android.shared.original.core.ui.controls.banners.ActionBanner
+import mega.privacy.android.shared.original.core.ui.controls.banners.WarningBanner
+import mega.privacy.android.shared.original.core.ui.controls.chip.ChipBar
+import mega.privacy.android.shared.original.core.ui.controls.chip.MegaChip
+import mega.privacy.android.shared.original.core.ui.controls.dividers.DividerType
+import mega.privacy.android.shared.original.core.ui.controls.dividers.MegaDivider
+import mega.privacy.android.shared.original.core.ui.controls.sheets.BottomSheet
+import mega.privacy.android.shared.original.core.ui.controls.snackbars.MegaSnackbar
+import mega.privacy.android.shared.original.core.ui.model.MenuAction
+import mega.privacy.mobile.analytics.event.SyncListBannerUpgradeButtonPressedEvent
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -78,6 +72,9 @@ internal fun SyncListScreen(
     onActionPressed: (MenuAction) -> Unit,
     onOpenUpgradeAccountClicked: () -> Unit,
     title: String? = null,
+    syncFoldersViewModel: SyncFoldersViewModel,
+    syncStalledIssuesViewModel: SyncStalledIssuesViewModel,
+    syncSolvedIssuesViewModel: SyncSolvedIssuesViewModel,
 ) {
     val onBackPressedDispatcher =
         LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
@@ -92,7 +89,6 @@ internal fun SyncListScreen(
 
     BottomSheet(
         modalSheetState = modalSheetState,
-        scrimColor = Color.Black.copy(alpha = 0.32f),
         sheetBody = {
             when (val content = sheetContent) {
                 is SyncModalSheetContent.DetailedInfo -> {
@@ -155,18 +151,17 @@ internal fun SyncListScreen(
                     },
                     addFolderClicked = addFolderClicked,
                     syncPermissionsManager = syncPermissionsManager,
-                    onOpenUpgradeAccountClicked = onOpenUpgradeAccountClicked
+                    onOpenUpgradeAccountClicked = onOpenUpgradeAccountClicked,
+                    syncFoldersViewModel = syncFoldersViewModel,
+                    syncStalledIssuesViewModel = syncStalledIssuesViewModel,
+                    syncSolvedIssuesViewModel = syncSolvedIssuesViewModel,
                 )
             },
             snackbarHost = {
                 SnackbarHost(
                     hostState = snackBarHostState,
                     snackbar = { data ->
-                        Snackbar(
-                            snackbarData = data,
-                            modifier = Modifier.padding(bottom = 4.dp),
-                            backgroundColor = MaterialTheme.colors.onPrimary,
-                        )
+                        MegaSnackbar(snackbarData = data)
                     }
                 )
             }
@@ -185,9 +180,9 @@ private fun SyncListScreenContent(
     addFolderClicked: () -> Unit,
     syncPermissionsManager: SyncPermissionsManager,
     onOpenUpgradeAccountClicked: () -> Unit,
-    syncFoldersViewModel: SyncFoldersViewModel = hiltViewModel(),
-    syncStalledIssuesViewModel: SyncStalledIssuesViewModel = hiltViewModel(),
-    syncSolvedIssuesViewModel: SyncSolvedIssuesViewModel = hiltViewModel(),
+    syncFoldersViewModel: SyncFoldersViewModel,
+    syncStalledIssuesViewModel: SyncStalledIssuesViewModel,
+    syncSolvedIssuesViewModel: SyncSolvedIssuesViewModel,
 ) {
     var checkedChip by rememberSaveable { mutableStateOf(SYNC_FOLDERS) }
 
@@ -205,7 +200,21 @@ private fun SyncListScreenContent(
         SyncPermissionWarningBanner(
             syncPermissionsManager = syncPermissionsManager
         )
-        if (syncFoldersState.isStorageOverQuota) {
+        if (syncFoldersState.isFreeAccount && syncFoldersState.syncUiItems.isNotEmpty()) {
+            ActionBanner(
+                mainText = stringResource(id = sharedR.string.sync_error_banner_free_user),
+                leftActionText = stringResource(sharedR.string.sync_error_storage_over_quota_banner_action),
+                leftActionClicked = {
+                    Analytics.tracker.trackEvent(SyncListBannerUpgradeButtonPressedEvent)
+                    onOpenUpgradeAccountClicked()
+                },
+                modifier = Modifier.padding(top = 20.dp)
+            )
+            MegaDivider(
+                dividerType = DividerType.FullSize,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        } else if (syncFoldersState.isStorageOverQuota) {
             ActionBanner(
                 mainText = stringResource(sharedR.string.sync_error_storage_over_quota_banner_title),
                 leftActionText = stringResource(sharedR.string.sync_error_storage_over_quota_banner_action),
@@ -268,33 +277,25 @@ private fun HeaderChips(
     modifier: Modifier = Modifier,
 ) {
     ChipBar(modifier = modifier.padding(vertical = 8.dp)) {
-        Chip(
+        MegaChip(
             selected = selectedChip == SYNC_FOLDERS,
-            contentDescription = stringResource(id = R.string.sync_folders),
-            onClick = { onChipSelected(SYNC_FOLDERS) },
-        ) {
-            Text(text = stringResource(id = R.string.sync_folders))
-        }
-        Chip(
+            text = stringResource(id = R.string.sync_folders),
+            onClick = { onChipSelected(SYNC_FOLDERS) }
+        )
+        MegaChip(
             selected = selectedChip == STALLED_ISSUES,
-            contentDescription = stringResource(id = R.string.sync_stalled_issue_zero),
-            onClick = { onChipSelected(STALLED_ISSUES) },
-        ) {
-            Text(
-                text = if (stalledIssuesCount > 0) {
-                    stringResource(R.string.sync_stalled_issues, stalledIssuesCount)
-                } else {
-                    stringResource(id = R.string.sync_stalled_issue_zero)
-                }
-            )
-        }
-        Chip(
+            text = if (stalledIssuesCount > 0) {
+                stringResource(R.string.sync_stalled_issues, stalledIssuesCount)
+            } else {
+                stringResource(id = R.string.sync_stalled_issue_zero)
+            },
+            onClick = { onChipSelected(STALLED_ISSUES) }
+        )
+        MegaChip(
             selected = selectedChip == SOLVED_ISSUES,
-            contentDescription = stringResource(id = sharedR.string.device_center_sync_solved_issues_chip_text),
-            onClick = { onChipSelected(SOLVED_ISSUES) },
-        ) {
-            Text(text = stringResource(id = sharedR.string.device_center_sync_solved_issues_chip_text))
-        }
+            text = stringResource(id = sharedR.string.device_center_sync_solved_issues_chip_text),
+            onClick = { onChipSelected(SOLVED_ISSUES) }
+        )
     }
 }
 
@@ -333,22 +334,5 @@ private fun SelectedChipScreen(
         SOLVED_ISSUES -> {
             SyncSolvedIssuesRoute(viewModel = syncSolvedIssuesViewModel)
         }
-    }
-}
-
-@CombinedThemePreviews
-@Composable
-private fun SyncListScreenPreview() {
-    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
-        SyncListScreen(
-            stalledIssuesCount = 3,
-            addFolderClicked = {},
-            actionSelected = { _, _ -> },
-            snackBarHostState = SnackbarHostState(),
-            syncPermissionsManager = SyncPermissionsManager(LocalContext.current),
-            actions = listOf(),
-            onActionPressed = {},
-            onOpenUpgradeAccountClicked = {}
-        )
     }
 }

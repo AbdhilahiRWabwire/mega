@@ -6,6 +6,7 @@ dependencies {
     compileOnly(plugin.build.tools)
     compileOnly(plugin.kotlin.gradle)
     compileOnly(plugin.ksp.gradle.plugin)
+    compileOnly(plugin.jfrog)
     compileOnly(kotlin("stdlib"))
     compileOnly(gradleApi())
     testImplementation(testlib.truth)
@@ -66,4 +67,41 @@ gradlePlugin {
             implementationClass = "AndroidApplicationJacocoConventionPlugin"
         }
     }
+    plugins {
+        register("androidApplicationFirebaseConvention") {
+            id = "mega.android.application.firebase"
+            implementationClass = "AndroidApplicationFirebaseConvention"
+        }
+    }
+    plugins {
+        register("lint") {
+            id = "mega.lint"
+            implementationClass = "AndroidLintConventionPlugin"
+        }
+    }
+    plugins {
+        register("androidHilt") {
+            id = "mega.android.hilt"
+            implementationClass = "AndroidHiltConventionPlugin"
+        }
+    }
+    plugins {
+        register("jvmHilt") {
+            id = "mega.jvm.hilt"
+            implementationClass = "JvmHiltConventionPlugin"
+        }
+    }
+    plugins {
+        register("androidApplicationCompose") {
+            id = "mega.android.application.compose"
+            implementationClass = "AndroidApplicationComposeConventionPlugin"
+        }
+    }
+    plugins {
+        register("androidLibraryCompose") {
+            id = "mega.android.library.compose"
+            implementationClass = "AndroidLibraryComposeConventionPlugin"
+        }
+    }
 }
+

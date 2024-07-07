@@ -46,6 +46,7 @@ import mega.privacy.android.app.myAccount.MyAccountActivity
 import mega.privacy.android.app.presentation.permissions.NotificationsPermissionActivity
 import mega.privacy.android.app.presentation.settings.SettingsActivity
 import mega.privacy.android.app.presentation.settings.model.TargetPreference
+import mega.privacy.android.app.presentation.snackbar.LegacySnackBarWrapper
 import mega.privacy.android.app.presentation.transfers.starttransfer.StartTransfersComponentViewModel
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.StartTransferEvent
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.StartTransferJobInProgress
@@ -57,13 +58,12 @@ import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.usecase.exception.NotEnoughQuotaMegaException
 import mega.privacy.android.app.usecase.exception.QuotaExceededMegaException
 import mega.privacy.android.app.utils.AlertsAndWarnings
-import mega.privacy.android.app.utils.Util
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.shared.original.core.ui.controls.dialogs.ConfirmationDialog
 import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDialog
 import mega.privacy.android.shared.original.core.ui.navigation.launchFolderPicker
-import mega.privacy.android.shared.original.core.ui.utils.MinimumTimeVisibility
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.utils.MinimumTimeVisibility
 import timber.log.Timber
 
 /**
@@ -76,6 +76,7 @@ internal fun StartTransferComponent(
     event: StateEventWithContent<TransferTriggerEvent>,
     onConsumeEvent: () -> Unit,
     snackBarHostState: SnackbarHostState,
+    onScanningFinished: (StartTransferEvent) -> Unit = {},
     viewModel: StartTransfersComponentViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -146,6 +147,7 @@ internal fun StartTransferComponent(
         onResumeTransfers = viewModel::resumeTransfers,
         onAskedResumeTransfers = viewModel::setAskedResumeTransfers,
         snackBarHostState = snackBarHostState,
+        onScanningFinished = onScanningFinished,
     )
 }
 
@@ -153,12 +155,14 @@ internal fun StartTransferComponent(
  * Helper function to wrap [StartTransferComponent] into a [ComposeView] so it can be used in screens using View system
  * @param activity the parent activity where this view will be added, it should implement [SnackbarShower] to show the generated Snackbars
  * @param transferEventState flow that usually comes from the view model and triggers the download Transfer events
- * @param onConsumeEvent lambda to consume the download event, typically it will launch the corresponding consume event in the view model
+ * @param onConsumeEvent lambda to consume the download event, typically it will launch the corresponding consume event in the view model,
+ * @param onScanningFinished lambda to be called when the scanning process is finished.
  */
 fun createStartTransferView(
     activity: Activity,
     transferEventState: Flow<StateEventWithContent<TransferTriggerEvent>>,
     onConsumeEvent: () -> Unit,
+    onScanningFinished: (StartTransferEvent) -> Unit = {},
 ): View = ComposeView(activity).apply {
     setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
     setContent {
@@ -168,16 +172,12 @@ fun createStartTransferView(
         OriginalTempTheme(isDark = isSystemInDarkTheme()) {
             val snackbarHostState = remember { SnackbarHostState() }
             //if we need this view is because we are not using compose views, so we don't have a scaffold to show snack bars and need to launch a View snackbar
-            LaunchedEffect(snackbarHostState.currentSnackbarData) {
-                snackbarHostState.currentSnackbarData?.message?.let {
-                    Util.showSnackbar(activity, it)
-                }
-                snackbarHostState.currentSnackbarData?.dismiss()
-            }
+            LegacySnackBarWrapper(snackbarHostState = snackbarHostState, activity)
             StartTransferComponent(
                 downloadEvent,
                 onConsumeEvent,
                 snackBarHostState = snackbarHostState,
+                onScanningFinished,
             )
         }
     }
@@ -197,6 +197,7 @@ private fun StartTransferComponent(
     onResumeTransfers: () -> Unit,
     onAskedResumeTransfers: () -> Unit,
     snackBarHostState: SnackbarHostState,
+    onScanningFinished: (StartTransferEvent) -> Unit = {},
 ) {
     val context = LocalContext.current
     var showOfflineAlertDialog by rememberSaveable { mutableStateOf(false) }
@@ -208,19 +209,24 @@ private fun StartTransferComponent(
     var showAskDestinationDialog by remember {
         mutableStateOf<TransferTriggerEvent.StartDownloadNode?>(null)
     }
-    val folderPicker = launchFolderPicker { uri ->
-        showAskDestinationDialog?.let { event ->
-            onDestinationSet(event, uri)
+    val folderPicker = launchFolderPicker(
+        onCancel = {
             showAskDestinationDialog = null
-        }
-    }
+        },
+        onFolderSelected = { uri ->
+            showAskDestinationDialog?.let { event ->
+                onDestinationSet(event, uri)
+                showAskDestinationDialog = null
+            }
+        },
+    )
 
     EventEffect(
         event = uiState.oneOffViewEvent,
         onConsumed = onOneOffEventConsumed,
         action = {
             when (it) {
-                is StartTransferEvent.FinishDownloadProcessing ->
+                is StartTransferEvent.FinishDownloadProcessing -> {
                     consumeFinishProcessing(
                         event = it,
                         snackBarHostState = snackBarHostState,
@@ -228,6 +234,8 @@ private fun StartTransferComponent(
                         context = context,
                         transferTriggerEvent = it.triggerEvent,
                     )
+                    onScanningFinished(it)
+                }
 
                 is StartTransferEvent.FinishUploadProcessing -> {
                     val message = context.resources.getQuantityString(
@@ -236,6 +244,7 @@ private fun StartTransferComponent(
                         it.totalFiles,
                     )
                     snackBarHostState.showSnackbar(message)
+                    onScanningFinished(it)
                 }
 
                 is StartTransferEvent.Message ->
@@ -320,8 +329,14 @@ private fun StartTransferComponent(
             onDismiss = { showConfirmLargeTransfer = null },
         )
     }
-    if (showAskDestinationDialog != null) {
-        folderPicker.launch(null)
+    LaunchedEffect(showAskDestinationDialog) {
+        if (showAskDestinationDialog != null) {
+            runCatching {
+                folderPicker.launch(null)
+            }.onFailure {
+                snackBarHostState.showSnackbar(context.getString(R.string.general_warning_no_picker))
+            }
+        }
     }
     showPromptSaveDestinationDialog?.let { destination ->
         //this dialog will be updated once we have a dialog defined for this case that follows our DS

@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.palm.composestateevents.consumed
+import de.palm.composestateevents.triggered
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
+import mega.privacy.android.app.ShareInfo
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.featuretoggle.ApiFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
@@ -30,6 +33,7 @@ import mega.privacy.android.app.presentation.extensions.getState
 import mega.privacy.android.app.presentation.manager.model.ManagerState
 import mega.privacy.android.app.presentation.manager.model.SharesTab
 import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
+import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
@@ -101,6 +105,7 @@ import mega.privacy.android.domain.usecase.node.RemoveShareUseCase
 import mega.privacy.android.domain.usecase.node.RestoreNodesUseCase
 import mega.privacy.android.domain.usecase.notifications.BroadcastHomeBadgeCountUseCase
 import mega.privacy.android.domain.usecase.notifications.GetNumUnreadPromoNotificationsUseCase
+import mega.privacy.android.domain.usecase.offline.RemoveOfflineNodesUseCase
 import mega.privacy.android.domain.usecase.photos.mediadiscovery.SendStatisticsMediaDiscoveryUseCase
 import mega.privacy.android.domain.usecase.psa.DismissPsaUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorUpdatePushNotificationSettingsUseCase
@@ -112,10 +117,11 @@ import mega.privacy.android.domain.usecase.workers.StartCameraUploadUseCase
 import mega.privacy.android.domain.usecase.workers.StopCameraUploadsUseCase
 import mega.privacy.android.feature.sync.domain.usecase.sync.MonitorSyncStalledIssuesUseCase
 import mega.privacy.android.feature.sync.domain.usecase.sync.MonitorSyncsUseCase
-import mega.privacy.android.shared.sync.featuretoggle.SyncFeatures
+import mega.privacy.android.shared.sync.featuretoggle.SyncABTestFeatures
 import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -221,6 +227,7 @@ class ManagerViewModel @Inject constructor(
     private val monitorBackupFolder: MonitorBackupFolder,
     private val moveNodesToRubbishUseCase: MoveNodesToRubbishUseCase,
     private val deleteNodesUseCase: DeleteNodesUseCase,
+    private val removeOfflineNodesUseCase: RemoveOfflineNodesUseCase,
     private val moveNodesUseCase: MoveNodesUseCase,
     private val copyNodesUseCase: CopyNodesUseCase,
     private val renameRecoveryKeyFileUseCase: RenameRecoveryKeyFileUseCase,
@@ -476,7 +483,7 @@ class ManagerViewModel @Inject constructor(
 
         viewModelScope.launch {
             val androidSyncEnabled =
-                getFeatureFlagValueUseCase(SyncFeatures.AndroidSync)
+                getFeatureFlagValueUseCase(SyncABTestFeatures.asyc)
 
             if (androidSyncEnabled) {
                 monitorSyncsUseCase().catch { Timber.e(it) }.collect { syncFolders ->
@@ -484,9 +491,7 @@ class ManagerViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             androidSyncServiceEnabled = isServiceEnabled,
-                            isSyncFeatureFlagEnabled = getFeatureFlagValueUseCase(
-                                SyncFeatures.AndroidSync
-                            )
+                            isSyncFeatureFlagEnabled = true
                         )
                     }
                 }
@@ -1007,6 +1012,21 @@ class ManagerViewModel @Inject constructor(
     }
 
     /**
+     * Remove offline nodes
+     *
+     * @param nodeHandles
+     */
+    fun removeOfflineNodes(nodeHandles: List<Long>) {
+        viewModelScope.launch {
+            runCatching {
+                removeOfflineNodesUseCase(nodeHandles.map { NodeId(it) })
+            }.onFailure {
+                Timber.e(it)
+            }
+        }
+    }
+
+    /**
      * Mark handle move request result
      *
      */
@@ -1157,7 +1177,6 @@ class ManagerViewModel @Inject constructor(
                 val call = getChatCallUseCase(chatId)
                 val scheduledMeetingStatus = when (call?.status) {
                     ChatCallStatus.UserNoPresent -> ScheduledMeetingStatus.NotJoined(call.duration)
-
                     ChatCallStatus.Connecting,
                     ChatCallStatus.Joining,
                     ChatCallStatus.InProgress,
@@ -1285,6 +1304,61 @@ class ManagerViewModel @Inject constructor(
      */
     fun updateSearchQuery(query: String) {
         _state.update { it.copy(searchQuery = query) }
+    }
+
+
+    /**
+     * Uploads a file to the specified destination.
+     *
+     * @param file The file to upload.
+     * @param destination The destination where the file will be uploaded.
+     */
+    fun uploadFile(
+        file: File,
+        destination: Long,
+    ) {
+        uploadFiles(
+            mapOf(file.absolutePath to null),
+            NodeId(destination)
+        )
+    }
+
+    /**
+     * Uploads a list of files to the specified destination.
+     *
+     * @param shareInfo The files as [ShareInfo] to upload.
+     * @param destination The destination where the files will be uploaded.
+     */
+    fun uploadShareInfo(
+        shareInfo: List<ShareInfo>,
+        destination: Long,
+    ) {
+        val pathsAndNames = shareInfo.map { it.fileAbsolutePath }.associateWith { null }
+
+        uploadFiles(pathsAndNames, NodeId(destination))
+    }
+
+    private fun uploadFiles(
+        pathsAndNames: Map<String, String?>,
+        destinationId: NodeId,
+    ) {
+        _state.update { state ->
+            state.copy(
+                uploadEvent = triggered(
+                    TransferTriggerEvent.StartUpload.Files(
+                        pathsAndNames = pathsAndNames,
+                        destinationId = destinationId,
+                    )
+                )
+            )
+        }
+    }
+
+    /**
+     * Consume upload event
+     */
+    fun consumeUploadEvent() {
+        _state.update { it.copy(uploadEvent = consumed()) }
     }
 
     internal companion object {

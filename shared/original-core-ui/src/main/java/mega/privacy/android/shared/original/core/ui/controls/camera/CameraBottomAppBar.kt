@@ -20,11 +20,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Icon
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -32,11 +32,12 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
 import mega.privacy.android.core.R
-import mega.privacy.android.shared.original.core.ui.controls.chip.Chip
+import mega.privacy.android.shared.original.core.ui.controls.chip.MegaChip
+import mega.privacy.android.shared.original.core.ui.controls.chip.RoundedChipStyle
 import mega.privacy.android.shared.original.core.ui.preview.BooleanProvider
 import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.android.shared.original.core.ui.theme.MegaOriginalTheme
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 
 /**
  * Camera bottom app bar
@@ -50,6 +51,7 @@ import mega.privacy.android.shared.original.core.ui.theme.MegaOriginalTheme
  */
 @Composable
 fun CameraBottomAppBar(
+    rotationDegree: Float,
     isCaptureVideo: Boolean,
     isRecording: Boolean,
     modifier: Modifier = Modifier,
@@ -75,6 +77,7 @@ fun CameraBottomAppBar(
             InternalAnimatedContent(visible = !isRecording) {
                 CameraButton(
                     modifier = Modifier.testTag(TEST_TAG_CAMERA_BOTTOM_APP_BAR_GALLERY),
+                    rotationDegree = rotationDegree,
                     iconResId = R.drawable.ic_gallery,
                     onClick = onOpenGallery,
                 )
@@ -88,6 +91,7 @@ fun CameraBottomAppBar(
             InternalAnimatedContent(visible = !isRecording) {
                 CameraButton(
                     modifier = Modifier.testTag(TEST_TAG_CAMERA_BOTTOM_APP_BAR_ROTATE),
+                    rotationDegree = rotationDegree,
                     iconResId = R.drawable.ic_camera_rotate,
                     onClick = onToggleCamera,
                 )
@@ -102,7 +106,7 @@ fun CameraBottomAppBar(
                 val (videoRef, photoRef) = createRefs()
 
                 if (isCaptureVideo) {
-                    Chip(
+                    MegaChip(
                         modifier = Modifier
                             .width(80.dp)
                             .testTag(TEST_TAG_CAMERA_BOTTOM_APP_BAR_VIDEO)
@@ -111,17 +115,13 @@ fun CameraBottomAppBar(
                                 end.linkTo(parent.end)
                                 top.linkTo(parent.top)
                             },
-                        contentDescription = stringResource(id = R.string.video_button),
+                        style = RoundedChipStyle,
                         selected = true,
-                        shape = CircleShape,
+                        text = stringResource(id = R.string.video_button),
                         onClick = {}
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.video_button),
-                        )
-                    }
+                    )
 
-                    Chip(
+                    MegaChip(
                         modifier = Modifier
                             .width(80.dp)
                             .testTag(TEST_TAG_CAMERA_BOTTOM_APP_BAR_PHOTO)
@@ -129,15 +129,13 @@ fun CameraBottomAppBar(
                                 end.linkTo(videoRef.start, 10.dp)
                                 top.linkTo(parent.top)
                             },
-                        contentDescription = stringResource(id = R.string.camera_photo_button),
+                        style = RoundedChipStyle,
                         selected = false,
-                        shape = CircleShape,
+                        text = stringResource(id = R.string.camera_photo_button),
                         onClick = onToggleCaptureMode
-                    ) {
-                        Text(text = stringResource(id = R.string.camera_photo_button))
-                    }
+                    )
                 } else {
-                    Chip(
+                    MegaChip(
                         modifier = Modifier
                             .width(80.dp)
                             .testTag(TEST_TAG_CAMERA_BOTTOM_APP_BAR_PHOTO)
@@ -146,15 +144,13 @@ fun CameraBottomAppBar(
                                 end.linkTo(parent.end)
                                 top.linkTo(parent.top)
                             },
-                        contentDescription = stringResource(id = R.string.camera_photo_button),
+                        style = RoundedChipStyle,
+                        text = stringResource(id = R.string.camera_photo_button),
                         selected = true,
-                        shape = CircleShape,
                         onClick = {}
-                    ) {
-                        Text(text = stringResource(id = R.string.camera_photo_button))
-                    }
+                    )
 
-                    Chip(
+                    MegaChip(
                         modifier = Modifier
                             .width(80.dp)
                             .testTag(TEST_TAG_CAMERA_BOTTOM_APP_BAR_VIDEO)
@@ -162,13 +158,11 @@ fun CameraBottomAppBar(
                                 start.linkTo(photoRef.end, 10.dp)
                                 top.linkTo(parent.top)
                             },
-                        contentDescription = stringResource(id = R.string.video_button),
+                        style = RoundedChipStyle,
+                        text = stringResource(id = R.string.video_button),
                         selected = false,
-                        shape = CircleShape,
                         onClick = onToggleCaptureMode
-                    ) {
-                        Text(text = stringResource(id = R.string.video_button))
-                    }
+                    )
                 }
             }
         }
@@ -218,7 +212,10 @@ private fun CaptureIcon(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .size(48.dp)
-                    .background(color = MegaOriginalTheme.colors.background.inverse, shape = CircleShape)
+                    .background(
+                        color = MegaOriginalTheme.colors.background.inverse,
+                        shape = CircleShape
+                    )
             ) {
                 if (isCaptureVideo) {
                     Box(
@@ -239,11 +236,13 @@ private fun CaptureIcon(
 @Composable
 private fun CameraButton(
     @DrawableRes iconResId: Int,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    rotationDegree: Float = 0f,
+    onClick: () -> Unit,
 ) {
     Box(
         modifier = modifier
+            .rotate(rotationDegree)
             .size(48.dp)
             .clip(CircleShape)
             .background(color = MegaOriginalTheme.colors.background.surface2, shape = CircleShape)
@@ -267,6 +266,7 @@ private fun CameraBottomAppBarPreview(
         CameraBottomAppBar(
             isCaptureVideo = isVideoSelected,
             isRecording = false,
+            rotationDegree = 0f,
         )
     }
 }
@@ -280,6 +280,7 @@ private fun RecordingCameraBottomAppBarPreview(
         CameraBottomAppBar(
             isCaptureVideo = isVideoSelected,
             isRecording = true,
+            rotationDegree = 0f,
         )
     }
 }

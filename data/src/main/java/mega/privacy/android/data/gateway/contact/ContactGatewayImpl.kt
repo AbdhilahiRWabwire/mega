@@ -4,6 +4,7 @@ import android.content.Context
 import android.provider.ContactsContract
 import dagger.hilt.android.qualifiers.ApplicationContext
 import mega.privacy.android.domain.entity.contacts.LocalContact
+import mega.privacy.android.domain.entity.uri.UriPath
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -18,7 +19,9 @@ class ContactGatewayImpl @Inject constructor(
         buildList {
             val projection = arrayOf(
                 ContactsContract.Contacts._ID,
-                ContactsContract.Contacts.DISPLAY_NAME
+                ContactsContract.Contacts.DISPLAY_NAME,
+                ContactsContract.Contacts.PHOTO_URI,
+                ContactsContract.Contacts.PHOTO_THUMBNAIL_URI,
             )
             val cursor = context.contentResolver.query(
                 ContactsContract.Contacts.CONTENT_URI,
@@ -32,8 +35,16 @@ class ContactGatewayImpl @Inject constructor(
                 Timber.d("getting local contacts, has %d contacts", it.count)
                 while (it.moveToNext()) {
                     val id = it.getLong(0)
-                    val name = it.getString(1)
-                    add(LocalContact(id, name))
+                    val name = it.getString(1).orEmpty()
+                    val photoUri = it.getString(2)
+                    val photoThumbnailUri = it.getString(3)
+                    add(
+                        LocalContact(
+                            id = id,
+                            name = name,
+                            photoUri = (photoThumbnailUri ?: photoUri)?.let { uri -> UriPath(uri) }
+                        )
+                    )
                 }
             }
         }

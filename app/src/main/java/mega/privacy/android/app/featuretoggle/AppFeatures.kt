@@ -19,7 +19,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     NewZipBrowser(
         "Enable new zip browser",
-        false,
+        true,
     ),
 
     /**
@@ -96,14 +96,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     ),
 
     /**
-     * Enables DownloadWorker for download nodes, instead of DownloadService. This is a work in progress feature.
-     */
-    DownloadWorker(
-        "Enables DownloadWorker for download nodes, instead of DownloadService. This is a work in progress feature.",
-        true,
-    ),
-
-    /**
      * Enable the remember timeline preferences feature
      */
     RememberTimelinePreferences(
@@ -174,14 +166,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     PromoNotifications("Enable promotional notifications", true),
 
     /**
-     * To show strings for new features (meetings and VPN), strings should be hidden until the features are released
-     */
-    ShowStringsForNewFeatures(
-        "Show strings for new features (meetings and VPN)",
-        false
-    ),
-
-    /**
      * To enable the new add and manage description feature to node
      */
     NodeWithDescription(
@@ -232,6 +216,22 @@ enum class AppFeatures(override val description: String, private val defaultValu
     NewTourFragment(
         "Enable new tour fragment",
         true
+    ),
+
+    /**
+     * To enable the new add and manage description feature to node
+     */
+    NodeWithTags(
+        "Enable node with tags",
+        false
+    ),
+
+    /**
+     * Enables Picture in Picture (Pip) in Meeting
+     */
+    PictureInPicture(
+        "Enable Picture in Picture in Meeting",
+        false
     );
 
     companion object : FeatureFlagValueProvider {

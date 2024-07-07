@@ -20,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -29,6 +30,7 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.UploadService
 import mega.privacy.android.app.components.saver.NodeSaver
 import mega.privacy.android.app.domain.usecase.CheckNameCollision
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.listeners.ExportListener
 import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.namecollision.data.NameCollisionType
@@ -75,10 +77,12 @@ import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.filelink.GetPublicNodeFromSerializedDataUseCase
 import mega.privacy.android.domain.usecase.folderlink.GetPublicChildNodeFromIdUseCase
 import mega.privacy.android.domain.usecase.node.CopyChatNodeUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodeUseCase
+import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodeUseCase
 import mega.privacy.android.domain.usecase.node.chat.GetChatFileUseCase
 import mega.privacy.android.domain.usecase.transfers.downloads.DownloadBackgroundFile
@@ -136,6 +140,8 @@ class TextEditorViewModel @Inject constructor(
     private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase,
     private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
     private val isHiddenNodesOnboardedUseCase: IsHiddenNodesOnboardedUseCase,
+    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
+    private val monitorNodeUpdatesUseCase: MonitorNodeUpdatesUseCase,
 ) : ViewModel() {
 
     companion object {
@@ -173,6 +179,14 @@ class TextEditorViewModel @Inject constructor(
     init {
         monitorAccountDetail()
         monitorIsHiddenNodesOnboarded()
+        monitorNodeUpdates()
+    }
+
+    private fun monitorNodeUpdates() {
+        monitorNodeUpdatesUseCase()
+            .onEach { updateNode() }
+            .catch { Timber.e(it) }
+            .launchIn(viewModelScope)
     }
 
     fun onTextFileEditorDataUpdate(): LiveData<TextEditorData> = textEditorData
@@ -666,17 +680,34 @@ class TextEditorViewModel @Inject constructor(
         tempFile: File,
         parentHandle: Long,
     ) {
-        PermissionUtils.checkNotificationsPermission(activity)
+        viewModelScope.launch {
+            if (getFeatureFlagValueUseCase(AppFeatures.UploadWorker)) {
+                _uiState.update { state ->
+                    state.copy(
+                        transferEvent = triggered(
+                            TransferTriggerEvent.StartUpload.TextFile(
+                                path = tempFile.absolutePath,
+                                destinationId = NodeId(parentHandle),
+                                isEditMode = isEditMode(),
+                                fromHomePage = fromHome
+                            )
+                        )
+                    )
+                }
+            } else {
+                PermissionUtils.checkNotificationsPermission(activity)
 
-        val uploadServiceIntent = Intent(activity, UploadService::class.java)
-            .putExtra(UploadService.EXTRA_UPLOAD_TXT, mode.value)
-            .putExtra(FROM_HOME_PAGE, fromHome)
-            .putExtra(UploadService.EXTRA_FILE_PATH, tempFile.absolutePath)
-            .putExtra(UploadService.EXTRA_NAME, fileName.value)
-            .putExtra(UploadService.EXTRA_PARENT_HASH, parentHandle)
-        ContextCompat.startForegroundService(activity, uploadServiceIntent)
+                val uploadServiceIntent = Intent(activity, UploadService::class.java)
+                    .putExtra(UploadService.EXTRA_UPLOAD_TXT, mode.value)
+                    .putExtra(FROM_HOME_PAGE, fromHome)
+                    .putExtra(UploadService.EXTRA_FILE_PATH, tempFile.absolutePath)
+                    .putExtra(UploadService.EXTRA_NAME, fileName.value)
+                    .putExtra(UploadService.EXTRA_PARENT_HASH, parentHandle)
+                ContextCompat.startForegroundService(activity, uploadServiceIntent)
 
-        activity.finish()
+                activity.finish()
+            }
+        }
     }
 
     /**
@@ -899,7 +930,7 @@ class TextEditorViewModel @Inject constructor(
                                 textEditorData.value?.chatRoom?.chatId ?: INVALID_HANDLE
                             val msgId = textEditorData.value?.msgChat?.msgId ?: INVALID_HANDLE
                             val nodes = listOfNotNull(getChatFileUseCase(chatId, msgId))
-                            updateDownloadEvent(
+                            updateTransferEvent(
                                 TransferTriggerEvent.StartDownloadNode(nodes)
                             )
                         }
@@ -907,7 +938,7 @@ class TextEditorViewModel @Inject constructor(
                         FOLDER_LINK_ADAPTER -> {
                             val nodeId = NodeId(getNode()?.handle ?: INVALID_HANDLE)
                             val nodes = listOfNotNull(getPublicChildNodeFromIdUseCase(nodeId))
-                            updateDownloadEvent(
+                            updateTransferEvent(
                                 TransferTriggerEvent.StartDownloadNode(nodes)
                             )
                         }
@@ -917,7 +948,7 @@ class TextEditorViewModel @Inject constructor(
                                 getPublicNodeFromSerializedDataUseCase(it)
                             }
                             val nodes = listOfNotNull(node)
-                            updateDownloadEvent(
+                            updateTransferEvent(
                                 TransferTriggerEvent.StartDownloadNode(nodes)
                             )
                         }
@@ -927,7 +958,7 @@ class TextEditorViewModel @Inject constructor(
                                 getNodeByIdUseCase(NodeId(it))
                             }
                             val nodes = listOfNotNull(node)
-                            updateDownloadEvent(
+                            updateTransferEvent(
                                 TransferTriggerEvent.StartDownloadNode(nodes)
                             )
                         }
@@ -937,18 +968,18 @@ class TextEditorViewModel @Inject constructor(
         }
     }
 
-    private fun updateDownloadEvent(event: TransferTriggerEvent) {
+    private fun updateTransferEvent(event: TransferTriggerEvent) {
         _uiState.update {
-            it.copy(downloadEvent = triggered(event))
+            it.copy(transferEvent = triggered(event))
         }
     }
 
     /**
-     * Consume download event
+     * Consume transfer event
      */
-    fun consumeDownloadEvent() {
+    fun consumeTransferEvent() {
         _uiState.update {
-            it.copy(downloadEvent = consumed())
+            it.copy(transferEvent = consumed())
         }
     }
 

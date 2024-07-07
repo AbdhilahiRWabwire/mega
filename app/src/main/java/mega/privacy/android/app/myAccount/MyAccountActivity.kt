@@ -40,6 +40,7 @@ import mega.privacy.android.app.main.dialog.storagestatus.TYPE_ANDROID_PLATFORM
 import mega.privacy.android.app.main.dialog.storagestatus.TYPE_ANDROID_PLATFORM_NO_NAVIGATION
 import mega.privacy.android.app.main.dialog.storagestatus.TYPE_ITUNES
 import mega.privacy.android.app.middlelayer.iab.BillingConstant
+import mega.privacy.android.app.presentation.cancelaccountplan.CancelAccountPlanActivity
 import mega.privacy.android.app.presentation.changepassword.ChangePasswordActivity
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.utils.AlertDialogUtil.isAlertDialogShown
@@ -144,7 +145,7 @@ class MyAccountActivity : PasscodeActivity(),
 
                 savedInstanceState.getBoolean(CANCEL_SUBSCRIPTIONS_SHOWN, false) -> {
                     cancelSubscriptionsFeedback = savedInstanceState.getString(TYPED_FEEDBACK)
-                    viewModel.checkForNewCancelSubscriptionFeature()
+                    handleShowCancelSubscription()
                 }
 
                 savedInstanceState.getBoolean(CONFIRM_CANCEL_SUBSCRIPTIONS_SHOWN, false) -> {
@@ -285,11 +286,25 @@ class MyAccountActivity : PasscodeActivity(),
                 viewModel.setOpenUpgradeFrom()
             }
 
-            R.id.action_cancel_subscriptions -> viewModel.checkForNewCancelSubscriptionFeature()
+            R.id.action_cancel_subscriptions -> {
+                handleShowCancelSubscription()
+            }
+
             R.id.action_logout -> viewModel.logout(this)
         }
 
         return super.onOptionsItemSelected(item)
+    }
+
+    /**
+     * Handles the show cancel subscription action depending on the feature flag.
+     */
+    private fun handleShowCancelSubscription() {
+        if (viewModel.isNewCancelSubscriptionFeatureEnabled()) {
+            navigateToCancelAccountPlan()
+        } else {
+            showCancelSubscriptions()
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -316,7 +331,7 @@ class MyAccountActivity : PasscodeActivity(),
             R.id.my_account -> {
                 menu.toggleAllMenuItemsVisibility(true)
 
-                if (viewModel.thereIsNoSubscription() || isProFlexiAccount) {
+                if (viewModel.thereIsNoSubscription() || (isProFlexiAccount && !viewModel.isNewCancelSubscriptionFeatureEnabled())) {
                     menu.findItem(R.id.action_cancel_subscriptions).isVisible = false
                 }
 
@@ -467,15 +482,24 @@ class MyAccountActivity : PasscodeActivity(),
                 showConfirmChangeEmailDialog()
                 viewModel.resetChangeEmailConfirmation()
             }
-            state.showNewCancelSubscriptionFeature?.let { isEnabled ->
-                if (isEnabled) {
-                    // Enable the new cancel subscription feature
-                } else {
-                    showCancelSubscriptions()
-                }
-                viewModel.resetCheckForNewCancelSubscriptionFeature()
-            }
         }
+    }
+
+    private fun navigateToCancelAccountPlan() {
+        val accountType = viewModel.getAccountType()
+        val totalStorage = viewModel.getTotalStorage()
+        val totalTransfer = viewModel.getTotalTransfer()
+
+        startActivity(
+            Intent(this, CancelAccountPlanActivity::class.java)
+                .putExtra(
+                    CancelAccountPlanActivity.EXTRA_ACCOUNT_TYPE, accountType
+                ).putExtra(
+                    CancelAccountPlanActivity.EXTRA_TRANSFER_QUOTA, totalTransfer
+                ).putExtra(
+                    CancelAccountPlanActivity.EXTRA_STORAGE_QUOTA, totalStorage
+                )
+        )
     }
 
     /**

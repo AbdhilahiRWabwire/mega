@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,11 +22,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.unit.dp
 import mega.privacy.android.core.formatter.formatFileSize
 import mega.privacy.android.core.formatter.formatModifiedDate
+import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.feature.sync.R
+import mega.privacy.android.feature.sync.domain.entity.SyncStatus
+import mega.privacy.android.feature.sync.ui.model.SyncUiItem
 import mega.privacy.android.shared.original.core.ui.controls.banners.WarningBanner
 import mega.privacy.android.shared.original.core.ui.controls.buttons.MegaButtonWithIconAndText
 import mega.privacy.android.shared.original.core.ui.controls.cards.MegaCard
@@ -39,13 +41,9 @@ import mega.privacy.android.shared.original.core.ui.controls.status.getStatusIco
 import mega.privacy.android.shared.original.core.ui.controls.status.getStatusTextColor
 import mega.privacy.android.shared.original.core.ui.controls.text.MegaText
 import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorPrimary
-import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
-import mega.privacy.android.domain.entity.node.NodeId
-import mega.privacy.android.feature.sync.R
-import mega.privacy.android.feature.sync.domain.entity.SyncStatus
-import mega.privacy.android.feature.sync.ui.model.SyncUiItem
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.theme.extensions.subtitle1medium
+import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
 
 @Composable
 internal fun SyncCard(
@@ -55,6 +53,7 @@ internal fun SyncCard(
     removeFolderClicked: () -> Unit,
     issuesInfoClicked: () -> Unit,
     isLowBatteryLevel: Boolean,
+    isFreeAccount: Boolean,
     @StringRes errorRes: Int?,
     modifier: Modifier = Modifier,
 ) {
@@ -96,6 +95,7 @@ internal fun SyncCard(
                 issuesInfoClicked = issuesInfoClicked,
                 isLowBatteryLevel = isLowBatteryLevel,
                 isError = errorRes != null,
+                isFreeAccount = isFreeAccount,
                 expanded = sync.expanded,
             )
         },
@@ -127,10 +127,10 @@ private fun SyncCardHeader(
                 modifier = Modifier.padding(end = 8.dp),
             )
             Column {
-                Text(
+                MegaText(
                     text = folderPairName,
-                    style = MaterialTheme.typography.subtitle1.copy(color = MaterialTheme.colors.textColorPrimary),
-                    fontWeight = FontWeight.Medium
+                    textColor = TextColor.Primary,
+                    style = MaterialTheme.typography.subtitle1medium
                 )
                 MegaStatusIndicator(
                     modifier = Modifier.padding(top = 2.dp, bottom = 2.dp),
@@ -261,6 +261,7 @@ private fun SyncCardFooter(
     issuesInfoClicked: () -> Unit,
     isLowBatteryLevel: Boolean,
     isError: Boolean,
+    isFreeAccount: Boolean,
     expanded: Boolean,
 ) {
     when {
@@ -302,7 +303,7 @@ private fun SyncCardFooter(
                 } else {
                     stringResource(id = R.string.sync_card_run_sync)
                 },
-                enabled = !isLowBatteryLevel && !isError
+                enabled = !isLowBatteryLevel && !isError && !isFreeAccount
             )
             MegaButtonWithIconAndText(
                 onClick = removeFolderClicked,
@@ -337,6 +338,7 @@ private fun SyncCardExpandedPreview() {
             removeFolderClicked = {},
             issuesInfoClicked = {},
             isLowBatteryLevel = false,
+            isFreeAccount = false,
             errorRes = null,
         )
     }
@@ -366,6 +368,7 @@ private fun SyncCardExpandedWithBannerPreview() {
             removeFolderClicked = {},
             issuesInfoClicked = {},
             isLowBatteryLevel = false,
+            isFreeAccount = false,
             errorRes = sharedR.string.general_sync_active_sync_below_path,
         )
     }
@@ -395,6 +398,7 @@ private fun SyncCardCollapsedPreview() {
             removeFolderClicked = {},
             issuesInfoClicked = {},
             isLowBatteryLevel = false,
+            isFreeAccount = false,
             errorRes = null
         )
     }
@@ -424,6 +428,7 @@ private fun SyncCardCollapsedWithBannerPreview() {
             removeFolderClicked = {},
             issuesInfoClicked = {},
             isLowBatteryLevel = false,
+            isFreeAccount = false,
             errorRes = sharedR.string.general_sync_active_sync_below_path,
         )
     }

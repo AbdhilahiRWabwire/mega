@@ -18,10 +18,11 @@ import mega.privacy.android.app.mediaplayer.mapper.SubtitleFileInfoItemMapper
 import mega.privacy.android.app.mediaplayer.model.SubtitleFileInfoItem
 import mega.privacy.android.app.mediaplayer.model.SubtitleLoadState
 import mega.privacy.android.app.utils.Constants.INVALID_VALUE
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.mediaplayer.SubtitleFileInfo
-import mega.privacy.android.domain.entity.statistics.MediaPlayerStatisticsEvents
+import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.videoplayer.GetSRTSubtitleFileListUseCase
-import mega.privacy.android.domain.usecase.mediaplayer.SendStatisticsMediaPlayerUseCase
+import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
 import mega.privacy.android.legacy.core.ui.model.SearchWidgetState
 import mega.privacy.mobile.analytics.event.SearchModeEnablePressedEvent
 import javax.inject.Inject
@@ -33,7 +34,8 @@ import javax.inject.Inject
 class SelectSubtitleFileViewModel @Inject constructor(
     private val getSRTSubtitleFileListUseCase: GetSRTSubtitleFileListUseCase,
     private val subtitleFileInfoItemMapper: SubtitleFileInfoItemMapper,
-    private val sendStatisticsMediaPlayerUseCase: SendStatisticsMediaPlayerUseCase,
+    private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
+    private val monitorShowHiddenItemsUseCase: MonitorShowHiddenItemsUseCase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val _state = MutableStateFlow<SubtitleLoadState>(SubtitleLoadState.Loading)
@@ -64,13 +66,30 @@ class SelectSubtitleFileViewModel @Inject constructor(
                 query,
                 selected,
                 subtitleFileListState,
-                ::mapToSubtitleFileInfoItem
-            ).collect { list ->
+                monitorAccountDetailUseCase(),
+                monitorShowHiddenItemsUseCase()
+            ) { search, selected, subtitleFileInfoList, accountDetail, showHiddenItems ->
+                val accountType = accountDetail.levelDetail?.accountType
+                val filteredItems =
+                    filterNonSensitiveItems(
+                        items = subtitleFileInfoList,
+                        accountType = accountType,
+                        showHiddenItems = showHiddenItems
+                    )
+                mapToSubtitleFileInfoItem(
+                    search,
+                    selected,
+                    filteredItems,
+                ) to accountType
+            }.collect { (list, accountType) ->
                 _state.update {
                     if (list.isEmpty()) {
                         SubtitleLoadState.Empty
                     } else {
-                        SubtitleLoadState.Success(list)
+                        SubtitleLoadState.Success(
+                            items = list,
+                            accountType = accountType
+                        )
                     }
                 }
             }
@@ -81,8 +100,8 @@ class SelectSubtitleFileViewModel @Inject constructor(
         search: String?,
         selected: SubtitleFileInfo?,
         subtitleFileInfoList: List<SubtitleFileInfo>,
-    ): List<SubtitleFileInfoItem> =
-        if (subtitleFileInfoList.isEmpty()) {
+    ): List<SubtitleFileInfoItem> {
+        return if (subtitleFileInfoList.isEmpty()) {
             emptyList()
         } else {
             subtitleFileInfoList.filter { info ->
@@ -95,6 +114,7 @@ class SelectSubtitleFileViewModel @Inject constructor(
                 )
             }
         }
+    }
 
     /**
      * Get subtitle file info list
@@ -143,7 +163,6 @@ class SelectSubtitleFileViewModel @Inject constructor(
      */
     fun searchWidgetStateUpdate() {
         searchState = if (searchState == SearchWidgetState.COLLAPSED) {
-            sendSearchModeEnabledEvent()
             Analytics.tracker.trackEvent(SearchModeEnablePressedEvent)
             SearchWidgetState.EXPANDED
         } else {
@@ -159,35 +178,16 @@ class SelectSubtitleFileViewModel @Inject constructor(
         searchState = SearchWidgetState.COLLAPSED
     }
 
-    /**
-     * Send SearchModeEnabledEvent
-     */
-    private fun sendSearchModeEnabledEvent() {
-        sendMediaPlayerStatisticsEvent(MediaPlayerStatisticsEvents.SearchModeEnabledEvent())
-    }
-
-    /**
-     * Send AddSubtitleClickedEvent
-     */
-    fun sendAddSubtitleClickedEvent() {
-        sendMediaPlayerStatisticsEvent(MediaPlayerStatisticsEvents.AddSubtitleClickedEvent())
-    }
-
-    /**
-     * Send SelectSubtitleCancelledEvent
-     */
-    fun sendSelectSubtitleCancelledEvent() {
-        sendMediaPlayerStatisticsEvent(MediaPlayerStatisticsEvents.SelectSubtitleCancelledEvent())
-    }
-
-    /**
-     * Send MediaPlayerStatisticsEvent
-     *
-     * @param event MediaPlayerStatisticsEvents
-     */
-    private fun sendMediaPlayerStatisticsEvent(event: MediaPlayerStatisticsEvents) {
-        viewModelScope.launch {
-            sendStatisticsMediaPlayerUseCase(event)
+    private fun filterNonSensitiveItems(
+        items: List<SubtitleFileInfo>,
+        accountType: AccountType?,
+        showHiddenItems: Boolean,
+    ): List<SubtitleFileInfo> {
+        accountType ?: return items
+        return if (showHiddenItems || !accountType.isPaid) {
+            items
+        } else {
+            items.filter { !it.isMarkedSensitive && !it.isSensitiveInherited }
         }
     }
 }

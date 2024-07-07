@@ -2,6 +2,9 @@ package mega.privacy.android.data.gateway
 
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import kotlinx.coroutines.flow.Flow
+import mega.privacy.android.domain.entity.document.DocumentFolder
+import mega.privacy.android.domain.entity.uri.UriPath
 import java.io.File
 import java.io.IOException
 
@@ -118,6 +121,13 @@ interface FileGateway {
     @Throws(IOException::class)
     suspend fun copyFile(source: File, destination: File)
 
+    /**
+     * Copy files allow to copy files from source folder to destination
+     *
+     * @param source
+     * @param destination
+     */
+    suspend fun copyFileToFolder(source: File, destination: File)
 
     /**
      * creating a new temporary file in a root directory by copying the file from local path
@@ -277,6 +287,14 @@ interface FileGateway {
     suspend fun isContentUri(uriString: String): Boolean
 
     /**
+     * Is document uri
+     *
+     * @param uri
+     * @return
+     */
+    suspend fun isDocumentUri(uri: UriPath): Boolean
+
+    /**
      * @return true if the [uriString] represents an external storage content Uri
      */
     suspend fun isExternalStorageContentUri(uriString: String): Boolean
@@ -292,11 +310,13 @@ interface FileGateway {
     suspend fun getFileSizeFromUri(uriString: String): Long?
 
     /**
-     * Copies the file represented by a content [uriString] to the destination File. Usually, it is to make a content file returned by a share intent usable by the SDK.
-     * @param uriString the string representing the file, it must be a "content" uri
-     * @param file the destination file where the original file will be copied
+     * Copies the file or folder represented by a content [sourceUri] to the destination File.
+     * If [sourceUri] represents a file then [targetFile] must represent a file as well, same for folders.
+     * Usually, it is to make a content file returned by a share intent usable by the SDK.
+     * @param sourceUri the string representing the file or folder, it must be a "content" uri
+     * @param targetFile the destination file or folder where the original file or folder will be copied
      */
-    suspend fun copyContentUriToFile(uriString: String, file: File)
+    suspend fun copyContentUriToFile(sourceUri: UriPath, targetFile: File)
 
     /**
      * Creates a new image from [file] to [destination] with [maxPixels] pixels if the image has more than [maxPixels] pixels
@@ -310,4 +330,34 @@ interface FileGateway {
      * @return
      */
     suspend fun deleteFileByUri(uri: Uri): Boolean
+
+    /**
+     * Get files in document folder
+     *
+     * @param folder
+     * @return list of files in the folder
+     */
+    suspend fun getFilesInDocumentFolder(folder: UriPath): DocumentFolder
+
+    /**
+     * Search files in document folder recursive
+     *
+     * @param folder
+     * @param query
+     */
+    fun searchFilesInDocumentFolderRecursive(
+        folder: UriPath,
+        query: String,
+    ): Flow<DocumentFolder>
+
+    /**
+     * Copy files to document uri
+     *
+     * @param source
+     * @param destination
+     */
+    suspend fun copyFilesToDocumentFolder(
+        source: File,
+        destination: DocumentFile,
+    )
 }

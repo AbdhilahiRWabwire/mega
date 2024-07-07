@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -17,6 +18,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.activities.WebViewActivity
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.globalmanagement.MyAccountInfo
@@ -37,6 +39,8 @@ import mega.privacy.android.domain.entity.billing.MegaPurchase
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.mobile.analytics.event.UpgradeAccountBuyButtonPressedEvent
+import mega.privacy.mobile.analytics.event.UpgradeAccountCancelledEvent
 import nz.mega.sdk.MegaApiAndroid
 import timber.log.Timber
 import javax.inject.Inject
@@ -89,19 +93,21 @@ class UpgradeAccountFragment : Fragment() {
         val uiState by upgradeAccountViewModel.state.collectAsStateWithLifecycle()
         val mode by getThemeMode()
             .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
+        BackHandler { trackAndFinish() }
         OriginalTempTheme(isDark = mode.isDarkMode()) {
             UpgradeAccountView(
                 modifier = Modifier.semantics {
                     testTagsAsResourceId = true
                 },
                 state = uiState,
-                onBackPressed = upgradeAccountActivity.onBackPressedDispatcher::onBackPressed,
+                onBackPressed = { trackAndFinish() },
                 onBuyClicked = {
                     val chosenPlan = convertAccountTypeToInt(uiState.chosenPlan)
                     upgradeAccountViewModel.currentPaymentCheck(chosenPlan)
                     if (uiState.currentPayment == UpgradePayment()) {
                         startPurchase(uiState.isMonthlySelected, chosenPlan)
                     }
+                    Analytics.tracker.trackEvent(UpgradeAccountBuyButtonPressedEvent)
                 },
                 onPlayStoreLinkClicked = this::redirectToPlayStoreSubscription,
                 onPricingPageClicked = this::redirectToPricingPage,
@@ -135,6 +141,11 @@ class UpgradeAccountFragment : Fragment() {
                 showUpgradeWarningBanner = uiState.isCrossAccountMatch.not()
             )
         }
+    }
+
+    private fun trackAndFinish() {
+        Analytics.tracker.trackEvent(UpgradeAccountCancelledEvent)
+        upgradeAccountActivity.finish()
     }
 
     private fun startPurchase(

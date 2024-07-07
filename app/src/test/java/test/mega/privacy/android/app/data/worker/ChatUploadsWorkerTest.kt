@@ -1,5 +1,6 @@
 package test.mega.privacy.android.app.data.worker
 
+import android.app.Notification
 import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.core.app.ApplicationProvider
@@ -18,23 +19,28 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.yield
 import mega.privacy.android.data.mapper.transfer.ChatUploadNotificationMapper
 import mega.privacy.android.data.mapper.transfer.OverQuotaNotificationBuilder
 import mega.privacy.android.data.worker.AreNotificationsEnabledUseCase
 import mega.privacy.android.data.worker.ChatUploadsWorker
 import mega.privacy.android.data.worker.ForegroundSetter
-import mega.privacy.android.domain.entity.chat.PendingMessage
+import mega.privacy.android.domain.entity.Progress
 import mega.privacy.android.domain.entity.chat.PendingMessageState
 import mega.privacy.android.domain.entity.chat.messages.pending.UpdatePendingMessageStateRequest
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.transfer.ActiveTransferTotals
+import mega.privacy.android.domain.entity.transfer.ChatCompressionProgress
+import mega.privacy.android.domain.entity.transfer.ChatCompressionState
 import mega.privacy.android.domain.entity.transfer.MonitorOngoingActiveTransfersResult
 import mega.privacy.android.domain.entity.transfer.Transfer
 import mega.privacy.android.domain.entity.transfer.TransferAppData
@@ -42,7 +48,6 @@ import mega.privacy.android.domain.entity.transfer.TransferEvent
 import mega.privacy.android.domain.entity.transfer.TransferType
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.monitoring.CrashReporter
-import mega.privacy.android.domain.repository.chat.ChatMessageRepository
 import mega.privacy.android.domain.usecase.chat.message.AttachNodeWithPendingMessageUseCase
 import mega.privacy.android.domain.usecase.chat.message.CheckFinishedChatUploadsUseCase
 import mega.privacy.android.domain.usecase.chat.message.MonitorPendingMessagesByStateUseCase
@@ -62,11 +67,14 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.anyVararg
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoMoreInteractions
 import org.mockito.kotlin.whenever
 import java.util.UUID
 import java.util.concurrent.Executor
@@ -98,7 +106,6 @@ class ChatUploadsWorkerTest {
     private val clearActiveTransfersIfFinishedUseCase =
         mock<ClearActiveTransfersIfFinishedUseCase>()
     private val chatUploadNotificationMapper = mock<ChatUploadNotificationMapper>()
-    private val chatMessageRepository = mock<ChatMessageRepository>()
     private val updatePendingMessageUseCase = mock<UpdatePendingMessageUseCase>()
     private val checkFinishedChatUploadsUseCase = mock<CheckFinishedChatUploadsUseCase>()
     private val setForeground = mock<ForegroundSetter>()
@@ -162,6 +169,7 @@ class ChatUploadsWorkerTest {
             prepareAllPendingMessagesUseCase,
             crashReporter,
             setForeground,
+            notificationSamplePeriod = 0L,
         )
     }
 
@@ -233,7 +241,7 @@ class ChatUploadsWorkerTest {
         }
 
     @Test
-    fun `test that doWorkInternal starts compressing pending messages`() = runTest {
+    fun `test that doWork starts compressing pending messages`() = runTest {
         commonStub()
 
         underTest.doWork()
@@ -243,7 +251,7 @@ class ChatUploadsWorkerTest {
     }
 
     @Test
-    fun `test that doWorkInternal starts preparing all pending messages`() = runTest {
+    fun `test that doWork starts preparing all pending messages`() = runTest {
         commonStub()
 
         underTest.doWork()
@@ -253,7 +261,7 @@ class ChatUploadsWorkerTest {
     }
 
     @Test
-    fun `test that doWorkInternal starts uploading pending messages`() = runTest {
+    fun `test that doWork starts uploading pending messages`() = runTest {
         commonStub()
 
         underTest.doWork()
@@ -331,6 +339,41 @@ class ChatUploadsWorkerTest {
             }
         }
 
+    @Test
+    fun `test that notification is updated when compression progress is updated`() = runTest {
+        commonStub()
+        whenever(areNotificationsEnabledUseCase()).thenReturn(true)
+        val firstNotification = mock<Notification>()
+        val secondNotification = mock<Notification>()
+        val firstCompressionProgress = ChatCompressionProgress(0, 1, Progress(0f))
+        val secondCompressionProgress = ChatCompressionProgress(0, 1, Progress(0.5f))
+        val compressionFlow = MutableStateFlow<ChatCompressionState>(firstCompressionProgress)
+        whenever(monitorPendingMessagesByStateUseCase(anyVararg())) doReturn
+                flowOf(listOf(mock()))
+        whenever(compressPendingMessagesUseCase()) doReturn compressionFlow
+        whenever(
+            chatUploadNotificationMapper(anyOrNull(), eq(firstCompressionProgress), any())
+        ) doReturn firstNotification
+        whenever(
+            chatUploadNotificationMapper(anyOrNull(), eq(secondCompressionProgress), any())
+        ) doReturn secondNotification
+        val workerJob = launch {
+            underTest.doWork()
+        }
+        yield() //to wait for the doWork to start
+        verify(
+            notificationManager,
+            times(2) //twice because we are not sampling in tests
+        ).notify(any(), eq(firstNotification))
+        verifyNoMoreInteractions(notificationManager)
+
+        compressionFlow.value = secondCompressionProgress
+
+        verify(notificationManager).notify(any(), eq(secondNotification))
+
+        workerJob.cancel()
+    }
+
     private fun monitorOngoingActiveTransfersFlow(hasOngoingTransfers: Boolean): Flow<MonitorOngoingActiveTransfersResult> {
         val activeTransferTotals = mock<ActiveTransferTotals> {
             on { this.hasOngoingTransfers() } doReturn hasOngoingTransfers
@@ -359,11 +402,6 @@ class ChatUploadsWorkerTest {
             on { this.transfer } doReturn transfer
             on { this.error } doReturn error
         }
-        val pendingMsg = mock<PendingMessage> {
-            on { id } doReturn PENDING_MSG_ID
-            on { this.chatId } doReturn CHAT_ID
-        }
-        whenever(chatMessageRepository.getPendingMessage(PENDING_MSG_ID)).thenReturn(pendingMsg)
         val totals = mock<ActiveTransferTotals> {
             on { transferredBytes }.thenReturn(100L)
             on { totalBytes }.thenReturn(200L)

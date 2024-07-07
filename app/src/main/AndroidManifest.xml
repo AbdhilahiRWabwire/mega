@@ -109,14 +109,18 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:gwpAsanMode="always"
         android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
         android:requestLegacyExternalStorage="true"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:screenOrientation="fullUser"
         android:supportsRtl="true"
         android:theme="@style/Theme.Mega"
         android:usesCleartextTraffic="true">
+        <activity
+            android:name=".presentation.cancelaccountplan.CancelAccountPlanActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
         <activity
             android:name=".presentation.settings.SettingsActivity"
             android:exported="false"
@@ -340,7 +344,10 @@
             android:name=".main.AddContactActivity"
             android:windowSoftInputMode="adjustNothing" />
         <activity
-            android:name=".presentation.contact.invite.contact.InviteContactActivity"
+            android:name=".presentation.contact.invite.InviteContactActivity"
+            android:windowSoftInputMode="adjustNothing" />
+        <activity
+            android:name=".presentation.contact.invite.InviteContactActivityV2"
             android:windowSoftInputMode="adjustNothing" />
         <activity
             android:name=".presentation.meeting.chat.ChatHostActivity"
@@ -486,9 +493,10 @@
             android:launchMode="singleTop" />
         <activity
             android:name=".meeting.activity.MeetingActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:supportsPictureInPicture="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
             android:excludeFromRecents="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".meeting.activity.LeftMeetingActivity"
@@ -519,8 +527,7 @@
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"
-            tools:node="merge" />
-        <!-- Older devices that run Android 4.4 (API level 19) through Android 10 (API level 29) can install a backported version of the photo picker. -->
+            tools:node="merge" /> <!-- Older devices that run Android 4.4 (API level 19) through Android 10 (API level 29) can install a backported version of the photo picker. -->
         <!-- Trigger Google Play services to install the backported photo picker module. -->
         <!-- suppress AndroidDomInspection -->
         <service
@@ -651,6 +658,9 @@
             android:name=".presentation.videosection.VideoSelectedActivity"
             android:launchMode="singleTop" />
         <activity
+            android:name=".presentation.videosection.VideoToPlaylistActivity"
+            android:launchMode="singleTop" />
+        <activity
             android:name=".activities.settingsActivities.StartScreenPreferencesActivity"
             android:label="@string/start_screen_setting"
             android:launchMode="singleTop" />
@@ -709,9 +719,12 @@
             android:label=""
             android:launchMode="singleTop" />
         <activity
-            android:name="mega.privacy.android.app.camera.CameraActivity"
+            android:name=".camera.CameraActivity"
             android:launchMode="singleTop"
             android:screenOrientation="portrait" />
+        <activity
+            android:name=".presentation.tags.TagsActivity"
+            android:launchMode="singleTop" />
     </application>
 
 </manifest>

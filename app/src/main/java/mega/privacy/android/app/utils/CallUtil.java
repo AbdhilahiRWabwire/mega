@@ -79,7 +79,7 @@ import mega.privacy.android.app.meeting.activity.MeetingActivity;
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway;
 import mega.privacy.android.app.meeting.listeners.DisableAudioVideoCallListener;
 import mega.privacy.android.app.objects.PasscodeManagement;
-import mega.privacy.android.app.presentation.contact.invite.contact.InviteContactActivity;
+import mega.privacy.android.app.presentation.contact.invite.InviteContactActivity;
 import mega.privacy.android.app.presentation.contactinfo.ContactInfoActivity;
 import mega.privacy.android.app.presentation.extensions.StorageStateExtensionsKt;
 import mega.privacy.android.app.presentation.meeting.WaitingRoomActivity;
@@ -771,6 +771,13 @@ public class CallUtil {
         }
     }
 
+    /**
+     * This function determines whether there are ongoing video calls.
+     *
+     * @return Long. The chat ID.
+     * @deprecated <p> Use {@link mega.privacy.android.domain.usecase.meeting.AreThereOngoingVideoCallsUseCase} instead.
+     */
+    @Deprecated
     public static long isNecessaryDisableLocalCamera() {
         MegaChatCall call = getCallInProgress();
         if (call == null || !call.hasLocalVideo()) {
@@ -790,7 +797,9 @@ public class CallUtil {
      *                   ACTION_TAKE_PICTURE, TAKE_PICTURE_PROFILE_CODE, ACTION_OPEN_QR
      * @param openScanQR if the action is ACTION_OPEN_QR, it specifies whether to open the "Scan QR" section.
      *                   True if it should open the "Scan QR" section, false otherwise.
+     * @deprecated <p> Use OpenCameraConfirmationDialogRoute instead.
      */
+    @Deprecated
     public static void showConfirmationOpenCamera(Activity activity, String action, boolean openScanQR) {
         DialogInterface.OnClickListener dialogClickListener = (dialog, which) -> {
             switch (which) {
@@ -914,6 +923,19 @@ public class CallUtil {
         if (listCallsJoining != null && listCallsJoining.size() > 0) {
             for (int i = 0; i < listCallsJoining.size(); i++) {
                 listCalls.add(listCallsJoining.get(i));
+            }
+        }
+
+        MegaHandleList listCallsInInitialState = megaChatApi.getChatCalls(MegaChatCall.CALL_STATUS_INITIAL);
+        if (listCallsInInitialState != null && listCallsInInitialState.size() > 0) {
+            for (int i = 0; i < listCallsInInitialState.size(); i++) {
+                listCalls.add(listCallsInInitialState.get(i));
+            }
+        }
+        MegaHandleList listCallsConnecting = megaChatApi.getChatCalls(MegaChatCall.CALL_STATUS_CONNECTING);
+        if (listCallsConnecting != null && listCallsConnecting.size() > 0) {
+            for (int i = 0; i < listCallsConnecting.size(); i++) {
+                listCalls.add(listCallsConnecting.get(i));
             }
         }
 

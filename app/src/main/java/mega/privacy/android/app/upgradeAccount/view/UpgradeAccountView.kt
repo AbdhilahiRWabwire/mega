@@ -1,5 +1,6 @@
 package mega.privacy.android.app.upgradeAccount.view
 
+import mega.privacy.android.shared.resources.R as sharedR
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.AppBarDefaults
 import androidx.compose.material.Card
 import androidx.compose.material.Divider
 import androidx.compose.material.FabPosition
@@ -71,12 +73,18 @@ import mega.privacy.android.app.upgradeAccount.view.components.SaveUpToLabel
 import mega.privacy.android.app.upgradeAccount.view.components.SubscriptionDetails
 import mega.privacy.android.app.utils.Constants.INVALID_VALUE
 import mega.privacy.android.app.utils.Constants.PRICING_PAGE_URL
+import mega.privacy.android.domain.entity.AccountType
+import mega.privacy.android.domain.entity.Currency
+import mega.privacy.android.domain.entity.account.CurrencyAmount
+import mega.privacy.android.shared.original.core.ui.controls.appbar.AppBarType
+import mega.privacy.android.shared.original.core.ui.controls.appbar.MegaAppBar
 import mega.privacy.android.shared.original.core.ui.controls.text.MegaSpannedClickableText
 import mega.privacy.android.shared.original.core.ui.controls.text.MegaText
 import mega.privacy.android.shared.original.core.ui.model.MegaSpanStyle
 import mega.privacy.android.shared.original.core.ui.model.MegaSpanStyleWithAnnotation
 import mega.privacy.android.shared.original.core.ui.model.SpanIndicator
 import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.android.shared.original.core.ui.theme.Typography
 import mega.privacy.android.shared.original.core.ui.theme.extensions.black_yellow_700
 import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_020_grey_800
@@ -87,27 +95,6 @@ import mega.privacy.android.shared.original.core.ui.theme.extensions.teal_300_te
 import mega.privacy.android.shared.original.core.ui.theme.extensions.yellow_100_yellow_700_alpha_015
 import mega.privacy.android.shared.original.core.ui.theme.subtitle1
 import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
-import mega.privacy.android.domain.entity.AccountType
-import mega.privacy.android.domain.entity.Currency
-import mega.privacy.android.domain.entity.account.CurrencyAmount
-import mega.privacy.android.legacy.core.ui.controls.appbar.SimpleNoTitleTopAppBar
-import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
-
-internal const val UPGRADE_ACCOUNT_SCREEN_TAG = "upgrade_account_screen:"
-internal const val BILLING_WARNING_TAG = "upgrade_account_screen:box_warning_unavailable_payments"
-internal const val BILLING_WARNING_CLOSE_BUTTON_TAG =
-    "upgrade_account_screen:button_close_billing_warning"
-internal const val EMPTY_CARD_TAG = "upgrade_account_screen:card_empty_loading_plans"
-internal const val PRO_PLAN_CARD_TAG = "upgrade_account_screen:card_pro_plan_"
-internal const val PRICING_PAGE_LINK_TAG = "upgrade_account_screen:text_pricing_page_link"
-internal const val BUY_BUTTON_TAG = "upgrade_account_screen:button_buy_pro_plan_"
-internal const val UPGRADE_WARNING_BANNER_TAG = "upgrade_account_screen:upgrade_warning_banner"
-internal const val GOOGLE_PLAY_STORE_SUBSCRIPTION_LINK_TAG =
-    "upgrade_account_screen:text_link_google_play_store_subscription"
-internal const val SUBSCRIPTION_DETAILS_TITLE_TAG =
-    "upgrade_account_screen:text_subscription_details_title"
-internal const val SUBSCRIPTION_DETAILS_DESCRIPTION_TAG =
-    "upgrade_account_screen:text_subscription_details_description"
 
 /**
  * Screen is shown when user taps on Upgrade button
@@ -115,7 +102,6 @@ internal const val SUBSCRIPTION_DETAILS_DESCRIPTION_TAG =
  */
 @Composable
 fun UpgradeAccountView(
-    modifier: Modifier = Modifier,
     state: UpgradeAccountState,
     onBackPressed: () -> Unit,
     onBuyClicked: () -> Unit,
@@ -128,6 +114,7 @@ fun UpgradeAccountView(
     onDialogConfirmButtonClicked: (Int) -> Unit,
     onDialogDismissButtonClicked: () -> Unit,
     showUpgradeWarningBanner: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
@@ -145,9 +132,11 @@ fun UpgradeAccountView(
     Scaffold(
         scaffoldState = scaffoldState,
         topBar = {
-            SimpleNoTitleTopAppBar(
-                elevation = state.showBillingWarning,
-                onBackPressed = onBackPressed
+            MegaAppBar(
+                appBarType = AppBarType.BACK_NAVIGATION,
+                title = "",
+                onNavigationPressed = { onBackPressed() },
+                elevation = if (state.showBillingWarning) AppBarDefaults.TopAppBarElevation else 0.dp
             )
         },
         floatingActionButtonPosition = FabPosition.Center,
@@ -299,7 +288,7 @@ fun UpgradeAccountView(
 
                 FeaturesOfPlans(
                     showNoAdsFeature = state.showNoAdsFeature,
-                    showNewFeatures = state.showNewFeatures,
+                    showAndroidSyncString = state.showAndroidSyncString,
                 )
                 if (state.localisedSubscriptionsList.isNotEmpty()) {
                     SubscriptionDetails(
@@ -530,7 +519,7 @@ fun EmptySubscriptionPlansInfoCards(brush: Brush) {
 @Composable
 private fun FeaturesOfPlans(
     showNoAdsFeature: Boolean,
-    showNewFeatures: Boolean,
+    showAndroidSyncString: Boolean,
 ) {
     val modifier = Modifier.padding(
         start = 10.dp,
@@ -571,29 +560,35 @@ private fun FeaturesOfPlans(
                 style = MaterialTheme.typography.body2.copy(textIndent = textIndent),
                 modifier = modifier
             )
+            if (showAndroidSyncString) {
+                MegaText(
+                    text = stringResource(id = sharedR.string.account_upgrade_account_description_feature_sync),
+                    textColor = TextColor.Primary,
+                    style = MaterialTheme.typography.body2.copy(textIndent = textIndent),
+                    modifier = modifier
+                )
+            }
             MegaText(
                 text = stringResource(id = R.string.account_upgrade_account_description_feature_rewind),
                 textColor = TextColor.Primary,
                 style = MaterialTheme.typography.body2.copy(textIndent = textIndent),
                 modifier = modifier
             )
-            if (showNewFeatures) {
-                MegaText(
-                    text = stringResource(id = R.string.account_upgrade_account_description_feature_meetings),
-                    textColor = TextColor.Primary,
-                    style = MaterialTheme.typography.body2.copy(textIndent = textIndent),
-                    modifier = modifier
+            MegaText(
+                text = stringResource(id = R.string.account_upgrade_account_description_feature_meetings),
+                textColor = TextColor.Primary,
+                style = MaterialTheme.typography.body2.copy(textIndent = textIndent),
+                modifier = modifier
+            )
+            MegaText(
+                text = stringResource(id = R.string.account_upgrade_account_description_feature_vpn),
+                textColor = TextColor.Primary,
+                style = MaterialTheme.typography.body2.copy(textIndent = textIndent),
+                modifier = Modifier.padding(
+                    start = 10.dp,
+                    bottom = 12.dp
                 )
-                MegaText(
-                    text = stringResource(id = R.string.account_upgrade_account_description_feature_vpn),
-                    textColor = TextColor.Primary,
-                    style = MaterialTheme.typography.body2.copy(textIndent = textIndent),
-                    modifier = Modifier.padding(
-                        start = 10.dp,
-                        bottom = 12.dp
-                    )
-                )
-            }
+            )
             MegaText(
                 text = stringResource(id = R.string.account_upgrade_account_description_feature_rubbish_bin),
                 textColor = TextColor.Primary,
@@ -763,4 +758,20 @@ private class UpgradeAccountPreviewProvider :
         )
     }
 }
+
+internal const val UPGRADE_ACCOUNT_SCREEN_TAG = "upgrade_account_screen:"
+internal const val BILLING_WARNING_TAG = "upgrade_account_screen:box_warning_unavailable_payments"
+internal const val BILLING_WARNING_CLOSE_BUTTON_TAG =
+    "upgrade_account_screen:button_close_billing_warning"
+internal const val EMPTY_CARD_TAG = "upgrade_account_screen:card_empty_loading_plans"
+internal const val PRO_PLAN_CARD_TAG = "upgrade_account_screen:card_pro_plan_"
+internal const val PRICING_PAGE_LINK_TAG = "upgrade_account_screen:text_pricing_page_link"
+internal const val BUY_BUTTON_TAG = "upgrade_account_screen:button_buy_pro_plan_"
+internal const val UPGRADE_WARNING_BANNER_TAG = "upgrade_account_screen:upgrade_warning_banner"
+internal const val GOOGLE_PLAY_STORE_SUBSCRIPTION_LINK_TAG =
+    "upgrade_account_screen:text_link_google_play_store_subscription"
+internal const val SUBSCRIPTION_DETAILS_TITLE_TAG =
+    "upgrade_account_screen:text_subscription_details_title"
+internal const val SUBSCRIPTION_DETAILS_DESCRIPTION_TAG =
+    "upgrade_account_screen:text_subscription_details_description"
 

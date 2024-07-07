@@ -42,7 +42,6 @@ import mega.privacy.android.app.constants.EventConstants
 import mega.privacy.android.app.constants.EventConstants.EVENT_UPDATE_CALL
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.fragments.homepage.Event
-import mega.privacy.android.app.listeners.EditChatRoomNameListener
 import mega.privacy.android.app.listeners.GetUserEmailListener
 import mega.privacy.android.app.main.listeners.CreateGroupChatWithPublicLink
 import mega.privacy.android.app.meeting.adapter.Participant
@@ -54,7 +53,6 @@ import mega.privacy.android.app.presentation.meeting.model.InMeetingUiState
 import mega.privacy.android.app.presentation.meeting.model.ParticipantsChange
 import mega.privacy.android.app.presentation.meeting.model.ParticipantsChangeType
 import mega.privacy.android.app.usecase.call.GetCallUseCase
-import mega.privacy.android.app.usecase.call.GetNetworkChangesUseCase
 import mega.privacy.android.app.usecase.call.GetParticipantsChangesUseCase
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.app.utils.CallUtil
@@ -66,6 +64,7 @@ import mega.privacy.android.app.utils.Constants.NAME_CHANGE
 import mega.privacy.android.app.utils.Constants.TYPE_JOIN
 import mega.privacy.android.app.utils.Constants.TYPE_LEFT
 import mega.privacy.android.data.gateway.api.MegaChatApiGateway
+import mega.privacy.android.domain.entity.chat.ChatCall
 import mega.privacy.android.domain.entity.chat.ChatParticipant
 import mega.privacy.android.domain.entity.chat.ChatRoomChange
 import mega.privacy.android.domain.entity.meeting.AnotherCallType
@@ -73,16 +72,19 @@ import mega.privacy.android.domain.entity.meeting.CallOnHoldType
 import mega.privacy.android.domain.entity.meeting.CallUIStatusType
 import mega.privacy.android.domain.entity.meeting.ChatCallChanges
 import mega.privacy.android.domain.entity.meeting.ChatCallStatus
+import mega.privacy.android.domain.entity.meeting.ChatSessionChanges
+import mega.privacy.android.domain.entity.meeting.NetworkQualityType
 import mega.privacy.android.domain.entity.meeting.SubtitleCallType
 import mega.privacy.android.domain.entity.statistics.EndCallEmptyCall
 import mega.privacy.android.domain.entity.statistics.EndCallForAll
 import mega.privacy.android.domain.entity.statistics.StayOnCallEmptyCall
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.chat.EndCallUseCase
-import mega.privacy.android.domain.usecase.chat.MonitorCallReconnectingStatusUseCase
 import mega.privacy.android.domain.usecase.chat.HoldChatCallUseCase
 import mega.privacy.android.domain.usecase.chat.IsEphemeralPlusPlusUseCase
+import mega.privacy.android.domain.usecase.chat.MonitorCallReconnectingStatusUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatRoomUpdatesUseCase
+import mega.privacy.android.domain.usecase.chat.SetChatTitleUseCase
 import mega.privacy.android.domain.usecase.chat.link.JoinPublicChatUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.login.ChatLogoutUseCase
@@ -93,11 +95,13 @@ import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.IsAudioLevelMonitorEnabledUseCase
 import mega.privacy.android.domain.usecase.meeting.JoinMeetingAsGuestUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
+import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorParticipatingInAnotherCallUseCase
 import mega.privacy.android.domain.usecase.meeting.RequestHighResolutionVideoUseCase
 import mega.privacy.android.domain.usecase.meeting.RequestLowResolutionVideoUseCase
 import mega.privacy.android.domain.usecase.meeting.SendStatisticsMeetingsUseCase
-import mega.privacy.android.domain.usecase.meeting.StartChatCall
+import mega.privacy.android.domain.usecase.meeting.SetIgnoredCallUseCase
+import mega.privacy.android.domain.usecase.meeting.StartCallUseCase
 import mega.privacy.android.domain.usecase.meeting.StopHighResolutionVideoUseCase
 import mega.privacy.android.domain.usecase.meeting.StopLowResolutionVideoUseCase
 import mega.privacy.android.domain.usecase.meeting.raisehandtospeak.IsRaiseToHandSuggestionShownUseCase
@@ -124,8 +128,7 @@ import javax.inject.Inject
  *
  * @property inMeetingRepository                [InMeetingRepository]
  * @property getCallUseCase                     [GetCallUseCase]
- * @property startChatCall                      [StartChatCall]
- * @property getNetworkChangesUseCase           [GetNetworkChangesUseCase]
+ * @property startCallUseCase                   [StartCallUseCase]
  * @property monitorCallReconnectingStatusUseCase       [MonitorCallReconnectingStatusUseCase]
  * @property endCallUseCase                     [EndCallUseCase]
  * @property getParticipantsChangesUseCase      [GetParticipantsChangesUseCase]
@@ -148,16 +151,13 @@ import javax.inject.Inject
  * @property joinMeetingAsGuestUseCase          [JoinMeetingAsGuestUseCase]
  * @property chatLogoutUseCase                  [ChatLogoutUseCase]
  * @property getFeatureFlagValueUseCase         [GetFeatureFlagValueUseCase]
- * @property getMyUserHandleUseCase             [GetMyUserHandleUseCase]
  * @property raiseHandToSpeakUseCase            [RaiseHandToSpeakUseCase]
  * @property lowerHandToStopSpeakUseCase        [LowerHandToStopSpeakUseCase]
  * @property holdChatCallUseCase                [HoldChatCallUseCase]
  * @property monitorParticipatingInAnotherCallUseCase [MonitorParticipatingInAnotherCallUseCase]
  * @property getStringFromStringResMapper        [GetStringFromStringResMapper]
- * @property getPluralStringFromStringResMapper  [GetPluralStringFromStringResMapper]
  * @property isEphemeralPlusPlusUseCase         [IsEphemeralPlusPlusUseCase]
  * @property isRaiseToHandSuggestionShownUseCase [IsRaiseToHandSuggestionShownUseCase]
- * @property setRaiseToHandSuggestionShown      [SetRaiseToHandSuggestionShown]
  * @property state                              Current view state as [InMeetingUiState]
  * @property context                            Application context
  */
@@ -166,8 +166,7 @@ import javax.inject.Inject
 class InMeetingViewModel @Inject constructor(
     private val inMeetingRepository: InMeetingRepository,
     private val getCallUseCase: GetCallUseCase,
-    private val startChatCall: StartChatCall,
-    private val getNetworkChangesUseCase: GetNetworkChangesUseCase,
+    private val startCallUseCase: StartCallUseCase,
     private val monitorCallReconnectingStatusUseCase: MonitorCallReconnectingStatusUseCase,
     private val endCallUseCase: EndCallUseCase,
     private val getParticipantsChangesUseCase: GetParticipantsChangesUseCase,
@@ -180,6 +179,7 @@ class InMeetingViewModel @Inject constructor(
     private val enableAudioLevelMonitorUseCase: EnableAudioLevelMonitorUseCase,
     private val isAudioLevelMonitorEnabledUseCase: IsAudioLevelMonitorEnabledUseCase,
     private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase,
+    private val monitorChatSessionUpdatesUseCase: MonitorChatSessionUpdatesUseCase,
     private val monitorChatRoomUpdatesUseCase: MonitorChatRoomUpdatesUseCase,
     private val requestHighResolutionVideoUseCase: RequestHighResolutionVideoUseCase,
     private val requestLowResolutionVideoUseCase: RequestLowResolutionVideoUseCase,
@@ -201,9 +201,10 @@ class InMeetingViewModel @Inject constructor(
     private val lowerHandToStopSpeakUseCase: LowerHandToStopSpeakUseCase,
     private val isRaiseToHandSuggestionShownUseCase: IsRaiseToHandSuggestionShownUseCase,
     private val setRaiseToHandSuggestionShownUseCase: SetRaiseToHandSuggestionShownUseCase,
+    private val setIgnoredCallUseCase: SetIgnoredCallUseCase,
+    private val setChatTitleUseCase: SetChatTitleUseCase,
     @ApplicationContext private val context: Context,
-) : ViewModel(), EditChatRoomNameListener.OnEditedChatRoomNameCallback,
-    GetUserEmailListener.OnUserEmailUpdateCallback {
+) : ViewModel(), GetUserEmailListener.OnUserEmailUpdateCallback {
 
     private val composite = CompositeDisposable()
 
@@ -218,12 +219,12 @@ class InMeetingViewModel @Inject constructor(
     val state = _state.asStateFlow()
 
     private var anotherCallInProgressDisposable: Disposable? = null
-    private var networkQualityDisposable: Disposable? = null
     private var reconnectingJob: Job? = null
 
     private var monitorParticipatingInAnotherCallJob: Job? = null
     private var monitorChatRoomUpdatesJob: Job? = null
     private var monitorChatCallUpdatesJob: Job? = null
+    private var monitorChatSessionUpdatesJob: Job? = null
 
 
     private val _pinItemEvent = MutableLiveData<Event<Participant>>()
@@ -342,13 +343,27 @@ class InMeetingViewModel @Inject constructor(
     init {
         startMonitorChatRoomUpdates()
         startMonitorChatCallUpdates()
-
+        startMonitorChatSessionUpdates()
         viewModelScope.launch {
             runCatching {
                 getFeatureFlagValueUseCase(AppFeatures.RaiseToSpeak).let { flag ->
                     _state.update { state ->
                         state.copy(
                             isRaiseToSpeakFeatureFlagEnabled = flag,
+                        )
+                    }
+                }
+            }.onFailure {
+                Timber.e(it)
+            }
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                getFeatureFlagValueUseCase(AppFeatures.PictureInPicture).let { flag ->
+                    _state.update { state ->
+                        state.copy(
+                            isPictureInPictureFeatureFlagEnabled = flag,
                         )
                     }
                 }
@@ -462,6 +477,12 @@ class InMeetingViewModel @Inject constructor(
                         }
                         handleFreeCallEndWarning()
                         isEphemeralAccount()
+                        if (status == ChatCallStatus.InProgress && state.value.isRaiseToSpeakFeatureFlagEnabled) {
+                            Timber.d("Call recovered, check the participants with raised  hand")
+                            updateParticipantsWithRaisedHand(call)
+                        }
+
+                        updateNetworkQuality(call.networkQuality)
                     }
                 }
             }.onFailure { exception ->
@@ -469,6 +490,16 @@ class InMeetingViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Update network quality
+     *
+     * @param quality   [NetworkQualityType]
+     */
+    private fun updateNetworkQuality(quality: NetworkQualityType?) {
+        _showPoorConnectionBanner.value = quality == NetworkQualityType.Bad
+    }
+
 
     /**
      * Get chat room updates
@@ -495,6 +526,32 @@ class InMeetingViewModel @Inject constructor(
     /**
      * Get chat call updates
      */
+    private fun startMonitorChatSessionUpdates() {
+        monitorChatSessionUpdatesJob?.cancel()
+        monitorChatSessionUpdatesJob = viewModelScope.launch {
+            monitorChatSessionUpdatesUseCase()
+                .filter { it.call?.chatId == _state.value.currentChatId }
+                .collectLatest { result ->
+                    result.call?.let { call ->
+                        _state.update { it.copy(call = call) }
+                        result.session?.let { session ->
+                            session.changes?.apply {
+                                when {
+                                    contains(ChatSessionChanges.SessionOnHold) -> {
+                                        _state.update { it.copy(sessionOnHoldChanges = session) }
+
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+        }
+    }
+
+    /**
+     * Get chat call updates
+     */
     private fun startMonitorChatCallUpdates() {
         monitorChatCallUpdatesJob?.cancel()
         monitorChatCallUpdatesJob = viewModelScope.launch {
@@ -513,6 +570,10 @@ class InMeetingViewModel @Inject constructor(
                                     if (status == ChatCallStatus.InProgress) {
                                         Timber.d("Call in progress, get my user information")
                                         isEphemeralAccount()
+                                        if (state.value.isRaiseToSpeakFeatureFlagEnabled) {
+                                            Timber.d("Call in progress, check the participants with raised hand")
+                                            updateParticipantsWithRaisedHand(call)
+                                        }
                                     }
                                     checkSubtitleToolbar()
                                     _state.update { state ->
@@ -523,13 +584,17 @@ class InMeetingViewModel @Inject constructor(
                                 }
                             }
 
-                            contains(ChatCallChanges.CallWillEnd) -> {
-                                handleFreeCallEndWarning()
+                            contains(ChatCallChanges.CallWillEnd) -> handleFreeCallEndWarning()
+                            contains(ChatCallChanges.CallRaiseHand) -> if (state.value.isRaiseToSpeakFeatureFlagEnabled) {
+                                Timber.d("Change in CallRaiseHand, update participants with raised hand")
+                                updateParticipantsWithRaisedHand(call)
                             }
 
-                            contains(ChatCallChanges.CallRaiseHand) -> {
-                                updateParticipantsWithRaisedHand()
-                            }
+                            contains(ChatCallChanges.LocalAVFlags) -> checkUpdatesInLocalAVFlags(
+                                update = true
+                            )
+
+                            contains(ChatCallChanges.NetworkQuality) -> updateNetworkQuality(call.networkQuality)
                         }
                     }
                 }
@@ -537,39 +602,44 @@ class InMeetingViewModel @Inject constructor(
     }
 
     /**
-     * Update participants with hand raised list
+     * Check update Local AVFlags
+     *
+     * @param update    True, is updated. False, if not.
      */
-    private fun updateParticipantsWithRaisedHand() {
-        val listWithChanges: MutableList<Long> = mutableListOf()
-        state.value.call?.let { call ->
+    fun checkUpdatesInLocalAVFlags(update: Boolean) = _state.update { state ->
+        state.copy(
+            shouldUpdateLocalAVFlags = update,
+        )
+    }
+
+    /**
+     * Update participants with hand raised list
+     *
+     * @param call  [ChatCall]
+     */
+    private fun updateParticipantsWithRaisedHand(call: ChatCall) {
+        val listWithChanges = buildList {
             participants.value = participants.value?.map { participant ->
-                call.usersRaiseHands.filter { it.key == participant.peerId }.forEach {
-                    when {
-                        participant.isRaisedHand != it.value -> {
-                            listWithChanges.add(participant.peerId)
-                            return@map participant.copy(
-                                isRaisedHand = it.value
-                            )
-                        }
-
-                        else -> return@map participant
+                call.usersRaiseHands[participant.peerId]?.let { isRaisedHand ->
+                    // update the participant's isRaisedHand status and order based on the corresponding values in the usersRaiseHands.
+                    // If the participant's isRaisedHand status changes, their ID is added to the listWithChanges.
+                    if (participant.isRaisedHand != isRaisedHand) {
+                        add(participant.peerId)
+                        participant.copy(isRaisedHand = isRaisedHand)
+                    } else {
+                        participant
                     }
-                }
-
-                when {
-                    participant.isRaisedHand -> {
-                        listWithChanges.add(participant.peerId)
-                        return@map participant.copy(
-                            isRaisedHand = false
-                        )
-                    }
-
-                    else -> return@map participant
+                } ?: if (participant.isRaisedHand) {
+                    add(participant.peerId)
+                    // If a participant's ID is not found in the triple list, it means they have not raised their hand.
+                    // In this case, their isRaisedHand status is set to false
+                    participant.copy(isRaisedHand = false)
+                } else {
+                    participant
                 }
             }?.toMutableList()
         }
-
-        _state.update { state -> state.copy(userIdsWithChangesInRaisedHand = listWithChanges.toMutableList()) }
+        _state.update { state -> state.copy(userIdsWithChangesInRaisedHand = listWithChanges) }
     }
 
     /**
@@ -871,23 +941,6 @@ class InMeetingViewModel @Inject constructor(
     }
 
     /**
-     * Method that controls whether to display the bad connection banner
-     */
-    private fun checkNetworkQualityChanges() {
-        networkQualityDisposable?.dispose()
-        networkQualityDisposable = getNetworkChangesUseCase.get(_state.value.currentChatId)
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy(
-                onNext = {
-                    _showPoorConnectionBanner.value =
-                        it == GetNetworkChangesUseCase.NetworkQuality.NETWORK_QUALITY_BAD
-                },
-                onError = Timber::e
-            ).addTo(composite)
-    }
-
-    /**
      * Method that controls whether to display the reconnecting banner
      */
     private fun checkReconnectingChanges() {
@@ -932,7 +985,6 @@ class InMeetingViewModel @Inject constructor(
                     _updateCallId.value = it.callId
                     checkAnotherCallBanner()
                     checkParticipantsList()
-                    checkNetworkQualityChanges()
                     checkReconnectingChanges()
                     updateMeetingInfoBottomPanel()
                 }
@@ -1233,33 +1285,6 @@ class InMeetingViewModel @Inject constructor(
         if (chatId == MEGACHAT_INVALID_HANDLE) null else inMeetingRepository.getMeeting(chatId)
 
     /**
-     * Method to know if exists another call in progress or on hold.
-     *
-     * @return MegaChatCall the another call
-     */
-    fun getAnotherCall(): MegaChatCall? {
-        val anotherCallChatId = CallUtil.getAnotherCallParticipating(_state.value.currentChatId)
-        if (anotherCallChatId != MEGACHAT_INVALID_HANDLE) {
-            val anotherCall = inMeetingRepository.getMeeting(anotherCallChatId)
-            anotherCall?.let {
-                if (isCallOnHold() && !it.isOnHold) {
-                    Timber.d("This call in on hold, another call in progress")
-                    return anotherCall
-                }
-
-                if (!isCallOnHold() && it.isOnHold) {
-                    Timber.d("This call in progress, another call on hold")
-                    return anotherCall
-                }
-            }
-
-        }
-
-        Timber.d("No other calls in progress or on hold")
-        return null
-    }
-
-    /**
      * Get session of a contact in a one-to-one call
      *
      * @param callChat MegaChatCall
@@ -1286,7 +1311,6 @@ class InMeetingViewModel @Inject constructor(
     fun updateParticipantsNameOrAvatar(
         peerId: Long,
         typeChange: Int,
-        context: Context,
     ): MutableSet<Participant> {
         val listWithChanges = mutableSetOf<Participant>()
         inMeetingRepository.getChatRoom(_state.value.currentChatId)?.let {
@@ -1316,7 +1340,7 @@ class InMeetingViewModel @Inject constructor(
     /**
      * Method that makes the necessary changes to the participant list when my own privileges have changed.
      */
-    fun updateOwnPrivileges(context: Context) {
+    fun updateOwnPrivileges() {
         inMeetingRepository.getChatRoom(_state.value.currentChatId)?.let {
             participants.value = participants.value?.map { participant ->
                 return@map participant.copy(
@@ -1335,7 +1359,7 @@ class InMeetingViewModel @Inject constructor(
      *
      * @return list of participants with changes
      */
-    fun updateParticipantsPrivileges(context: Context): MutableSet<Participant> {
+    fun updateParticipantsPrivileges(): MutableSet<Participant> {
         val listWithChanges = mutableSetOf<Participant>()
         inMeetingRepository.getChatRoom(_state.value.currentChatId)?.let {
             participants.value = participants.value?.map { participant ->
@@ -1477,17 +1501,18 @@ class InMeetingViewModel @Inject constructor(
                 viewModelScope.launch {
                     runCatching {
                         setChatVideoInDeviceUseCase()
-                        startChatCall(_state.value.currentChatId, enableVideo, enableAudio)
+                        startCallUseCase(
+                            chatId = _state.value.currentChatId,
+                            audio = enableAudio,
+                            video = enableVideo
+                        )
                     }.onFailure { exception ->
                         Timber.e(exception)
-                    }.onSuccess { resultStartCall ->
-                        val chatId = resultStartCall.chatHandle
-                        if (chatId != MEGACHAT_INVALID_HANDLE) {
-                            chatManagement.setSpeakerStatus(chatId, resultStartCall.flag)
-                            megaChatApiGateway.getChatCall(chatId)?.let { call ->
-                                if (call.isOutgoing) {
-                                    chatManagement.setRequestSentCall(call.callId, true)
-                                }
+                    }.onSuccess { call ->
+                        call?.apply {
+                            chatManagement.setSpeakerStatus(chatId, hasLocalVideo)
+                            if (isOutgoing) {
+                                chatManagement.setRequestSentCall(callId, isRequestSent = true)
                             }
 
                             chatIdResult.value = chatId
@@ -1825,7 +1850,7 @@ class InMeetingViewModel @Inject constructor(
      * @param clientId  Client Id
      * @return the position of the participant
      */
-    fun addParticipant(clientId: Long, context: Context): Int? {
+    fun addParticipant(clientId: Long): Int? {
         createParticipant(isScreenShared = false, clientId)?.let { participantCreated ->
             participants.value?.add(participantCreated)
             updateParticipantsList()
@@ -1859,7 +1884,7 @@ class InMeetingViewModel @Inject constructor(
      * @param session MegaChatSession of a participant
      * @return the position of the participant
      */
-    fun removeParticipant(session: MegaChatSession, context: Context): Int {
+    fun removeParticipant(session: MegaChatSession): Int {
         inMeetingRepository.getChatRoom(_state.value.currentChatId)?.let {
             val iterator = participants.value?.iterator()
             iterator?.let { list ->
@@ -2327,11 +2352,17 @@ class InMeetingViewModel @Inject constructor(
     }
 
     /**
-     * Method for ignore a call
+     * Ignore call
      */
     private fun ignoreCall() {
-        _callLiveData.value?.let {
-            inMeetingRepository.ignoreCall(it.chatid)
+        viewModelScope.launch {
+            runCatching {
+                setIgnoredCallUseCase(_state.value.currentChatId)
+            }.onSuccess {
+                Timber.d("Call was ignored")
+            }.onFailure { exception ->
+                Timber.e(exception)
+            }
         }
     }
 
@@ -2363,12 +2394,20 @@ class InMeetingViewModel @Inject constructor(
         if (_state.value.currentChatId == MEGACHAT_INVALID_HANDLE) {
             _state.update { it.copy(chatTitle = newTitle) }
         } else {
-            inMeetingRepository.getChatRoom(_state.value.currentChatId)?.let {
-                inMeetingRepository.setTitleChatRoom(
-                    it.chatId,
-                    newTitle,
-                    EditChatRoomNameListener(MegaApplication.getInstance(), this)
-                )
+            viewModelScope.launch {
+                runCatching {
+                    setChatTitleUseCase(chatId = _state.value.currentChatId, title = newTitle)
+                }.onSuccess { chatRequest ->
+                    if (_state.value.currentChatId == chatRequest.chatHandle) {
+                        _state.update { state ->
+                            state.copy(
+                                chatTitle = chatRequest.text ?: "",
+                            )
+                        }
+                    }
+                }.onFailure { exception ->
+                    Timber.e(exception)
+                }
             }
         }
     }
@@ -2644,16 +2683,6 @@ class InMeetingViewModel @Inject constructor(
 
         LiveEventBus.get<Pair<Long, Boolean>>(EventConstants.EVENT_UPDATE_WAITING_FOR_OTHERS)
             .removeObserver(waitingForOthersBannerObserver)
-    }
-
-    override fun onEditedChatRoomName(chatId: Long, name: String) {
-        if (_state.value.currentChatId == chatId) {
-            _state.update { state ->
-                state.copy(
-                    chatTitle = name,
-                )
-            }
-        }
     }
 
     /**
@@ -3253,7 +3282,7 @@ class InMeetingViewModel @Inject constructor(
     private fun swapCalls() {
         putCallOnHoldOrResumeCall(
             chatId = state.value.currentChatId,
-            setOnHold = !state.value.isCallOnHold
+            setOnHold = state.value.isCallOnHold == false
         )
 
         state.value.anotherCall?.let {
@@ -3409,6 +3438,17 @@ class InMeetingViewModel @Inject constructor(
                 _state.update { it.copy(isRaiseToHandSuggestionShown = value) }
             }.onFailure {
                 Timber.e(it)
+            }
+        }
+    }
+
+    /**
+     * Update PiP mode value
+     */
+    fun updateIsInPipMode(isInPipMode: Boolean) {
+        viewModelScope.launch {
+            _state.update {
+                it.copy(isInPipMode = isInPipMode)
             }
         }
     }

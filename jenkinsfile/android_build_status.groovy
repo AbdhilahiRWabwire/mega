@@ -1,16 +1,19 @@
 import groovy.json.JsonSlurperClassic
 
+@Library('jenkins-android-shared-lib') _
+
 BUILD_STEP = ""
 
 GMS_APK_BUILD_LOG = "gms_build.log"
 QA_APK_BUILD_LOG = "qa_build.log"
 
-MODULE_LIST = ['app', 'domain', 'shared/original-core-ui', 'data', 'feature/sync','feature/devicecenter','legacy-core-ui']
+MODULE_LIST = ['app', 'domain', 'shared/original-core-ui', 'data', 'feature/sync', 'feature/devicecenter', 'legacy-core-ui']
 
 LINT_REPORT_FOLDER = "lint_reports"
 LINT_REPORT_ARCHIVE = "lint_reports.zip"
 LINT_REPORT_SUMMARY_MAP = [:]
 
+MERGE_REQUEST_FILE_CHANGES_MESSAGE = ""
 COVERAGE_SUMMARY = ""
 
 // key is module name, value is the link of the unit test html report uploaded to GitLab
@@ -107,21 +110,21 @@ pipeline {
                     common.downloadJenkinsConsoleLog(CONSOLE_LOG_FILE)
 
                     // upload Jenkins console log
-                    String jsonJenkinsLog = common.uploadFileToGitLab(CONSOLE_LOG_FILE)
+                    String jenkinsLog = common.uploadFileToArtifactory(CONSOLE_LOG_FILE)
 
                     // upload unit test report if unit test fail
 
                     String unitTestResult = ""
                     for (def module in UNIT_TEST_RESULT_LINK_MAP.keySet()) {
                         String result = UNIT_TEST_RESULT_LINK_MAP[module]
-                        unitTestResult += "<br>$module Unit Test: ${result}"
+                        unitTestResult += "<br>$module Unit Test: [$module test report](${result})"
                     }
 
                     def failureMessage = ":x: Build Failed(Build: ${env.BUILD_NUMBER})" +
                             "<br/>Failure Stage: ${BUILD_STEP}" +
                             "<br/>Last Commit Message: ${getLastCommitMessage()}" +
                             "Last Commit ID: ${env.GIT_COMMIT}" +
-                            "<br/>Build Log: ${jsonJenkinsLog}" +
+                            "<br/>Build Log: [${env.CONSOLE_LOG_FILE}](${jenkinsLog})" +
                             unitTestResult
                     common.sendToMR(failureMessage)
                 } else {
@@ -149,12 +152,20 @@ pipeline {
                                 "<b>WIP:</b> from the beginning of MR title."
                         common.sendToMR(skipMessage)
                     } else {
-                        // Create the String to be posted as a comment in Gitlab
-                        String mergeRequestMessage = ":white_check_mark: Build Succeeded!(Build: ${env.BUILD_NUMBER})\n\n" +
+                        String buildMessage = ":white_check_mark: Build Succeeded!(Build: ${env.BUILD_NUMBER})\n\n" +
                                 "**Last Commit:** (${env.GIT_COMMIT})" + getLastCommitMessage() +
-                                "**Build Warnings:**\n" + getBuildWarnings() + "\n\n" +
-                                buildLintSummaryTable(JSON_LINT_REPORT_LINK) + "\n\n" +
+                                "**Build Warnings:**\n" + getBuildWarnings() + "\n\n"
+
+                        String coverageMessage = buildLintSummaryTable(JSON_LINT_REPORT_LINK) + "\n\n" +
                                 COVERAGE_SUMMARY
+
+                        // Create the String to be posted as a comment in Gitlab
+                        String mergeRequestMessage
+                        if (!MERGE_REQUEST_FILE_CHANGES_MESSAGE.isBlank()) {
+                            mergeRequestMessage = buildMessage + MERGE_REQUEST_FILE_CHANGES_MESSAGE + "\n\n" + coverageMessage
+                        } else {
+                            mergeRequestMessage = buildMessage + coverageMessage
+                        }
 
                         common.sendToMR(mergeRequestMessage)
                     }
@@ -207,25 +218,17 @@ pipeline {
                         expression { (!shouldSkipBuild()) }
                     }
                     steps {
-                        script {
-                            common.downloadDependencyLibForSdk()
-                        }
-                        gitlabCommitStatus(name: 'Build APK (GMS+QA)') {
 
-                            withCredentials([
-                                    string(credentialsId: 'ARTIFACTORY_USER', variable: 'ARTIFACTORY_USER'),
-                                    string(credentialsId: 'ARTIFACTORY_ACCESS_TOKEN', variable: 'ARTIFACTORY_ACCESS_TOKEN'),
-                            ]) {
-                                withEnv([
-                                        "ARTIFACTORY_USER=${ARTIFACTORY_USER}",
-                                        "ARTIFACTORY_ACCESS_TOKEN=${ARTIFACTORY_ACCESS_TOKEN}"
-                                ]) {
+                        gitlabCommitStatus(name: 'Build APK (GMS+QA)') {
+                            script {
+                                common.downloadDependencyLibForSdk()
+
+                                util.useArtifactory() {
                                     sh "./gradlew app:assembleGmsDebug 2>&1  | tee ${GMS_APK_BUILD_LOG}"
                                     sh "./gradlew app:assembleGmsQa 2>&1  | tee ${QA_APK_BUILD_LOG}"
                                 }
-                            }
 
-                            sh """
+                                sh """
                                 if grep -q -m 1 \"^FAILURE: \" ${GMS_APK_BUILD_LOG}; then
                                     echo GMS APK build failed. Exitting....
                                     exit 1
@@ -235,6 +238,16 @@ pipeline {
                                     exit 1
                                 fi
                             """
+
+                                util.useGitLab() {
+                                    String htmlOutput = "mr-file-changes.html"
+                                    try {
+                                        sh "./gradlew checkMergeRequestFileChanges --html-output $htmlOutput"
+                                    } finally {
+                                        MERGE_REQUEST_FILE_CHANGES_MESSAGE = getHtmlReport(htmlOutput, "")
+                                    }
+                                }
+                            }
                         }
                     }
                     post {
@@ -260,62 +273,54 @@ pipeline {
                         }
                         gitlabCommitStatus(name: 'Unit Test and Code Coverage') {
                             script {
-                                withCredentials([
-                                        string(credentialsId: 'ARTIFACTORY_USER', variable: 'ARTIFACTORY_USER'),
-                                        string(credentialsId: 'ARTIFACTORY_ACCESS_TOKEN', variable: 'ARTIFACTORY_ACCESS_TOKEN'),
-                                ]) {
-                                    withEnv([
-                                            "ARTIFACTORY_USER=${ARTIFACTORY_USER}",
-                                            "ARTIFACTORY_ACCESS_TOKEN=${ARTIFACTORY_ACCESS_TOKEN}"
-                                    ]) {
-                                        String buildReportPath = "build/unittest/html"
-                                        try {
-                                            sh "./gradlew domain:jacocoTestReport"
-                                        } finally {
-                                            // if gradle command fails, we collect the test report. And the build will discontinue.
-                                            UNIT_TEST_RESULT_LINK_MAP.put("domain", unitTestArchiveLink("domain/$buildReportPath", "unit_test_result_domain.zip"))
-                                        }
-
-                                        try {
-                                            sh "./gradlew data:testDebugUnitTestCoverage"
-                                        } finally {
-                                            UNIT_TEST_RESULT_LINK_MAP.put("data", unitTestArchiveLink("data/$buildReportPath", "unit_test_result_data.zip"))
-                                        }
-
-                                        try {
-                                            sh "./gradlew app:createUnitTestCoverageReport"
-                                        } finally {
-                                            UNIT_TEST_RESULT_LINK_MAP.put("app", unitTestArchiveLink("app/$buildReportPath", "unit_test_result_app.zip"))
-                                        }
-
-                                        try {
-                                            sh "./gradlew feature:devicecenter:testDebugUnitTestCoverage"
-                                        } finally {
-                                            UNIT_TEST_RESULT_LINK_MAP.put("feature/devicecenter", unitTestArchiveLink("feature/devicecenter/$buildReportPath", "unit_test_result_feature_devicecenter.zip"))
-                                        }
-
-                                        try {
-                                            sh "./gradlew feature:sync:testDebugUnitTestCoverage"
-                                        } finally {
-                                            UNIT_TEST_RESULT_LINK_MAP.put("feature/sync", unitTestArchiveLink("feature/sync/$buildReportPath", "unit_test_result_feature_sync.zip"))
-                                        }
-
-                                        try {
-                                            sh "./gradlew shared:original-core-ui:testDebugUnitTestCoverage"
-                                        } finally {
-                                            UNIT_TEST_RESULT_LINK_MAP.put("shared/original-core-ui", unitTestArchiveLink("shared/original-core-ui/$buildReportPath", "unit_test_result_shared_original_core_ui.zip"))
-                                        }
-
-                                        try {
-                                            sh "./gradlew legacy-core-ui:testDebugUnitTestCoverage"
-                                        } finally {
-                                            UNIT_TEST_RESULT_LINK_MAP.put("legacy-core-ui", unitTestArchiveLink("legacy-core-ui/$buildReportPath", "unit_test_result_legacy_core_ui.zip"))
-                                        }
-
-                                        String htmlOutput = "coverage.html"
-                                        sh "./gradlew collectCoverage --modules \"${MODULE_LIST.join(",")}\" --html-output ${htmlOutput}"
-                                        COVERAGE_SUMMARY = getCoverageHtmlReport(htmlOutput)
+                                util.useArtifactory() {
+                                    String buildReportPath = "build/unittest/html"
+                                    try {
+                                        sh "./gradlew domain:jacocoTestReport"
+                                    } finally {
+                                        // if gradle command fails, we collect the test report. And the build will discontinue.
+                                        UNIT_TEST_RESULT_LINK_MAP.put("domain", unitTestArchiveLink("domain/$buildReportPath", "unit_test_result_domain.zip"))
                                     }
+
+                                    try {
+                                        sh "./gradlew data:testDebugUnitTestCoverage"
+                                    } finally {
+                                        UNIT_TEST_RESULT_LINK_MAP.put("data", unitTestArchiveLink("data/$buildReportPath", "unit_test_result_data.zip"))
+                                    }
+
+                                    try {
+                                        sh "./gradlew app:createUnitTestCoverageReport"
+                                    } finally {
+                                        UNIT_TEST_RESULT_LINK_MAP.put("app", unitTestArchiveLink("app/$buildReportPath", "unit_test_result_app.zip"))
+                                    }
+
+                                    try {
+                                        sh "./gradlew feature:devicecenter:testDebugUnitTestCoverage"
+                                    } finally {
+                                        UNIT_TEST_RESULT_LINK_MAP.put("feature/devicecenter", unitTestArchiveLink("feature/devicecenter/$buildReportPath", "unit_test_result_feature_devicecenter.zip"))
+                                    }
+
+                                    try {
+                                        sh "./gradlew feature:sync:testDebugUnitTestCoverage"
+                                    } finally {
+                                        UNIT_TEST_RESULT_LINK_MAP.put("feature/sync", unitTestArchiveLink("feature/sync/$buildReportPath", "unit_test_result_feature_sync.zip"))
+                                    }
+
+                                    try {
+                                        sh "./gradlew shared:original-core-ui:testDebugUnitTestCoverage"
+                                    } finally {
+                                        UNIT_TEST_RESULT_LINK_MAP.put("shared/original-core-ui", unitTestArchiveLink("shared/original-core-ui/$buildReportPath", "unit_test_result_shared_original_core_ui.zip"))
+                                    }
+
+                                    try {
+                                        sh "./gradlew legacy-core-ui:testDebugUnitTestCoverage"
+                                    } finally {
+                                        UNIT_TEST_RESULT_LINK_MAP.put("legacy-core-ui", unitTestArchiveLink("legacy-core-ui/$buildReportPath", "unit_test_result_legacy_core_ui.zip"))
+                                    }
+
+                                    String htmlOutput = "coverage.html"
+                                    sh "./gradlew collectCoverage --modules \"${MODULE_LIST.join(",")}\" --html-output ${htmlOutput}"
+                                    COVERAGE_SUMMARY = getHtmlReport(htmlOutput, "No coverage report found")
                                 }
                             }
                         }
@@ -338,33 +343,21 @@ pipeline {
                         expression { (!shouldSkipBuild()) }
                     }
                     steps {
-                        // Run Lint and analyse the results
-                        script {
-                            common.downloadDependencyLibForSdk()
-                        }
-
                         gitlabCommitStatus(name: 'Lint Check') {
+                            script {
+                                common.downloadDependencyLibForSdk()
 
-                            withCredentials([
-                                    string(credentialsId: 'ARTIFACTORY_USER', variable: 'ARTIFACTORY_USER'),
-                                    string(credentialsId: 'ARTIFACTORY_ACCESS_TOKEN', variable: 'ARTIFACTORY_ACCESS_TOKEN'),
-                            ]) {
-                                withEnv([
-                                        "ARTIFACTORY_USER=${ARTIFACTORY_USER}",
-                                        "ARTIFACTORY_ACCESS_TOKEN=${ARTIFACTORY_ACCESS_TOKEN}"
-                                ]) {
+                                util.useArtifactory() {
                                     sh "mv custom_lint.xml lint.xml"
                                     sh "./gradlew lint"
                                 }
-                            }
 
-                            script {
                                 MODULE_LIST.each { module ->
                                     LINT_REPORT_SUMMARY_MAP.put(module, lintSummary(module))
                                 }
                                 archiveLintReports()
 
-                                JSON_LINT_REPORT_LINK = common.uploadFileToGitLab(LINT_REPORT_ARCHIVE)
+                                JSON_LINT_REPORT_LINK = common.uploadFileToArtifactory(LINT_REPORT_ARCHIVE)
                             }
                         }
                     }
@@ -423,20 +416,20 @@ String buildLintSummaryTable(String jsonLintReportLink) {
     }
 
     // Create Summary to be returned after iterating through all modules
-    String lintSummary = "<details><summary><b>Lint Summary:</b> Fatal(${fatalCount}) Error(${errorCount}) Warning(${warningCount})</summary>" + "\n ${jsonLintReportLink} \n\n" + tableStr + "</details>"
+    String lintSummary = "<details><summary><b>Lint Summary:</b> Fatal(${fatalCount}) Error(${errorCount}) Warning(${warningCount})</summary>" + "\n [lint_report](${jsonLintReportLink}) \n\n" + tableStr + "</details>"
 
     // Return the final result
     lintSummary
 }
 
-String getCoverageHtmlReport(String reportPath) {
-    String coverageReport
+String getHtmlReport(String reportPath, String messageOnMissingFile) {
+    String htmlReport
     if (fileExists(reportPath)) {
-        coverageReport = readFile(reportPath)
+        htmlReport = readFile(reportPath)
     } else {
-        coverageReport = "No coverage report found"
+        htmlReport = messageOnMissingFile
     }
-    return coverageReport
+    return htmlReport
 }
 
 /**
@@ -550,7 +543,7 @@ def unitTestArchiveLink(String reportPath, String archiveTargetName) {
     String result
     if (archiveUnitTestReport(reportPath, archiveTargetName)) {
         common = load('jenkinsfile/common.groovy')
-        unitTestFileLink = common.uploadFileToGitLab(archiveTargetName)
+        unitTestFileLink = common.uploadFileToArtifactory(archiveTargetName)
         result = "${unitTestFileLink}"
     } else {
         result = "Unit Test report not available, perhaps test code has compilation error. Please check full build log."

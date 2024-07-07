@@ -73,10 +73,14 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.imagepreview.ImagePreviewViewModel
-import mega.privacy.android.app.presentation.slideshow.view.PhotoBox
-import mega.privacy.android.app.presentation.slideshow.view.PhotoState
-import mega.privacy.android.app.presentation.slideshow.view.rememberPhotoState
+import mega.privacy.android.app.presentation.imagepreview.slideshow.view.PhotoBox
+import mega.privacy.android.app.presentation.imagepreview.slideshow.view.PhotoState
+import mega.privacy.android.app.presentation.imagepreview.slideshow.view.rememberPhotoState
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.StartTransferComponent
+import mega.privacy.android.domain.entity.VideoFileTypeInfo
+import mega.privacy.android.domain.entity.account.AccountDetail
+import mega.privacy.android.domain.entity.imageviewer.ImageResult
+import mega.privacy.android.domain.entity.node.ImageNode
 import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDialog
 import mega.privacy.android.shared.original.core.ui.controls.text.MiddleEllipsisText
 import mega.privacy.android.shared.original.core.ui.theme.black
@@ -86,10 +90,6 @@ import mega.privacy.android.shared.original.core.ui.theme.teal_200
 import mega.privacy.android.shared.original.core.ui.theme.teal_300
 import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
 import mega.privacy.android.shared.original.core.ui.theme.white
-import mega.privacy.android.domain.entity.VideoFileTypeInfo
-import mega.privacy.android.domain.entity.account.AccountDetail
-import mega.privacy.android.domain.entity.imageviewer.ImageResult
-import mega.privacy.android.domain.entity.node.ImageNode
 
 @Composable
 internal fun ImagePreviewScreen(

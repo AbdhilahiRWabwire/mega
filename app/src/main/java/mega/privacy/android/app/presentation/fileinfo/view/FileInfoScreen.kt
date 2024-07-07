@@ -64,6 +64,8 @@ internal fun FileInfoScreen(
     onPublicLinkCopyClick: () -> Unit,
     onMenuActionClick: (FileInfoMenuAction) -> Unit,
     onVerifyContactClick: (String) -> Unit,
+    onAddTagClick: () -> Unit,
+    onUpgradeAccountClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val actionModeSelect = viewState.outShareContactsSelected.isNotEmpty()
@@ -142,6 +144,8 @@ internal fun FileInfoScreen(
             onPublicLinkCopyClick = onPublicLinkCopyClick,
             onVerifyContactClick = onVerifyContactClick,
             onSetDescriptionClick = onSetDescriptionClick,
+            onAddTagClick = onAddTagClick,
+            onUpgradeAccountClick = onUpgradeAccountClick,
         )
         viewState.jobInProgressState?.progressMessage?.let {
             LoadingDialog(text = stringResource(id = it))
@@ -158,11 +162,11 @@ private fun FileInfoScreenPreview(
     var state by mutableStateOf(viewState) //not remembered to allow multiple states in device, don't do that in real code, just in previews
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         FileInfoScreen(
-            modifier = Modifier.background(color = MaterialTheme.colors.background),
             viewState = state,
             snackBarHostState = SnackbarHostState(),
             onBackPressed = {},
             onTakeDownLinkClick = {},
+            onLocationClick = {},
             availableOfflineChanged = {
                 state = state.copy(isAvailableOffline = !state.isAvailableOffline)
             },
@@ -180,8 +184,6 @@ private fun FileInfoScreenPreview(
             onSharedWithContactMoreOptionsClick = {},
             onShowMoreSharedWithContactsClick = {},
             onPublicLinkCopyClick = {},
-            onLocationClick = {},
-            onVerifyContactClick = {},
             onMenuActionClick = { action ->
                 when (action) {
                     FileInfoMenuAction.SelectionModeAction.ClearSelection -> {
@@ -196,6 +198,10 @@ private fun FileInfoScreenPreview(
                     else -> {}
                 }
             },
+            onVerifyContactClick = {},
+            onAddTagClick = {},
+            onUpgradeAccountClick = {},
+            modifier = Modifier.background(color = MaterialTheme.colors.background),
         )
     }
 }

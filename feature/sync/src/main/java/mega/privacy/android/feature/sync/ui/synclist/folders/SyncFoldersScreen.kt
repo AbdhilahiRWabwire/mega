@@ -1,5 +1,6 @@
 package mega.privacy.android.feature.sync.ui.synclist.folders
 
+import mega.privacy.android.icon.pack.R as iconPackR
 import mega.privacy.android.shared.resources.R as sharedResR
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -27,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.feature.sync.R
 import mega.privacy.android.feature.sync.domain.entity.SyncStatus
@@ -35,13 +37,16 @@ import mega.privacy.android.feature.sync.ui.synclist.folders.SyncFoldersAction.C
 import mega.privacy.android.feature.sync.ui.views.SyncItemView
 import mega.privacy.android.feature.sync.ui.views.TAG_SYNC_LIST_SCREEN_NO_ITEMS
 import mega.privacy.android.shared.original.core.ui.controls.buttons.RaisedDefaultMegaButton
+import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDialog
+import mega.privacy.android.shared.original.core.ui.controls.skeleton.CardItemLoadingSkeleton
 import mega.privacy.android.shared.original.core.ui.controls.text.MegaText
 import mega.privacy.android.shared.original.core.ui.preview.BooleanProvider
 import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.android.shared.original.core.ui.theme.extensions.h6Medium
 import mega.privacy.android.shared.original.core.ui.theme.extensions.subtitle2medium
 import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
-import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.mobile.analytics.event.SyncListEmptyStateUpgradeButtonPressedEvent
 
 @Composable
 internal fun SyncFoldersScreen(
@@ -54,6 +59,9 @@ internal fun SyncFoldersScreen(
     issuesInfoClicked: () -> Unit,
     isLowBatteryLevel: Boolean,
     isFreeAccount: Boolean,
+    isLoading: Boolean,
+    showSyncsPausedErrorDialog: Boolean,
+    onShowSyncsPausedErrorDialogDismissed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -63,7 +71,11 @@ internal fun SyncFoldersScreen(
             state = rememberLazyListState(), modifier = modifier
                 .fillMaxSize()
         ) {
-            if (syncUiItems.isEmpty()) {
+            if (isLoading) {
+                item {
+                    SyncFoldersScreenLoadingState()
+                }
+            } else if (syncUiItems.isEmpty()) {
                 item {
                     SyncFoldersScreenEmptyState(
                         isFreeAccount = isFreeAccount,
@@ -90,17 +102,31 @@ internal fun SyncFoldersScreen(
                         removeFolderClicked = removeFolderClicked,
                         issuesInfoClicked = issuesInfoClicked,
                         isLowBatteryLevel = isLowBatteryLevel,
+                        isFreeAccount = isFreeAccount,
                         errorRes = syncUiItems[itemIndex].error
                     )
                 }
             }
         }
-        if (syncUiItems.isNotEmpty()) {
+        if (showSyncsPausedErrorDialog) {
+            MegaAlertDialog(
+                title = "",
+                body = stringResource(sharedResR.string.sync_error_dialog_free_user),
+                icon = iconPackR.drawable.ic_alert_triangle_color,
+                confirmButtonText = stringResource(sharedResR.string.sync_error_dialog_free_user_confirm_action),
+                cancelButtonText = null,
+                onConfirm = onShowSyncsPausedErrorDialogDismissed,
+                onDismiss = onShowSyncsPausedErrorDialogDismissed,
+                bodyTextColor = TextColor.Primary,
+            )
+        }
+        if (syncUiItems.isNotEmpty() || isLoading) {
             FloatingActionButton(
                 onClick = { addFolderClicked() },
                 modifier = Modifier
                     .padding(16.dp)
                     .align(Alignment.BottomEnd)
+                    .testTag(TEST_TAG_SYNC_LIST_SCREEN_FAB)
             ) {
                 Icon(
                     Icons.Filled.Add,
@@ -155,13 +181,38 @@ private fun SyncFoldersScreenEmptyState(
         }
         RaisedDefaultMegaButton(
             textId = if (isFreeAccount) sharedResR.string.general_upgrade_now_label else sharedResR.string.device_center_sync_add_new_syn_button_option,
-            onClick = if (isFreeAccount) upgradeNowClicked else addFolderClicked,
+            onClick = if (isFreeAccount) {
+                Analytics.tracker.trackEvent(SyncListEmptyStateUpgradeButtonPressedEvent)
+                upgradeNowClicked
+            } else {
+                addFolderClicked
+            },
             modifier = Modifier
                 .padding(top = if (isFreeAccount) 108.dp else 162.dp)
                 .defaultMinSize(minWidth = 232.dp)
                 .testTag(TEST_TAG_SYNC_LIST_SCREEN_EMPTY_STATUS_BUTTON),
         )
     }
+}
+
+/**
+ * A Composable that displays the initial Loading state
+ */
+@Composable
+private fun SyncFoldersScreenLoadingState() {
+    Column(
+        modifier = Modifier.testTag(TEST_TAG_SYNC_LIST_SCREEN_LOADING_STATE),
+        content = {
+            for (i in 1..4) {
+                CardItemLoadingSkeleton(
+                    modifier = Modifier.padding(
+                        vertical = 12.dp,
+                        horizontal = 16.dp
+                    )
+                )
+            }
+        }
+    )
 }
 
 @CombinedThemePreviews
@@ -180,6 +231,33 @@ private fun SyncFoldersScreenEmptyStatePreview(
             issuesInfoClicked = {},
             isLowBatteryLevel = false,
             isFreeAccount = isFreeAccount,
+            isLoading = false,
+            showSyncsPausedErrorDialog = false,
+            onShowSyncsPausedErrorDialogDismissed = {},
+        )
+    }
+}
+
+/**
+ * A Preview Composable that displays the Loading state
+ */
+@CombinedThemePreviews
+@Composable
+private fun SyncFoldersScreenLoadingStatePreview() {
+    OriginalTempTheme(isDark = isSystemInDarkTheme()) {
+        SyncFoldersScreen(
+            syncUiItems = emptyList(),
+            cardExpanded = {},
+            pauseRunClicked = {},
+            removeFolderClicked = {},
+            addFolderClicked = {},
+            upgradeAccountClicked = {},
+            issuesInfoClicked = {},
+            isLowBatteryLevel = false,
+            isFreeAccount = false,
+            isLoading = true,
+            showSyncsPausedErrorDialog = false,
+            onShowSyncsPausedErrorDialogDismissed = {},
         )
     }
 }
@@ -210,6 +288,9 @@ private fun SyncFoldersScreenSyncingPreview() {
             issuesInfoClicked = {},
             isLowBatteryLevel = false,
             isFreeAccount = false,
+            isLoading = false,
+            showSyncsPausedErrorDialog = false,
+            onShowSyncsPausedErrorDialogDismissed = {},
         )
     }
 }
@@ -240,6 +321,9 @@ private fun SyncFoldersScreenSyncingWithStalledIssuesPreview() {
             issuesInfoClicked = {},
             isLowBatteryLevel = false,
             isFreeAccount = false,
+            isLoading = false,
+            showSyncsPausedErrorDialog = false,
+            onShowSyncsPausedErrorDialogDismissed = {},
         )
     }
 }
@@ -248,3 +332,5 @@ internal const val TEST_TAG_SYNC_LIST_SCREEN_EMPTY_STATUS_TEXT_FOR_FREE_ACCOUNTS
     "sync_list_screen_empty_status_text_for_free_accounts"
 internal const val TEST_TAG_SYNC_LIST_SCREEN_EMPTY_STATUS_BUTTON =
     "sync_list_screen_empty_status_button"
+internal const val TEST_TAG_SYNC_LIST_SCREEN_FAB = "sync_list_screen:fab"
+internal const val TEST_TAG_SYNC_LIST_SCREEN_LOADING_STATE = "sync_list_screen:loading_state"

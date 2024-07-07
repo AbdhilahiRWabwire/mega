@@ -415,7 +415,8 @@ internal class MegaApiFacade @Inject constructor(
     }
 
     override suspend fun isSensitiveInherited(node: MegaNode): Boolean {
-        return megaApi.isSensitiveInherited(node)
+        val parentNode = megaApi.getParentNode(node) ?: return false
+        return megaApi.isSensitiveInherited(parentNode)
     }
 
     override fun addLogger(logger: MegaLoggerInterface) = MegaApiAndroid.addLoggerObject(logger)
@@ -1386,27 +1387,6 @@ internal class MegaApiFacade @Inject constructor(
 
     override val currentDownloadSpeed: Int
         get() = megaApi.currentDownloadSpeed
-
-    @Deprecated(
-        "This value is deprecated in SDK. " +
-                "Replace with the corresponding value get from ActiveTransfers when ready"
-    )
-    override val totalDownloadedBytes: Long
-        get() = megaApi.totalDownloadedBytes
-
-    @Deprecated(
-        "This value is deprecated in SDK. " +
-                "Replace with the corresponding value get from ActiveTransfers when ready"
-    )
-    override val totalDownloadBytes: Long
-        get() = megaApi.totalDownloadBytes
-
-    @Deprecated(
-        "This value is deprecated in SDK. " +
-                "Replace with the corresponding value get from ActiveTransfers when ready"
-    )
-    override val totalDownloads: Int
-        get() = megaApi.totalDownloads
 
     override fun getPsa(listener: MegaRequestListenerInterface) =
         megaApi.getPSAWithUrl(listener)

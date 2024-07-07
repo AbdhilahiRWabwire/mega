@@ -79,7 +79,6 @@ internal class VideoPlayerViewModelTest {
             context = mock(),
             mediaPlayerGateway = mock(),
             ioDispatcher = UnconfinedTestDispatcher(),
-            sendStatisticsMediaPlayerUseCase = mock(),
             offlineThumbnailFileWrapper = mock(),
             monitorTransferEventsUseCase = monitorTransferEventsUseCase,
             playlistItemMapper = mock(),
@@ -167,7 +166,9 @@ internal class VideoPlayerViewModelTest {
                     id = expectedId,
                     name = expectedName,
                     url = expectedUrl,
-                    parentName = null
+                    parentName = null,
+                    isMarkedSensitive = false,
+                    isSensitiveInherited = false,
                 )
             )
             advanceUntilIdle()
@@ -204,7 +205,9 @@ internal class VideoPlayerViewModelTest {
                     id = expectedId,
                     name = expectedName,
                     url = expectedUrl,
-                    parentName = null
+                    parentName = null,
+                    isMarkedSensitive = false,
+                    isSensitiveInherited = false,
                 )
             )
             assertThat(underTest.selectOptionState).isEqualTo(
@@ -227,7 +230,9 @@ internal class VideoPlayerViewModelTest {
                 id = expectedId,
                 name = expectedName,
                 url = expectedUrl,
-                parentName = null
+                parentName = null,
+                isMarkedSensitive = false,
+                isSensitiveInherited = false,
             )
         )
         advanceUntilIdle()

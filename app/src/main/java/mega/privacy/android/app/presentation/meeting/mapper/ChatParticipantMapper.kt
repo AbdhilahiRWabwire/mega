@@ -12,24 +12,19 @@ class ChatParticipantMapper @Inject constructor() {
     internal operator fun invoke(
         participant: Participant,
         chatParticipant: ChatParticipant,
-    ): ChatParticipant = ChatParticipant(
-        handle = chatParticipant.handle,
-        data = chatParticipant.data,
-        email = chatParticipant.email,
-        isMe = chatParticipant.isMe,
-        privilege = chatParticipant.privilege,
-        defaultAvatarColor = chatParticipant.defaultAvatarColor,
-        areCredentialsVerified = chatParticipant.areCredentialsVerified,
-        status = chatParticipant.status,
-        lastSeen = chatParticipant.lastSeen,
-        callParticipantData = CallParticipantData(
-            clientId = participant.clientId,
-            isAudioOn = participant.isAudioOn,
-            isVideoOn = participant.isVideoOn,
-            isContact = participant.isContact,
-            isSpeaker = participant.isSpeaker,
-            isGuest = participant.isGuest,
-            isRaisedHand = participant.isRaisedHand
-        ),
-    )
+        raisedHandAndOrder: Pair<Boolean, Int>? = null,
+    ): ChatParticipant {
+        return chatParticipant.copy(
+            isRaisedHand = raisedHandAndOrder?.first ?: false,
+            order = raisedHandAndOrder?.second ?: Int.MAX_VALUE,
+            callParticipantData = CallParticipantData(
+                clientId = participant.clientId,
+                isAudioOn = participant.isAudioOn,
+                isVideoOn = participant.isVideoOn,
+                isContact = participant.isContact,
+                isSpeaker = participant.isSpeaker,
+                isGuest = participant.isGuest,
+            ),
+        )
+    }
 }

@@ -10,7 +10,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.CompoundButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -30,7 +29,6 @@ import androidx.lifecycle.lifecycleScope
 import coil.load
 import coil.transform.RoundedCornersTransformation
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.switchmaterial.SwitchMaterial
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
@@ -39,7 +37,6 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.WebViewActivity
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.featuretoggle.AppFeatures
-import mega.privacy.android.app.imageviewer.ImageViewerActivity.Companion.getIntentForParentNode
 import mega.privacy.android.app.interfaces.SnackbarShower
 import mega.privacy.android.app.main.DrawerItem
 import mega.privacy.android.app.main.FileContactListActivity
@@ -85,12 +82,13 @@ import mega.privacy.android.app.utils.MegaNodeUtil.showConfirmationLeaveIncoming
 import mega.privacy.android.app.utils.OfflineUtils
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.ViewUtils.isVisible
+import mega.privacy.android.app.utils.wrapper.MegaNodeUtilWrapper
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.ShareData
-import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.shared.original.core.ui.controls.controlssliders.MegaSwitch
 import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaShare
 import timber.log.Timber
@@ -110,12 +108,16 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
 
     private val nodeOptionsViewModel: NodeOptionsViewModel by viewModels()
     private val startDownloadViewModel: StartDownloadViewModel by activityViewModels()
+    private var tempNodeId: NodeId? = null
 
     /**
      * Inject [GetFeatureFlagValueUseCase] to the Fragment
      */
     @Inject
     lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
+
+    @Inject
+    lateinit var megaNodeUtilWrapper: MegaNodeUtilWrapper
 
     private val hiddenNodesOnboardingLauncher: ActivityResultLauncher<Intent> =
         registerForActivityResult(
@@ -168,7 +170,7 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
         val optionLabelCurrent = contentView.findViewById<TextView>(R.id.option_label_current)
         //      counterSave
         val optionDownload = contentView.findViewById<TextView>(R.id.download_option)
-        val offlineSwitch = contentView.findViewById<SwitchMaterial>(R.id.file_properties_switch)
+        val offlineSwitch = contentView.findViewById<MegaSwitch>(R.id.file_properties_switch)
         //      counterShares
         val optionLink = contentView.findViewById<TextView>(R.id.link_option)
         val optionRemoveLink = contentView.findViewById<TextView>(R.id.remove_link_option)
@@ -181,8 +183,6 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
         val optionMove = contentView.findViewById<TextView>(R.id.move_option)
         val optionCopy = contentView.findViewById<TextView>(R.id.copy_option)
         val optionRestoreFromRubbish = contentView.findViewById<TextView>(R.id.restore_option)
-        //      slideShow
-        val optionSlideshow = contentView.findViewById<TextView>(R.id.option_slideshow)
         //      counterOpen
         val optionOpenFolder = contentView.findViewById<TextView>(R.id.open_folder_option)
         val optionOpenWith = contentView.findViewById<TextView>(R.id.open_with_option)
@@ -304,7 +304,6 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                 }
                 optionRemove.setOnClickListener { onClick { onDeleteClicked(node) } }
                 optionOpenFolder.setOnClickListener { onClick { onOpenFolderClicked(node) } }
-                optionSlideshow.setOnClickListener { onClick { onSlideShowClicked(node) } }
                 optionOpenWith.setOnClickListener {
                     onClick {
                         onOpenWithClicked(node)
@@ -329,8 +328,6 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                     )
                 }
 
-                //Due to requirement change, not just hide slideshow entry in node context menu
-                optionSlideshow.visibility = View.GONE
                 if (state.isOnline) {
                     nodeName.setupNodeTitleText(
                         nodeDeviceCenterInformation = state.nodeDeviceCenterInformation,
@@ -411,10 +408,18 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                 optionLabel.visibility = if (isTakenDown) View.GONE else View.VISIBLE
                 optionFavourite.visibility = if (isTakenDown) View.GONE else View.VISIBLE
                 optionHideLayout.visibility =
-                    if (isHiddenNodesEnabled && mode != SHARED_ITEMS_MODE && accountType != null && isHiddenNodesOnboarded != null && state.isHidingActionAllowed)
+                    if (isHiddenNodesEnabled && mode != SHARED_ITEMS_MODE
+                        && accountType != null
+                        && isHiddenNodesOnboarded != null
+                        && state.isHidingActionAllowed
+                        && megaApi.getParentNode(node)?.let {
+                            megaApi.isSensitiveInherited(it)
+                        } != true
+                    ) {
                         View.VISIBLE
-                    else
+                    } else {
                         View.GONE
+                    }
                 optionHideProLabel.visibility =
                     if (accountType?.isPaid == false) View.VISIBLE else View.GONE
                 optionHideHelp.visibility =
@@ -700,7 +705,7 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                 separatorDownload.visibility = if (counterSave <= 0) View.GONE else View.VISIBLE
                 separatorShares.visibility = if (counterShares <= 0) View.GONE else View.VISIBLE
                 separatorModify.visibility = if (counterModify <= 0) View.GONE else View.VISIBLE
-                offlineSwitch.setOnCheckedChangeListener { _: CompoundButton, _: Boolean ->
+                offlineSwitch.setOnCheckedChangeListener { _, _ ->
                     onClick {
                         onOfflineClicked(
                             node = node,
@@ -1254,6 +1259,7 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
             )
             setStateBottomSheetBehaviorHidden()
         } else {
+            tempNodeId = nodeOptionsViewModel.state.value.node?.handle?.let { NodeId(it) }
             showHiddenNodesOnboarding()
         }
     }
@@ -1384,19 +1390,6 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
         setStateBottomSheetBehaviorHidden()
     }
 
-    private fun onSlideShowClicked(node: MegaNode) {
-        val intent = getIntentForParentNode(
-            requireContext(),
-            megaApi.getParentNode(node)?.handle,
-            SortOrder.ORDER_DEFAULT_ASC,
-            node.handle,
-            true
-        )
-        startActivity(intent)
-        dismissAllowingStateLoss()
-        setStateBottomSheetBehaviorHidden()
-    }
-
     private fun onOpenFolderClicked(node: MegaNode) {
         nodeController.openFolderFromSearch(node.handle)
         dismissAllowingStateLoss()
@@ -1407,7 +1400,8 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
         if (nodeOptionsViewModel.isFilePreviewOnline(node = node)) {
             openWith(
                 context = requireActivity(),
-                node = node
+                megaNodeUtilWrapper = megaNodeUtilWrapper,
+                node = node,
             ) {
                 (requireActivity() as ManagerActivity).saveNodeByOpenWith(node)
             }
@@ -1574,10 +1568,10 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
 
     private fun handleHiddenNodesOnboardingResult(result: ActivityResult) {
         if (result.resultCode == Activity.RESULT_OK) {
-            val node = nodeOptionsViewModel.state.value.node ?: return
+            val nodeId = tempNodeId ?: return
 
             nodeOptionsViewModel.hideOrUnhideNode(
-                handle = node.handle,
+                handle = nodeId.longValue,
                 hidden = true,
             )
 

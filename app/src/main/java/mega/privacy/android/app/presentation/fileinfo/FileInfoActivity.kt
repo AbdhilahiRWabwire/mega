@@ -44,8 +44,11 @@ import mega.privacy.android.app.presentation.fileinfo.model.FileInfoViewState
 import mega.privacy.android.app.presentation.fileinfo.view.ExtraActionDialog
 import mega.privacy.android.app.presentation.fileinfo.view.FileInfoScreen
 import mega.privacy.android.app.presentation.security.PasscodeCheck
+import mega.privacy.android.app.presentation.tags.TagsActivity
+import mega.privacy.android.app.presentation.tags.TagsActivity.Companion.NODE_ID
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.StartTransferComponent
 import mega.privacy.android.app.sync.fileBackups.FileBackupManager
+import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.utils.AlertsAndWarnings
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.ContactUtil
@@ -66,10 +69,10 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.mobile.analytics.event.NodeInfoDescriptionAddedMessageDisplayedEvent
+import mega.privacy.mobile.analytics.event.NodeInfoDescriptionUpdatedMessageDisplayedEvent
 import mega.privacy.mobile.analytics.event.NodeInfoScreenEvent
 import nz.mega.sdk.MegaShare
 import timber.log.Timber
-import java.lang.ref.WeakReference
 import javax.inject.Inject
 
 /**
@@ -155,10 +158,7 @@ class FileInfoActivity : BaseActivity() {
                     onTakeDownLinkClick = this::navigateToLink,
                     onLocationClick = { this.navigateToLocation(uiState.nodeLocationInfo) },
                     availableOfflineChanged = { availableOffline ->
-                        viewModel.availableOfflineChanged(
-                            availableOffline,
-                            WeakReference(this@FileInfoActivity)
-                        )
+                        viewModel.availableOfflineChanged(availableOffline)
                     },
                     onVersionsClick = this::navigateToVersions,
                     onSetDescriptionClick = viewModel::setNodeDescription,
@@ -172,6 +172,8 @@ class FileInfoActivity : BaseActivity() {
                     onPublicLinkCopyClick = viewModel::copyPublicLink,
                     onMenuActionClick = { handleAction(it, uiState) },
                     onVerifyContactClick = this::navigateToVerifyContacts,
+                    onAddTagClick = this::navigateToTags,
+                    onUpgradeAccountClick = this::navigateToUpgradeAccountScreen,
                     modifier = Modifier.semantics {
                         testTagsAsResourceId = true
                     }
@@ -194,6 +196,21 @@ class FileInfoActivity : BaseActivity() {
         }
     }
 
+    private fun navigateToUpgradeAccountScreen() {
+        startActivity(Intent(this, UpgradeAccountActivity::class.java))
+    }
+
+    private fun navigateToTags() {
+        startActivity(
+            Intent(this, TagsActivity::class.java).apply {
+                putExtra(NODE_ID, readExtrasAndGetHandle())
+            }
+        )
+    }
+
+    /**
+     * on restart callback
+     */
     override fun onRestart() {
         super.onRestart()
         viewModel.setNode(
@@ -503,7 +520,11 @@ class FileInfoActivity : BaseActivity() {
                     event.successMessage(this)?.let {
                         snackBarHostState.showSnackbar(it)
                     }
-                    sendBroadcast(Intent(Constants.BROADCAST_ACTION_INTENT_FILTER_UPDATE_FULL_SCREEN).setPackage(applicationContext.packageName))
+                    sendBroadcast(
+                        Intent(Constants.BROADCAST_ACTION_INTENT_FILTER_UPDATE_FULL_SCREEN).setPackage(
+                            applicationContext.packageName
+                        )
+                    )
                 } else {
                     Timber.e(event.exception)
                     if (!manageCopyMoveException(event.exception)) {
@@ -518,6 +539,9 @@ class FileInfoActivity : BaseActivity() {
                 snackBarHostState.showSnackbar(getString(event.message))
                 if (event is FileInfoOneOffViewEvent.Message.NodeDescriptionAdded) {
                     Analytics.tracker.trackEvent(NodeInfoDescriptionAddedMessageDisplayedEvent)
+                }
+                if (event is FileInfoOneOffViewEvent.Message.NodeDescriptionUpdated) {
+                    Analytics.tracker.trackEvent(NodeInfoDescriptionUpdatedMessageDisplayedEvent)
                 }
             }
 

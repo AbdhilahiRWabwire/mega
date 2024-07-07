@@ -5,7 +5,6 @@ import mega.privacy.android.domain.entity.CameraUploadsRecordType
 import mega.privacy.android.domain.entity.MediaStoreFileType
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadFolderType
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRecord
-import mega.privacy.android.domain.usecase.IsSecondaryFolderEnabled
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -31,7 +30,7 @@ class ProcessCameraUploadsMediaUseCaseTest {
     private val getPrimaryFolderPathUseCase = mock<GetPrimaryFolderPathUseCase>()
     private val getSecondaryFolderPathUseCase = mock<GetSecondaryFolderPathUseCase>()
     private val getMediaStoreFileTypesUseCase = mock<GetMediaStoreFileTypesUseCase>()
-    private val isSecondaryFolderEnabled = mock<IsSecondaryFolderEnabled>()
+    private val isMediaUploadsEnabledUseCase = mock<IsMediaUploadsEnabledUseCase>()
     private val retrieveMediaFromMediaStoreUseCase = mock<RetrieveMediaFromMediaStoreUseCase>()
     private val saveCameraUploadsRecordUseCase = mock<SaveCameraUploadsRecordUseCase>()
 
@@ -41,7 +40,7 @@ class ProcessCameraUploadsMediaUseCaseTest {
             getPrimaryFolderPathUseCase = getPrimaryFolderPathUseCase,
             getSecondaryFolderPathUseCase = getSecondaryFolderPathUseCase,
             getMediaStoreFileTypesUseCase = getMediaStoreFileTypesUseCase,
-            isSecondaryFolderEnabled = isSecondaryFolderEnabled,
+            isMediaUploadsEnabledUseCase = isMediaUploadsEnabledUseCase,
             retrieveMediaFromMediaStoreUseCase = retrieveMediaFromMediaStoreUseCase,
             saveCameraUploadsRecordUseCase = saveCameraUploadsRecordUseCase,
         )
@@ -53,7 +52,7 @@ class ProcessCameraUploadsMediaUseCaseTest {
             getPrimaryFolderPathUseCase,
             getSecondaryFolderPathUseCase,
             getMediaStoreFileTypesUseCase,
-            isSecondaryFolderEnabled,
+            isMediaUploadsEnabledUseCase,
             retrieveMediaFromMediaStoreUseCase,
             saveCameraUploadsRecordUseCase,
         )
@@ -77,7 +76,7 @@ class ProcessCameraUploadsMediaUseCaseTest {
             whenever(getPrimaryFolderPathUseCase()).thenReturn(primaryFolderPath)
             whenever(retrieveMediaFromMediaStoreUseCase(any(), any(), any(), any(), any()))
                 .thenReturn(emptyList())
-            whenever(isSecondaryFolderEnabled()).thenReturn(false)
+            whenever(isMediaUploadsEnabledUseCase()).thenReturn(false)
 
             val (photoFileTypes, videoFileTypes) = mediaStoreFileType.partition { it.isImageFileType() }
 
@@ -111,7 +110,7 @@ class ProcessCameraUploadsMediaUseCaseTest {
             whenever(getPrimaryFolderPathUseCase()).thenReturn(primaryFolderPath)
             whenever(retrieveMediaFromMediaStoreUseCase(any(), any(), any(), any(), any()))
                 .thenReturn(emptyList())
-            whenever(isSecondaryFolderEnabled()).thenReturn(false)
+            whenever(isMediaUploadsEnabledUseCase()).thenReturn(false)
 
             val (photoFileTypes, videoFileTypes) = mediaStoreFileType.partition { it.isImageFileType() }
 
@@ -145,7 +144,7 @@ class ProcessCameraUploadsMediaUseCaseTest {
             whenever(getPrimaryFolderPathUseCase()).thenReturn(primaryFolderPath)
             whenever(retrieveMediaFromMediaStoreUseCase(any(), any(), any(), any(), any()))
                 .thenReturn(emptyList())
-            whenever(isSecondaryFolderEnabled()).thenReturn(false)
+            whenever(isMediaUploadsEnabledUseCase()).thenReturn(false)
 
             val types = mediaStoreFileType.partition { it.isImageFileType() }
 
@@ -178,7 +177,7 @@ class ProcessCameraUploadsMediaUseCaseTest {
             whenever(getPrimaryFolderPathUseCase()).thenReturn(primaryFolderPath)
             whenever(retrieveMediaFromMediaStoreUseCase(any(), any(), any(), any(), any()))
                 .thenReturn(emptyList())
-            whenever(isSecondaryFolderEnabled()).thenReturn(false)
+            whenever(isMediaUploadsEnabledUseCase()).thenReturn(false)
             whenever(getSecondaryFolderPathUseCase()).thenReturn(secondaryFolderPath)
 
             underTest("tempRoot")
@@ -205,7 +204,7 @@ class ProcessCameraUploadsMediaUseCaseTest {
             whenever(getPrimaryFolderPathUseCase()).thenReturn(primaryFolderPath)
             whenever(retrieveMediaFromMediaStoreUseCase(any(), any(), any(), any(), any()))
                 .thenReturn(emptyList())
-            whenever(isSecondaryFolderEnabled()).thenReturn(true)
+            whenever(isMediaUploadsEnabledUseCase()).thenReturn(true)
             whenever(getSecondaryFolderPathUseCase()).thenReturn(secondaryFolderPath)
 
             val types = mediaStoreFileType.partition { it.isImageFileType() }
@@ -241,7 +240,7 @@ class ProcessCameraUploadsMediaUseCaseTest {
             whenever(getPrimaryFolderPathUseCase()).thenReturn(primaryFolderPath)
             whenever(retrieveMediaFromMediaStoreUseCase(any(), any(), any(), any(), any()))
                 .thenReturn(emptyList())
-            whenever(isSecondaryFolderEnabled()).thenReturn(true)
+            whenever(isMediaUploadsEnabledUseCase()).thenReturn(true)
             whenever(getSecondaryFolderPathUseCase()).thenReturn(secondaryFolderPath)
 
             val types = mediaStoreFileType.partition { it.isImageFileType() }
@@ -277,7 +276,7 @@ class ProcessCameraUploadsMediaUseCaseTest {
             whenever(getPrimaryFolderPathUseCase()).thenReturn(primaryFolderPath)
             whenever(retrieveMediaFromMediaStoreUseCase(any(), any(), any(), any(), any()))
                 .thenReturn(emptyList())
-            whenever(isSecondaryFolderEnabled()).thenReturn(true)
+            whenever(isMediaUploadsEnabledUseCase()).thenReturn(true)
             whenever(getSecondaryFolderPathUseCase()).thenReturn(secondaryFolderPath)
 
             val types = mediaStoreFileType.partition { it.isImageFileType() }
@@ -373,7 +372,7 @@ class ProcessCameraUploadsMediaUseCaseTest {
                         tempRoot
                     )
                 ).thenReturn(videoSecondaryRecordList)
-                whenever(isSecondaryFolderEnabled()).thenReturn(true)
+                whenever(isMediaUploadsEnabledUseCase()).thenReturn(true)
                 whenever(getSecondaryFolderPathUseCase()).thenReturn(secondaryFolderPath)
 
                 val expected =

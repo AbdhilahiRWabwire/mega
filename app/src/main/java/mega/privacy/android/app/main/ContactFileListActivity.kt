@@ -21,12 +21,13 @@ import androidx.appcompat.app.ActionBar
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.Toolbar
 import androidx.coordinatorlayout.widget.CoordinatorLayout
-import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import de.palm.composestateevents.StateEventWithContentTriggered
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.schedulers.Schedulers
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.ShareInfo
@@ -36,6 +37,7 @@ import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.saver.NodeSaver
 import mega.privacy.android.app.constants.BroadcastConstants.BROADCAST_ACTION_DESTROY_ACTION_MODE
 import mega.privacy.android.app.constants.BroadcastConstants.BROADCAST_ACTION_INTENT_MANAGE_SHARE
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.generalusecase.FilePrepareUseCase
 import mega.privacy.android.app.interfaces.ActionNodeCallback
 import mega.privacy.android.app.interfaces.SnackbarShower
@@ -84,6 +86,8 @@ import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.node.MoveRequestResult
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
+import mega.privacy.android.domain.qualifier.ApplicationScope
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import nz.mega.documentscanner.DocumentScannerActivity
 import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaChatApiJava
@@ -120,6 +124,13 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
 
     @Inject
     lateinit var copyRequestMessageMapper: CopyRequestMessageMapper
+
+    @Inject
+    @ApplicationScope
+    lateinit var applicationScope: CoroutineScope
+
+    @Inject
+    lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
 
     @Inject
     lateinit var moveRequestMessageMapper: MoveRequestMessageMapper
@@ -271,7 +282,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
         if (isFinishing) {
             return
         }
-        val parentHandle = contactFileListFragment?.getParentHandle() ?: return
+        val parentHandle = contactFileListFragment?.parentHandle ?: return
         val parentNode = megaApi.getNodeByHandle(parentHandle) ?: return
         Timber.d("parentNode != null: %s", parentNode.name)
         val nL = megaApi.getChildren(parentNode).orEmpty()
@@ -353,8 +364,8 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
             }
             contactFileListFragment?.let {
                 it.setUserEmail(userEmail)
-                it.setCurrNodePosition(currNodePosition)
-                it.setParentHandle(parentHandle)
+                it.currNodePosition = currNodePosition
+                it.parentHandle = parentHandle
                 supportFragmentManager.beginTransaction().replace(
                     R.id.fragment_container_contact_properties,
                     it,
@@ -407,6 +418,10 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
                     MegaChatApiJava.MEGACHAT_INVALID_HANDLE
                 )
                 viewModel.onConsumeSnackBarMessageEvent()
+            }
+
+            if (uiState.uploadEvent is StateEventWithContentTriggered) {
+                startDownloadViewModel.onUploadClicked(uiState.uploadEvent.content)
             }
         }
     }
@@ -619,7 +634,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
         } else if (requestCode == Constants.TAKE_PHOTO_CODE) {
             Timber.d("TAKE_PHOTO_CODE")
             if (resultCode == RESULT_OK) {
-                val parentHandle = contactFileListFragment?.getParentHandle() ?: return
+                val parentHandle = contactFileListFragment?.parentHandle ?: return
                 val file = UploadUtil.getTemporalTakePictureFile(this)
                 if (file != null) {
                     composite.add(
@@ -644,18 +659,28 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
                                         getString(R.string.general_error)
                                     )
                                 } else if (throwable is ChildDoesNotExistsException) {
-                                    checkNotificationsPermission(this)
-                                    composite.add(
-                                        uploadUseCase.upload(
-                                            this,
-                                            file,
-                                            contactFileListFragment?.getParentHandle()
-                                                ?: return@subscribe
-                                        ).subscribeOn(Schedulers.io())
-                                            .observeOn(AndroidSchedulers.mainThread())
-                                            .subscribe({ Timber.d("Upload started") }) { t: Throwable? ->
-                                                Timber.e(t)
-                                            })
+                                    applicationScope.launch {
+                                        if (getFeatureFlagValueUseCase(AppFeatures.UploadWorker)) {
+                                            viewModel.uploadFile(
+                                                file,
+                                                contactFileListFragment?.parentHandle
+                                                    ?: return@launch
+                                            )
+                                        } else {
+                                            checkNotificationsPermission(this@ContactFileListActivity)
+                                            composite.add(
+                                                uploadUseCase.upload(
+                                                    this@ContactFileListActivity,
+                                                    file,
+                                                    contactFileListFragment?.parentHandle
+                                                        ?: return@launch
+                                                ).subscribeOn(Schedulers.io())
+                                                    .observeOn(AndroidSchedulers.mainThread())
+                                                    .subscribe({ Timber.d("Upload started") }) { t: Throwable? ->
+                                                        Timber.e(t)
+                                                    })
+                                        }
+                                    }
                                 }
                             })
                 }
@@ -724,26 +749,32 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
                             nameCollisionActivityContract?.launch(collisions)
                         }
                         if (withoutCollisions.isNotEmpty()) {
-                            val text = resources.getQuantityString(
-                                R.plurals.upload_began,
-                                withoutCollisions.size,
-                                withoutCollisions.size
-                            )
-                            composite.add(
-                                uploadUseCase.uploadInfos(
-                                    this,
-                                    withoutCollisions,
-                                    null,
-                                    parentNode.handle
-                                )
-                                    .subscribeOn(Schedulers.io())
-                                    .observeOn(AndroidSchedulers.mainThread())
-                                    .subscribe({
-                                        showSnackbar(
-                                            Constants.SNACKBAR_TYPE,
-                                            text
+                            applicationScope.launch {
+                                if (getFeatureFlagValueUseCase(AppFeatures.UploadWorker)) {
+                                    viewModel.uploadShareInfo(withoutCollisions, parentNode.handle)
+                                } else {
+                                    val text = resources.getQuantityString(
+                                        R.plurals.upload_began,
+                                        withoutCollisions.size,
+                                        withoutCollisions.size
+                                    )
+                                    composite.add(
+                                        uploadUseCase.uploadInfos(
+                                            this@ContactFileListActivity,
+                                            withoutCollisions,
+                                            null,
+                                            parentNode.handle
                                         )
-                                    }) { t: Throwable? -> Timber.e(t) })
+                                            .subscribeOn(Schedulers.io())
+                                            .observeOn(AndroidSchedulers.mainThread())
+                                            .subscribe({
+                                                showSnackbar(
+                                                    Constants.SNACKBAR_TYPE,
+                                                    text
+                                                )
+                                            }) { t: Throwable? -> Timber.e(t) })
+                                }
+                            }
                         }
                     }
                 })
@@ -924,7 +955,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
         }
     }
 
-    fun getParentHandle(): Long = contactFileListFragment?.getParentHandle() ?: -1
+    fun getParentHandle(): Long = contactFileListFragment?._parentHandle ?: -1
 
     override fun showSnackbar(type: Int, content: String?, chatId: Long) {
         showSnackbar(type, fragmentContainer, content, chatId)

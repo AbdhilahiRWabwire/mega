@@ -17,10 +17,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.SnackbarHostState
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -33,6 +35,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.palm.composestateevents.EventEffect
+import kotlinx.coroutines.launch
+import mega.privacy.android.feature.sync.R
+import mega.privacy.android.feature.sync.domain.entity.RemoteFolder
+import mega.privacy.android.feature.sync.ui.megapicker.AllFilesAccessDialog
+import mega.privacy.android.feature.sync.ui.permissions.SyncPermissionsManager
+import mega.privacy.android.feature.sync.ui.views.InputSyncInformationView
 import mega.privacy.android.shared.original.core.ui.controls.appbar.AppBarType
 import mega.privacy.android.shared.original.core.ui.controls.appbar.MegaAppBar
 import mega.privacy.android.shared.original.core.ui.controls.banners.WarningBanner
@@ -41,13 +49,8 @@ import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDi
 import mega.privacy.android.shared.original.core.ui.controls.layouts.MegaScaffold
 import mega.privacy.android.shared.original.core.ui.controls.text.MegaText
 import mega.privacy.android.shared.original.core.ui.navigation.launchFolderPicker
-import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
-import mega.privacy.android.feature.sync.R
-import mega.privacy.android.feature.sync.domain.entity.RemoteFolder
-import mega.privacy.android.feature.sync.ui.megapicker.AllFilesAccessDialog
-import mega.privacy.android.feature.sync.ui.permissions.SyncPermissionsManager
-import mega.privacy.android.feature.sync.ui.views.InputSyncInformationView
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
 
 @Composable
 internal fun SyncNewFolderScreen(
@@ -92,7 +95,8 @@ internal fun SyncNewFolderScreen(
                     syncPermissionsManager = syncPermissionsManager,
                     showStorageOverQuota = showStorageOverQuota,
                     onDismissStorageOverQuota = onDismissStorageOverQuota,
-                    onOpenUpgradeAccount = onOpenUpgradeAccount
+                    onOpenUpgradeAccount = onOpenUpgradeAccount,
+                    snackBarHostState = scaffoldState.snackbarHostState,
                 )
 
                 val context = LocalContext.current
@@ -120,8 +124,10 @@ private fun SyncNewFolderScreenContent(
     showStorageOverQuota: Boolean,
     onDismissStorageOverQuota: () -> Unit,
     onOpenUpgradeAccount: () -> Unit,
+    snackBarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     var showSyncPermissionBanner by rememberSaveable {
         mutableStateOf(false)
     }
@@ -129,18 +135,26 @@ private fun SyncNewFolderScreenContent(
         mutableStateOf(false)
     }
     val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
     Column(
         modifier.verticalScroll(scrollState)
     ) {
-        val folderPicker = launchFolderPicker {
+        val folderPicker = launchFolderPicker(
+            Uri.parse(ROOT_FOLDER_URI_STRING)
+        ) {
             localFolderSelected(it)
         }
-
         val launcher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { isGranted: Boolean ->
             if (isGranted) {
-                folderPicker.launch(null)
+                runCatching {
+                    folderPicker.launch(null)
+                }.onFailure {
+                    coroutineScope.launch {
+                        snackBarHostState.showSnackbar(context.getString(sharedResR.string.general_no_picker_warning))
+                    }
+                }
             } else {
                 showSyncPermissionBanner = true
             }
@@ -190,7 +204,13 @@ private fun SyncNewFolderScreenContent(
         InputSyncInformationView(
             selectDeviceFolderClicked = {
                 if (syncPermissionsManager.isManageExternalStoragePermissionGranted()) {
-                    folderPicker.launch(null)
+                    runCatching {
+                        folderPicker.launch(null)
+                    }.onFailure {
+                        coroutineScope.launch {
+                            snackBarHostState.showSnackbar(context.getString(sharedResR.string.general_no_picker_warning))
+                        }
+                    }
                 } else {
                     if (showSyncPermissionBanner) {
                         syncPermissionsManager.launchAppSettingFileStorageAccess()
@@ -232,6 +252,8 @@ private fun SyncNewFolderScreenContent(
     }
 }
 
+private const val ROOT_FOLDER_URI_STRING =
+    "content://com.android.externalstorage.documents/root/primary"
 internal const val TAG_SYNC_NEW_FOLDER_SCREEN_TOOLBAR = "sync_new_folder_screen_toolbar_test_tag"
 internal const val TAG_SYNC_NEW_FOLDER_SCREEN_SYNC_BUTTON =
     "sync_new_folder_screen_sync_button_test_tag"

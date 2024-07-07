@@ -2,6 +2,7 @@ package mega.privacy.android.data.repository
 
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.webkit.MimeTypeMap
 import androidx.core.net.toFile
 import androidx.core.net.toUri
@@ -10,6 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filter
@@ -46,10 +48,12 @@ import mega.privacy.android.data.mapper.node.NodeMapper
 import mega.privacy.android.data.mapper.shares.ShareDataMapper
 import mega.privacy.android.data.model.GlobalUpdate
 import mega.privacy.android.data.qualifier.FileVersionsOption
+import mega.privacy.android.domain.entity.document.DocumentFolder
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.ViewerNode
+import mega.privacy.android.domain.entity.uri.UriPath
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.NullFileException
 import mega.privacy.android.domain.qualifier.ApplicationScope
@@ -65,6 +69,7 @@ import nz.mega.sdk.MegaTransfer.COLLISION_RESOLUTION_NEW_WITH_N
 import nz.mega.sdk.MegaUser
 import timber.log.Timber
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.net.URI
 import java.net.URLConnection
@@ -357,7 +362,7 @@ internal class FileSystemRepositoryImpl @Inject constructor(
             fileGateway.deleteDirectory(path = "${cameraUploadsCacheFolder?.absolutePath}${File.separator}")
         }
 
-    override suspend fun createCameraUploadTemporaryRootDirectory() =
+    override suspend fun createCameraUploadsTemporaryRootDirectory() =
         withContext(ioDispatcher) {
             cacheGateway.getCameraUploadsCacheFolder()
         }
@@ -467,6 +472,24 @@ internal class FileSystemRepositoryImpl @Inject constructor(
         sdCardGateway.isSDCardCachePath(localPath)
     }
 
+    override suspend fun copyFilesToDocumentUri(
+        source: File,
+        destinationUri: UriPath,
+    ) = withContext(ioDispatcher) {
+        val uri = destinationUri.value.toUri()
+        val isTreeUri = DocumentsContract.isTreeUri(uri)
+        val destination = if (isTreeUri) {
+            DocumentFile.fromTreeUri(context, uri)
+        } else {
+            DocumentFile.fromSingleUri(context, uri)
+        } ?: throw FileNotFoundException("Content uri doesn't exist: $destinationUri")
+        fileGateway.copyFilesToDocumentFolder(source, destination)
+    }
+
+    override suspend fun copyFiles(source: File, destination: File) = withContext(ioDispatcher) {
+        fileGateway.copyFileToFolder(source, destination)
+    }
+
     override suspend fun moveFileToSd(
         file: File,
         destinationUri: String,
@@ -545,6 +568,10 @@ internal class FileSystemRepositoryImpl @Inject constructor(
         fileGateway.isContentUri(uriString)
     }
 
+    override suspend fun isDocumentUri(uri: UriPath): Boolean = withContext(ioDispatcher) {
+        fileGateway.isDocumentUri(uri)
+    }
+
     override suspend fun isExternalStorageContentUri(uriString: String): Boolean =
         withContext(ioDispatcher) {
             fileGateway.isExternalStorageContentUri(uriString)
@@ -560,9 +587,9 @@ internal class FileSystemRepositoryImpl @Inject constructor(
             fileGateway.getFileSizeFromUri(uriString)
         }
 
-    override suspend fun copyContentUriToFile(uriString: String, file: File) {
+    override suspend fun copyContentUriToFile(sourceUri: UriPath, targetFile: File) {
         withContext(ioDispatcher) {
-            fileGateway.copyContentUriToFile(uriString, file)
+            fileGateway.copyContentUriToFile(sourceUri, targetFile)
         }
     }
 
@@ -596,4 +623,15 @@ internal class FileSystemRepositoryImpl @Inject constructor(
     override suspend fun deleteFileByUri(uri: String): Boolean = withContext(ioDispatcher) {
         fileGateway.deleteFileByUri(Uri.parse(uri))
     }
+
+    override suspend fun getFilesInDocumentFolder(uri: UriPath): DocumentFolder =
+        withContext(ioDispatcher) {
+            fileGateway.getFilesInDocumentFolder(uri)
+        }
+
+    override fun searchFilesInDocumentFolderRecursive(
+        folder: UriPath,
+        query: String,
+    ): Flow<DocumentFolder> = fileGateway.searchFilesInDocumentFolderRecursive(folder, query)
+        .flowOn(ioDispatcher)
 }

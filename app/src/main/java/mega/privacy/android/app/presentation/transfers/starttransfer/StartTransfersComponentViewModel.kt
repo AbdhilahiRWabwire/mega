@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import mega.privacy.android.app.middlelayer.iar.OnCompleteListener
 import mega.privacy.android.app.presentation.mapper.file.FileSizeStringMapper
 import mega.privacy.android.app.presentation.transfers.TransfersConstants
@@ -139,7 +140,7 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                         return@launch
                     }
                     startUploads(
-                        uris = transferTriggerEvent.uris,
+                        pathsAndNames = transferTriggerEvent.pathsAndNames,
                         destinationId = transferTriggerEvent.destinationId,
                         transferTriggerEvent = transferTriggerEvent,
                     )
@@ -169,6 +170,7 @@ internal class StartTransfersComponentViewModel @Inject constructor(
             _uiState.updateEventAndClearProgress(StartTransferEvent.Message.TransferCancelled)
         } else {
             lastDownloadTriggerEvent = transferTriggerEvent
+            lastTransferStartedHere = true
             when (transferTriggerEvent) {
                 is TransferTriggerEvent.StartDownloadForOffline -> {
                     startDownloadForOffline(transferTriggerEvent)
@@ -531,6 +533,9 @@ internal class StartTransfersComponentViewModel @Inject constructor(
             monitorActiveTransferFinishedUseCase(TransferType.DOWNLOAD)
                 .catch { Timber.e(it) }
                 .collect { totalNodes ->
+                    if (!lastTransferStartedHere) {
+                        yield() //wait for others to listen the event to try to show the snackbar in the same component that started the transfer
+                    }
                     if (active) {
                         when (lastDownloadTriggerEvent) {
                             is TransferTriggerEvent.StartDownloadForOffline -> {
@@ -549,24 +554,26 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                         }
                         lastDownloadTriggerEvent = null
                     }
+                    lastTransferStartedHere = false
                 }
         }
     }
 
     private fun MutableStateFlow<StartTransferViewState>.updateEventAndClearProgress(
         event: StartTransferEvent?,
-    ) =
-        this.update {
-            it.copy(
-                oneOffViewEvent = event?.let { triggered(event) } ?: consumed(),
-                jobInProgressState = null,
-            )
-        }
+    ) = this.update {
+        it.copy(
+            oneOffViewEvent = event?.let { triggered(event) } ?: consumed(),
+            jobInProgressState = null,
+        )
+    }
 
     private fun String.ensureSuffix(suffix: String) =
         if (this.endsWith(suffix)) this else this.plus(suffix)
 
     private var active = false
+    private var lastTransferStartedHere = false
+
     override fun onResume(owner: LifecycleOwner) {
         super.onResume(owner)
         active = true
@@ -603,29 +610,33 @@ internal class StartTransfersComponentViewModel @Inject constructor(
     }
 
     private suspend fun startUploads(
-        uris: List<Uri>,
+        pathsAndNames: Map<String, String?>,
         destinationId: NodeId,
         transferTriggerEvent: TransferTriggerEvent.StartUpload,
     ) {
         runCatching { clearActiveTransfersIfFinishedUseCase(TransferType.GENERAL_UPLOAD) }
             .onFailure { Timber.e(it) }
 
-        if (uris.isEmpty()) {
-            Timber.e("Uri in $uris must exist")
+        if (pathsAndNames.isEmpty()) {
+            Timber.e("Paths in $pathsAndNames must exist")
             _uiState.updateEventAndClearProgress(StartTransferEvent.Message.TransferCancelled)
             return
         }
 
         lastUpload = transferTriggerEvent
+        lastTransferStartedHere = true
         monitorUploadFinish()
         _uiState.update {
             it.copy(jobInProgressState = StartTransferJobInProgress.ScanningTransfers)
         }
         var startMessageShown = false
         startUploadWithWorkerUseCase(
-            uris.map { it.toString() }.associateWith { null },
+            pathsAndNames,
             destinationId
         ).catch {
+            if (transferTriggerEvent is TransferTriggerEvent.StartUpload.TextFile) {
+                lastUploadError = it
+            }
             Timber.e(it)
         }.onCompletion {
             if (it is CancellationException) {
@@ -643,7 +654,10 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                     //show start message as soon as an event with all transfers updated is received
                     if (!startMessageShown && event.allTransfersUpdated) {
                         startMessageShown = true
-                        StartTransferEvent.FinishUploadProcessing(totalFiles = event.startedFiles)
+                        StartTransferEvent.FinishUploadProcessing(
+                            totalFiles = event.startedFiles,
+                            triggerEvent = transferTriggerEvent,
+                        )
                     } else {
                         null
                     }
@@ -666,10 +680,27 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                 .catch { Timber.e(it) }
                 .collect { totalFiles ->
                     if (active) {
-                        lastUpload?.let {
-                            _uiState.updateEventAndClearProgress(
+                        when (lastUpload) {
+                            is TransferTriggerEvent.StartUpload.TextFile -> {
+                                val isSuccess = lastUploadError == null
+                                val lastUpload =
+                                    lastUpload as TransferTriggerEvent.StartUpload.TextFile
+                                lastUploadError = null
+
+                                StartTransferEvent.Message.FinishTextFileUpload(
+                                    isSuccess = isSuccess,
+                                    isEditMode = lastUpload.isEditMode,
+                                    isCloudFile = lastUpload.fromHomePage
+                                )
+                            }
+
+                            is TransferTriggerEvent.StartUpload.Files -> {
                                 StartTransferEvent.MessagePlural.FinishUploading(totalFiles)
-                            )
+                            }
+
+                            else -> null
+                        }?.let { finishEvent ->
+                            _uiState.updateEventAndClearProgress(finishEvent)
                         }
                         lastUpload = null
                     }
@@ -687,5 +718,10 @@ internal class StartTransfersComponentViewModel @Inject constructor(
          * The last trigger event that started the upload, we need to keep it to know what to do when the upload finishes even in other screens
          */
         private var lastUpload: TransferTriggerEvent.StartUpload? = null
+
+        /**
+         * The last upload error, we need to keep it to know what to show when the upload finishes in other screens
+         */
+        private var lastUploadError: Throwable? = null
     }
 }

@@ -76,14 +76,14 @@ import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.qualifier.LoginMutex
 import mega.privacy.android.domain.repository.FileSystemRepository
 import mega.privacy.android.domain.repository.TimeSystemRepository
-import mega.privacy.android.domain.usecase.CreateCameraUploadTemporaryRootDirectoryUseCase
-import mega.privacy.android.domain.usecase.IsSecondaryFolderEnabled
-import mega.privacy.android.domain.usecase.IsWifiNotSatisfiedUseCase
+import mega.privacy.android.domain.usecase.camerauploads.CreateCameraUploadsTemporaryRootDirectoryUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsMediaUploadsEnabledUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsWifiNotSatisfiedUseCase
 import mega.privacy.android.domain.usecase.account.IsStorageOverQuotaUseCase
 import mega.privacy.android.domain.usecase.backup.InitializeBackupsUseCase
 import mega.privacy.android.domain.usecase.camerauploads.AreCameraUploadsFoldersInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.camerauploads.BroadcastCameraUploadsSettingsActionUseCase
-import mega.privacy.android.domain.usecase.camerauploads.BroadcastStorageOverQuotaUseCase
+import mega.privacy.android.domain.usecase.transfers.overquota.BroadcastStorageOverQuotaUseCase
 import mega.privacy.android.domain.usecase.camerauploads.CheckOrCreateCameraUploadsNodeUseCase
 import mega.privacy.android.domain.usecase.camerauploads.DeleteCameraUploadsTemporaryRootDirectoryUseCase
 import mega.privacy.android.domain.usecase.camerauploads.DisableCameraUploadsUseCase
@@ -101,7 +101,7 @@ import mega.privacy.android.domain.usecase.camerauploads.IsChargingRequiredUseCa
 import mega.privacy.android.domain.usecase.camerauploads.IsPrimaryFolderPathValidUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsSecondaryFolderSetUseCase
 import mega.privacy.android.domain.usecase.camerauploads.MonitorIsChargingRequiredToUploadContentUseCase
-import mega.privacy.android.domain.usecase.camerauploads.MonitorStorageOverQuotaUseCase
+import mega.privacy.android.domain.usecase.transfers.overquota.MonitorStorageOverQuotaUseCase
 import mega.privacy.android.domain.usecase.camerauploads.ProcessCameraUploadsMediaUseCase
 import mega.privacy.android.domain.usecase.camerauploads.RenameCameraUploadsRecordsUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SendBackupHeartBeatSyncUseCase
@@ -137,7 +137,7 @@ class CameraUploadsWorker @AssistedInject constructor(
     private val getPrimaryFolderPathUseCase: GetPrimaryFolderPathUseCase,
     private val isPrimaryFolderPathValidUseCase: IsPrimaryFolderPathValidUseCase,
     private val isSecondaryFolderSetUseCase: IsSecondaryFolderSetUseCase,
-    private val isSecondaryFolderEnabled: IsSecondaryFolderEnabled,
+    private val isMediaUploadsEnabledUseCase: IsMediaUploadsEnabledUseCase,
     private val isCameraUploadsEnabledUseCase: IsCameraUploadsEnabledUseCase,
     private val isWifiNotSatisfiedUseCase: IsWifiNotSatisfiedUseCase,
     private val setPrimaryFolderLocalPathUseCase: SetPrimaryFolderLocalPathUseCase,
@@ -158,7 +158,7 @@ class CameraUploadsWorker @AssistedInject constructor(
     private val establishCameraUploadsSyncHandlesUseCase: EstablishCameraUploadsSyncHandlesUseCase,
     private val resetTotalUploadsUseCase: ResetTotalUploadsUseCase,
     private val disableMediaUploadSettingsUseCase: DisableMediaUploadsSettingsUseCase,
-    private val createCameraUploadTemporaryRootDirectoryUseCase: CreateCameraUploadTemporaryRootDirectoryUseCase,
+    private val createCameraUploadsTemporaryRootDirectoryUseCase: CreateCameraUploadsTemporaryRootDirectoryUseCase,
     private val deleteCameraUploadsTemporaryRootDirectoryUseCase: DeleteCameraUploadsTemporaryRootDirectoryUseCase,
     private val scheduleCameraUploadUseCase: ScheduleCameraUploadUseCase,
     private val updateCameraUploadsBackupStatesUseCase: UpdateCameraUploadsBackupStatesUseCase,
@@ -556,13 +556,13 @@ class CameraUploadsWorker @AssistedInject constructor(
         !isChargingConstraintSatisfied() -> CameraUploadsFinishedReason.DEVICE_CHARGING_REQUIREMENT_NOT_MET
         isStorageQuotaExceeded() -> CameraUploadsFinishedReason.ACCOUNT_STORAGE_OVER_QUOTA
         else -> {
-            if (isSecondaryFolderEnabled())
+            if (isMediaUploadsEnabledUseCase())
                 isLocalSecondaryFolderValid()
 
             when {
                 !synchronizeUploadNodeHandles() -> CameraUploadsFinishedReason.ERROR_DURING_PROCESS
                 !checkOrCreatePrimaryUploadNodes() -> CameraUploadsFinishedReason.ERROR_DURING_PROCESS
-                isSecondaryFolderEnabled() && !checkOrCreateSecondaryUploadNodes() -> CameraUploadsFinishedReason.ERROR_DURING_PROCESS
+                isMediaUploadsEnabledUseCase() && !checkOrCreateSecondaryUploadNodes() -> CameraUploadsFinishedReason.ERROR_DURING_PROCESS
                 !initializeBackup() -> CameraUploadsFinishedReason.ERROR_DURING_PROCESS
                 !createTempCacheFile() -> CameraUploadsFinishedReason.ERROR_DURING_PROCESS
                 else -> null
@@ -1198,7 +1198,7 @@ class CameraUploadsWorker @AssistedInject constructor(
      */
     private suspend fun createTempCacheFile(): Boolean {
         return runCatching {
-            tempRoot = createCameraUploadTemporaryRootDirectoryUseCase()
+            tempRoot = createCameraUploadsTemporaryRootDirectoryUseCase()
         }.onFailure {
             Timber.e(it)
         }.isSuccess

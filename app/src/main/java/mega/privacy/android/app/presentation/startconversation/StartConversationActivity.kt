@@ -19,7 +19,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.main.AddContactActivity
-import mega.privacy.android.app.presentation.contact.invite.contact.InviteContactActivity
+import mega.privacy.android.app.presentation.contact.invite.InviteContactActivity
 import mega.privacy.android.app.presentation.extensions.changeStatusBarColor
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.security.PasscodeCheck
@@ -49,8 +49,8 @@ class StartConversationActivity : ComponentActivity() {
 
     private val viewModel by viewModels<StartConversationViewModel>()
 
-    lateinit var resultLauncher: ActivityResultLauncher<Intent?>
-    private lateinit var addContactActivityLauncher: ActivityResultLauncher<Intent?>
+    lateinit var resultLauncher: ActivityResultLauncher<Intent>
+    private lateinit var addContactActivityLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

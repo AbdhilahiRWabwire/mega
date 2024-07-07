@@ -34,8 +34,11 @@ import mega.privacy.android.data.mapper.SortOrderIntMapper
 import mega.privacy.android.data.mapper.node.NodeMapper
 import mega.privacy.android.data.mapper.shares.ShareDataMapper
 import mega.privacy.android.data.model.GlobalUpdate
+import mega.privacy.android.domain.entity.document.DocumentEntity
+import mega.privacy.android.domain.entity.document.DocumentFolder
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
+import mega.privacy.android.domain.entity.uri.UriPath
 import mega.privacy.android.domain.exception.FileNotCreatedException
 import mega.privacy.android.domain.exception.NotEnoughStorageException
 import mega.privacy.android.domain.repository.FileSystemRepository
@@ -424,7 +427,7 @@ internal class FileSystemRepositoryImplTest {
 
     @Test
     fun `test that copyContentUriToFile calls gateway method`() = runTest {
-        val uri = "uri//:example.txt"
+        val uri = UriPath("uri//:example.txt")
         val file = mock<File>()
         underTest.copyContentUriToFile(uri, file)
         verify(fileGateway).copyContentUriToFile(uri, file)
@@ -591,5 +594,25 @@ internal class FileSystemRepositoryImplTest {
             verify(fileGateway).deleteFileByUri(uri)
             assertThat(actual).isEqualTo(expected)
         }
+    }
+
+    @Test
+    fun `test that get file in document folder returns correct value`() = runTest {
+        val folderUri = UriPath("file://test/file/path")
+        val entity = mock<DocumentEntity>()
+        whenever(fileGateway.getFilesInDocumentFolder(folderUri)).thenReturn(
+            DocumentFolder(listOf(entity))
+        )
+        assertThat(underTest.getFilesInDocumentFolder(folderUri)).isEqualTo(
+            DocumentFolder(listOf(entity))
+        )
+    }
+
+    @Test
+    fun `test that copy files invokes gateway method`() = runTest {
+        val file = mock<File>()
+        val destination = mock<File>()
+        underTest.copyFiles(file, destination)
+        verify(fileGateway).copyFileToFolder(file, destination)
     }
 }

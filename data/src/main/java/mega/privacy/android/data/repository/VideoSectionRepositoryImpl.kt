@@ -12,6 +12,7 @@ import mega.privacy.android.data.extensions.failWithError
 import mega.privacy.android.data.extensions.getRequestListener
 import mega.privacy.android.data.gateway.MegaLocalRoomGateway
 import mega.privacy.android.data.gateway.api.MegaApiGateway
+import mega.privacy.android.data.listener.AddElementToSetsListenerInterface
 import mega.privacy.android.data.listener.CreateSetElementListenerInterface
 import mega.privacy.android.data.listener.OptionalMegaRequestListenerInterface
 import mega.privacy.android.data.listener.RemoveSetElementListenerInterface
@@ -249,6 +250,26 @@ internal class VideoSectionRepositoryImpl @Inject constructor(
             }
         }
 
+    override suspend fun addVideoToMultiplePlaylists(playlistIDs: List<Long>, videoID: Long) =
+        withContext(ioDispatcher) {
+            suspendCancellableCoroutine { continuation ->
+                val listener = AddElementToSetsListenerInterface(
+                    target = playlistIDs,
+                    onCompletion = { success, _ ->
+                        continuation.resumeWith(Result.success(success))
+                    }
+                )
+                for (playlistID in playlistIDs) {
+                    megaApiGateway.createSetElement(
+                        sid = playlistID,
+                        node = videoID,
+                        listener = listener
+                    )
+                }
+                continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
+            }
+        }
+
     override suspend fun updateVideoPlaylistTitle(
         playlistID: NodeId,
         newTitle: String,
@@ -281,4 +302,6 @@ internal class VideoSectionRepositoryImpl @Inject constructor(
     override fun getVideoSetsMap() = videoSetsMap
 
     override fun getVideoPlaylistsMap() = videoPlaylistsMap
+
+    override suspend fun getVideoPlaylistSets(): List<UserSet> = getAllUserSets()
 }

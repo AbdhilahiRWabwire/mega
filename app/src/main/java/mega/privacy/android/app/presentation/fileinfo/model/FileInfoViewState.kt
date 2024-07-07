@@ -92,6 +92,9 @@ internal data class FileInfoViewState(
     val actions: List<FileInfoMenuAction> = emptyList(),
     val requiredExtraAction: FileInfoExtraAction? = null,
     val isRemindersForContactVerificationEnabled: Boolean = false,
+    val tagsEnabled: Boolean = false,
+    val isProAccount: Boolean = false,
+    val tags: List<String> = emptyList(),
 ) {
 
     /**
@@ -114,7 +117,8 @@ internal data class FileInfoViewState(
         creationTime = typedNode.creationTime,
         modificationTime = (typedNode as? TypedFileNode)?.modificationTime,
         descriptionText = typedNode.description.orEmpty(),
-        hasPreview = (typedNode as? TypedFileNode)?.hasPreview == true
+        hasPreview = (typedNode as? TypedFileNode)?.hasPreview == true,
+        tags = typedNode.tags.orEmpty(),
     )
 
 
@@ -124,6 +128,12 @@ internal data class FileInfoViewState(
     fun isDescriptionEnabled() = !isNodeInRubbish && !isNodeInBackups &&
             (accessPermission == AccessPermission.FULL ||
                     accessPermission == AccessPermission.OWNER)
+
+    /**
+     * Check Conditions to enable tags field
+     */
+    fun canEnableTags() = tagsEnabled && !isNodeInRubbish && !isNodeInBackups &&
+            accessPermission == AccessPermission.OWNER
 
     /**
      * Creates a copy of this view state with the info that can be extracted directly from folderTreeInfo

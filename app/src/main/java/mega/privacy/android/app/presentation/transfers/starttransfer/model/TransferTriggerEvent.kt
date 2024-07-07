@@ -2,6 +2,7 @@ package mega.privacy.android.app.presentation.transfers.starttransfer.model
 
 import android.net.Uri
 import androidx.core.net.toUri
+import mega.privacy.android.app.namecollision.data.NameCollisionChoice
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.transfer.TransferType
@@ -118,14 +119,15 @@ sealed interface TransferTriggerEvent {
     /**
      * Event to start uploading a list of files
      *
-     * @property uris list of files to be uploaded.
+     * @property pathsAndNames List of files to be uploaded along with the chosen names for them.
+     *                          The name will be null in case the original name.
      * @property destinationId the id of the folder where the files will be uploaded.
      */
     sealed interface StartUpload : TransferTriggerEvent {
         override val type: TransferType
             get() = TransferType.GENERAL_UPLOAD
 
-        val uris: List<Uri>
+        val pathsAndNames: Map<String, String?>
 
         val destinationId: NodeId
 
@@ -133,7 +135,35 @@ sealed interface TransferTriggerEvent {
          * Upload files
          */
         data class Files(
-            override val uris: List<Uri>,
+            override val pathsAndNames: Map<String, String?>,
+            override val destinationId: NodeId,
+        ) : StartUpload
+
+        /**
+         * Upload text file.
+         *
+         * @param path the path of the text file to be uploaded.
+         * @param destinationId the id of the folder where the file will be uploaded.
+         * @param isEditMode true if the file is uploaded in edit mode, false otherwise.
+         * @param fromHomePage true if the file is uploaded from home page, false otherwise.
+         */
+        data class TextFile(
+            val path: String,
+            override val destinationId: NodeId,
+            val isEditMode: Boolean,
+            val fromHomePage: Boolean,
+        ) : StartUpload {
+            override val pathsAndNames = mapOf(path to null)
+        }
+
+        /**
+         * Upload collided files.
+         *
+         * @property collisionChoice the choice made by the user to resolve the name collision.
+         */
+        data class CollidedFiles(
+            val collisionChoice: NameCollisionChoice?,
+            override val pathsAndNames: Map<String, String?>,
             override val destinationId: NodeId,
         ) : StartUpload
     }

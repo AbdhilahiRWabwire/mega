@@ -1,10 +1,13 @@
 package mega.privacy.android.domain.repository
 
+import kotlinx.coroutines.flow.Flow
 import mega.privacy.android.domain.entity.FileTypeInfo
+import mega.privacy.android.domain.entity.document.DocumentFolder
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.ViewerNode
+import mega.privacy.android.domain.entity.uri.UriPath
 import java.io.File
 import java.io.IOException
 
@@ -129,9 +132,9 @@ interface FileSystemRepository {
     suspend fun createDirectory(path: String): File
 
     /**
-     * Creates the temporary Camera Uploads root directory
+     * Creates a temporary Camera Uploads root directory
      */
-    suspend fun createCameraUploadTemporaryRootDirectory(): File?
+    suspend fun createCameraUploadsTemporaryRootDirectory(): File?
 
     /**
      * Recursively deletes the temporary Camera Uploads root directory
@@ -342,6 +345,14 @@ interface FileSystemRepository {
     suspend fun isContentUri(uriString: String): Boolean
 
     /**
+     * Is document uri
+     *
+     * @param uri
+     * @return
+     */
+    suspend fun isDocumentUri(uri: UriPath): Boolean
+
+    /**
      * @return true if the [uriString] represents an external storage content Uri
      */
     suspend fun isExternalStorageContentUri(uriString: String): Boolean
@@ -357,11 +368,12 @@ interface FileSystemRepository {
     suspend fun getFileSizeFromUri(uriString: String): Long?
 
     /**
-     * Copies the file represented by a content [uriString] to the destination File. Usually, it is to make a content file returned by a share intent usable by the SDK.
-     * @param uriString the string representing the file, it must be a "content" uri
-     * @param file the destination file where the original file will be copied
+     * Copies the file or folder represented by a content [sourceUri] to the destination File.
+     * If [sourceUri] represents a file then [targetFile] must represent a file as well, same for folders.
+     * @param sourceUri the string representing the file, it must be a "content" uri
+     * @param targetFile the destination file where the original file will be copied
      */
-    suspend fun copyContentUriToFile(uriString: String, file: File)
+    suspend fun copyContentUriToFile(sourceUri: UriPath, targetFile: File)
 
     /**
      * @return the files in same folder
@@ -392,4 +404,46 @@ interface FileSystemRepository {
      * @return true if the file is deleted successfully
      */
     suspend fun deleteFileByUri(uri: String): Boolean
+
+    /**
+     * Get files in document folder
+     *
+     * @param uri file uri of the document folder
+     * @return
+     */
+    suspend fun getFilesInDocumentFolder(uri: UriPath): DocumentFolder
+
+    /**
+     * Search files in document folder recursive
+     *
+     * @param folder
+     * @param query
+     * @return
+     */
+    fun searchFilesInDocumentFolderRecursive(
+        folder: UriPath,
+        query: String,
+    ): Flow<DocumentFolder>
+
+    /**
+     * Move files to document uri
+     *
+     * @param source
+     * @param destinationUri
+     */
+    suspend fun copyFilesToDocumentUri(
+        source: File,
+        destinationUri: UriPath,
+    )
+
+    /**
+     * Copy files
+     *
+     * @param source file or folder to copy
+     * @param destination destination folder
+     */
+    suspend fun copyFiles(
+        source: File,
+        destination: File,
+    )
 }

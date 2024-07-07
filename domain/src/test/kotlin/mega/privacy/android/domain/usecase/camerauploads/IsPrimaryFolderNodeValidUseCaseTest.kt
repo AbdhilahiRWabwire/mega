@@ -3,7 +3,6 @@ package mega.privacy.android.domain.usecase.camerauploads
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.domain.repository.CameraUploadsRepository
-import mega.privacy.android.domain.usecase.IsSecondaryFolderEnabled
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -26,20 +25,20 @@ internal class IsPrimaryFolderNodeValidUseCaseTest {
 
     private val cameraUploadsRepository = mock<CameraUploadsRepository>()
     private val getSecondarySyncHandleUseCase = mock<GetSecondarySyncHandleUseCase>()
-    private val isSecondaryFolderEnabled = mock<IsSecondaryFolderEnabled>()
+    private val isMediaUploadsEnabledUseCase = mock<IsMediaUploadsEnabledUseCase>()
 
     @BeforeAll
     fun setUp() {
         underTest = IsPrimaryFolderNodeValidUseCase(
             cameraUploadsRepository = cameraUploadsRepository,
             getSecondarySyncHandleUseCase = getSecondarySyncHandleUseCase,
-            isSecondaryFolderEnabled = isSecondaryFolderEnabled,
+            isMediaUploadsEnabledUseCase = isMediaUploadsEnabledUseCase,
         )
     }
 
     @BeforeEach
     fun resetMocks() {
-        reset(cameraUploadsRepository, getSecondarySyncHandleUseCase, isSecondaryFolderEnabled)
+        reset(cameraUploadsRepository, getSecondarySyncHandleUseCase, isMediaUploadsEnabledUseCase)
     }
 
     @Test
@@ -53,7 +52,7 @@ internal class IsPrimaryFolderNodeValidUseCaseTest {
         nodeHandle: Long,
         isPrimaryFolderNodeValid: Boolean,
     ) = runTest {
-        whenever(isSecondaryFolderEnabled()).thenReturn(false)
+        whenever(isMediaUploadsEnabledUseCase()).thenReturn(false)
         whenever(cameraUploadsRepository.getInvalidHandle()).thenReturn(-1L)
 
         assertThat(underTest(nodeHandle)).isEqualTo(isPrimaryFolderNodeValid)
@@ -71,7 +70,7 @@ internal class IsPrimaryFolderNodeValidUseCaseTest {
         secondaryFolderNodeHandle: Long,
         isPrimaryFolderNodeValid: Boolean,
     ) = runTest {
-        whenever(isSecondaryFolderEnabled()).thenReturn(true)
+        whenever(isMediaUploadsEnabledUseCase()).thenReturn(true)
         whenever(cameraUploadsRepository.getInvalidHandle()).thenReturn(-1L)
         whenever(getSecondarySyncHandleUseCase()).thenReturn(secondaryFolderNodeHandle)
 

@@ -1,6 +1,7 @@
 package mega.privacy.android.app.presentation.photos.albums.getlink
 
 import mega.privacy.android.icon.pack.R as iconPackR
+import mega.privacy.android.shared.resources.R as sharedR
 import android.text.TextUtils.TruncateAt.MIDDLE
 import android.view.View
 import android.widget.TextView
@@ -83,7 +84,7 @@ import mega.privacy.android.shared.original.core.ui.theme.white_alpha_054
 import mega.privacy.android.shared.original.core.ui.theme.white_alpha_087
 import mega.privacy.android.domain.entity.photos.Album
 import mega.privacy.android.domain.entity.photos.Photo
-import mega.privacy.android.legacy.core.ui.controls.controlssliders.MegaSwitch
+import mega.privacy.android.shared.original.core.ui.controls.controlssliders.MegaSwitch
 import mega.privacy.mobile.analytics.event.SingleAlbumLinkScreenEvent
 
 private typealias ImageDownloader = (photo: Photo, callback: (Boolean) -> Unit) -> Unit
@@ -138,7 +139,10 @@ internal fun AlbumGetLinkScreen(
     LaunchedEffect(isCopyrightAgreed) {
         if (isCopyrightAgreed) {
             albumGetLinkViewModel.hideCopyright()
-            albumGetLinkViewModel.fetchAlbum()
+
+            if (!state.showSharingSensitiveWarning) {
+                albumGetLinkViewModel.fetchAlbum()
+            }
         }
     }
 
@@ -160,6 +164,23 @@ internal fun AlbumGetLinkScreen(
 
                 showShareKeyConfirmation = false
             },
+        )
+    }
+
+    if (!state.showCopyright && state.showSharingSensitiveWarning) {
+        ConfirmationDialog(
+            title = stringResource(id = sharedR.string.hidden_items),
+            text = stringResource(id = R.string.hidden_nodes_sharing_album),
+            confirmButtonText = stringResource(id = R.string.button_continue),
+            cancelButtonText = stringResource(id = R.string.button_cancel),
+            dismissOnClickOutside = false,
+            dismissOnBackPress = false,
+            onConfirm = {
+                albumGetLinkViewModel.hideSharingSensitiveWarning()
+                albumGetLinkViewModel.fetchAlbum()
+            },
+            onDismiss = {},
+            onCancel = onBack,
         )
     }
 

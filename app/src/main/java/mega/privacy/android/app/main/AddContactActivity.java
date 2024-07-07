@@ -74,7 +74,6 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.widget.SearchView;
-import androidx.appcompat.widget.SwitchCompat;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.ContextCompat;
 import androidx.core.text.HtmlCompat;
@@ -122,7 +121,7 @@ import mega.privacy.android.app.main.adapters.ShareContactsAdapter;
 import mega.privacy.android.app.main.adapters.ShareContactsHeaderAdapter;
 import mega.privacy.android.app.main.controllers.ContactController;
 import mega.privacy.android.app.main.tasks.AddContactViewModel;
-import mega.privacy.android.app.presentation.contact.invite.contact.InviteContactActivity;
+import mega.privacy.android.app.presentation.contact.invite.InviteContactActivity;
 import mega.privacy.android.app.presentation.meeting.view.ParticipantsLimitWarningView;
 import mega.privacy.android.app.presentation.qrcode.QRCodeComposeActivity;
 import mega.privacy.android.app.psa.PsaWebBrowser;
@@ -130,6 +129,7 @@ import mega.privacy.android.app.usecase.chat.GetChatChangesUseCase;
 import mega.privacy.android.app.utils.ColorUtils;
 import mega.privacy.android.data.database.DatabaseHandler;
 import mega.privacy.android.domain.entity.Contact;
+import mega.privacy.android.shared.original.core.ui.controls.controlssliders.MegaSwitch;
 import nz.mega.sdk.MegaApiJava;
 import nz.mega.sdk.MegaChatApi;
 import nz.mega.sdk.MegaChatRoom;
@@ -295,11 +295,11 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
 
     private LinearLayout addContactsLayout;
     private NestedScrollView newGroupLayout;
-    private SwitchCompat ekrSwitch;
+    private MegaSwitch ekrSwitch;
     private boolean isEKREnabled = false;
     private RelativeLayout getChatLinkLayout;
     private CheckBox getChatLinkBox;
-    private SwitchCompat allowAddParticipantsSwitch;
+    private MegaSwitch allowAddParticipantsSwitch;
     private boolean isAllowAddParticipantsEnabled = true;
     private LinearLayoutManager newGrouplinearLayoutManager;
     private RecyclerView newGroupRecyclerView;
@@ -1631,7 +1631,7 @@ public class AddContactActivity extends PasscodeActivity implements View.OnClick
 
         newGroupLayout = (NestedScrollView) findViewById(R.id.new_group_layout);
         newGroupLayout.setVisibility(View.GONE);
-        ekrSwitch = (SwitchCompat) findViewById(R.id.ekr_switch);
+        ekrSwitch = (MegaSwitch) findViewById(R.id.ekr_switch);
         ekrSwitch.setOnClickListener(this);
         getChatLinkBox = (CheckBox) findViewById(R.id.get_chat_link_checkbox);
         getChatLinkLayout = (RelativeLayout) findViewById(R.id.get_chat_link_layout);

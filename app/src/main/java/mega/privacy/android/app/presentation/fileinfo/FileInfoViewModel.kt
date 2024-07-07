@@ -1,6 +1,5 @@
 package mega.privacy.android.app.presentation.fileinfo
 
-import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,7 +15,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import mega.privacy.android.app.domain.usecase.CheckNameCollision
 import mega.privacy.android.app.domain.usecase.GetNodeLocationInfo
-import mega.privacy.android.app.domain.usecase.offline.RemoveAvailableOfflineUseCase
 import mega.privacy.android.app.domain.usecase.shares.GetOutShares
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.namecollision.data.NameCollisionType
@@ -46,6 +44,7 @@ import mega.privacy.android.domain.entity.node.NodeChanges.Owner
 import mega.privacy.android.domain.entity.node.NodeChanges.Parent
 import mega.privacy.android.domain.entity.node.NodeChanges.Public_link
 import mega.privacy.android.domain.entity.node.NodeChanges.Remove
+import mega.privacy.android.domain.entity.node.NodeChanges.Tags
 import mega.privacy.android.domain.entity.node.NodeChanges.Timestamp
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
@@ -55,15 +54,16 @@ import mega.privacy.android.domain.entity.shares.AccessPermission
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.usecase.GetFolderTreeInfo
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
-import mega.privacy.android.domain.usecase.IsSecondaryFolderEnabled
 import mega.privacy.android.domain.usecase.MonitorChildrenUpdates
 import mega.privacy.android.domain.usecase.MonitorContactUpdates
 import mega.privacy.android.domain.usecase.MonitorNodeUpdatesById
 import mega.privacy.android.domain.usecase.MonitorOfflineFileAvailabilityUseCase
+import mega.privacy.android.domain.usecase.account.IsProAccountUseCase
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetPrimarySyncHandleUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetSecondarySyncHandleUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsEnabledUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsMediaUploadsEnabledUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactVerificationWarningUseCase
 import mega.privacy.android.domain.usecase.contact.MonitorChatOnlineStatusUseCase
 import mega.privacy.android.domain.usecase.favourites.IsAvailableOfflineUseCase
@@ -79,6 +79,7 @@ import mega.privacy.android.domain.usecase.node.IsNodeInBackupsUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodeUseCase
 import mega.privacy.android.domain.usecase.node.SetNodeDescriptionUseCase
+import mega.privacy.android.domain.usecase.offline.RemoveOfflineNodeUseCase
 import mega.privacy.android.domain.usecase.shares.GetContactItemFromInShareFolder
 import mega.privacy.android.domain.usecase.shares.GetNodeAccessPermission
 import mega.privacy.android.domain.usecase.shares.GetNodeOutSharesUseCase
@@ -86,9 +87,9 @@ import mega.privacy.android.domain.usecase.shares.SetOutgoingPermissions
 import mega.privacy.android.domain.usecase.shares.StopSharingNode
 import mega.privacy.android.domain.usecase.thumbnailpreview.GetPreviewUseCase
 import nz.mega.sdk.MegaNode
+import nz.mega.sdk.MegaShare
 import timber.log.Timber
 import java.io.File
-import java.lang.ref.WeakReference
 import javax.inject.Inject
 
 /**
@@ -122,7 +123,7 @@ class FileInfoViewModel @Inject constructor(
     private val getNodeLocationInfo: GetNodeLocationInfo,
     private val setNodeDescriptionUseCase: SetNodeDescriptionUseCase,
     private val isAvailableOfflineUseCase: IsAvailableOfflineUseCase,
-    private val removeAvailableOfflineUseCase: RemoveAvailableOfflineUseCase,
+    private val removeOfflineNodeUseCase: RemoveOfflineNodeUseCase,
     private val getNodeAccessPermission: GetNodeAccessPermission,
     private val setOutgoingPermissions: SetOutgoingPermissions,
     private val stopSharingNode: StopSharingNode,
@@ -130,13 +131,14 @@ class FileInfoViewModel @Inject constructor(
     private val getPrimarySyncHandleUseCase: GetPrimarySyncHandleUseCase,
     private val isCameraUploadsEnabledUseCase: IsCameraUploadsEnabledUseCase,
     private val getSecondarySyncHandleUseCase: GetSecondarySyncHandleUseCase,
-    private val isSecondaryFolderEnabled: IsSecondaryFolderEnabled,
+    private val isMediaUploadsEnabledUseCase: IsMediaUploadsEnabledUseCase,
     private val getAvailableNodeActionsUseCase: GetAvailableNodeActionsUseCase,
     private val nodeActionMapper: NodeActionMapper,
     private val clipboardGateway: ClipboardGateway,
     private val monitorOfflineFileAvailabilityUseCase: MonitorOfflineFileAvailabilityUseCase,
     private val getContactVerificationWarningUseCase: GetContactVerificationWarningUseCase,
     private val fileTypeIconMapper: FileTypeIconMapper,
+    private val isProAccountUseCase: IsProAccountUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FileInfoViewState())
@@ -169,10 +171,30 @@ class FileInfoViewModel @Inject constructor(
 
     init {
         checkDescriptionFlag()
+        checkTagsFeatureFlag()
+        checkIsProAccount()
         viewModelScope.launch {
             val isRemindersForContactVerificationEnabled =
                 getContactVerificationWarningUseCase()
             _uiState.update { it.copy(isRemindersForContactVerificationEnabled = isRemindersForContactVerificationEnabled) }
+        }
+    }
+
+    private fun checkIsProAccount() = viewModelScope.launch {
+        runCatching {
+            isProAccountUseCase()
+        }.onSuccess { result ->
+            _uiState.update { it.copy(isProAccount = result) }
+        }.onFailure {
+            Timber.e("Get isProAccount failed $it")
+        }
+    }
+
+    private fun checkTagsFeatureFlag() = viewModelScope.launch {
+        runCatching { getFeatureFlagValueUseCase(AppFeatures.NodeWithTags) }.onSuccess { flag ->
+            _uiState.update { it.copy(tagsEnabled = flag) }
+        }.onFailure {
+            Timber.e("Get feature flag failed $it")
         }
     }
 
@@ -199,10 +221,17 @@ class FileInfoViewModel @Inject constructor(
                 setNodeDescriptionUseCase(nodeHandle = nodeId, description = description)
             }.onSuccess {
                 _uiState.update {
-                    it.copy(
-                        oneOffViewEvent = triggered(FileInfoOneOffViewEvent.Message.NodeDescriptionAdded),
-                        descriptionText = description
-                    )
+                    if (it.descriptionText.isEmpty()) {
+                        it.copy(
+                            oneOffViewEvent = triggered(FileInfoOneOffViewEvent.Message.NodeDescriptionAdded),
+                            descriptionText = description
+                        )
+                    } else {
+                        it.copy(
+                            oneOffViewEvent = triggered(FileInfoOneOffViewEvent.Message.NodeDescriptionUpdated),
+                            descriptionText = description
+                        )
+                    }
                 }
             }.onFailure {
                 Timber.e("Set Node Description Failed $it")
@@ -355,7 +384,6 @@ class FileInfoViewModel @Inject constructor(
      */
     fun availableOfflineChanged(
         availableOffline: Boolean,
-        activity: WeakReference<Activity>,
     ) {
         viewModelScope.launch {
             if (availableOffline == _uiState.value.isAvailableOffline) return@launch
@@ -375,9 +403,8 @@ class FileInfoViewModel @Inject constructor(
                     it.copy(isAvailableOfflineEnabled = false) // to avoid multiple changes while changing
                 }
                 viewModelScope.launch {
-                    removeAvailableOfflineUseCase(
-                        typedNode.id,
-                        activity
+                    removeOfflineNodeUseCase(
+                        typedNode.id
                     )
                     updateState {
                         it.copy(
@@ -416,7 +443,7 @@ class FileInfoViewModel @Inject constructor(
      * gets the [MegaShare] of the given email if it exists
      */
     @Deprecated("this should be avoided, need while using FileContactsListBottomSheetDialogFragment. To be removed once migrated to compose")
-    fun getShareFromEmail(email: String?) =
+    fun getShareFromEmail(email: String?): MegaShare? =
         _uiState.value.outSharesDeprecated.firstOrNull { it.user == email }
 
     /**
@@ -569,7 +596,7 @@ class FileInfoViewModel @Inject constructor(
                             FileInfoExtraAction.ConfirmRemove.SendToRubbishCameraUploads
                         }
 
-                        getSecondarySyncHandleUseCase() == handle && isSecondaryFolderEnabled() -> {
+                        getSecondarySyncHandleUseCase() == handle && isMediaUploadsEnabledUseCase() -> {
                             FileInfoExtraAction.ConfirmRemove.SendToRubbishSecondaryMediaUploads
                         }
 
@@ -657,7 +684,6 @@ class FileInfoViewModel @Inject constructor(
                             }
                         }
 
-                        Name -> updateTitle()
                         Owner -> updateOwner()
                         Inshare -> updateAccessPermission()
                         Parent ->
@@ -671,8 +697,7 @@ class FileInfoViewModel @Inject constructor(
                                 return@any true
                             }
 
-                        Timestamp -> updateTimeStamp()
-                        Description -> updateDescription()
+                        Description, Name, Tags, Timestamp -> updateTypedNode()
                         Outshare -> {
                             updateOutShares()
                             updateIcon()
@@ -832,16 +857,6 @@ class FileInfoViewModel @Inject constructor(
         }
     }
 
-    private fun updateTimeStamp() {
-        updateState {
-            //we need to update the typedNode to get changes in timeStamps
-            getNodeByIdUseCase(typedNode.id)?.let { updateTypedNode ->
-                typedNode = updateTypedNode
-            }
-            it.copyWithTypedNode(typedNode = typedNode)
-        }
-    }
-
     private fun updateFolderTreeInfo() {
         (typedNode as? TypedFolderNode)?.let { folder ->
             viewModelScope.launch {
@@ -881,16 +896,7 @@ class FileInfoViewModel @Inject constructor(
         }
     }
 
-    private fun updateTitle() {
-        updateState {
-            getNodeByIdUseCase(typedNode.id)?.let { updateTypedNode ->
-                typedNode = updateTypedNode
-            }
-            it.copyWithTypedNode(typedNode = typedNode)
-        }
-    }
-
-    private fun updateDescription() {
+    private fun updateTypedNode() {
         updateState {
             getNodeByIdUseCase(typedNode.id)?.let { updateTypedNode ->
                 typedNode = updateTypedNode
@@ -1030,4 +1036,5 @@ class FileInfoViewModel @Inject constructor(
             )
         }
     }
+
 }

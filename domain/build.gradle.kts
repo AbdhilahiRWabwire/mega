@@ -4,14 +4,9 @@ plugins {
     alias(convention.plugins.mega.jvm.library)
     alias(convention.plugins.mega.jvm.test)
     alias(convention.plugins.mega.jvm.jacoco)
-    id("com.android.lint")
-    id("kotlin-kapt")
+    alias(convention.plugins.mega.lint)
+    alias(convention.plugins.mega.jvm.hilt)
     kotlin("plugin.serialization") version "1.9.21"
-}
-
-lint {
-    abortOnError = false
-    xmlOutput = file("build/reports/lint-results.xml")
 }
 
 dependencies {
@@ -19,14 +14,9 @@ dependencies {
     implementation(lib.coroutines.core)
     implementation(lib.javax.inject)
 
-    implementation(google.hilt.core)
     implementation(androidx.paging.core)
 
     implementation(lib.kotlin.serialisation)
-
-    if (shouldApplyDefaultConfiguration(project)) {
-        kapt(google.hilt.android.compiler)
-    }
 
     // Testing dependencies
     testImplementation(testlib.bundles.unit.test)

@@ -73,14 +73,14 @@ import mega.privacy.android.domain.exception.QuotaExceededMegaException
 import mega.privacy.android.domain.monitoring.CrashReporter
 import mega.privacy.android.domain.repository.FileSystemRepository
 import mega.privacy.android.domain.repository.TimeSystemRepository
-import mega.privacy.android.domain.usecase.CreateCameraUploadTemporaryRootDirectoryUseCase
-import mega.privacy.android.domain.usecase.IsSecondaryFolderEnabled
-import mega.privacy.android.domain.usecase.IsWifiNotSatisfiedUseCase
+import mega.privacy.android.domain.usecase.camerauploads.CreateCameraUploadsTemporaryRootDirectoryUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsMediaUploadsEnabledUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsWifiNotSatisfiedUseCase
 import mega.privacy.android.domain.usecase.account.IsStorageOverQuotaUseCase
 import mega.privacy.android.domain.usecase.backup.InitializeBackupsUseCase
 import mega.privacy.android.domain.usecase.camerauploads.AreCameraUploadsFoldersInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.camerauploads.BroadcastCameraUploadsSettingsActionUseCase
-import mega.privacy.android.domain.usecase.camerauploads.BroadcastStorageOverQuotaUseCase
+import mega.privacy.android.domain.usecase.transfers.overquota.BroadcastStorageOverQuotaUseCase
 import mega.privacy.android.domain.usecase.camerauploads.CheckOrCreateCameraUploadsNodeUseCase
 import mega.privacy.android.domain.usecase.camerauploads.DeleteCameraUploadsTemporaryRootDirectoryUseCase
 import mega.privacy.android.domain.usecase.camerauploads.DisableCameraUploadsUseCase
@@ -98,7 +98,7 @@ import mega.privacy.android.domain.usecase.camerauploads.IsChargingRequiredUseCa
 import mega.privacy.android.domain.usecase.camerauploads.IsPrimaryFolderPathValidUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsSecondaryFolderSetUseCase
 import mega.privacy.android.domain.usecase.camerauploads.MonitorIsChargingRequiredToUploadContentUseCase
-import mega.privacy.android.domain.usecase.camerauploads.MonitorStorageOverQuotaUseCase
+import mega.privacy.android.domain.usecase.transfers.overquota.MonitorStorageOverQuotaUseCase
 import mega.privacy.android.domain.usecase.camerauploads.ProcessCameraUploadsMediaUseCase
 import mega.privacy.android.domain.usecase.camerauploads.RenameCameraUploadsRecordsUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SendBackupHeartBeatSyncUseCase
@@ -158,7 +158,7 @@ internal class CameraUploadsWorkerTest {
     private val getPrimaryFolderPathUseCase: GetPrimaryFolderPathUseCase = mock()
     private val isPrimaryFolderPathValidUseCase: IsPrimaryFolderPathValidUseCase = mock()
     private val isSecondaryFolderSetUseCase: IsSecondaryFolderSetUseCase = mock()
-    private val isSecondaryFolderEnabled: IsSecondaryFolderEnabled = mock()
+    private val isMediaUploadsEnabledUseCase: IsMediaUploadsEnabledUseCase = mock()
     private val isCameraUploadsEnabledUseCase: IsCameraUploadsEnabledUseCase = mock()
     private val isWifiNotSatisfiedUseCase: IsWifiNotSatisfiedUseCase = mock()
     private val setPrimaryFolderLocalPathUseCase: SetPrimaryFolderLocalPathUseCase = mock()
@@ -181,7 +181,7 @@ internal class CameraUploadsWorkerTest {
         mock()
     private val resetTotalUploadsUseCase: ResetTotalUploadsUseCase = mock()
     private val disableMediaUploadSettingsUseCase: DisableMediaUploadsSettingsUseCase = mock()
-    private val createCameraUploadTemporaryRootDirectoryUseCase: CreateCameraUploadTemporaryRootDirectoryUseCase =
+    private val createCameraUploadsTemporaryRootDirectoryUseCase: CreateCameraUploadsTemporaryRootDirectoryUseCase =
         mock()
     private val deleteCameraUploadsTemporaryRootDirectoryUseCase: DeleteCameraUploadsTemporaryRootDirectoryUseCase =
         mock()
@@ -261,7 +261,7 @@ internal class CameraUploadsWorkerTest {
                 getPrimaryFolderPathUseCase = getPrimaryFolderPathUseCase,
                 isPrimaryFolderPathValidUseCase = isPrimaryFolderPathValidUseCase,
                 isSecondaryFolderSetUseCase = isSecondaryFolderSetUseCase,
-                isSecondaryFolderEnabled = isSecondaryFolderEnabled,
+                isMediaUploadsEnabledUseCase = isMediaUploadsEnabledUseCase,
                 isCameraUploadsEnabledUseCase = isCameraUploadsEnabledUseCase,
                 isWifiNotSatisfiedUseCase = isWifiNotSatisfiedUseCase,
                 setPrimaryFolderLocalPathUseCase = setPrimaryFolderLocalPathUseCase,
@@ -282,7 +282,7 @@ internal class CameraUploadsWorkerTest {
                 establishCameraUploadsSyncHandlesUseCase = establishCameraUploadsSyncHandlesUseCase,
                 resetTotalUploadsUseCase = resetTotalUploadsUseCase,
                 disableMediaUploadSettingsUseCase = disableMediaUploadSettingsUseCase,
-                createCameraUploadTemporaryRootDirectoryUseCase = createCameraUploadTemporaryRootDirectoryUseCase,
+                createCameraUploadsTemporaryRootDirectoryUseCase = createCameraUploadsTemporaryRootDirectoryUseCase,
                 deleteCameraUploadsTemporaryRootDirectoryUseCase = deleteCameraUploadsTemporaryRootDirectoryUseCase,
                 scheduleCameraUploadUseCase = scheduleCameraUploadUseCase,
                 updateCameraUploadsBackupStatesUseCase = updateCameraUploadsBackupStatesUseCase,
@@ -346,11 +346,11 @@ internal class CameraUploadsWorkerTest {
         whenever(isPrimaryFolderPathValidUseCase(primaryLocalPath)).thenReturn(true)
         whenever(getUploadFolderHandleUseCase(CameraUploadFolderType.Primary))
             .thenReturn(primaryNodeHandle)
-        whenever(isSecondaryFolderEnabled()).thenReturn(false)
+        whenever(isMediaUploadsEnabledUseCase()).thenReturn(false)
 
 
         // mock upload process
-        whenever(createCameraUploadTemporaryRootDirectoryUseCase()).thenReturn(tempPath)
+        whenever(createCameraUploadsTemporaryRootDirectoryUseCase()).thenReturn(tempPath)
         whenever(getUploadFolderHandleUseCase(CameraUploadFolderType.Primary))
             .thenReturn(primaryNodeHandle)
         whenever(getUploadFolderHandleUseCase(CameraUploadFolderType.Secondary))
@@ -1157,7 +1157,7 @@ internal class CameraUploadsWorkerTest {
     fun `test that the worker disable media uploads, reset secondary local folder path and show an error notification when media uploads enabled and local secondary folder path is not valid`() =
         runTest {
             setupDefaultCheckConditionMocks()
-            whenever(isSecondaryFolderEnabled()).thenReturn(true)
+            whenever(isMediaUploadsEnabledUseCase()).thenReturn(true)
             whenever(isSecondaryFolderSetUseCase()).thenReturn(false)
 
             underTest.doWork()
@@ -1217,7 +1217,7 @@ internal class CameraUploadsWorkerTest {
     fun `test that the worker returns failure when secondary upload node is not retrieved and fails to be created`() =
         runTest {
             setupDefaultCheckConditionMocks()
-            whenever(isSecondaryFolderEnabled()).thenReturn(true)
+            whenever(isMediaUploadsEnabledUseCase()).thenReturn(true)
             whenever(isSecondaryFolderSetUseCase()).thenReturn(true)
             whenever(getUploadFolderHandleUseCase(CameraUploadFolderType.Secondary))
                 .thenReturn(-1L)
@@ -1255,7 +1255,7 @@ internal class CameraUploadsWorkerTest {
     fun `test that the worker returns failure when it fails to create the temporary folder`() =
         runTest {
             setupDefaultCheckConditionMocks()
-            whenever(createCameraUploadTemporaryRootDirectoryUseCase()).thenThrow(RuntimeException())
+            whenever(createCameraUploadsTemporaryRootDirectoryUseCase()).thenThrow(RuntimeException())
 
             val result = underTest.doWork()
 

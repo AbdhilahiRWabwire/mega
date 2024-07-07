@@ -1,123 +1,19 @@
 package mega.privacy.android.shared.original.core.ui.controls.chip
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ChipDefaults
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.SelectableChipColors
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.State
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.dp
 import mega.privacy.android.shared.original.core.ui.theme.MegaOriginalTheme
 import mega.privacy.android.shared.original.core.ui.theme.extensions.subtitle2medium
 
-/**
- * Chip colors
- */
-@Stable
-interface ChipColors {
-
-    /**
-     * Background (filling) color of chip
-     * @param selected if chip is selected
-     * @param enabled if chip is enabled
-     *
-     * @return background color as [State]
-     */
-    @Composable
-    fun backgroundColor(selected: Boolean, enabled: Boolean): State<Color>
-
-    /**
-     * Content (inside chip) color of chip
-     * @param selected if chip is selected
-     * @param enabled if chip is enabled
-     *
-     * @return content color as [State]
-     */
-    @Composable
-    fun contentColor(selected: Boolean, enabled: Boolean): State<Color>
-
-    /**
-     * Border color of chip
-     * @param selected if chip is selected
-     * @param enabled if chip is enabled
-     *
-     * @return border color as [State]
-     */
-    @Composable
-    fun borderColor(selected: Boolean, enabled: Boolean): State<Color>
-}
-
-/**
- * Default chip colors
- * @property selectedBackgroundColor color of background when selected
- * @property unselectedBackgroundColor color of background when unselected
- * @property disabledBackgroundColor color of background when disabled
- * @property selectedContentColor color of content when selected
- * @property unselectedContentColor color of content when unselected
- * @property disabledContentColor color of content when disabled
- * @property selectedBorderColor color of border when selected
- * @property unselectedBorderColor color of border when unselected
- * @property disabledBorderColor color of border when disabled
- */
-@Immutable
-class DefaultChipColors(
-    val selectedBackgroundColor: Color,
-    val unselectedBackgroundColor: Color,
-    val disabledBackgroundColor: Color,
-    val selectedContentColor: Color,
-    val unselectedContentColor: Color,
-    val disabledContentColor: Color,
-    val selectedBorderColor: Color,
-    val unselectedBorderColor: Color,
-    val disabledBorderColor: Color,
-) : ChipColors {
-
-    @Composable
-    override fun backgroundColor(selected: Boolean, enabled: Boolean): State<Color> {
-        return rememberUpdatedState(
-            if (!enabled) {
-                disabledBackgroundColor
-            } else {
-                if (selected) {
-                    selectedBackgroundColor
-                } else {
-                    unselectedBackgroundColor
-                }
-            }
-        )
-    }
-
-    @Composable
-    override fun contentColor(selected: Boolean, enabled: Boolean): State<Color> {
-        return rememberUpdatedState(
-            if (!enabled) {
-                disabledContentColor
-            } else {
-                if (selected) {
-                    selectedContentColor
-                } else {
-                    unselectedContentColor
-                }
-            }
-        )
-    }
-
-    @Composable
-    override fun borderColor(selected: Boolean, enabled: Boolean): State<Color> {
-        return rememberUpdatedState(
-            if (!enabled) {
-                disabledBorderColor
-            } else {
-                if (selected) {
-                    selectedBorderColor
-                } else {
-                    unselectedBorderColor
-                }
-            }
-        )
-    }
-}
 
 /**
  * Definition of chips
@@ -125,12 +21,11 @@ class DefaultChipColors(
 interface ChipStyle {
 
     /**
-     * Colors of chip
-     *
-     * @return [ChipColors]
+     * Colors of selectable chip
      */
+    @OptIn(ExperimentalMaterialApi::class)
     @Composable
-    fun colors(): ChipColors
+    fun selectableChipColors(): SelectableChipColors
 
     /**
      * Typography of chip
@@ -139,6 +34,21 @@ interface ChipStyle {
      */
     @Composable
     fun typography(): TextStyle
+
+    /**
+     * Border style of chip
+     *
+     * @return [BorderStroke] or null if no border
+     */
+    @Composable
+    fun borderStyle(): BorderStroke = BorderStroke(1.dp, Color.Transparent)
+
+    /**
+     * Shape of chip
+     *
+     * @return [Shape]
+     */
+    fun shape(): Shape = RoundedCornerShape(8.dp)
 }
 
 /**
@@ -146,20 +56,18 @@ interface ChipStyle {
  */
 object DefaultChipStyle : ChipStyle {
 
-    /**
-     * Colors of chip
-     */
+    @OptIn(ExperimentalMaterialApi::class)
     @Composable
-    override fun colors(): ChipColors = DefaultChipColors(
+    override fun selectableChipColors(): SelectableChipColors = ChipDefaults.filterChipColors(
         selectedBackgroundColor = MegaOriginalTheme.colors.components.selectionControl,
-        unselectedBackgroundColor = MegaOriginalTheme.colors.button.secondary,
-        disabledBackgroundColor = MegaOriginalTheme.colors.button.secondary,
         selectedContentColor = MegaOriginalTheme.colors.text.inverse,
-        unselectedContentColor = MegaOriginalTheme.colors.text.secondary,
+        selectedLeadingIconColor = MegaOriginalTheme.colors.icon.inverse,
+        backgroundColor = MegaOriginalTheme.colors.button.secondary,
+        contentColor = MegaOriginalTheme.colors.text.secondary,
+        leadingIconColor = MegaOriginalTheme.colors.icon.inverse,
+        disabledBackgroundColor = MegaOriginalTheme.colors.button.secondary,
         disabledContentColor = MegaOriginalTheme.colors.text.secondary,
-        selectedBorderColor = Color.Transparent,
-        unselectedBorderColor = Color.Transparent,
-        disabledBorderColor = Color.Transparent,
+        disabledLeadingIconColor = MegaOriginalTheme.colors.icon.secondary,
     )
 
     /**
@@ -167,4 +75,55 @@ object DefaultChipStyle : ChipStyle {
      */
     @Composable
     override fun typography(): TextStyle = MaterialTheme.typography.subtitle2medium
+}
+
+/**
+ * Transparent style for chips
+ */
+object TransparentChipStyle : ChipStyle {
+
+    @OptIn(ExperimentalMaterialApi::class)
+    @Composable
+    override fun selectableChipColors(): SelectableChipColors = ChipDefaults.filterChipColors(
+        selectedBackgroundColor = Color.Transparent,
+        selectedContentColor = MegaOriginalTheme.colors.text.primary,
+        selectedLeadingIconColor = MegaOriginalTheme.colors.icon.primary,
+        backgroundColor = Color.Transparent,
+        contentColor = MegaOriginalTheme.colors.text.primary,
+        leadingIconColor = MegaOriginalTheme.colors.icon.primary,
+        disabledBackgroundColor = Color.Transparent,
+        disabledContentColor = MegaOriginalTheme.colors.text.primary,
+        disabledLeadingIconColor = MegaOriginalTheme.colors.icon.primary,
+    )
+
+    @Composable
+    override fun typography(): TextStyle = MaterialTheme.typography.subtitle2medium
+
+    @Composable
+    override fun borderStyle() = BorderStroke(1.dp, MegaOriginalTheme.colors.border.strong)
+}
+
+/**
+ * Rounded style for chips
+ */
+object RoundedChipStyle : ChipStyle {
+
+    @OptIn(ExperimentalMaterialApi::class)
+    @Composable
+    override fun selectableChipColors(): SelectableChipColors = ChipDefaults.filterChipColors(
+        selectedBackgroundColor = MegaOriginalTheme.colors.components.selectionControl,
+        selectedContentColor = MegaOriginalTheme.colors.text.inverse,
+        selectedLeadingIconColor = MegaOriginalTheme.colors.icon.inverse,
+        backgroundColor = MegaOriginalTheme.colors.button.secondary,
+        contentColor = MegaOriginalTheme.colors.text.secondary,
+        leadingIconColor = MegaOriginalTheme.colors.icon.inverse,
+        disabledBackgroundColor = MegaOriginalTheme.colors.button.secondary,
+        disabledContentColor = MegaOriginalTheme.colors.text.secondary,
+        disabledLeadingIconColor = MegaOriginalTheme.colors.icon.secondary,
+    )
+
+    @Composable
+    override fun typography(): TextStyle = MaterialTheme.typography.subtitle2medium
+
+    override fun shape(): Shape = RoundedCornerShape(18.dp)
 }

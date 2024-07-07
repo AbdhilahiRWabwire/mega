@@ -3,26 +3,16 @@ import mega.privacy.android.build.shouldApplyDefaultConfiguration
 
 plugins {
     alias(convention.plugins.mega.android.library)
+    alias(convention.plugins.mega.android.library.compose)
     alias(convention.plugins.mega.android.test)
     alias(convention.plugins.mega.android.library.jacoco)
+    alias(convention.plugins.mega.lint)
+    alias(convention.plugins.mega.android.hilt)
     id("kotlin-android")
-    id("kotlin-kapt")
     id("de.mannodermaus.android-junit5")
 }
 
 android {
-    buildFeatures {
-        compose = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = androidx.versions.compose.compiler.get()
-    }
-
-    lint {
-        abortOnError = false
-        xmlOutput = file("build/reports/lint-results.xml")
-    }
     namespace = "mega.privacy.android.feature.devicecenter"
 }
 
@@ -53,27 +43,17 @@ dependencies {
     implementation(google.material)
     implementation(androidx.lifecycle.viewmodel)
     implementation(androidx.lifecycle.service)
-    implementation(google.hilt.android)
-
-    if (shouldApplyDefaultConfiguration(project)) {
-        apply(plugin = "dagger.hilt.android.plugin")
-
-        kapt(google.hilt.android.compiler)
-        kapt(androidx.hilt.compiler)
-    }
 
     // Compose
     implementation(androidx.lifecycle.runtime.compose)
     implementation(androidx.compose.activity)
     implementation(androidx.compose.viewmodel)
-    implementation(platform(androidx.compose.bom))
     implementation(androidx.bundles.compose.bom)
     implementation(lib.compose.state.events)
     implementation(androidx.hilt.navigation)
     implementation(androidx.constraintlayout.compose)
     implementation(lib.compose.state.events)
 
-    testImplementation(testlib.compose.junit)
     testImplementation(testlib.bundles.ui.test)
     testImplementation(testlib.bundles.unit.test)
 
