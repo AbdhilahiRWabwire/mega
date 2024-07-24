@@ -12,6 +12,7 @@ import mega.privacy.android.data.gateway.CacheGateway
 import mega.privacy.android.data.gateway.FileGateway
 import mega.privacy.android.data.gateway.MegaLocalRoomGateway
 import mega.privacy.android.data.gateway.MegaLocalStorageGateway
+import mega.privacy.android.data.gateway.WorkManagerGateway
 import mega.privacy.android.data.gateway.api.MegaApiFolderGateway
 import mega.privacy.android.data.gateway.api.MegaApiGateway
 import mega.privacy.android.data.gateway.api.MegaChatApiGateway
@@ -48,10 +49,12 @@ import mega.privacy.android.domain.entity.node.TypedImageNode
 import mega.privacy.android.domain.entity.node.publiclink.PublicLinkFolder
 import mega.privacy.android.domain.entity.offline.OfflineFolderInfo
 import mega.privacy.android.domain.entity.offline.OtherOfflineNodeInformation
+import mega.privacy.android.domain.entity.search.SensitivityFilterOption
 import mega.privacy.android.domain.entity.shares.AccessPermission
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.node.ForeignNodeException
 import mega.privacy.android.domain.repository.NodeRepository
+import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaCancelToken
 import nz.mega.sdk.MegaChatMessage
 import nz.mega.sdk.MegaChatRoom
@@ -122,6 +125,7 @@ class NodeRepositoryImplTest {
     private val cancelTokenProvider = mock<CancelTokenProvider>()
     private val megaSearchFilterMapper = mock<MegaSearchFilterMapper>()
     private val stringListMapper = mock<StringListMapper>()
+    private val workManagerGateway = mock<WorkManagerGateway>()
     private val fileNodeMapper = FileNodeMapper(
         cacheGateway = cacheGateway,
         megaApiGateway = megaApiGateway,
@@ -174,6 +178,7 @@ class NodeRepositoryImplTest {
             nodeLabelIntMapper = nodeLabelIntMapper,
             cancelTokenProvider = cancelTokenProvider,
             megaSearchFilterMapper = megaSearchFilterMapper,
+            workManagerGateway = workManagerGateway,
         )
     }
 
@@ -204,6 +209,7 @@ class NodeRepositoryImplTest {
             accessPermissionMapper,
             megaLocalStorageGateway,
             megaNodeMapper,
+            workManagerGateway
         )
     }
 
@@ -718,7 +724,8 @@ class NodeRepositoryImplTest {
         whenever(megaApiGateway.getNumChildFiles(megaNode)).thenReturn(3)
         whenever(megaApiGateway.isPendingShare(megaNode)).thenReturn(true)
         whenever(megaApiGateway.isInRubbish(megaNode)).thenReturn(true)
-        whenever(fileTypeInfoMapper.invoke(megaNode)).thenReturn(PdfFileTypeInfo)
+        whenever(fileTypeInfoMapper.invoke(megaNode.name, megaNode.duration))
+            .thenReturn(PdfFileTypeInfo)
         whenever(megaApiGateway.isSensitiveInherited(megaNode)).thenReturn(false)
         return megaNode
     }
@@ -1337,6 +1344,99 @@ class NodeRepositoryImplTest {
                 description = description
             )
             verify(megaApiGateway).setNodeDescription(eq(megaNode), eq(description), any())
+        }
+
+    @Test
+    fun `test that sensitive descendant is checked properly`() = runTest {
+        val node = mock<MegaNode>()
+        val nodeId = NodeId(node.handle)
+        val filter = mock<MegaSearchFilter>()
+        val token = mock<MegaCancelToken>()
+
+        whenever(cancelTokenProvider.getOrCreateCancelToken()).thenReturn(token)
+        whenever(sortOrderIntMapper(SortOrder.ORDER_NONE)).thenReturn(MegaApiJava.ORDER_NONE)
+        whenever(
+            megaSearchFilterMapper(
+                parentHandle = nodeId,
+                sensitivityFilter = SensitivityFilterOption.SensitiveOnly,
+            )
+        ).thenReturn(filter)
+        whenever(
+            megaApiGateway.searchWithFilter(
+                filter,
+                sortOrderIntMapper(SortOrder.ORDER_NONE),
+                token,
+            )
+        ).thenReturn(listOf(node))
+
+        assertThat(underTest.hasSensitiveDescendant(nodeId)).isTrue()
+    }
+
+    @Test
+    fun `test that sensitive inheritance is checked properly`() = runTest {
+        val node = mock<MegaNode>()
+        val nodeId = NodeId(node.handle)
+
+        whenever(megaApiGateway.getMegaNodeByHandle(nodeId.longValue))
+            .thenReturn(node)
+        whenever(megaApiGateway.isSensitiveInherited(node))
+            .thenReturn(true)
+
+        assertThat(underTest.hasSensitiveInherited(nodeId)).isTrue()
+    }
+
+    @Test
+    fun `test that all offline nodes are fetched when getOfflineNodesByQuery is called with parent id -1`() =
+        runTest {
+            val query = "test"
+            val parentId = -1
+            val firstNodeName = "TeSt file name"
+
+            val offlineNode1 = mock<Offline> {
+                on { name }.thenReturn(firstNodeName)
+            }
+            val offlineNodeInformation1 = mock<OtherOfflineNodeInformation> {
+                on { name }.thenReturn(firstNodeName)
+
+            }
+            whenever(megaLocalRoomGateway.getAllOfflineInfo()).thenReturn(
+                listOf(offlineNode1)
+            )
+            whenever(offlineNodeInformationMapper(offlineNode1)).thenReturn(offlineNodeInformation1)
+
+            val result = underTest.getOfflineNodesByQuery(query, parentId)
+            assertThat(result.size).isEqualTo(1)
+            assertThat(result.first().name).isEqualTo(firstNodeName)
+        }
+
+    @Test
+    fun `test that getOfflineNodesByQuery filters nodes by case-insensitive name when invoked with query`() =
+        runTest {
+            val query = "test"
+            val parentId = 123
+            val firstNodeName = "TeSt file name"
+
+            val offlineNode1 = mock<Offline> {
+                on { name }.thenReturn(firstNodeName)
+            }
+            val offlineNodeInformation1 = mock<OtherOfflineNodeInformation> {
+                on { name }.thenReturn(firstNodeName)
+
+            }
+            val offlineNode2 = mock<Offline> {
+                on { name }.thenReturn("file name")
+            }
+            whenever(megaLocalRoomGateway.getOfflineInfoByParentId(parentId)).thenReturn(
+                listOf(
+                    offlineNode1,
+                    offlineNode2
+                )
+            )
+            whenever(offlineNodeInformationMapper(offlineNode1)).thenReturn(offlineNodeInformation1)
+
+            val result = underTest.getOfflineNodesByQuery(query, parentId)
+            assertThat(result.size).isEqualTo(1)
+            assertThat(result.first().name).isEqualTo(firstNodeName)
         }
 
     private fun provideNodeId() = Stream.of(

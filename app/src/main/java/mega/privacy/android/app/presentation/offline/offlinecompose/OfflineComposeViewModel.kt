@@ -122,7 +122,6 @@ class OfflineComposeViewModel @Inject constructor(
         }
     }
 
-
     private fun refreshOfflineNodes() {
         viewModelScope.launch {
             loadOfflineNodes()
@@ -131,19 +130,33 @@ class OfflineComposeViewModel @Inject constructor(
 
     private suspend fun loadOfflineNodes() {
         runCatching {
-            getOfflineNodesByParentIdUseCase(uiState.value.parentId)
+            getOfflineNodesByParentIdUseCase(uiState.value.parentId, uiState.value.searchQuery)
         }.onSuccess { offlineNodeList ->
             _uiState.update {
                 it.copy(
+                    isLoading = false,
                     offlineNodes = offlineNodeList.map { item -> OfflineNodeUIItem(item) }
                 )
             }
         }.onFailure { throwable ->
             Timber.e(throwable)
             _uiState.update {
-                it.copy(offlineNodes = emptyList())
+                it.copy(
+                    isLoading = false,
+                    offlineNodes = emptyList()
+                )
             }
         }
+    }
+
+    /**
+     * Set search query
+     */
+    fun setSearchQuery(query: String?) {
+        _uiState.update {
+            it.copy(searchQuery = query)
+        }
+        refreshOfflineNodes()
     }
 
     /**
@@ -167,20 +180,21 @@ class OfflineComposeViewModel @Inject constructor(
                 if (rootFolderOnly) {
                     _uiState.update {
                         it.copy(
-                            openFolderInPageEvent = triggered(offlineNodeUIItem)
+                            openFolderInPageEvent = triggered(offlineNodeUIItem.offlineNode),
                         )
                     }
                 } else {
                     parentStack.push(
                         Pair(
                             offlineNodeUIItem.offlineNode.parentId,
-                            uiState.value.title ?: ""
+                            uiState.value.title
                         )
                     )
                     _uiState.update {
                         it.copy(
                             title = offlineNodeUIItem.offlineNode.name,
                             parentId = offlineNodeUIItem.offlineNode.id,
+                            closeSearchViewEvent = triggered
                         )
                     }
                     refreshOfflineNodes()
@@ -198,6 +212,15 @@ class OfflineComposeViewModel @Inject constructor(
     }
 
     /**
+     * On Close Search View Event Consumed
+     */
+    fun onCloseSearchViewEventConsumed() {
+        _uiState.update {
+            it.copy(closeSearchViewEvent = consumed)
+        }
+    }
+
+    /**
      * On Open Offline Node Event Consumed
      */
     fun onOpenOfflineNodeEventConsumed() {
@@ -208,6 +231,8 @@ class OfflineComposeViewModel @Inject constructor(
 
     /**
      * OnBackClicked
+     *
+     * @return [Int] 0 if no node was opened, and offline page should be exited
      */
     fun onBackClicked(): Int? {
         parentStack.pop()?.let { (parentId, parentTitle) ->
@@ -220,7 +245,7 @@ class OfflineComposeViewModel @Inject constructor(
             refreshOfflineNodes()
             return null
         } ?: run {
-            return -1
+            return 0
         }
     }
 

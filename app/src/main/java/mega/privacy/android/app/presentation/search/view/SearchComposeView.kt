@@ -13,6 +13,7 @@ import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,8 +85,8 @@ fun SearchComposeView(
     nodeActionHandler: NodeActionHandler,
     clearSelection: () -> Unit,
     fileTypeIconMapper: FileTypeIconMapper,
-    modifier: Modifier = Modifier,
     nodeSourceType: NodeSourceType,
+    modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
@@ -109,6 +110,12 @@ fun SearchComposeView(
             updateSearchQuery(it)
         },
     )
+
+    val highlightText by remember(state.navigationLevel) {
+        derivedStateOf {
+            searchQuery.takeIf { state.navigationLevel.isEmpty() }.orEmpty()
+        }
+    }
 
     topBarPadding = if (state.navigationLevel.isNotEmpty()) 8.dp else 0.dp
 
@@ -171,6 +178,7 @@ fun SearchComposeView(
                         onItemClicked = onItemClick,
                         onLongClick = onLongClick,
                         sortOrder = sortOrder,
+                        highlightText = if (state.searchDescriptionEnabled == true) highlightText else "",
                         isListView = state.currentViewType == ViewType.LIST,
                         onSortOrderClick = onSortOrderClick,
                         onChangeViewTypeClick = onChangeViewTypeClick,

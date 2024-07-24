@@ -82,6 +82,20 @@ sealed interface TransferTriggerEvent {
         val isHighPriority: Boolean
     }
 
+    /**
+     * Copy trigger event
+     *
+     */
+    sealed interface CopyTriggerEvent : DownloadTriggerEvent {
+        override val type: TransferType
+            get() = TransferType.DOWNLOAD
+
+        override val nodes: List<TypedNode>
+            get() = emptyList()
+        override val isHighPriority: Boolean
+            get() = false
+    }
+
 
     /**
      * Event to start downloading a node for offline use
@@ -103,6 +117,26 @@ sealed interface TransferTriggerEvent {
         override val nodes: List<TypedNode>,
         override val isHighPriority: Boolean = false,
     ) : DownloadTriggerEvent
+
+    /**
+     * Copy offline node
+     *
+     * @property nodeIds
+     */
+    data class CopyOfflineNode(
+        val nodeIds: List<NodeId>,
+    ) : CopyTriggerEvent
+
+    /**
+     * Copy uri
+     *
+     * @property name
+     * @property uri
+     */
+    data class CopyUri(
+        val name: String,
+        val uri: Uri,
+    ) : CopyTriggerEvent
 
     /**
      * Event to start downloading node for preview

@@ -70,7 +70,7 @@ class OfflineNodeActionsViewModelTest {
     }
 
     private suspend fun stubCommon() {
-        whenever(getOfflineFilesUseCase(any())).thenReturn(listOf())
+        whenever(getOfflineFilesUseCase(any())).thenReturn(mapOf())
         whenever(exportNodesUseCase(any())).thenReturn(mapOf())
     }
 
@@ -89,9 +89,13 @@ class OfflineNodeActionsViewModelTest {
     fun `test that handleShareOfflineNodes emits shareFilesEvent when all nodes are files`() =
         runTest {
             val file = mock<File>()
-            val offlineFileInformation: OfflineFileInformation = mock()
-            whenever(offlineFileInformation.isFolder).thenReturn(false)
-            whenever(getOfflineFilesUseCase(listOf(offlineFileInformation))).thenReturn(listOf(file))
+            val offlineFileInformation: OfflineFileInformation = mock {
+                on { id } doReturn 123
+                on { isFolder } doReturn false
+            }
+            whenever(getOfflineFilesUseCase(listOf(offlineFileInformation))).thenReturn(
+                mapOf(123 to file)
+            )
 
             underTest.handleShareOfflineNodes(listOf(offlineFileInformation), true)
             verify(getOfflineFilesUseCase).invoke(any())
@@ -224,6 +228,29 @@ class OfflineNodeActionsViewModelTest {
             }
         }
 
+    @Test
+    fun `test that URL file type is handled when handleOpenOfflineFile is invoked`() =
+        runTest {
+            val nodeInfo = mock<OfflineFileInformation>().stub {
+                on { handle } doReturn "123"
+                on { path } doReturn "path"
+                on { name } doReturn "name"
+                on { fileTypeInfo } doReturn UrlFileTypeInfo
+            }
+            val file = mock<File>()
+            whenever(getOfflineFileUseCase(nodeInfo)).thenReturn(file)
+
+            underTest.handleOpenOfflineFile(nodeInfo)
+
+            verify(getPathFromNodeContentUseCase).invoke(NodeContentUri.LocalContentUri(file))
+            underTest.uiState.test {
+                val res = awaitItem()
+                assertThat(res.openFileEvent)
+                    .isInstanceOf(StateEventWithContentTriggered::class.java)
+                assertThat((res.openFileEvent as StateEventWithContentTriggered).content)
+                    .isInstanceOf(OfflineNodeActionUiEntity.Uri::class.java)
+            }
+        }
 
     private fun provideOfflineNodeType() = Stream.of(
         Arguments.of(

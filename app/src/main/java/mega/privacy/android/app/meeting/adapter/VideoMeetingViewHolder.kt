@@ -113,7 +113,7 @@ class VideoMeetingViewHolder(
         initAvatar(participant)
 
         if (isGrid || isDrawing) {
-            inMeetingViewModel.getSession(participant.clientId)?.let {
+            inMeetingViewModel.getSessionByClientId(participant.clientId)?.let {
                 participant.videoListener?.let { listener ->
                     Timber.d("Removing listener, clientID ${participant.clientId}")
                     inMeetingViewModel.removeChatRemoteVideoListener(
@@ -166,9 +166,9 @@ class VideoMeetingViewHolder(
      */
     private fun checkUI(participant: Participant) {
         Timber.d("Check the current UI status")
-        inMeetingViewModel.getSession(participant.clientId)?.let {
+        inMeetingViewModel.getSessionByClientId(participant.clientId)?.let {
             when (isGrid) {
-                true -> if (it.hasVideo() && participant.isVideoOn) {
+                true -> if (it.hasVideo && participant.isVideoOn) {
                     Timber.d("Check if camera should be on")
                     checkVideoOn(participant)
                 } else {
@@ -177,7 +177,7 @@ class VideoMeetingViewHolder(
                 }
 
 
-                false -> if ((it.hasScreenShare() && participant.isScreenShared) || (it.hasCamera() && !participant.isScreenShared)) {
+                false -> if ((it.hasScreenShare && participant.isScreenShared) || (it.hasCamera && !participant.isScreenShared)) {
                     Timber.d("Check if video should be on")
                     checkVideoOn(participant)
                 } else {
@@ -237,14 +237,14 @@ class VideoMeetingViewHolder(
             binding.parentTextureView.removeAllViews()
             createListener(participant)
 
-            inMeetingViewModel.getSession(participant.clientId)?.let {
+            inMeetingViewModel.getSessionByClientId(participant.clientId)?.let {
                 when {
-                    participant.hasHiRes && !it.canRecvVideoHiRes() && it.isHiResVideo -> {
+                    participant.hasHiRes && !it.canReceiveVideoHiRes && it.isHiResVideo -> {
                         Timber.d("Asking for HiRes video, clientId ${participant.clientId}")
                         inMeetingViewModel.requestHiResVideo(it, inMeetingViewModel.getChatId())
                     }
 
-                    !participant.hasHiRes && !it.canRecvVideoLowRes() && it.isLowResVideo -> {
+                    !participant.hasHiRes && !it.canReceiveVideoLowRes && it.isLowResVideo -> {
                         Timber.d("Asking for LowRes video, clientId ${participant.clientId}")
                         inMeetingViewModel.requestLowResVideo(it, inMeetingViewModel.getChatId())
                     }
@@ -399,8 +399,8 @@ class VideoMeetingViewHolder(
         if (isInvalid(participant)) return
 
         if (shouldAddListener) {
-            if (inMeetingViewModel.getSession(participant.clientId)
-                    ?.hasVideo() == true && !inMeetingViewModel.isCallOrSessionOnHold(participant.clientId)
+            if (inMeetingViewModel.getSessionByClientId(participant.clientId)
+                    ?.hasVideo == true && !inMeetingViewModel.isCallOrSessionOnHold(participant.clientId)
             ) {
                 if (participant.videoListener == null) {
                     createListener(participant)
@@ -432,9 +432,7 @@ class VideoMeetingViewHolder(
     private fun checkOnHold(participant: Participant) {
         if (isInvalid(participant)) return
 
-        val isCallOnHold = inMeetingViewModel.isCallOnHold()
-        val isSessionOnHold = inMeetingViewModel.isSessionOnHold(participant.clientId)
-        if (isSessionOnHold) {
+        if (inMeetingViewModel.isSessionOnHoldByClientId(participant.clientId)) {
             Timber.d("Show on hold icon participant")
             binding.onHoldIcon.isVisible = true
             binding.avatar.alpha = AVATAR_WITH_TRANSPARENCY
@@ -442,7 +440,7 @@ class VideoMeetingViewHolder(
             Timber.d("Hide on hold icon")
             binding.onHoldIcon.isVisible = false
             binding.avatar.alpha =
-                if (isCallOnHold) AVATAR_WITH_TRANSPARENCY else AVATAR_VIDEO_VISIBLE
+                if (inMeetingViewModel.isCallOnHold()) AVATAR_WITH_TRANSPARENCY else AVATAR_VIDEO_VISIBLE
         }
     }
 
@@ -466,8 +464,8 @@ class VideoMeetingViewHolder(
         if (isInvalid(participant)) return
 
         Timber.d("Update audio icon")
-        inMeetingViewModel.getSession(participant.clientId)?.let { session ->
-            session.hasAudio().not().let { value ->
+        inMeetingViewModel.getSessionByClientId(participant.clientId)?.let { session ->
+            session.hasAudio.not().let { value ->
                 binding.muteIcon.isVisible = value
                 binding.speakingIcon.isVisible = false
                 binding.speakingForeground.isVisible = false
@@ -476,7 +474,7 @@ class VideoMeetingViewHolder(
                 }
             }
 
-            if (session.hasAudio()) {
+            if (session.hasAudio) {
                 session.isAudioDetected.let { value ->
                     binding.speakingIcon.isVisible = value
                     binding.speakingForeground.isVisible = value
@@ -498,10 +496,10 @@ class VideoMeetingViewHolder(
         if (isInvalid(participant)) return
 
         if (!inMeetingViewModel.isCallOrSessionOnHold(participant.clientId)) {
-            inMeetingViewModel.getSession(participant.clientId)?.let { session ->
+            inMeetingViewModel.getSessionByClientId(participant.clientId)?.let { session ->
                 when (isGrid) {
                     true -> {
-                        if (session.hasVideo() && participant.isVideoOn) {
+                        if (session.hasVideo && participant.isVideoOn) {
                             Timber.d("Grid video/screen share should be on")
                             videoOnUI(participant)
                             return
@@ -509,13 +507,13 @@ class VideoMeetingViewHolder(
                     }
 
                     false -> {
-                        if (participant.isScreenShared && session.hasScreenShare() && participant.isScreenShareOn) {
+                        if (participant.isScreenShared && session.hasScreenShare && participant.isScreenShareOn) {
                             Timber.d("Screen share should be on")
                             videoOnUI(participant)
                             return
                         }
 
-                        if (!participant.isScreenShared && session.hasCamera() && participant.isCameraOn) {
+                        if (!participant.isScreenShared && session.hasCamera && participant.isCameraOn) {
                             Timber.d("Video should be on")
                             videoOnUI(participant)
                             return
@@ -813,7 +811,7 @@ class VideoMeetingViewHolder(
             ?.let { participant ->
                 inMeetingViewModel.removeParticipantVisible(participant)
 
-                if (inMeetingViewModel.getSession(participant.clientId)?.hasVideo() == true) {
+                if (inMeetingViewModel.getSessionByClientId(participant.clientId)?.hasVideo == true) {
                     Timber.d("Recycle participant in the list, participant clientId is ${participant.clientId}")
                     participant.videoListener?.let {
                         removeResolutionAndListener(participant)

@@ -45,6 +45,8 @@ internal class TransferMapperTest {
             tag = megaTransfer.tag,
             folderTransferTag = megaTransfer.folderTransferTag,
             speed = megaTransfer.speed,
+            isSyncTransfer = megaTransfer.isSyncTransfer,
+            isBackupTransfer = megaTransfer.isBackupTransfer,
             isForeignOverQuota = megaTransfer.isForeignOverquota,
             isStreamingTransfer = megaTransfer.isStreamingTransfer,
             isFinished = megaTransfer.isFinished,
@@ -55,11 +57,9 @@ internal class TransferMapperTest {
             notificationNumber = megaTransfer.notificationNumber,
         )
         assertThat(
-            TransferMapper(transferAppDataMapper, transferTypeMapper, transferStateMapper).invoke(
-                megaTransfer
-            )
-        )
-            .isEqualTo(expected)
+            TransferMapper(transferAppDataMapper, transferTypeMapper, transferStateMapper)
+                .invoke(megaTransfer)
+        ).isEqualTo(expected)
     }
 
     @ParameterizedTest
@@ -100,6 +100,8 @@ internal class TransferMapperTest {
             on { tag }.thenReturn(Random.nextInt())
             on { this.folderTransferTag }.thenReturn(folderTransferTag)
             on { speed }.thenReturn(Random.nextLong())
+            on { isSyncTransfer }.thenReturn(true)
+            on { isBackupTransfer }.thenReturn(false)
             on { isForeignOverquota }.thenReturn(Random.nextBoolean())
             on { isStreamingTransfer }.thenReturn(true)
             on { isFinished }.thenReturn(Random.nextBoolean())

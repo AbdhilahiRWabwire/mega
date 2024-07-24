@@ -29,10 +29,8 @@ class RemoveOfflineNodeUseCase @Inject constructor(
     suspend operator fun invoke(nodeId: NodeId) = withContext(ioDispatcher) {
         nodeRepository.getOfflineNodeInformation(nodeId)?.let {
             if (it.isFolder) {
-                val childNodes = nodeRepository.getOfflineNodeByParentId(it.id)
-                childNodes?.let { childNode ->
-                    deleteChildrenInDb(childNode)
-                }
+                val childNodes = nodeRepository.getOfflineNodesByParentId(it.id)
+                deleteChildrenInDb(childNodes)
             }
             //remove red arrow from current item
             val parentId = it.parentId
@@ -56,7 +54,7 @@ class RemoveOfflineNodeUseCase @Inject constructor(
         var offlineChild: OfflineNodeInformation
         offlineInfoChildren?.forEach {
             offlineChild = it
-            val children = nodeRepository.getOfflineNodeByParentId(offlineChild.id)
+            val children = nodeRepository.getOfflineNodesByParentId(offlineChild.id)
             if (offlineInfoChildren.isNotEmpty()) {
                 deleteChildrenInDb(children)
             }
@@ -65,7 +63,7 @@ class RemoveOfflineNodeUseCase @Inject constructor(
     }
 
     private suspend fun updateParentOfflineStatus(parentId: Int) {
-        val siblings = nodeRepository.getOfflineNodeByParentId(parentId)
+        val siblings = nodeRepository.getOfflineNodesByParentId(parentId)
         siblings?.let {
             if (it.isNotEmpty()) {
                 return

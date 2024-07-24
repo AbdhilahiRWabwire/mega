@@ -15,6 +15,14 @@ import mega.privacy.android.domain.featuretoggle.FeatureFlagValueProvider
 enum class AppFeatures(override val description: String, private val defaultValue: Boolean) :
     Feature {
     /**
+     * Enables new video player
+     */
+    NewVideoPlayer(
+        "Enable new video player",
+        false,
+    ),
+
+    /**
      * Enables new video queue
      */
     NewZipBrowser(
@@ -43,14 +51,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     NewAudioQueue(
         "Enable new audio queue",
-        true,
-    ),
-
-    /**
-     * Enables recent actions compose tab
-     */
-    RecentActionsCompose(
-        "Enables new Recent Actions Compose tab (requires app restart)",
         true,
     ),
 
@@ -148,7 +148,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
     /**
      * To switch into new Offline Screen Compose UI
      */
-    OfflineCompose("Enable compose for Offline Screen", false),
+    OfflineCompose("Enable compose for Offline Screen", true),
 
     /**
      * Meeting notification settings
@@ -171,6 +171,14 @@ enum class AppFeatures(override val description: String, private val defaultValu
     NodeWithDescription(
         "Enable node with description",
         true
+    ),
+
+    /**
+     * To enable search by node description
+     */
+    SearchWithDescription(
+        "Enable search with description",
+        false
     ),
 
     /**
@@ -199,6 +207,14 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     UploadWorker(
         "Enables UploadWorker for download files, instead of UploadService. This is a work in progress feature.",
+        true,
+    ),
+
+    /**
+     * Camera uploads utilizes active transfers to monitor transfers
+     */
+    ActiveTransfersInCameraUploads(
+        "Camera Uploads uses Active transfers to monitor the transfer progress",
         false,
     ),
 
@@ -231,6 +247,22 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     PictureInPicture(
         "Enable Picture in Picture in Meeting",
+        false
+    ),
+
+    /**
+     * Enables new invite contact compose page
+     */
+    NewInviteContactActivity(
+        "Enable new invite contact activity",
+        true
+    ),
+
+    /**
+     * Enables new transfers section
+     */
+    TransfersSection(
+        "Enable new transfers fragment",
         false
     );
 

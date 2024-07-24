@@ -215,7 +215,6 @@ class AudioPlayerActivity : MediaPlayerActivity() {
 
         if (savedInstanceState != null) {
             nodeAttacher.restoreState(savedInstanceState)
-            nodeSaver.restoreState(savedInstanceState)
         }
 
         binding = ActivityAudioPlayerBinding.inflate(layoutInflater)
@@ -302,21 +301,14 @@ class AudioPlayerActivity : MediaPlayerActivity() {
             when (menuId) {
                 R.id.save_to_device -> {
                     when (adapterType) {
-                        OFFLINE_ADAPTER -> nodeSaver.saveOfflineNode(
-                            handle = playingHandle,
-                            fromMediaViewer = true
-                        )
-
                         ZIP_ADAPTER -> {
                             val mediaItem = serviceGateway?.getCurrentMediaItem()
                             mediaItem?.localConfiguration?.uri?.let { uri ->
                                 playerServiceGateway?.getPlaylistItem(mediaItem.mediaId)
                                     ?.let { playlistItem ->
-                                        nodeSaver.saveUri(
+                                        startDownloadViewModel.onCopyUriClicked(
                                             uri = uri,
                                             name = playlistItem.nodeName,
-                                            size = playlistItem.size,
-                                            fromMediaViewer = true
                                         )
                                     }
                             }
@@ -539,7 +531,6 @@ class AudioPlayerActivity : MediaPlayerActivity() {
         super.onSaveInstanceState(outState)
 
         nodeAttacher.saveState(outState)
-        nodeSaver.saveState(outState)
     }
 
     override fun showSystemUI() {
@@ -589,7 +580,6 @@ class AudioPlayerActivity : MediaPlayerActivity() {
         if (serviceBound) {
             unbindService(connection)
         }
-        nodeSaver.destroy()
         AlertDialogUtil.dismissAlertDialogIfExists(takenDownDialog)
     }
 
@@ -671,18 +661,6 @@ class AudioPlayerActivity : MediaPlayerActivity() {
             }
         }
         return false
-    }
-
-    /**
-     * onRequestPermissionsResult
-     */
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray,
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        nodeSaver.handleRequestPermissionsResult(requestCode = requestCode)
     }
 
     override fun setupToolbar() {

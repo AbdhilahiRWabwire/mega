@@ -45,6 +45,8 @@ import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.fragments.homepage.banner.BannerAdapter
 import mega.privacy.android.app.fragments.homepage.banner.BannerClickHandler
 import mega.privacy.android.app.main.ManagerActivity
+import mega.privacy.android.app.main.mapper.UserChatStatusIconMapper
+import mega.privacy.android.app.main.view.OngoingCallViewModel
 import mega.privacy.android.app.presentation.manager.UserInfoViewModel
 import mega.privacy.android.app.presentation.settings.startscreen.util.StartScreenUtil.notAlertAnymoreAboutStartScreen
 import mega.privacy.android.app.presentation.settings.startscreen.util.StartScreenUtil.shouldShowStartScreenDialog
@@ -75,7 +77,6 @@ import mega.privacy.mobile.analytics.event.HomeUploadTextPressedEvent
 import mega.privacy.mobile.analytics.event.OfflineTabEvent
 import mega.privacy.mobile.analytics.event.RecentsTabEvent
 import nz.mega.sdk.MegaBanner
-import nz.mega.sdk.MegaChatApi
 import nz.mega.sdk.MegaChatApiJava.MEGACHAT_INVALID_HANDLE
 import javax.inject.Inject
 
@@ -102,8 +103,12 @@ class HomepageFragment : Fragment() {
     @Inject
     lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
 
+    @Inject
+    lateinit var userChatStatusIconMapper: UserChatStatusIconMapper
+
     private val viewModel: HomePageViewModel by viewModels()
     private val userInfoViewModel: UserInfoViewModel by activityViewModels()
+    private val callInProgressViewModel: OngoingCallViewModel by activityViewModels()
 
     private lateinit var viewDataBinding: FragmentHomepageBinding
 
@@ -194,7 +199,10 @@ class HomepageFragment : Fragment() {
         setupBottomSheetBehavior()
         setupFabs()
 
-        (activity as? ManagerActivity)?.adjustTransferWidgetPositionInHomepage()
+        (activity as? ManagerActivity)?.apply {
+            adjustTransferWidgetPositionInHomepage()
+            fetchPsa()
+        }
 
         if (savedInstanceState?.getBoolean(START_SCREEN_DIALOG_SHOWN, false) == true) {
             showChooseStartScreenDialog()
@@ -323,29 +331,12 @@ class HomepageFragment : Fragment() {
             searchInputView.setAvatar(it.avatarContent)
         }
 
-        viewModel.onShowCallIcon().observe(viewLifecycleOwner) {
-            searchInputView.setOngoingCallVisibility(it)
+        viewLifecycleOwner.collectFlow(callInProgressViewModel.state) {
+            searchInputView.setOngoingCallVisibility(it.currentCall != null)
         }
 
-        viewModel.chatStatus.observe(viewLifecycleOwner) {
-            val iconRes = if (Util.isDarkMode(requireContext())) {
-                when (it) {
-                    MegaChatApi.STATUS_ONLINE -> R.drawable.ic_online_dark_drawer
-                    MegaChatApi.STATUS_AWAY -> R.drawable.ic_away_dark_drawer
-                    MegaChatApi.STATUS_BUSY -> R.drawable.ic_busy_dark_drawer
-                    MegaChatApi.STATUS_OFFLINE -> R.drawable.ic_offline_dark_drawer
-                    else -> 0
-                }
-            } else {
-                when (it) {
-                    MegaChatApi.STATUS_ONLINE -> R.drawable.ic_online_light
-                    MegaChatApi.STATUS_AWAY -> R.drawable.ic_away_light
-                    MegaChatApi.STATUS_BUSY -> R.drawable.ic_busy_light
-                    MegaChatApi.STATUS_OFFLINE -> R.drawable.ic_offline_light
-                    else -> 0
-                }
-            }
-
+        viewLifecycleOwner.collectFlow(viewModel.uiState) {
+            val iconRes = userChatStatusIconMapper(it.userChatStatus, Util.isDarkMode(requireContext()))
             searchInputView.setChatStatus(iconRes != 0, iconRes)
         }
 
@@ -383,18 +374,14 @@ class HomepageFragment : Fragment() {
      */
     private fun setupBottomSheetUI() {
         var enableOfflineCompose: Boolean
-        var enableRecentActionsCompose: Boolean
         runBlocking {
             enableOfflineCompose = getFeatureFlagValueUseCase(AppFeatures.OfflineCompose)
-            enableRecentActionsCompose =
-                getFeatureFlagValueUseCase(AppFeatures.RecentActionsCompose)
         }
         viewPager = viewDataBinding.homepageBottomSheet.viewPager
         val adapter =
             BottomSheetPagerAdapter(
                 fragment = this@HomepageFragment,
                 enableOfflineCompose = enableOfflineCompose,
-                enableRecentActionsCompose = enableRecentActionsCompose
             )
         // By setting this will make BottomSheetPagerAdapter create all the fragments on initialization.
         viewPager.offscreenPageLimit = adapter.itemCount

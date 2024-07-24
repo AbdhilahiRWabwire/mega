@@ -1,40 +1,46 @@
 package mega.privacy.android.app.contacts.usecase
 
-import android.net.Uri
-import androidx.core.net.toUri
-import io.reactivex.rxjava3.core.Flowable
+import app.cash.turbine.test
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
-import mega.privacy.android.app.contacts.list.data.ContactItem
-import mega.privacy.android.app.usecase.chat.GetChatChangesUseCase
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
+import mega.privacy.android.domain.entity.chat.ChatConnectionState
+import mega.privacy.android.domain.entity.chat.ChatConnectionStatus
+import mega.privacy.android.domain.entity.chat.ChatRoom
+import mega.privacy.android.domain.entity.contacts.ContactData
+import mega.privacy.android.domain.entity.contacts.ContactItem
+import mega.privacy.android.domain.entity.contacts.OnlineStatus
+import mega.privacy.android.domain.entity.contacts.UserChatStatus
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.entity.user.UserId
+import mega.privacy.android.domain.entity.user.UserLastGreen
 import mega.privacy.android.domain.entity.user.UserUpdate
 import mega.privacy.android.domain.entity.user.UserVisibility
-import nz.mega.sdk.MegaApiJava
-import nz.mega.sdk.MegaChatApi.STATUS_ONLINE
-import nz.mega.sdk.MegaError
-import nz.mega.sdk.MegaRequest
-import nz.mega.sdk.MegaRequestListenerInterface
+import mega.privacy.android.domain.repository.AccountRepository
+import mega.privacy.android.domain.repository.ChatRepository
+import mega.privacy.android.domain.repository.ContactsRepository
+import nz.mega.sdk.MegaChatApi
 import nz.mega.sdk.MegaUser
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.junit.jupiter.api.io.TempDir
-import org.mockito.ArgumentMatchers.eq
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.stub
+import org.mockito.kotlin.times
+import org.mockito.kotlin.verifyBlocking
+import org.mockito.kotlin.verifyNoInteractions
 import test.mega.privacy.android.app.InstantExecutorExtension
 import test.mega.privacy.android.app.TestSchedulerExtension
-import java.io.File
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @ExtendWith(
@@ -45,262 +51,374 @@ import java.io.File
 class GetContactsUseCaseTest {
     private lateinit var underTest: GetContactsUseCase
 
-    private val getChatChangesUseCase = mock<GetChatChangesUseCase>()
-    private val megaContactsMapper = mock<(MegaUser, File) -> ContactItem.Data>()
-    private val getContacts = mock<() -> ArrayList<MegaUser>>()
-    private val getUserAttribute = mock<(String, Int, MegaRequestListenerInterface) -> Unit>()
-    private val getContact = mock<(String) -> MegaUser?>()
-    private val areCredentialsVerified = mock<(MegaUser) -> Boolean>()
-    private val getUserFullnameFromCache = mock<(Long) -> String>()
-    private val requestLastGreen = mock<(Long) -> Unit>()
-    private val getChatRoomIdByUser = mock<(Long) -> Long?>()
-    private val getUserAvatar = mock<(String, String, MegaRequestListenerInterface) -> Unit>()
-    private val onlineString = mock<() -> String>()
-    private val getUnformattedLastSeenDate = mock<(Int) -> String>()
-    private val getAliasMap = mock<(MegaRequest) -> Map<Long, String>>()
-    private val getUserUpdates = mock<() -> Flow<UserUpdate>>()
-
-    @TempDir
-    lateinit var tempDir: File
+    private val contactsRepository = mock<ContactsRepository>()
+    private val chatRepository = mock<ChatRepository>()
+    private val accountRepository = mock<AccountRepository>()
 
     @BeforeEach
     fun setUp() {
         reset(
-            getChatChangesUseCase,
-            megaContactsMapper,
-            getContacts,
-            getUserAttribute,
-            getContact,
-            areCredentialsVerified,
-            getUserFullnameFromCache,
-            requestLastGreen,
-            getChatRoomIdByUser,
-            getUserAvatar,
-            onlineString,
-            getUnformattedLastSeenDate,
-            getUserUpdates
+            chatRepository,
+            accountRepository,
+            contactsRepository,
         )
 
-        getChatChangesUseCase.stub {
-            on { get() } doReturn Flowable.empty()
+        accountRepository.stub {
+            on { monitorUserUpdates() } doReturn emptyFlow()
         }
 
-
-        getUserUpdates.stub {
-            on { invoke() } doReturn emptyFlow()
+        contactsRepository.stub {
+            onBlocking { getVisibleContacts() } doReturn emptyList()
+            on { monitorChatPresenceLastGreenUpdates() } doReturn emptyFlow()
+            on { monitorChatOnlineStatusUpdates() } doReturn emptyFlow()
+            on { monitorChatConnectionStateUpdates() } doReturn emptyFlow()
         }
     }
-
 
 
     internal fun initUnderTest() {
         underTest = GetContactsUseCase(
-            getChatChangesUseCase = getChatChangesUseCase,
-            megaContactsMapper = megaContactsMapper,
-            getContacts = getContacts,
-            getUserAttribute = getUserAttribute,
-
-            getContact = getContact,
-            areCredentialsVerified = areCredentialsVerified,
-            getUserFullnameFromCache = getUserFullnameFromCache,
-            requestLastGreen = requestLastGreen,
-            getChatRoomIdByUser = getChatRoomIdByUser,
-            getUserAvatar = getUserAvatar,
-            onlineString = onlineString,
-            getUnformattedLastSeenDate = getUnformattedLastSeenDate,
-            getAliasMap = getAliasMap,
-            getUserUpdates = getUserUpdates,
+            accountsRepository = accountRepository,
+            contactsRepository = contactsRepository,
+            chatRepository = chatRepository
         )
     }
 
     @Test
-    fun `test that an empty list is returned if no contacts`() {
-        getContacts.stub {
-            on { invoke() } doReturn arrayListOf()
+    fun `test that an empty list is returned if no contacts`() = runTest {
+        contactsRepository.stub {
+            onBlocking { getVisibleContacts() } doReturn emptyList()
         }
+
         initUnderTest()
 
-        underTest.get(tempDir).test().assertValue(emptyList())
+        underTest().test {
+            assertThat(awaitItem()).isEmpty()
+        }
     }
 
     @Test
-    fun `test that a contact is returned if found`() {
-        val megaUser = mock<MegaUser> {
-            on { visibility } doReturn MegaUser.VISIBILITY_VISIBLE
-        }
-        val expected = mock<ContactItem.Data>()
-        megaContactsMapper.stub {
-            on { invoke(any(), any()) } doReturn expected
-        }
-        getContacts.stub {
-            on { invoke() } doReturn arrayListOf(megaUser)
-        }
+    fun `test that a contact is returned if found`() = runTest {
+        val expected = stubContact(userHandle = 1, userEmail = "email")
 
         initUnderTest()
 
-        underTest.get(tempDir).test().assertValue(listOf(expected))
+        underTest().test {
+            assertThat(awaitItem()).containsExactly(expected)
+        }
     }
 
     @Test
     fun `test that contact is removed if visibility changes`() = runTest {
         val userHandle = 1L
         val userEmail = "email"
-        val megaUser = mock<MegaUser> {
-            on { handle } doReturn userHandle
-            on { visibility }.thenReturn(MegaUser.VISIBILITY_VISIBLE, MegaUser.VISIBILITY_HIDDEN)
-        }
-        val expected = mock<ContactItem.Data> {
+        val contactItem = mock<ContactItem> {
             on { handle } doReturn userHandle
             on { email } doReturn userEmail
+            on { visibility } doReturn UserVisibility.Visible
         }
-        megaContactsMapper.stub {
-            on { invoke(any(), any()) } doReturn expected
-        }
-        getContacts.stub {
-            on { invoke() } doReturn arrayListOf(megaUser)
-        }
+        stubContactsList(listOf(contactItem), emptyList())
 
-        stubGlobalUpdate(userEmail, userHandle, emptyList(), MegaUser.VISIBILITY_HIDDEN)
+        stubGlobalUpdate(
+            userEmail = userEmail,
+            userHandle = userHandle,
+            changes = emptyList(),
+            userVisibility = UserVisibility.Hidden,
+        )
 
         initUnderTest()
 
-        underTest.get(tempDir).test().assertValues(listOf(expected), emptyList())
+        underTest().test {
+            assertThat(awaitItem()).isNotEmpty()
+            assertThat(awaitItem()).isEmpty()
+        }
     }
 
     @Test
     fun `test that first name is updated when changed`() = runTest {
         val userHandle = 1L
         val userEmail = "email"
-        val initial = "initial"
-        val expected = "Expected"
-        val attributeType = MegaApiJava.USER_ATTR_FIRSTNAME
+        val initial = ContactData(fullName = "Initial", alias = "alias", avatarUri = null)
+        val expected = ContactData(fullName = "Expected", alias = "alias", avatarUri = null)
         val changes = listOf(MegaUser.CHANGE_TYPE_FIRSTNAME)
 
         stubContact(
             userHandle = userHandle,
             userEmail = userEmail,
-            fullName = initial,
+            fullName = initial.fullName,
+            alias = initial.alias!!,
         )
-        stubUserAttribute(attributeType = attributeType, userEmail = userEmail)
         stubGlobalUpdate(userEmail, userHandle, changes)
-        getUserFullnameFromCache.stub {
-            on { invoke(userHandle) } doReturn expected
+
+        contactsRepository.stub {
+            onBlocking { getContactData(any()) } doReturn expected
         }
 
         initUnderTest()
 
-        underTest.get(tempDir).map { it.first().fullName ?: "NO NAME" }.test()
-            .assertValues(initial, expected)
+        underTest().map { it.first().contactData.fullName.orEmpty() }.test {
+            assertThat(awaitItem()).isEqualTo(initial.fullName)
+            assertThat(awaitItem()).isEqualTo(expected.fullName)
+        }
     }
 
     @Test
     fun `test that last name is updated when changed`() = runTest {
         val userHandle = 1L
         val userEmail = "email"
-        val initial = "initial"
-        val expected = "Expected"
-        val attributeType = MegaApiJava.USER_ATTR_LASTNAME
+        val initial = ContactData(fullName = "Initial", alias = "alias", avatarUri = null)
+        val expected = ContactData(fullName = "Expected", alias = "alias", avatarUri = null)
         val changes = listOf(MegaUser.CHANGE_TYPE_LASTNAME)
 
         stubContact(
             userHandle = userHandle,
             userEmail = userEmail,
-            fullName = initial,
+            fullName = initial.fullName,
+            alias = initial.alias!!,
         )
-        stubUserAttribute(attributeType = attributeType, userEmail = userEmail)
         stubGlobalUpdate(userEmail, userHandle, changes)
-        getUserFullnameFromCache.stub {
-            on { invoke(userHandle) } doReturn expected
+
+        contactsRepository.stub {
+            onBlocking { getContactData(any()) } doReturn expected
         }
 
         initUnderTest()
 
-        underTest.get(tempDir).map { it.first().fullName ?: "NO NAME" }.test()
-            .assertValues(initial, expected)
+        underTest().map { it.first().contactData.fullName.orEmpty() }.test {
+            assertThat(awaitItem()).isEqualTo(initial.fullName)
+            assertThat(awaitItem()).isEqualTo(expected.fullName)
+        }
     }
 
     @Test
-    fun `test that avatar is updated when changed`() {
-        val userEmail = "email"
+    fun `test that avatar is updated when changed`() = runTest {
         val userHandle = 1L
-        stubContact(userHandle = userHandle, userEmail = userEmail)
-        val file = "file"
-        stubUserAttribute(
-            attributeType = MegaApiJava.USER_ATTR_AVATAR,
+        val userEmail = "email"
+        val initial = ContactData(fullName = "Initial", alias = "alias", avatarUri = null)
+        val newUri = "newUri"
+        val expected = ContactData(fullName = "Expected", alias = "alias", avatarUri = newUri)
+        val changes = listOf(MegaUser.CHANGE_TYPE_FIRSTNAME)
+
+        stubContact(
+            userHandle = userHandle,
             userEmail = userEmail,
-            fileName = file
+            fullName = initial.fullName,
+            alias = initial.alias!!,
         )
-        stubGlobalUpdate(userEmail, userHandle, listOf(MegaUser.CHANGE_TYPE_AVATAR))
+        stubGlobalUpdate(userEmail, userHandle, changes)
+
+        contactsRepository.stub {
+            onBlocking { getContactData(any()) } doReturn expected
+        }
 
         initUnderTest()
 
-        underTest.get(tempDir).test()
-            .assertValueAt(0) { it.first().avatarUri == Uri.EMPTY }
-            .assertValueAt(1) { it.first().avatarUri == File(file).toUri() }
+        underTest().test {
+            assertThat(awaitItem().first().contactData.avatarUri).isEqualTo(null)
+            assertThat(awaitItem().first().contactData.avatarUri).isEqualTo(newUri)
+        }
     }
 
     @Test
-    fun `test that alias is updated when changed`() {
+    fun `test that alias is updated when changed`() = runTest {
         val userEmail = "email"
         val notUserEmail = userEmail + "Not"
         val userHandle = 1L
         val notUserHandle = userHandle + 1
-        val oldAlias = "alias"
+        val oldAlias = ContactData(
+            fullName = "name", alias = "oldAlias", avatarUri = null
+        )
 
-        stubContact(userHandle = userHandle, userEmail = userEmail, alias = oldAlias)
+        stubContact(
+            userHandle = userHandle, userEmail = userEmail, alias = oldAlias.alias.orEmpty()
+        )
         stubGlobalUpdate(notUserEmail, notUserHandle, listOf(MegaUser.CHANGE_TYPE_ALIAS))
 
-        val newAlias = "new alias"
-        stubUserAttribute(
-            attributeType = MegaApiJava.USER_ATTR_ALIAS,
-            userEmail = notUserEmail,
-            alias = newAlias
+        val newAlias = ContactData(
+            fullName = "name", alias = "newAlias", avatarUri = null
         )
-        getAliasMap.stub {
-            on { invoke(any()) } doReturn mapOf(userHandle to newAlias)
+        contactsRepository.stub {
+            onBlocking { getContactData(any()) } doReturn newAlias
         }
-
         initUnderTest()
 
-        underTest.get(tempDir).test()
-            .assertValueAt(0) { it.first().alias == oldAlias }
-            .assertValueAt(1) { it.first().alias == newAlias }
+        underTest().test {
+            assertThat(awaitItem().first().contactData.alias).isEqualTo(oldAlias.alias)
+            assertThat(awaitItem().first().contactData.alias).isEqualTo(newAlias.alias)
+        }
     }
 
     @Test
-    fun `test that new user is added if a visible change is returned from user changes`() {
-        val userHandle = 1L
-        val userEmail = "email"
-        val megaUser = mock<MegaUser> {
-            on { email } doReturn userEmail
-            on { handle } doReturn userHandle
-            on { visibility }.thenReturn(MegaUser.VISIBILITY_VISIBLE)
-        }
-        val expected = mock<ContactItem.Data> {
-            on { handle } doReturn userHandle
-        }
-        megaContactsMapper.stub {
-            on { invoke(any(), any()) } doReturn expected
-        }
-        getContacts.stub {
-            on { invoke() }.doReturn(arrayListOf(), arrayListOf(megaUser))
+    fun `test that new user is added if a visible change is returned from user changes`() =
+        runTest {
+            val userHandle = 1L
+            val userEmail = "email"
+            val contactItem = mock<ContactItem> {
+                on { handle } doReturn userHandle
+                on { email } doReturn userEmail
+            }
+            stubContactsList(emptyList(), listOf(contactItem))
+
+            stubGlobalUpdate(
+                userEmail = userEmail,
+                userHandle = userHandle,
+                changes = emptyList(),
+                userVisibility = UserVisibility.Visible
+            )
+
+            initUnderTest()
+
+            underTest().test {
+                assertThat(awaitItem()).isEmpty()
+                assertThat(awaitItem()).isNotEmpty()
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 
-        stubGlobalUpdate(userEmail, userHandle, listOf(MegaUser.VISIBILITY_HIDDEN))
+    @Test
+    fun `test that chat online update with online status updates the contact status`() = runTest {
+        val userHandle = 1
+        val lastSeen = 42
+        stubContact(userHandle = userHandle.toLong(), userEmail = "email", lastSeen = lastSeen)
+
+        val expectedStatus = UserChatStatus.Online
+        stubOnlineStatusUpdate(userHandle = userHandle, status = expectedStatus)
 
         initUnderTest()
 
-        underTest.get(tempDir).test().assertValues(emptyList(), listOf(expected))
+        underTest().test {
+            awaitItem()
+            val actual = awaitItem().first()
+            assertThat(actual.status).isEqualTo(expectedStatus)
+            assertThat(actual.lastSeen).isEqualTo(lastSeen)
+        }
+    }
+
+    @Test
+    fun `test that last green updates update the last seen field`() = runTest {
+        val userHandle = 1L
+        stubContact(userHandle = userHandle, userEmail = "email")
+
+        val expectedLastGreen = 123456
+        stubLastGreenUpdate(userHandle = userHandle, lastGreen = expectedLastGreen)
+
+        initUnderTest()
+
+        underTest().test {
+            awaitItem()
+            assertThat(awaitItem().first().lastSeen).isEqualTo(expectedLastGreen)
+        }
+    }
+
+    @Test
+    fun `test that chat connection update sets contact is new status to false`() = runTest {
+        val userHandle = 1
+        stubContact(userHandle = userHandle.toLong(), userEmail = "email", isNew = true)
+
+        val expectedChatId = 123L
+        val expectedState = MegaChatApi.CHAT_CONNECTION_ONLINE
+
+        val chatRoom = mock<ChatRoom> {
+            on { chatId } doReturn expectedChatId
+        }
+        chatRepository.stub {
+            onBlocking { getChatRoomByUser(userHandle.toLong()) } doReturn chatRoom
+        }
+
+        stubChatConnectionUpdate(expectedChatId, expectedState)
+
+        initUnderTest()
+
+        underTest().test {
+            assertThat(awaitItem().first().chatroomId).isNull()
+            assertThat(awaitItem().first().chatroomId).isNotNull()
+        }
+    }
+
+    @Test
+    fun `test that authentication update fetches the contacts again`() = runTest {
+        val userHandle = 1L
+        val userEmail = "email"
+        val contactItem = mock<ContactItem> {
+            on { handle } doReturn userHandle
+            on { email } doReturn userEmail
+            on { areCredentialsVerified }.doReturn(false, true)
+            on { visibility } doReturn UserVisibility.Visible
+        }
+        stubContactsList(listOf(contactItem), listOf(contactItem))
+
+        stubGlobalUpdate(
+            userEmail = userEmail,
+            userHandle = userHandle,
+            changes = listOf(MegaUser.CHANGE_TYPE_AUTHRING),
+        )
+
+        initUnderTest()
+
+        verifyNoInteractions(contactsRepository)
+
+        underTest().test { cancelAndIgnoreRemainingEvents() }
+
+        verifyBlocking(contactsRepository, times(2)) { getVisibleContacts() }
+    }
+
+    private fun stubChatConnectionUpdate(expectedChatId: Long, expectedState: Int) {
+        contactsRepository.stub {
+            on { monitorChatConnectionStateUpdates() } doReturn flow {
+                emit(
+                    ChatConnectionState(
+                        chatId = expectedChatId,
+                        chatConnectionStatus = getConnectedStatusFromInt(expectedState)
+                    )
+                )
+                awaitCancellation()
+            }
+        }
+    }
+
+    private fun getConnectedStatusFromInt(expectedState: Int) = when (expectedState) {
+        MegaChatApi.CHAT_CONNECTION_OFFLINE -> ChatConnectionStatus.Offline
+        MegaChatApi.CHAT_CONNECTION_IN_PROGRESS -> ChatConnectionStatus.InProgress
+        MegaChatApi.CHAT_CONNECTION_ONLINE -> ChatConnectionStatus.Online
+        else -> ChatConnectionStatus.Unknown
+    }
+
+    private fun stubLastGreenUpdate(userHandle: Long, lastGreen: Int) {
+        contactsRepository.stub {
+            on { monitorChatPresenceLastGreenUpdates() } doReturn flow {
+                emit(
+                    UserLastGreen(
+                        handle = userHandle, lastGreen = lastGreen
+                    )
+                )
+                awaitCancellation()
+            }
+        }
+    }
+
+    private fun stubOnlineStatusUpdate(userHandle: Int, status: UserChatStatus) {
+        contactsRepository.stub {
+            on { monitorChatOnlineStatusUpdates() } doReturn flow {
+                emit(
+                    OnlineStatus(
+                        userHandle = userHandle.toLong(),
+                        status = status,
+                        inProgress = false
+                    )
+                )
+                awaitCancellation()
+            }
+        }
     }
 
     private fun stubGlobalUpdate(
         userEmail: String,
         userHandle: Long,
         changes: List<Int>,
-        userVisibility: Int = MegaUser.VISIBILITY_VISIBLE,
+        userVisibility: UserVisibility = UserVisibility.Visible,
     ) {
-        getUserUpdates.stub {
-            on { invoke() } doReturn flow {
+        accountRepository.stub {
+            on { monitorUserUpdates() } doReturn flow {
                 emit(
                     UserUpdate(
                         changes = stubChangesList(userHandle, changes, userVisibility),
@@ -316,20 +434,11 @@ class GetContactsUseCaseTest {
     private fun stubChangesList(
         userHandle: Long,
         changes: List<Int>,
-        userVisibility: Int,
+        userVisibility: UserVisibility,
     ) = mapOf(
         UserId(userHandle) to (mapChanges(changes).takeUnless { it.isEmpty() }
             ?: listOf(
-                UserChanges.Visibility(
-                    when (userVisibility) {
-                        MegaUser.VISIBILITY_HIDDEN -> UserVisibility.Hidden
-                        MegaUser.VISIBILITY_VISIBLE -> UserVisibility.Visible
-                        MegaUser.VISIBILITY_BLOCKED -> UserVisibility.Blocked
-                        MegaUser.VISIBILITY_UNKNOWN -> UserVisibility.Unknown
-                        MegaUser.VISIBILITY_INACTIVE -> UserVisibility.Inactive
-                        else -> UserVisibility.Unknown
-                    }
-                )
+                UserChanges.Visibility(userVisibility)
             ))
     )
 
@@ -369,56 +478,38 @@ class GetContactsUseCaseTest {
         }
     }
 
+    private fun stubContactsList(list: List<ContactItem>, vararg lists: List<ContactItem>) {
+        contactsRepository.stub {
+            onBlocking { getVisibleContacts() }.doReturn(list, *lists)
+        }
+    }
+
     private fun stubContact(
         userHandle: Long,
         userEmail: String,
         fullName: String? = "name",
         alias: String = "alias",
-    ) {
-        val megaUser = mock<MegaUser> {
-            on { visibility }.thenReturn(MegaUser.VISIBILITY_VISIBLE)
-        }
-
-        val item = ContactItem.Data(
+        isNew: Boolean = false,
+        lastSeen: Int? = null,
+    ): ContactItem {
+        val domainContact = ContactItem(
             handle = userHandle,
             email = userEmail,
-            placeholder = mock(),
-            fullName = fullName,
-            avatarUri = Uri.EMPTY,
-            alias = alias,
-            status = STATUS_ONLINE,
+            contactData = ContactData(
+                fullName = fullName, alias = alias, avatarUri = null
+            ),
+            defaultAvatarColor = null,
+            visibility = UserVisibility.Visible,
+            lastSeen = lastSeen,
+            timestamp = if (isNew) LocalDateTime.now().toEpochSecond(ZoneOffset.ofHours(0)) else 0L,
+            status = UserChatStatus.Offline,
+            areCredentialsVerified = false,
+            chatroomId = null,
         )
-        megaContactsMapper.stub {
-            on { invoke(any(), any()) } doReturn item
+        contactsRepository.stub {
+            onBlocking { getVisibleContacts() } doReturn listOf(domainContact)
         }
-        getContacts.stub {
-            on { invoke() } doReturn arrayListOf(megaUser)
-        }
-    }
 
-    private fun stubUserAttribute(
-        attributeType: Int,
-        userEmail: String,
-        fileName: String? = null,
-        alias: String? = null,
-    ) {
-        val request = mock<MegaRequest> {
-            on { paramType } doReturn attributeType
-            on { email } doReturn userEmail
-            on { file } doReturn fileName
-            on { text } doReturn alias
-        }
-        val error = mock<MegaError> {
-            on { errorCode } doReturn MegaError.API_OK
-        }
-        val api = mock<MegaApiJava>()
-
-
-        getUserAttribute.stub {
-            on { invoke(any(), eq(attributeType), any()) }.thenAnswer {
-                val listener = it.getArgument<MegaRequestListenerInterface>(2)
-                listener.onRequestFinish(api, request, error)
-            }
-        }
+        return domainContact
     }
 }

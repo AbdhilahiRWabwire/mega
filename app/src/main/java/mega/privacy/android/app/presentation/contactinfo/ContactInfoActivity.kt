@@ -51,7 +51,6 @@ import mega.privacy.android.app.activities.contract.SelectFolderToShareActivityC
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.AppBarStateChangeListener
 import mega.privacy.android.app.components.attacher.MegaAttacher
-import mega.privacy.android.app.components.saver.NodeSaver
 import mega.privacy.android.app.components.twemoji.EmojiEditText
 import mega.privacy.android.app.constants.BroadcastConstants.ACTION_UPDATE_RETENTION_TIME
 import mega.privacy.android.app.constants.BroadcastConstants.BROADCAST_ACTION_DESTROY_ACTION_MODE
@@ -167,10 +166,6 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
     private var contactStateIconPaddingLeft = 0
     private var stateToolbar = AppBarStateChangeListener.State.IDLE
     private val megaAttacher = MegaAttacher(this)
-    private val nodeSaver = NodeSaver(
-        this, this, this,
-        showSaveToDeviceConfirmDialog(this)
-    )
     private var forceAppUpdateDialog: AlertDialog? = null
 
     private var drawableShare: Drawable? = null
@@ -191,8 +186,7 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
     private lateinit var selectFolderToCopyLauncher: ActivityResultLauncher<LongArray>
     private val manageShareReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            sharedFoldersFragment?.clearSelections()
-            sharedFoldersFragment?.hideMultipleSelect()
+            hideSelectMode()
             statusDialog?.dismiss()
         }
     }
@@ -214,8 +208,7 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == BROADCAST_ACTION_DESTROY_ACTION_MODE) {
                 if (sharedFoldersFragment?.isVisible == true) {
-                    sharedFoldersFragment?.clearSelections()
-                    sharedFoldersFragment?.hideMultipleSelect()
+                    hideSelectMode()
                 }
             }
         }
@@ -260,8 +253,7 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
             Timber.d("Status dialogue dismiss exception $ex")
         }
         if (sharedFoldersFragment?.isVisible == true) {
-            sharedFoldersFragment?.clearSelections()
-            sharedFoldersFragment?.hideMultipleSelect()
+            hideSelectMode()
         }
         if (error.errorCode == MegaError.API_EOVERQUOTA && api.isForeignNode(request.parentHandle)) {
             showForeignStorageOverQuotaWarningDialog(this@ContactInfoActivity)
@@ -323,10 +315,7 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
     }
 
     override fun actionConfirmed() {
-        if (sharedFoldersFragment?.isVisible == true) {
-            sharedFoldersFragment?.clearSelections()
-            sharedFoldersFragment?.hideMultipleSelect()
-        }
+        hideSelectMode()
     }
 
     override fun createFolder(folderName: String) {
@@ -375,7 +364,6 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
         }
         if (savedInstanceState != null) {
             megaAttacher.restoreState(savedInstanceState)
-            nodeSaver.restoreState(savedInstanceState)
         }
         configureActivityLaunchers()
 
@@ -573,14 +561,6 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
         }
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (nodeSaver.handleActivityResult(this, requestCode, resultCode, data)) {
-            return
-        }
-    }
-
     private fun updateViewBasedOnNetworkAvailability() {
         if (viewModel.isOnline()) {
             Timber.d("online -- network connection")
@@ -700,7 +680,6 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         megaAttacher.saveState(outState)
-        nodeSaver.saveState(outState)
     }
 
     private fun visibilityStateIcon(userChatStatus: UserChatStatus) {
@@ -1145,7 +1124,6 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
 
             Constants.REQUEST_CAMERA -> verifyPermissionAndJoinCall()
         }
-        nodeSaver.handleRequestPermissionsResult(requestCode)
     }
 
     private fun pickFolderToShare() {
@@ -1327,7 +1305,6 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
         unregisterReceiver(retentionTimeReceiver)
         unregisterReceiver(manageShareReceiver)
         unregisterReceiver(destroyActionModeReceiver)
-        nodeSaver.destroy()
     }
 
     /**
@@ -1448,29 +1425,8 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
             nodeIds = nodes.map { NodeId(it.handle) },
             isHighPriority = true
         )
+        hideSelectMode()
     }
-
-    /**
-     * Helps to move folder
-     */
-    fun showMove(handleList: ArrayList<Long>) {
-        Timber.d("move folder")
-        moveToRubbish = false
-        val intent = Intent(this, FileExplorerActivity::class.java)
-        intent.action = FileExplorerActivity.ACTION_PICK_MOVE_FOLDER
-        intent.putExtra("MOVE_FROM", handleList.toLongArray())
-        moveFolderIntentResultLauncher.launch(intent)
-    }
-
-    private val moveFolderIntentResultLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            nodeSaver.handleActivityResult(
-                this,
-                Constants.REQUEST_CODE_SELECT_FOLDER_TO_MOVE,
-                it.resultCode,
-                it.data
-            )
-        }
 
     /**
      * Method responsible for copying files
@@ -1577,4 +1533,10 @@ class ContactInfoActivity : BaseActivity(), ActionNodeCallback, MegaRequestListe
         showSnackbar(type, activityChatContactBinding.fragmentContainer, content, chatId)
     }
 
+    private fun hideSelectMode() {
+        sharedFoldersFragment?.takeIf { it.isVisible }?.apply {
+            clearSelections()
+            hideMultipleSelect()
+        }
+    }
 }

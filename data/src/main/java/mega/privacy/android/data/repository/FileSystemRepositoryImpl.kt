@@ -22,7 +22,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import mega.privacy.android.data.cache.Cache
 import mega.privacy.android.data.constant.CacheFolderConstant
-import mega.privacy.android.data.extensions.APP_DATA_BACKGROUND_TRANSFER
 import mega.privacy.android.data.extensions.failWithError
 import mega.privacy.android.data.extensions.getFileName
 import mega.privacy.android.data.extensions.getRequestListener
@@ -41,13 +40,13 @@ import mega.privacy.android.data.listener.OptionalMegaTransferListenerInterface
 import mega.privacy.android.data.mapper.ChatFilesFolderUserAttributeMapper
 import mega.privacy.android.data.mapper.FileTypeInfoMapper
 import mega.privacy.android.data.mapper.MegaExceptionMapper
-import mega.privacy.android.data.mapper.MimeTypeMapper
 import mega.privacy.android.data.mapper.SortOrderIntMapper
-import mega.privacy.android.data.mapper.getFileTypeInfoForExtension
 import mega.privacy.android.data.mapper.node.NodeMapper
 import mega.privacy.android.data.mapper.shares.ShareDataMapper
+import mega.privacy.android.data.mapper.transfer.AppDataTypeConstants
 import mega.privacy.android.data.model.GlobalUpdate
 import mega.privacy.android.data.qualifier.FileVersionsOption
+import mega.privacy.android.domain.entity.FileTypeInfo
 import mega.privacy.android.domain.entity.document.DocumentFolder
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.Node
@@ -117,7 +116,6 @@ internal class FileSystemRepositoryImpl @Inject constructor(
     private val sdCardGateway: SDCardGateway,
     private val fileAttributeGateway: FileAttributeGateway,
     @ApplicationScope private val sharingScope: CoroutineScope,
-    private val mimeTypeMapper: MimeTypeMapper,
 ) : FileSystemRepository {
 
     init {
@@ -156,7 +154,7 @@ internal class FileSystemRepositoryImpl @Inject constructor(
                         node = node,
                         localPath = file.absolutePath,
                         fileName = file.name,
-                        appData = APP_DATA_BACKGROUND_TRANSFER,
+                        appData = AppDataTypeConstants.BackgroundTransfer.sdkTypeValue,
                         startFirst = true,
                         cancelToken = null,
                         collisionCheck = COLLISION_CHECK_FINGERPRINT,
@@ -490,6 +488,9 @@ internal class FileSystemRepositoryImpl @Inject constructor(
         fileGateway.copyFileToFolder(source, destination)
     }
 
+    override fun getFileTypeInfoByName(name: String, duration: Int): FileTypeInfo =
+        fileTypeInfoMapper(name, duration)
+
     override suspend fun moveFileToSd(
         file: File,
         destinationUri: String,
@@ -613,11 +614,7 @@ internal class FileSystemRepositoryImpl @Inject constructor(
     override suspend fun getFileTypeInfo(file: File) =
         withContext(ioDispatcher) {
             val duration = fileAttributeGateway.getVideoDuration(file.absolutePath)
-            getFileTypeInfoForExtension(
-                mimeType = mimeTypeMapper(file.extension),
-                extension = file.extension,
-                duration = duration?.inWholeSeconds?.toInt() ?: 0,
-            )
+            fileTypeInfoMapper(file.name, duration?.inWholeSeconds?.toInt() ?: 0)
         }
 
     override suspend fun deleteFileByUri(uri: String): Boolean = withContext(ioDispatcher) {
@@ -634,4 +631,29 @@ internal class FileSystemRepositoryImpl @Inject constructor(
         query: String,
     ): Flow<DocumentFolder> = fileGateway.searchFilesInDocumentFolderRecursive(folder, query)
         .flowOn(ioDispatcher)
+
+    override suspend fun copyUri(name: String, source: UriPath, destination: File) =
+        withContext(ioDispatcher) {
+            fileGateway.copyUriToDocumentFolder(
+                name = name,
+                source = source.value.toUri(),
+                destination = DocumentFile.fromFile(destination)
+            )
+        }
+
+    override suspend fun copyUri(name: String, source: UriPath, destination: UriPath) =
+        withContext(ioDispatcher) {
+            val uri = destination.value.toUri()
+            val isTreeUri = DocumentsContract.isTreeUri(uri)
+            val destinationUri = if (isTreeUri) {
+                DocumentFile.fromTreeUri(context, uri)
+            } else {
+                DocumentFile.fromSingleUri(context, uri)
+            } ?: throw FileNotFoundException("Content uri doesn't exist: $destination")
+            fileGateway.copyUriToDocumentFolder(
+                name = name,
+                source = source.value.toUri(),
+                destination = destinationUri
+            )
+        }
 }

@@ -28,6 +28,7 @@ kotlin-serialisation = "1.6.3"
 eclipse-jgit = "6.6.0.202305301015-r"
 json = "20230227"
 mega-core-ui = "2.10.20240531102524"
+kotlinx-collections-immutable = "0.3.7"
 
 [libraries]
 anko-commons = { module = "org.jetbrains.anko:anko-commons", version.ref = "anko" }
@@ -72,7 +73,7 @@ simplestorage = { module = "com.anggrayudi:storage", version.ref = "simplestorag
 stickyheader = 'com.brandongogetap:stickyheaders:0.6.1'
 vdurmont-emoji = 'com.vdurmont:emoji-java:4.0.0'
 compose-state-events = { module = "com.github.leonard-palm:compose-state-events", version.ref = "compose-state-events" }
-mega-analytics = "mega.privacy.mobile:analytics-events-android:20240625.220618"
+mega-analytics = "mega.privacy.mobile:analytics-events-android:20240702.021227"
 kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
 balloon = "com.github.skydoves:balloon-compose:1.6.4"
 xray = { module = "mega.privacy.android.xray:xray", version.ref = "xray" }
@@ -87,6 +88,7 @@ eclipse-jgit-ssh-jsch = { module = "org.eclipse.jgit:org.eclipse.jgit.ssh.jsch",
 json = { module = "org.json:json", version.ref = "json"}
 mega-core-ui = { group = "mega.android.core", name  = "ui", version.ref = "mega-core-ui" }
 mega-core-ui-tokens = { group = "mega.android.core", name  = "ui-tokens", version.ref = "mega-core-ui"}
+kotlinx-collections-immutable = { group = "org.jetbrains.kotlinx", name = "kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable" }
 
 [bundles]
 fresco = ["fresco", "fresco-gif", "fresco-webp", "fresco-webpsupport"]

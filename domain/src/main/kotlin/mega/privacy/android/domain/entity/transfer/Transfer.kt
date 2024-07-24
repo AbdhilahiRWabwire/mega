@@ -29,6 +29,8 @@ import java.math.BigInteger
  * @property tag An integer that identifies this transfer.
  * @property folderTransferTag tag of the initial folder transfer that initiated this transfer
  * @property speed The average speed of this transfer.
+ * @property isSyncTransfer True if this transfer belongs to the synchronization engine
+ * @property isBackupTransfer True if this transfer belongs to the backup engine
  * @property isForeignOverQuota True if the transfer has failed with MEGAErrorTypeApiEOverquota
  *                              and the target is foreign, false otherwise.
  * @property isStreamingTransfer True if this is a streaming transfer, false otherwise.
@@ -43,26 +45,28 @@ import java.math.BigInteger
  */
 data class Transfer(
     override val transferType: TransferType,
-    val transferredBytes: Long,
+    override val transferredBytes: Long,
     override val totalBytes: Long,
     val localPath: String,
     val parentPath: String,
     val nodeHandle: Long,
     val parentHandle: Long,
-    val fileName: String,
+    override val fileName: String,
     val stage: TransferStage,
     override val tag: Int,
     val folderTransferTag: Int?,
-    val speed: Long,
+    override val speed: Long,
+    val isSyncTransfer: Boolean,
+    val isBackupTransfer: Boolean,
     val isForeignOverQuota: Boolean,
     val isStreamingTransfer: Boolean,
     override val isFinished: Boolean,
     override val isFolderTransfer: Boolean,
     override val appData: List<TransferAppData>,
-    val state: TransferState,
-    val priority: BigInteger,
+    override val state: TransferState,
+    override val priority: BigInteger,
     val notificationNumber: Long,
-) : ActiveTransfer, AppDataOwner {
+) : ActiveTransfer, InProgressTransferData, AppDataOwner {
 
     /**
      * Gets paused state from [state]
@@ -83,5 +87,5 @@ data class Transfer(
     /**
      * progress of the transfer
      */
-    val progress = Progress(transferredBytes, totalBytes)
+    override val progress = Progress(transferredBytes, totalBytes)
 }

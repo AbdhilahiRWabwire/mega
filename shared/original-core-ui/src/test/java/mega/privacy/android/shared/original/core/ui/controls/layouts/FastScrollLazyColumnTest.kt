@@ -1,5 +1,6 @@
 package mega.privacy.android.shared.original.core.ui.controls.layouts
 
+import THUMB_TAG
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.Text

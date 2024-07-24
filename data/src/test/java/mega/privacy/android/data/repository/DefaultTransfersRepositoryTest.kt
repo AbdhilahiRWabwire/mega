@@ -1002,11 +1002,6 @@ class DefaultTransfersRepositoryTest {
     @Nested
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     inner class PendingCounters {
-        @Test
-        fun `test that getNumPendingGeneralUploads returns correctly`() = runTest {
-            stubUploadTransfers()
-            assertThat(underTest.getNumPendingGeneralUploads()).isEqualTo(2)
-        }
 
         @Test
         fun `test that getNumPendingCameraUploads returns correctly`() = runTest {
@@ -1015,27 +1010,9 @@ class DefaultTransfersRepositoryTest {
         }
 
         @Test
-        fun `test that getNumPendingChatUploads returns correctly`() = runTest {
-            stubUploadTransfers()
-            assertThat(underTest.getNumPendingChatUploads()).isEqualTo(2)
-        }
-
-        @Test
-        fun `test that getNumPendingPausedGeneralUploads returns correctly`() = runTest {
-            stubUploadTransfers()
-            assertThat(underTest.getNumPendingPausedGeneralUploads()).isEqualTo(1)
-        }
-
-        @Test
         fun `test that getNumPendingPausedCameraUploads returns correctly`() = runTest {
             stubUploadTransfers()
             assertThat(underTest.getNumPendingPausedCameraUploads()).isEqualTo(1)
-        }
-
-        @Test
-        fun `test that getNumPendingPausedChatUploads returns correctly`() = runTest {
-            stubUploadTransfers()
-            assertThat(underTest.getNumPendingPausedChatUploads()).isEqualTo(1)
         }
 
         private fun stubUploadTransfers() = runTest {
@@ -1180,6 +1157,26 @@ class DefaultTransfersRepositoryTest {
             )
         }
 
+        @ParameterizedTest
+        @EnumSource(TransferType::class)
+        fun `test that updateTransferredBytes doesn't update when the new value is 0 bytes`(
+            transferType: TransferType,
+        ) = runTest {
+            testCurrentActiveTransferTotals(
+                transferType = transferType,
+                expectedMap = { transfer ->
+                    mapOf(transfer.tag to transfer.transferredBytes)
+                },
+                callToTest = {
+                    val transferZero = mock<Transfer>()
+                    stubActiveTransfer(transferZero, transferType, transferredBytes = 0L)
+
+                    underTest.updateTransferredBytes(transfer)
+                    underTest.updateTransferredBytes(transferZero)
+                }
+            )
+        }
+
         /**
          * As getCurrentActiveTransferTotalsByType is based on a state flow, we need to reset this state to make testing stateless
          * This is a convenient function to test changes on this state and then reset it to its initial empty value.
@@ -1189,7 +1186,7 @@ class DefaultTransfersRepositoryTest {
             expectedMap: (Transfer) -> Map<Int, Long>,
             callToTest: suspend () -> Unit,
         ) {
-            stubActiveTransfer(transferType)
+            stubActiveTransfer(transfer, transferType)
             val list = mock<List<ActiveTransfer>>()
             whenever(megaLocalRoomGateway.getCurrentActiveTransfersByType(transferType))
                 .thenReturn(list)
@@ -1208,13 +1205,16 @@ class DefaultTransfersRepositoryTest {
             verify(activeTransferTotalsMapper).invoke(eq(transferType), eq(list), eq(emptyMap()))
         }
 
-        private fun stubActiveTransfer(transferType: TransferType) {
-            val transferred = 900L
+        private fun stubActiveTransfer(
+            transfer: Transfer,
+            transferType: TransferType,
+            transferredBytes:Long = 900L
+        ) {
             val total = 1024L
             val tag = 1
 
             whenever(transfer.transferType).thenReturn(transferType)
-            whenever(transfer.transferredBytes).thenReturn(transferred)
+            whenever(transfer.transferredBytes).thenReturn(transferredBytes)
             whenever(transfer.totalBytes).thenReturn(total)
             whenever(transfer.tag).thenReturn(tag)
         }

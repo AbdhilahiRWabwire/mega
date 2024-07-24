@@ -290,12 +290,6 @@
         <item quantity="many">Han finalizado %1$d de subidas</item>
         <item quantity="other">Han finalizado %1$d subidas</item>
     </plurals>
-    <!-- Warning shown when it tries to download some empty folders. Plural -->
-    <plurals name="empty_folders">
-        <item quantity="one">La carpeta está vacía.</item>
-        <item quantity="many">Las carpetas estás vacías.</item>
-        <item quantity="other">Las carpetas estás vacías.</item>
-    </plurals>
     <!-- Hint how to cancel the download -->
     <string name="download_touch_to_show">Ver transferencias</string>
     <!-- message when trying to open a downloaded file but there isn’t any app that open that file. Example: a user downloads a pdf but doesn’t have any app to read a pdf -->
@@ -1883,7 +1877,7 @@
     <!-- error message when importing multiple files from chat -->
     <string name="number_no_imported_from_chat">No se han podido compartir %d archivos</string>
     <!-- button’s text to open a full screen image -->
-    <string name="preview_content">Vista previa del contenido</string>
+    <string name="preview_content">Abrir</string>
     <!-- message shown when the user clicks on media file chat message, there is no network connection and the file is not been downloaded -->
     <string name="no_network_connection_on_play_file">Sin conexión. El archivo no se ha descargado y no se puede hacer streaming.</string>
     <!-- message shown when the user open a file, the file is not been opened due to unknown reason -->
@@ -5452,8 +5446,6 @@
     <string name="notifications_screen_notification_promo_expiration_time">Caduca el %1$s a las %2$s</string>
     <!-- Warning Message and upgrade link for organiser for Free Call -->
     <string name="meetings_free_call_organiser_number_of_participants_warning">Solo 100 participantes pueden unirse a la llamada. Los participantes adicionales solo podrán enviar y recibir mensajes. El organizador puede ampliar a Pro para eliminar estas restricciones.</string>
-    <!-- Warning Message for non organiser for Free Call -->
-    <string name="meetings_free_call_non_organiser_number_of_participants_warning">Only 100 participants can join the call. Any additional participants will only be able to send and read chats. Ask the organiser to remove this restriction.</string>
     <!-- The Video Quality Option shown in a Dialog in Settings Camera Uploads, indicating that the Videos will be compressed to Low Quality before being uploaded by Camera Uploads -->
     <string name="settings_camera_uploads_video_quality_dialog_option_low">Baja</string>
     <!-- The Video Quality Option shown in a Dialog in Settings Camera Uploads, indicating that the Videos will be compressed to Medium Quality before being uploaded by Camera Uploads -->
@@ -5560,17 +5552,17 @@
     <string name="meeting_your_hand_is_raised_message">Has levantado la mano</string>
     <!-- The snackbar message of you and others raised your hands -->
     <plurals name="meeting_you_and_others_raised_your_hands_message">
-        <item quantity="one">Tú y %1$d persona habéis levantado la mano</item>
-        <item quantity="many">Tú y %1$d personas habéis levantado la mano</item>
-        <item quantity="other">Tú y %1$d personas habéis levantado la mano</item>
+        <item quantity="one">Tú y %1$d persona más habéis levantado la mano</item>
+        <item quantity="many">Tú y %1$d de personas más habéis levantado la mano</item>
+        <item quantity="other">Tú y %1$d personas más habéis levantado la mano</item>
     </plurals>
     <!-- The snackbar message of another participant raised their hand -->
     <string name="meetings_one_participant_raised_their_hand_message">%1$s ha levantado la mano</string>
     <!-- The snackbar message two or more participants raised their hands -->
     <plurals name="meetings_other_participants_raised_their_hands_message">
         <item quantity="one">%1$s y %2$d más han levantado la mano</item>
-        <item quantity="many">%1$s y otros %2$d han levantado la mano</item>
-        <item quantity="other">%1$s y otros %2$d han levantado la mano</item>
+        <item quantity="many">%1$s y %2$dde personas más han levantado la mano</item>
+        <item quantity="other">%1$s y %2$d personas más han levantado la mano</item>
     </plurals>
     <!-- Hidden nodes sharing album -->
     <string name="hidden_nodes_sharing_album">Hay elementos ocultos en este álbum. Si compartes el álbum, los elementos ocultos estarán visibles para las personas con las que lo compartas. Los elementos seguirán ocultos en tu Nube.</string>
@@ -5580,4 +5572,8 @@
         <item quantity="many"></item>
         <item quantity="other"></item>
     </plurals>
+    <!-- Image or Video map location title-->
+    <string name="file_properties_info_map_location">Ubicación</string>
+    <!-- Image or Video no map location info-->
+    <string name="file_properties_info_map_location_no_location_info">No location information</string>
 </resources>

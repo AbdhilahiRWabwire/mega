@@ -6,6 +6,7 @@ plugins {
     alias(plugin.plugins.mega.android.release)
     alias(plugin.plugins.jfrog.artifactory) apply false
     alias(plugin.plugins.mega.artifactory.publish.convention) apply false
+    alias(plugin.plugins.de.mannodermaus.android.junit5) apply false
     id("org.jetbrains.kotlin.android") version "1.9.24" apply false
 }
 
@@ -30,7 +31,8 @@ buildscript {
         classpath(plugin.jfrog)
         classpath(plugin.junit5)
         classpath(plugin.kotlin.gradle)
-        classpath("androidx.benchmark:benchmark-baseline-profile-gradle-plugin:1.2.3")
+        classpath(lib.kotlin.serialisation)
+        classpath("androidx.benchmark:benchmark-baseline-profile-gradle-plugin:1.2.4")
         classpath("org.jfrog.buildinfo:build-info-extractor-gradle:${plugin.versions.jfrog.artifactory.get()}")
     }
 }
@@ -76,7 +78,7 @@ tasks.register("clean", Delete::class) {
 
 // Define versions in a single place
 // App
-extra["appVersion"] = "13.5"
+extra["appVersion"] = "13.6"
 
 // Sdk and tools
 extra["compileSdkVersion"] = 35
@@ -85,7 +87,7 @@ extra["targetSdkVersion"] = 34
 extra["buildTools"] = "35.0.0"
 
 // Prebuilt MEGA SDK version
-extra["megaSdkVersion"] = "20240626.001403-rel"
+extra["megaSdkVersion"] = "20240718.035505-rel"
 
 //JDK and Java Version
 extra["jdk"] = "17"

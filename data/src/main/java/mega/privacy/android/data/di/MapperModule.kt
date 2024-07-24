@@ -19,7 +19,6 @@ import mega.privacy.android.data.mapper.CountryMapper
 import mega.privacy.android.data.mapper.CurrencyMapper
 import mega.privacy.android.data.mapper.EventMapper
 import mega.privacy.android.data.mapper.FileDurationMapper
-import mega.privacy.android.data.mapper.FileTypeInfoMapper
 import mega.privacy.android.data.mapper.ImageMapper
 import mega.privacy.android.data.mapper.LocalPricingMapper
 import mega.privacy.android.data.mapper.MediaStoreFileTypeUriMapper
@@ -29,7 +28,6 @@ import mega.privacy.android.data.mapper.MegaSkuMapper
 import mega.privacy.android.data.mapper.MimeTypeMapper
 import mega.privacy.android.data.mapper.NodeUpdateMapper
 import mega.privacy.android.data.mapper.PaymentMethodTypeMapper
-import mega.privacy.android.data.mapper.PaymentPlatformTypeMapper
 import mega.privacy.android.data.mapper.PricingMapper
 import mega.privacy.android.data.mapper.SortOrderIntMapper
 import mega.privacy.android.data.mapper.SortOrderIntMapperImpl
@@ -49,7 +47,6 @@ import mega.privacy.android.data.mapper.camerauploads.UploadOptionIntMapperImpl
 import mega.privacy.android.data.mapper.changepassword.PasswordStrengthMapper
 import mega.privacy.android.data.mapper.changepassword.PasswordStrengthMapperImpl
 import mega.privacy.android.data.mapper.chat.ChatMessageMapper
-import mega.privacy.android.data.mapper.getFileTypeInfo
 import mega.privacy.android.data.mapper.getMimeType
 import mega.privacy.android.data.mapper.mapBooleanPreference
 import mega.privacy.android.data.mapper.mapMegaNodeListToNodeUpdate
@@ -71,7 +68,6 @@ import mega.privacy.android.data.mapper.toMegaAchievement
 import mega.privacy.android.data.mapper.toMegaPurchase
 import mega.privacy.android.data.mapper.toMegaSku
 import mega.privacy.android.data.mapper.toPaymentMethodType
-import mega.privacy.android.data.mapper.toPaymentPlatformType
 import mega.privacy.android.data.mapper.toPricing
 import mega.privacy.android.data.mapper.toStorageState
 import mega.privacy.android.data.mapper.toSubscriptionStatus
@@ -184,17 +180,6 @@ internal abstract class MapperModule {
         fun provideBooleanPreferenceMapper(): BooleanPreferenceMapper = ::mapBooleanPreference
 
         /**
-         * Provide file type info mapper
-         *
-         * @param mimeTypeMapper
-         */
-        @Provides
-        fun provideFileTypeInfoMapper(mimeTypeMapper: MimeTypeMapper): FileTypeInfoMapper =
-            { node ->
-                getFileTypeInfo(node, mimeTypeMapper)
-            }
-
-        /**
          * Provide contact request mapper
          */
         @Provides
@@ -281,13 +266,6 @@ internal abstract class MapperModule {
         @Provides
         fun provideChatFilesFolderUserAttributeMapper(): ChatFilesFolderUserAttributeMapper =
             ::toChatFilesFolderUserAttribute
-
-        /**
-         * Provide subscription platform type mapper
-         */
-        @Provides
-        fun provideSubscriptionPlatformTypeMapper(): PaymentPlatformTypeMapper =
-            ::toPaymentPlatformType
 
         /**
          * Provide account transfer detail mapper

@@ -127,7 +127,7 @@ interface FileGateway {
      * @param source
      * @param destination
      */
-    suspend fun copyFileToFolder(source: File, destination: File)
+    suspend fun copyFileToFolder(source: File, destination: File): Int
 
     /**
      * creating a new temporary file in a root directory by copying the file from local path
@@ -358,6 +358,18 @@ interface FileGateway {
      */
     suspend fun copyFilesToDocumentFolder(
         source: File,
+        destination: DocumentFile,
+    ): Int
+
+    /**
+     * Copy uri to document folder
+     *
+     * @param source uri
+     * @param destination document folder
+     */
+    suspend fun copyUriToDocumentFolder(
+        name: String,
+        source: Uri,
         destination: DocumentFile,
     )
 }

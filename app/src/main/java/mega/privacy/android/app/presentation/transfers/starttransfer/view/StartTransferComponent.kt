@@ -53,7 +53,7 @@ import mega.privacy.android.app.presentation.transfers.starttransfer.model.Start
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.StartTransferViewState
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.dialog.ResumeTransfersDialog
-import mega.privacy.android.app.presentation.transfers.view.TransferInProgressDialog
+import mega.privacy.android.app.presentation.transfers.view.dialog.TransferInProgressDialog
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.usecase.exception.NotEnoughQuotaMegaException
 import mega.privacy.android.app.usecase.exception.QuotaExceededMegaException
@@ -190,7 +190,7 @@ private fun StartTransferComponent(
     onOneOffEventConsumed: () -> Unit,
     onCancelledConfirmed: () -> Unit,
     onDownloadConfirmed: (TransferTriggerEvent.DownloadTriggerEvent, saveDoNotAskAgain: Boolean) -> Unit,
-    onDestinationSet: (TransferTriggerEvent.StartDownloadNode, destination: Uri) -> Unit,
+    onDestinationSet: (TransferTriggerEvent, destination: Uri) -> Unit,
     onPromptSaveDestinationConsumed: () -> Unit,
     onSaveDestination: (String) -> Unit,
     onDoNotPromptToSaveDestinationAgain: () -> Unit,
@@ -207,7 +207,7 @@ private fun StartTransferComponent(
         mutableStateOf<StartTransferEvent.ConfirmLargeDownload?>(null)
     }
     var showAskDestinationDialog by remember {
-        mutableStateOf<TransferTriggerEvent.StartDownloadNode?>(null)
+        mutableStateOf<TransferTriggerEvent?>(null)
     }
     val folderPicker = launchFolderPicker(
         onCancel = {

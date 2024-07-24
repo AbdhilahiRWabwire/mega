@@ -52,9 +52,16 @@ import mega.privacy.android.domain.entity.meeting.SubtitleCallType
  * @property userIdsWithChangesInRaisedHand         User identifiers with changes in the raised hand
  * @property isRaiseToHandSuggestionShown           True, if the Raise to Hand suggestion has been shown. False, otherwise.
  * @property shouldUpdateLocalAVFlags               True, if should update local av flag. False, if not
- * @property sessionOnHoldChanges                   [ChatSession] with changes
+ * @property sessionOnHoldChanges                   [ChatSession] with changes in session on hold
  * @property isPictureInPictureFeatureFlagEnabled       True, if Picture in Picture feature flag enabled. False, otherwise.
  * @property isInPipMode                                True, if is in Picture in Picture mode. False, otherwise.
+ * @property myUserHandle                               My user handle
+ * @property changesInAVFlagsInSession              [ChatSession] with changes in remote audio video flags
+ * @property changesInAudioLevelInSession           [ChatSession] with changes in audio level
+ * @property changesInHiResInSession                [ChatSession] with changes in high resolution video
+ * @property changesInLowResInSession               [ChatSession] with changes in low resolution video
+ * @property changesInStatusInSession               [ChatSession] with changes in status
+ * @property shouldCheckChildFragments              True, if should update fragments. False, if not.
  */
 data class InMeetingUiState(
     val error: Int? = null,
@@ -98,6 +105,13 @@ data class InMeetingUiState(
     val sessionOnHoldChanges: ChatSession? = null,
     val isPictureInPictureFeatureFlagEnabled: Boolean = false,
     val isInPipMode: Boolean = false,
+    val myUserHandle: Long? = null,
+    val changesInAVFlagsInSession: ChatSession? = null,
+    val changesInAudioLevelInSession: ChatSession? = null,
+    val changesInHiResInSession: ChatSession? = null,
+    val changesInLowResInSession: ChatSession? = null,
+    val changesInStatusInSession: ChatSession? = null,
+    val shouldCheckChildFragments: Boolean = false,
 ) {
     /**
      * Is call on hold
@@ -118,22 +132,52 @@ data class InMeetingUiState(
         get():Boolean = call?.hasLocalVideo == true
 
     /**
+     * Has local audio
+     */
+    val hasLocalAudio
+        get():Boolean = call?.hasLocalAudio == true
+
+    /**
      * Check session is on hold in one to one call
      */
     val isSessionOnHold
-        get(): Boolean? {
+        get(): Boolean? = getSession?.isOnHold
+
+    /**
+     * Check session is on hold in call
+     */
+    fun isSessionOnHoldByClientId(clientId: Long): Boolean? =
+        getSessionByClientId(clientId)?.isOnHold
+
+    /**
+     * Get session in one to one call
+     */
+    val getSession
+        get(): ChatSession? {
             call?.apply {
                 sessionsClientId?.takeIf { it.isNotEmpty() }?.let {
                     it.first().let { clientId ->
-                        sessionByClientId[clientId]?.let { session ->
-                            return session.isOnHold
-                        }
+                        return sessionByClientId[clientId]
                     }
                 }
             }
 
             return null
         }
+
+    /**
+     * Get session by client Id
+     *
+     * @param clientId
+     * @return [ChatSession]
+     */
+    fun getSessionByClientId(clientId: Long): ChatSession? {
+        call?.apply {
+            return sessionByClientId[clientId]
+        }
+
+        return null
+    }
 
     /**
      * Get the button to be displayed depending on the type of call on hold you have

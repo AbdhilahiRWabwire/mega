@@ -8,8 +8,8 @@ plugins {
     alias(convention.plugins.mega.android.library.jacoco)
     alias(convention.plugins.mega.lint)
     alias(convention.plugins.mega.android.hilt)
+    alias(plugin.plugins.de.mannodermaus.android.junit5)
     id("kotlin-android")
-    id("de.mannodermaus.android-junit5")
     kotlin("plugin.serialization") version "1.9.21"
 }
 
@@ -38,7 +38,7 @@ android.testVariants.all {
 dependencies {
     implementation(project(":domain"))
     implementation(project(":shared:sync"))
-    implementation("com.google.guava:guava:31.0.1-jre")
+    implementation("com.google.guava:guava:33.0.0-jre")
     preBuiltSdkDependency(rootProject.extra)
 
     implementation(lib.coroutines.core)
@@ -80,6 +80,8 @@ dependencies {
     testImplementation(lib.bundles.unit.test)
     testImplementation(platform(testlib.junit5.bom))
     testImplementation(testlib.bundles.junit5.api)
+    testImplementation(testlib.bundles.ui.test)
+    testImplementation(testlib.junit.test.ktx)
     testRuntimeOnly(testlib.junit.jupiter.engine)
 
     androidTestImplementation(testlib.bundles.unit.test)

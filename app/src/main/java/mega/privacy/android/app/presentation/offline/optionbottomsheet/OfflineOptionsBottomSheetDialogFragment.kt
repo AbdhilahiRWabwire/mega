@@ -21,9 +21,8 @@ import mega.privacy.android.app.presentation.offline.action.OfflineNodeActionsVi
 import mega.privacy.android.app.presentation.offline.confirmremovedialog.ConfirmRemoveFromOfflineDialogFragment
 import mega.privacy.android.app.presentation.offline.optionbottomsheet.OfflineOptionsViewModel.Companion.NODE_HANDLE
 import mega.privacy.android.app.presentation.offline.optionbottomsheet.view.OfflineOptionsContent
+import mega.privacy.android.app.presentation.transfers.starttransfer.StartDownloadViewModel
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.app.utils.OfflineUtils
-import mega.privacy.android.app.utils.callManager
 import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.node.NodeId
@@ -37,6 +36,7 @@ internal class OfflineOptionsBottomSheetDialogFragment : BottomSheetDialogFragme
 
     private val viewModel: OfflineOptionsViewModel by viewModels()
     private val offlineNodeActionsViewModel: OfflineNodeActionsViewModel by activityViewModels()
+    private val startDownloadViewModel: StartDownloadViewModel by activityViewModels()
 
     @Inject
     lateinit var getThemeMode: GetThemeMode
@@ -62,7 +62,7 @@ internal class OfflineOptionsBottomSheetDialogFragment : BottomSheetDialogFragme
                         fileTypeIconMapper = fileTypeIconMapper,
                         onRemoveFromOfflineClicked = { showConfirmationRemoveOfflineNode(uiState.nodeId) },
                         onOpenInfoClicked = { openInfo(uiState.nodeId) },
-                        onOpenWithClicked = { openWith(uiState.nodeId) },
+                        onOpenWithClicked = { openWith(it) },
                         onSaveToDeviceClicked = { saveToDevice(uiState.nodeId) },
                         onShareNodeClicked = {
                             shareOfflineNode(
@@ -99,21 +99,13 @@ internal class OfflineOptionsBottomSheetDialogFragment : BottomSheetDialogFragme
         dismissAllowingStateLoss()
     }
 
-    private fun openWith(nodeId: NodeId) {
-        OfflineUtils.openWithOffline(
-            requireContext(),
-            nodeId.longValue
-        )
+    private fun openWith(offlineFileInformation: OfflineFileInformation) {
+        offlineNodeActionsViewModel.handleOpenWithIntent(offlineFileInformation)
         dismissAllowingStateLoss()
     }
 
     private fun saveToDevice(nodeId: NodeId) {
-        callManager {
-            it.saveHandlesToDevice(
-                listOf(nodeId.longValue),
-                true
-            )
-        }
+        startDownloadViewModel.onCopyOfflineNodeClicked(listOf(nodeId))
         dismissAllowingStateLoss()
     }
 

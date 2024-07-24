@@ -36,7 +36,10 @@ class HandleTransferEventUseCase @Inject internal constructor(
      * @param event the [TransferEvent] that has been received.
      */
     suspend operator fun invoke(event: TransferEvent) {
-        if (event.transfer.isVoiceClip() || event.transfer.isBackgroundTransfer() || event.transfer.isStreamingTransfer) {
+        if (event.transfer.isVoiceClip() || event.transfer.isBackgroundTransfer()
+            || event.transfer.isStreamingTransfer || event.transfer.isSyncTransfer
+            || event.transfer.isBackupTransfer
+        ) {
             return
         }
         if (event is TransferEvent.TransferStartEvent || event is TransferEvent.TransferUpdateEvent) {
@@ -71,8 +74,8 @@ class HandleTransferEventUseCase @Inject internal constructor(
                 if (event.error is BusinessAccountExpiredMegaException) {
                     broadcastBusinessAccountExpiredUseCase()
                 }
-                transferRepository.insertOrUpdateActiveTransfer(event.transfer)
                 transferRepository.updateTransferredBytes(event.transfer)
+                transferRepository.insertOrUpdateActiveTransfer(event.transfer)
                 if (!event.transfer.isFolderTransfer) {
                     transferRepository.addCompletedTransfer(
                         event.transfer,

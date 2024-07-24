@@ -13,10 +13,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
-import androidx.compose.material.SnackbarHostState
+import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.core.text.HtmlCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -29,7 +28,6 @@ import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.MimeTypeList
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.WebViewActivity
-import mega.privacy.android.app.components.saver.NodeSaver
 import mega.privacy.android.app.constants.IntentConstants
 import mega.privacy.android.app.databinding.ActivityFolderLinkComposeBinding
 import mega.privacy.android.app.extensions.isPortrait
@@ -38,7 +36,7 @@ import mega.privacy.android.app.main.DecryptAlertDialog
 import mega.privacy.android.app.main.FileExplorerActivity
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.mediaplayer.AudioPlayerActivity
-import mega.privacy.android.app.mediaplayer.VideoPlayerActivity
+import mega.privacy.android.app.mediaplayer.LegacyVideoPlayerActivity
 import mega.privacy.android.app.mediaplayer.miniplayer.MiniAudioPlayerController
 import mega.privacy.android.app.myAccount.MyAccountActivity
 import mega.privacy.android.app.presentation.advertisements.model.AdsSlotIDs
@@ -58,7 +56,6 @@ import mega.privacy.android.app.textEditor.TextEditorActivity
 import mega.privacy.android.app.usecase.exception.NotEnoughQuotaMegaException
 import mega.privacy.android.app.usecase.exception.QuotaExceededMegaException
 import mega.privacy.android.app.utils.AlertDialogUtil
-import mega.privacy.android.app.utils.AlertsAndWarnings.showSaveToDeviceConfirmDialog
 import mega.privacy.android.app.utils.ColorUtils
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.MegaNodeUtil
@@ -68,7 +65,6 @@ import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
 import javax.inject.Inject
@@ -79,12 +75,6 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class FolderLinkComposeActivity : TransfersManagementActivity(),
     DecryptAlertDialog.DecryptDialogListener {
-
-    /**
-     * Use case to get the value of a feature flag
-     */
-    @Inject
-    lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
 
     /**
      * Mapper to get the icon of a file type
@@ -98,15 +88,6 @@ class FolderLinkComposeActivity : TransfersManagementActivity(),
 
     private var mKey: String? = null
     private var statusDialog: AlertDialog? = null
-    private val nodeSaver = NodeSaver(
-        this, this, this,
-        showSaveToDeviceConfirmDialog(this)
-    )
-
-    private val storagePermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-            nodeSaver.handleRequestPermissionsResult(Constants.REQUEST_WRITE_STORAGE)
-        }
 
     private val onBackPressedCallback = object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
@@ -169,7 +150,6 @@ class FolderLinkComposeActivity : TransfersManagementActivity(),
             }
         }
 
-        setTransfersWidgetLayout(binding.transfersWidgetLayout)
         intent?.let { viewModel.handleIntent(it) }
         setupObservers()
         viewModel.checkLoginRequired()
@@ -212,13 +192,14 @@ class FolderLinkComposeActivity : TransfersManagementActivity(),
         val themeMode by getThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.System)
         val uiState by viewModel.state.collectAsStateWithLifecycle()
         val adsUiState by adsViewModel.uiState.collectAsStateWithLifecycle()
+        val transferState by transfersManagementViewModel.state.collectAsStateWithLifecycle()
 
-
-        val snackBarHostState = remember { SnackbarHostState() }
+        val scaffoldState = rememberScaffoldState()
         OriginalTempTheme(isDark = themeMode.isDarkMode()) {
             FolderLinkView(
                 state = uiState,
-                snackBarHostState = snackBarHostState,
+                transferState = transferState,
+                scaffoldState = scaffoldState,
                 onBackPressed = viewModel::handleBackPress,
                 onShareClicked = ::onShareClicked,
                 onMoreOptionClick = viewModel::handleMoreOptionClick,
@@ -259,12 +240,13 @@ class FolderLinkComposeActivity : TransfersManagementActivity(),
                     adsViewModel.fetchNewAd(AdsSlotIDs.SHARED_LINK_SLOT_ID)
                 },
                 onAdDismissed = adsViewModel::onAdConsumed,
+                onTransferWidgetClick = ::onTransfersWidgetClick,
                 fileTypeIconMapper = fileTypeIconMapper
             )
             StartTransferComponent(
                 event = uiState.downloadEvent,
                 onConsumeEvent = viewModel::resetDownloadNode,
-                snackBarHostState = snackBarHostState
+                snackBarHostState = scaffoldState.snackbarHostState
             )
         }
     }
@@ -326,7 +308,7 @@ class FolderLinkComposeActivity : TransfersManagementActivity(),
                                 } else {
                                     Intent(
                                         this@FolderLinkComposeActivity,
-                                        VideoPlayerActivity::class.java
+                                        LegacyVideoPlayerActivity::class.java
                                     )
                                 }
                             }
@@ -409,7 +391,7 @@ class FolderLinkComposeActivity : TransfersManagementActivity(),
 
                         it.collisions != null -> {
                             AlertDialogUtil.dismissAlertDialogIfExists(statusDialog)
-                            nameCollisionActivityContract?.launch(it.collisions)
+                            nameCollisionActivityContract?.launch(ArrayList(it.collisions))
                             viewModel.resetLaunchCollisionActivity()
                             viewModel.clearAllSelection()
                         }
@@ -561,18 +543,6 @@ class FolderLinkComposeActivity : TransfersManagementActivity(),
         val accountIntent = Intent(this, MyAccountActivity::class.java)
             .setAction(IntentConstants.ACTION_OPEN_ACHIEVEMENTS)
         startActivity(accountIntent)
-    }
-
-    @SuppressLint("CheckResult")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
-        super.onActivityResult(requestCode, resultCode, intent)
-        Timber.d("onActivityResult")
-        if (intent == null) {
-            return
-        }
-        if (nodeSaver.handleActivityResult(this, requestCode, resultCode, intent)) {
-            return
-        }
     }
 
     /**

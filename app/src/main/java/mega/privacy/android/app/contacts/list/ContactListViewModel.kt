@@ -2,22 +2,19 @@ package mega.privacy.android.app.contacts.list
 
 import android.content.Context
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asLiveData
 import androidx.lifecycle.map
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
-import io.reactivex.rxjava3.disposables.CompositeDisposable
-import io.reactivex.rxjava3.kotlin.addTo
-import io.reactivex.rxjava3.kotlin.subscribeBy
-import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -28,12 +25,11 @@ import mega.privacy.android.app.contacts.list.data.ContactActionItem
 import mega.privacy.android.app.contacts.list.data.ContactActionItem.Type
 import mega.privacy.android.app.contacts.list.data.ContactItem
 import mega.privacy.android.app.contacts.list.data.ContactListState
+import mega.privacy.android.app.contacts.mapper.ContactItemDataMapper
 import mega.privacy.android.app.contacts.usecase.GetContactsUseCase
 import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
-import mega.privacy.android.app.utils.CacheFolderManager
 import mega.privacy.android.app.utils.CallUtil
-import mega.privacy.android.app.utils.notifyObserver
 import mega.privacy.android.data.gateway.api.MegaChatApiGateway
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.NodeId
@@ -46,29 +42,28 @@ import mega.privacy.android.domain.usecase.meeting.StartCallUseCase
 import mega.privacy.android.domain.usecase.shares.CreateShareKeyUseCase
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
-import java.io.File
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 /**
  * ViewModel that handles all related logic to Contact List for the current user.
  *
- * @param getContactsUseCase            Use case to get contacts
- * @param get1On1ChatIdUseCase          Use case to get 1on1 chat id
- * @param removedContactByEmailUseCase  Use case to remove contact by email
- * @param startCallUseCase              Use case to start chat call
- * @param passcodeManagement            PasscodeManagement object
- * @param chatApiGateway                MegaChatApiGateway object
- * @param setChatVideoInDeviceUseCase   Use case to set chat video in device
- * @param chatManagement                ChatManagement object
- * @param createShareKeyUseCase         Use case to create share key
- * @param getNodeByIdUseCase            Use case to get node by id
- * @param monitorSFUServerUpgradeUseCase Use case to monitor SFU server upgrade
- * @param monitorContactRequestsUseCase Use case to monitor contact requests
- * @param context                       Application context
+ * @property getContactsUseCase Use case to get contacts.
+ * @property get1On1ChatIdUseCase Use case to get 1 on 1 chat id.
+ * @property removedContactByEmailUseCase Use case to remove contact by email.
+ * @property startCallUseCase Use case to start a call.
+ * @property passcodeManagement PasscodeManagement object.
+ * @property chatApiGateway MegaChatApiGateway object.
+ * @property setChatVideoInDeviceUseCase Use case to set chat video in device.
+ * @property chatManagement ChatManagement object.
+ * @property createShareKeyUseCase Use case to create a share key.
+ * @property getNodeByIdUseCase Use case to get a node by id.
+ * @property monitorSFUServerUpgradeUseCase Use case to monitor SFU server upgrade.
+ * @property monitorContactRequestsUseCase Use case to monitor contact requests.
+ * @property contactItemDataMapper Mapper to map ContactItem to ContactItem.Data.
+ * @property context Application context.
  */
 @HiltViewModel
-class ContactListViewModel @Inject constructor(
+internal class ContactListViewModel @Inject constructor(
     private val getContactsUseCase: GetContactsUseCase,
     private val get1On1ChatIdUseCase: Get1On1ChatIdUseCase,
     private val removedContactByEmailUseCase: RemoveContactByEmailUseCase,
@@ -81,17 +76,11 @@ class ContactListViewModel @Inject constructor(
     private val getNodeByIdUseCase: GetNodeByIdUseCase,
     private val monitorSFUServerUpgradeUseCase: MonitorSFUServerUpgradeUseCase,
     private val monitorContactRequestsUseCase: MonitorContactRequestsUseCase,
+    private val contactItemDataMapper: ContactItemDataMapper,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
-
-    private val composite = CompositeDisposable()
-
-    companion object {
-        private const val REQUEST_TIMEOUT_IN_MS = 100L
-    }
-
-    private var queryString: String? = null
-    private val contacts: MutableLiveData<List<ContactItem.Data>> = MutableLiveData()
+    private val queryString = MutableStateFlow<String?>(null)
+    private val contacts: MutableStateFlow<List<ContactItem>> = MutableStateFlow(emptyList())
     private val _state = MutableStateFlow(ContactListState())
 
     private var monitorSFUServerUpgradeJob: Job? = null
@@ -104,8 +93,25 @@ class ContactListViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            CacheFolderManager.getCacheFolderAsync(CacheFolderManager.AVATAR_FOLDER)?.let {
-                retrieveContacts(it)
+            combine(
+                getContactsUseCase().map { domainList: List<mega.privacy.android.domain.entity.contacts.ContactItem> ->
+                    domainList.map { contactItemDataMapper(it) }.sortedAlphabetically()
+                },
+                queryString
+            ) { list: List<ContactItem.Data>, query: String? ->
+                if (query.isNullOrBlank()) {
+                    list.groupBy { it.getFirstCharacter() }
+                        .flatMap { (header, list) ->
+                            mutableListOf<ContactItem>().apply {
+                                add(ContactItem.Header(header))
+                                addAll(list)
+                            }
+                        }
+                } else {
+                    list.filter { it.matches(query) }
+                }
+            }.collectLatest {
+                contacts.value = it
             }
         }
         retrieveContactActions()
@@ -140,56 +146,36 @@ class ContactListViewModel @Inject constructor(
         }
     }
 
-    private fun retrieveContacts(avatarFolder: File) {
-        getContactsUseCase.get(avatarFolder)
-            .publish {
-                it.take(1).concatWith(it.debounce(REQUEST_TIMEOUT_IN_MS, TimeUnit.MILLISECONDS))
-            }
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy(
-                onNext = { items ->
-                    contacts.value = items.toList()
-                },
-                onError = Timber::e
-            )
-            .addTo(composite)
-    }
-
+    private fun List<ContactItem.Data>.sortedAlphabetically(): List<ContactItem.Data> =
+        sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, ContactItem.Data::getTitle))
 
     fun getRecentlyAddedContacts(): LiveData<List<ContactItem>> =
-        contacts.map { items ->
-            if (queryString.isNullOrBlank() && items.any { it.isNew }) {
+        combine(
+            queryString,
+            contacts
+                .map { list ->
+                    list.filterIsInstance<ContactItem.Data>()
+                        .filter { it.isNew }
+                }
+        ) { query, newContacts ->
+            if (query.isNullOrBlank()) {
                 mutableListOf<ContactItem>().apply {
                     add(ContactItem.Header(context.getString(R.string.section_recently_added)))
-                    addAll(items.filter { it.isNew })
+                    addAll(newContacts)
                     add(ContactItem.Header(context.getString(R.string.section_contacts)))
                 }
             } else {
                 emptyList()
             }
-        }
+        }.asLiveData()
 
     fun getContactsWithHeaders(): LiveData<List<ContactItem>> =
-        contacts.map { items ->
-            val itemsWithHeaders = mutableListOf<ContactItem>()
-            items?.forEachIndexed { index, item ->
-                if (queryString.isNullOrBlank()) {
-                    if (index == 0 || !items[index - 1].getFirstCharacter()
-                            .equals(items[index].getFirstCharacter(), true)
-                    ) {
-                        itemsWithHeaders.add(ContactItem.Header(item.getFirstCharacter()))
-                    }
-                    itemsWithHeaders.add(item)
-                } else if (item.matches(queryString!!)) {
-                    itemsWithHeaders.add(item)
-                }
-            }
-            itemsWithHeaders
-        }
+        contacts.asLiveData()
 
     fun getContact(userHandle: Long): LiveData<ContactItem.Data?> =
-        contacts.map { contact -> contact.find { it.handle == userHandle } }
+        contacts.map { contact -> contact.find { it is ContactItem.Data && it.handle == userHandle } }
+            .filterIsInstance<ContactItem.Data>()
+            .asLiveData()
 
     /**
      * Get chat room ID
@@ -223,8 +209,6 @@ class ContactListViewModel @Inject constructor(
 
     /**
      * Remove contact
-     *
-     * @param megaUser MegaUser to be removed
      */
     fun removeContact(userEmail: String) {
         viewModelScope.launch {
@@ -237,8 +221,7 @@ class ContactListViewModel @Inject constructor(
     }
 
     fun setQuery(query: String?) {
-        queryString = query
-        contacts.notifyObserver()
+        queryString.value = query
     }
 
     /**
@@ -350,11 +333,6 @@ class ContactListViewModel @Inject constructor(
         createShareKeyUseCase(typedNode)
     }.onFailure {
         Timber.e(it)
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        composite.clear()
     }
 
     fun getContactEmail(userHandle: Long) =

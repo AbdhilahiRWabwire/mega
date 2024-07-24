@@ -23,14 +23,13 @@ import mega.privacy.android.app.MegaApplication.Companion.isClosedChat
 import mega.privacy.android.app.MimeTypeList.Companion.typeForName
 import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
-import mega.privacy.android.app.components.saver.NodeSaver
 import mega.privacy.android.app.extensions.isPortrait
 import mega.privacy.android.app.featuretoggle.ABTestFeatures
 import mega.privacy.android.app.main.DecryptAlertDialog
 import mega.privacy.android.app.main.FileExplorerActivity
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.mediaplayer.AudioPlayerActivity
-import mega.privacy.android.app.mediaplayer.VideoPlayerActivity
+import mega.privacy.android.app.mediaplayer.LegacyVideoPlayerActivity
 import mega.privacy.android.app.presentation.advertisements.model.AdsSlotIDs
 import mega.privacy.android.app.presentation.clouddrive.FileLinkViewModel
 import mega.privacy.android.app.presentation.extensions.isDarkMode
@@ -44,14 +43,11 @@ import mega.privacy.android.app.presentation.pdfviewer.PdfViewerActivity
 import mega.privacy.android.app.presentation.transfers.TransfersManagementActivity
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.StartTransferComponent
 import mega.privacy.android.app.textEditor.TextEditorActivity
-import mega.privacy.android.app.utils.AlertsAndWarnings
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.domain.entity.ThemeMode
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
-import javax.inject.Inject
 
 /**
  * FileLinkActivity with compose view
@@ -60,17 +56,9 @@ import javax.inject.Inject
 class FileLinkComposeActivity : TransfersManagementActivity(),
     DecryptAlertDialog.DecryptDialogListener {
 
-    @Inject
-    lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
-
     private val viewModel: FileLinkViewModel by viewModels()
 
     private var mKey: String? = null
-
-    private val nodeSaver = NodeSaver(
-        this, this, this,
-        AlertsAndWarnings.showSaveToDeviceConfirmDialog(this)
-    )
 
     private val selectImportFolderResult =
         ActivityResultCallback<ActivityResult> { activityResult ->
@@ -92,8 +80,6 @@ class FileLinkComposeActivity : TransfersManagementActivity(),
 
         viewModel.handleIntent(intent)
         viewModel.checkLoginRequired()
-
-        savedInstanceState?.let { nodeSaver.restoreState(savedInstanceState) }
 
         setContent {
             val themeMode by getThemeMode()
@@ -295,7 +281,7 @@ class FileLinkComposeActivity : TransfersManagementActivity(),
                             } else {
                                 Intent(
                                     this@FileLinkComposeActivity,
-                                    VideoPlayerActivity::class.java
+                                    LegacyVideoPlayerActivity::class.java
                                 )
                             }
                         }
@@ -328,16 +314,6 @@ class FileLinkComposeActivity : TransfersManagementActivity(),
 
     override fun onDialogNegativeClick() {
         finish()
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
-        super.onActivityResult(requestCode, resultCode, intent)
-        if (intent == null) {
-            return
-        }
-        if (nodeSaver.handleActivityResult(this, requestCode, resultCode, intent)) {
-            return
-        }
     }
 
     companion object {

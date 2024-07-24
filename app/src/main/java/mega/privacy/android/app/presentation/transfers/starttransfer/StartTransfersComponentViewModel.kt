@@ -33,6 +33,7 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.transfer.MultiTransferEvent
 import mega.privacy.android.domain.entity.transfer.TransferType
+import mega.privacy.android.domain.entity.uri.UriPath
 import mega.privacy.android.domain.exception.NotEnoughStorageException
 import mega.privacy.android.domain.usecase.SetStorageDownloadAskAlwaysUseCase
 import mega.privacy.android.domain.usecase.SetStorageDownloadLocationUseCase
@@ -54,7 +55,10 @@ import mega.privacy.android.domain.usecase.transfers.downloads.SaveDoNotPromptTo
 import mega.privacy.android.domain.usecase.transfers.downloads.ShouldAskDownloadDestinationUseCase
 import mega.privacy.android.domain.usecase.transfers.downloads.ShouldPromptToSaveDestinationUseCase
 import mega.privacy.android.domain.usecase.transfers.downloads.StartDownloadsWithWorkerUseCase
+import mega.privacy.android.domain.usecase.transfers.offline.SaveOfflineNodesToDevice
+import mega.privacy.android.domain.usecase.transfers.offline.SaveUriToDeviceUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.PauseAllTransfersUseCase
+import mega.privacy.android.domain.usecase.transfers.uploads.GetCurrentUploadSpeedUseCase
 import mega.privacy.android.domain.usecase.transfers.uploads.StartUploadsWithWorkerUseCase
 import timber.log.Timber
 import java.io.File
@@ -88,6 +92,9 @@ internal class StartTransfersComponentViewModel @Inject constructor(
     private val setAskedResumeTransfersUseCase: SetAskedResumeTransfersUseCase,
     private val pauseAllTransfersUseCase: PauseAllTransfersUseCase,
     private val startUploadWithWorkerUseCase: StartUploadsWithWorkerUseCase,
+    private val saveOfflineNodesToDevice: SaveOfflineNodesToDevice,
+    private val saveUriToDeviceUseCase: SaveUriToDeviceUseCase,
+    private val getCurrentUploadSpeedUseCase: GetCurrentUploadSpeedUseCase,
 ) : ViewModel(), DefaultLifecycleObserver {
 
     private var currentInProgressJob: Job? = null
@@ -100,8 +107,9 @@ internal class StartTransfersComponentViewModel @Inject constructor(
     internal val uiState = _uiState.asStateFlow()
 
     init {
-        checkRating()
+        checkDownloadRating()
         monitorDownloadFinish()
+        checkUploadRating()
         monitorUploadFinish()
     }
 
@@ -115,10 +123,11 @@ internal class StartTransfersComponentViewModel @Inject constructor(
         viewModelScope.launch {
             when (transferTriggerEvent) {
                 is TransferTriggerEvent.DownloadTriggerEvent -> {
-                    if (checkAndHandleDeviceIsNotConnected()) {
+                    val isCopyEvent = transferTriggerEvent is TransferTriggerEvent.CopyTriggerEvent
+                    if (!isCopyEvent && checkAndHandleDeviceIsNotConnected()) {
                         return@launch
                     }
-                    if (transferTriggerEvent.nodes.isEmpty()) {
+                    if (transferTriggerEvent.nodes.isEmpty() && !isCopyEvent) {
                         Timber.e("Node in $transferTriggerEvent must exist")
                         _uiState.updateEventAndClearProgress(StartTransferEvent.Message.TransferCancelled)
                     } else if (!checkAndHandleNeedConfirmationForLargeDownload(transferTriggerEvent)) {
@@ -165,7 +174,8 @@ internal class StartTransfersComponentViewModel @Inject constructor(
             }
         }
         val node = transferTriggerEvent.nodes.firstOrNull()
-        if (node == null) {
+        val isCopyEvent = transferTriggerEvent is TransferTriggerEvent.CopyTriggerEvent
+        if (node == null && !isCopyEvent) {
             Timber.e("Node in $transferTriggerEvent must exist")
             _uiState.updateEventAndClearProgress(StartTransferEvent.Message.TransferCancelled)
         } else {
@@ -176,7 +186,7 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                     startDownloadForOffline(transferTriggerEvent)
                 }
 
-                is TransferTriggerEvent.StartDownloadNode -> {
+                is TransferTriggerEvent.StartDownloadNode, is TransferTriggerEvent.CopyOfflineNode, is TransferTriggerEvent.CopyUri -> {
                     viewModelScope.launch {
                         if (runCatching { shouldAskDownloadDestinationUseCase() }.getOrDefault(false)) {
                             _uiState.updateEventAndClearProgress(
@@ -188,10 +198,7 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                             runCatching { getOrCreateStorageDownloadLocationUseCase() }
                                 .onFailure { Timber.e(it) }
                                 .getOrNull()?.let { location ->
-                                    startDownloadNodes(
-                                        transferTriggerEvent,
-                                        location
-                                    )
+                                    startDownloadNodes(transferTriggerEvent, location)
                                 }
                         }
                     }
@@ -210,7 +217,7 @@ internal class StartTransfersComponentViewModel @Inject constructor(
      * @param destinationUri the chosen destination
      */
     fun startDownloadWithDestination(
-        startDownloadNode: TransferTriggerEvent.StartDownloadNode,
+        startDownloadNode: TransferTriggerEvent,
         destinationUri: Uri,
     ) {
         Timber.d("Selected destination $destinationUri")
@@ -221,6 +228,77 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                     it.copy(promptSaveDestination = triggered(destinationUri.toString()))
                 }
             }
+        }
+    }
+
+    /**
+     * It starts downloading the nodes with the appropriate use case
+     * @param startDownloadNode the [TransferTriggerEvent] that starts this download
+     * @param destination the destination where to download the nodes
+     */
+    private suspend fun startDownloadNodes(
+        startDownloadNode: TransferTriggerEvent,
+        destination: String,
+    ) {
+        when (startDownloadNode) {
+            is TransferTriggerEvent.StartDownloadNode -> {
+                val nodes = startDownloadNode.nodes
+                if (nodes.isEmpty()) return
+                currentInProgressJob = viewModelScope.launch {
+                    startDownloadNodes(
+                        nodes = nodes,
+                        isHighPriority = startDownloadNode.isHighPriority,
+                        getUri = {
+                            destination.ensureSuffix(File.separator)
+                        },
+                        transferTriggerEvent = startDownloadNode
+                    )
+                }
+            }
+
+            is TransferTriggerEvent.CopyOfflineNode -> {
+                saveOfflineNodeToDevice(startDownloadNode, destination)
+            }
+
+            is TransferTriggerEvent.CopyUri -> {
+                saveUriToDevice(startDownloadNode, destination)
+            }
+
+            else -> Unit
+        }
+    }
+
+    private suspend fun saveUriToDevice(
+        startDownloadNode: TransferTriggerEvent.CopyUri,
+        destination: String,
+    ) {
+        runCatching {
+            saveUriToDeviceUseCase(
+                name = startDownloadNode.name,
+                source = UriPath(startDownloadNode.uri.toString()),
+                destination = UriPath(destination)
+            )
+        }.onSuccess {
+            _uiState.updateEventAndClearProgress(StartTransferEvent.Message.FinishCopyUri)
+        }.onFailure {
+            Timber.e(it)
+        }
+    }
+
+    private suspend fun saveOfflineNodeToDevice(
+        startDownloadNode: TransferTriggerEvent.CopyOfflineNode,
+        destination: String,
+    ) {
+        runCatching {
+            saveOfflineNodesToDevice(startDownloadNode.nodeIds, UriPath(destination))
+        }.onSuccess { totalFiles ->
+            _uiState.updateEventAndClearProgress(
+                StartTransferEvent.MessagePlural.FinishDownloading(
+                    totalFiles
+                )
+            )
+        }.onFailure {
+            Timber.e(it)
         }
     }
 
@@ -242,29 +320,6 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                         .getOrNull()
                 },
                 transferTriggerEvent = event
-            )
-        }
-    }
-
-    /**
-     * It starts downloading the nodes with the appropriate use case
-     * @param startDownloadNode the [TransferTriggerEvent] that starts this download
-     * @param destination the destination where to download the nodes
-     */
-    private fun startDownloadNodes(
-        startDownloadNode: TransferTriggerEvent.StartDownloadNode,
-        destination: String?,
-    ) {
-        val nodes = startDownloadNode.nodes
-        if (nodes.isEmpty()) return
-        currentInProgressJob = viewModelScope.launch {
-            startDownloadNodes(
-                nodes = nodes,
-                isHighPriority = startDownloadNode.isHighPriority,
-                getUri = {
-                    destination?.ensureSuffix(File.separator)
-                },
-                transferTriggerEvent = startDownloadNode
             )
         }
     }
@@ -349,7 +404,7 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                     }
                 }.last()
             }
-        checkRating()
+        checkDownloadRating()
         when {
             terminalEvent == MultiTransferEvent.InsufficientSpace ->
                 _uiState.updateEventAndClearProgress(StartTransferEvent.Message.NotSufficientSpace)
@@ -490,29 +545,29 @@ internal class StartTransfersComponentViewModel @Inject constructor(
         return false
     }
 
-    private var checkShowRating = true
-    private fun checkRating() {
+    private var checkShowDownloadRating = true
+    private fun checkDownloadRating() {
         //check download speed and size to show rating
-        if (checkShowRating) {
+        if (checkShowDownloadRating) {
             viewModelScope.launch {
                 monitorOngoingActiveTransfersUseCase(TransferType.DOWNLOAD).conflate().takeWhile {
-                    checkShowRating
+                    checkShowDownloadRating
                 }.catch {
                     Timber.e(it)
                 }.collect { (transferTotals, paused) ->
-                    if (checkShowRating && !paused && transferTotals.totalFileTransfers > 0) {
+                    if (checkShowDownloadRating && !paused && transferTotals.totalFileTransfers > 0) {
                         val currentDownloadSpeed = getCurrentDownloadSpeedUseCase()
                         RatingHandlerImpl().showRatingBaseOnSpeedAndSize(
                             size = transferTotals.totalFileTransfers.toLong(),
                             speed = currentDownloadSpeed.toLong(),
                             listener = object : OnCompleteListener {
                                 override fun onComplete() {
-                                    checkShowRating = false
+                                    checkShowDownloadRating = false
                                 }
 
 
                                 override fun onConditionsUnmet() {
-                                    checkShowRating = false
+                                    checkShowDownloadRating = false
                                 }
                             }
                         )
@@ -652,10 +707,10 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                 MultiTransferEvent.InsufficientSpace -> StartTransferEvent.Message.NotSufficientSpace
                 is MultiTransferEvent.SingleTransferEvent -> {
                     //show start message as soon as an event with all transfers updated is received
-                    if (!startMessageShown && event.allTransfersUpdated) {
+                    if (!startMessageShown && event.scanningFinished) {
                         startMessageShown = true
                         StartTransferEvent.FinishUploadProcessing(
-                            totalFiles = event.startedFiles,
+                            totalFiles = pathsAndNames.size,
                             triggerEvent = transferTriggerEvent,
                         )
                     } else {
@@ -666,6 +721,7 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                 _uiState.updateEventAndClearProgress(it)
             }
         }
+        checkUploadRating()
     }
 
     private var monitorUploadFinishJob: Job? = null
@@ -679,6 +735,9 @@ internal class StartTransfersComponentViewModel @Inject constructor(
             monitorActiveTransferFinishedUseCase(TransferType.GENERAL_UPLOAD)
                 .catch { Timber.e(it) }
                 .collect { totalFiles ->
+                    if (!lastTransferStartedHere) {
+                        yield() //wait for others to listen the event to try to show the snackbar in the same component that started the transfer
+                    }
                     if (active) {
                         when (lastUpload) {
                             is TransferTriggerEvent.StartUpload.TextFile -> {
@@ -694,7 +753,9 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                                 )
                             }
 
-                            is TransferTriggerEvent.StartUpload.Files -> {
+                            is TransferTriggerEvent.StartUpload.Files,
+                            is TransferTriggerEvent.StartUpload.CollidedFiles,
+                            -> {
                                 StartTransferEvent.MessagePlural.FinishUploading(totalFiles)
                             }
 
@@ -704,7 +765,40 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                         }
                         lastUpload = null
                     }
+                    lastTransferStartedHere = false
                 }
+        }
+    }
+
+    private var checkShowUploadRating = true
+    private fun checkUploadRating() {
+        //check upload speed and size to show rating
+        if (checkShowUploadRating) {
+            viewModelScope.launch {
+                monitorOngoingActiveTransfersUseCase(TransferType.GENERAL_UPLOAD).conflate()
+                    .takeWhile {
+                        checkShowUploadRating
+                    }.catch {
+                        Timber.e(it)
+                    }.collect { (transferTotals, paused) ->
+                        if (checkShowUploadRating && !paused && transferTotals.totalFileTransfers > 0) {
+                            val currentUploadSpeed = getCurrentUploadSpeedUseCase()
+                            RatingHandlerImpl().showRatingBaseOnSpeedAndSize(
+                                size = transferTotals.totalFileTransfers.toLong(),
+                                speed = currentUploadSpeed,
+                                listener = object : OnCompleteListener {
+                                    override fun onComplete() {
+                                        checkShowUploadRating = false
+                                    }
+
+                                    override fun onConditionsUnmet() {
+                                        checkShowUploadRating = false
+                                    }
+                                }
+                            )
+                        }
+                    }
+            }
         }
     }
 

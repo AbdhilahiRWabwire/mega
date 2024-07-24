@@ -7,12 +7,14 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import dagger.hilt.android.AndroidEntryPoint
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.session.SessionContainer
@@ -61,16 +63,21 @@ class InviteContactFragment : Fragment() {
                 OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                     PasscodeContainer(
                         passcodeCryptObjectFactory = passcodeCryptObjectFactory,
+                        loading = {},
                         content = {
-                            InviteContactRoute(
-                                modifier = Modifier.fillMaxSize(),
-                                isDarkMode = themeMode.isDarkMode(),
-                                onNavigateUp = ::setActivityResultAndFinish,
-                                onBackPressed = ::onBackPressed,
-                                onShareContactLink = ::shareContactLink,
-                                onOpenPersonalQRCode = ::initMyQr,
-                                onOpenQRScanner = ::initScanQR,
-                            )
+                            // This is necessary to prevent the viewmodel class from being recreated when the configuration changes.
+                            // This can be removed after we fully migrate to a single activity and Compose navigation.
+                            CompositionLocalProvider(LocalViewModelStoreOwner provides activity as InviteContactActivityV2) {
+                                InviteContactRoute(
+                                    modifier = Modifier.fillMaxSize(),
+                                    isDarkMode = themeMode.isDarkMode(),
+                                    onNavigateUp = ::setActivityResultAndFinish,
+                                    onBackPressed = ::onBackPressed,
+                                    onShareContactLink = ::shareContactLink,
+                                    onOpenPersonalQRCode = ::initMyQr,
+                                    onOpenQRScanner = ::initScanQR,
+                                )
+                            }
                         }
                     )
                 }

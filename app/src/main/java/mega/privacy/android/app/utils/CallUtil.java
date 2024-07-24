@@ -79,7 +79,6 @@ import mega.privacy.android.app.meeting.activity.MeetingActivity;
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway;
 import mega.privacy.android.app.meeting.listeners.DisableAudioVideoCallListener;
 import mega.privacy.android.app.objects.PasscodeManagement;
-import mega.privacy.android.app.presentation.contact.invite.InviteContactActivity;
 import mega.privacy.android.app.presentation.contactinfo.ContactInfoActivity;
 import mega.privacy.android.app.presentation.extensions.StorageStateExtensionsKt;
 import mega.privacy.android.app.presentation.meeting.WaitingRoomActivity;
@@ -702,19 +701,6 @@ public class CallUtil {
         }
     }
 
-    public static String sessionStatusToString(int status) {
-        switch (status) {
-            case MegaChatSession.SESSION_STATUS_INVALID:
-                return "SESSION_STATUS_INVALID";
-            case MegaChatSession.SESSION_STATUS_IN_PROGRESS:
-                return "SESSION_STATUS_IN_PROGRESS";
-            case MegaChatSession.SESSION_STATUS_DESTROYED:
-                return "SESSION_STATUS_DESTROYED";
-            default:
-                return String.valueOf(status);
-        }
-    }
-
     public static boolean isStatusConnected(Context context, long chatId) {
         MegaChatApiAndroid megaChatApi = MegaApplication.getInstance().getMegaChatApi();
         return checkConnection(context) && megaChatApi.getConnectionState() == MegaChatApi.CONNECTED && megaChatApi.getChatConnectionState(chatId) == MegaChatApi.CHAT_CONNECTION_ONLINE;
@@ -821,9 +807,6 @@ public class CallUtil {
                     }
                     if (activity instanceof AddContactActivity && action.equals(ACTION_OPEN_QR)) {
                         ((AddContactActivity) activity).initScanQR();
-                    }
-                    if (activity instanceof InviteContactActivity && action.equals(ACTION_OPEN_QR)) {
-                        ((InviteContactActivity) activity).initScanQR();
                     }
                     break;
 

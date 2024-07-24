@@ -63,7 +63,7 @@ sealed interface StartTransferEvent {
      * Depending on Android version and user settings, download destination should be asked for each new download
      * @param originalEvent original [TransferTriggerEvent.StartDownloadNode] event that triggered this event
      */
-    data class AskDestination(val originalEvent: TransferTriggerEvent.StartDownloadNode) :
+    data class AskDestination(val originalEvent: TransferTriggerEvent) :
         StartTransferEvent
 
     /**
@@ -105,6 +105,11 @@ sealed interface StartTransferEvent {
          * Save offline has finished
          */
         data object FinishOffline : Message(R.string.file_available_offline, null, null)
+
+        /**
+         * Copy uri has finished
+         */
+        data object FinishCopyUri : Message(R.string.copy_already_downloaded, null, null)
 
         /**
          * Text file upload has finished

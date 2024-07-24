@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.reset
 import org.mockito.kotlin.whenever
 import java.math.BigInteger
 
@@ -58,6 +59,8 @@ internal class MonitorTransfersStatusUseCaseTest {
         tag = 1,
         folderTransferTag = 2,
         speed = 1L,
+        isSyncTransfer = false,
+        isBackupTransfer = false,
         isForeignOverQuota = false,
         isStreamingTransfer = false,
         isFinished = false,
@@ -79,6 +82,15 @@ internal class MonitorTransfersStatusUseCaseTest {
         )
     }
 
+    @BeforeEach
+    fun resetMocks() = reset(
+        transferRepository,
+        getNumPendingDownloadsNonBackgroundUseCase,
+        getNumPendingUploadsUseCase,
+        monitorOngoingActiveTransfersUseCase,
+        areTransfersPaused,
+    )
+
     @Test
     fun `test that value with correct values is emitted when a new active transfer total is received`() =
         runTest {
@@ -92,7 +104,7 @@ internal class MonitorTransfersStatusUseCaseTest {
                 storageOverQuota = true,
                 transferOverQuota = true,
             )
-            underTest().test {
+            underTest(uploadsWorkerFlag = true, activeTransfersInCameraUploadsFlag = true).test {
                 awaitItem() //ignore initial
                 flowsMap[TransferType.DOWNLOAD]?.update {
                     it.copy(
@@ -127,7 +139,7 @@ internal class MonitorTransfersStatusUseCaseTest {
             val flowsMap = stubActiveTransfersFlows(paused = true)
             val expected = TransfersStatusInfo(paused = false)
 
-            underTest().test {
+            underTest(uploadsWorkerFlag = true, activeTransfersInCameraUploadsFlag = true).test {
                 assertThat(awaitItem().paused).isTrue() // check initial is paused to validate the test is doing its job
                 flowsMap.values.first().update {
                     it.copy(paused = false)
@@ -144,7 +156,7 @@ internal class MonitorTransfersStatusUseCaseTest {
             val flowsMap = stubActiveTransfersFlows()
             val expected = TransfersStatusInfo(paused = true)
 
-            underTest().test {
+            underTest(uploadsWorkerFlag = true, activeTransfersInCameraUploadsFlag = true).test {
                 flowsMap.values.forEach { flow ->
                     assertThat(awaitItem().paused).isFalse() // all but last should be false, including initial
                     flow.update {
@@ -157,22 +169,112 @@ internal class MonitorTransfersStatusUseCaseTest {
             }
         }
 
+    @Test
+    fun `test that totals are the addition of active transfers plus camera uploads when activeTransfersInCameraUploadsFlag is false`() =
+        runTest {
+            val expected = TransfersStatusInfo(
+                totalSizeToTransfer = 2000L,
+                totalSizeTransferred = 3000L,
+                pendingUploads = 1,
+                pendingDownloads = 4,
+                paused = false,
+                storageOverQuota = false,
+                transferOverQuota = true,
+            )
+
+            whenever(getNumPendingUploadsUseCase()).thenReturn(expected.pendingUploads)
+            whenever(transferRepository.monitorTransferEvents()).thenReturn(globalTransferFlow)
+            whenever(getNumPendingDownloadsNonBackgroundUseCase()).thenReturn(0)
+            whenever(areTransfersPaused()).thenReturn(false)
+
+            val eventForLegacy = TransferEvent.TransferUpdateEvent(
+                transfer.copy(transferType = TransferType.CU_UPLOAD)
+            )
+            val eventFromActiveTransfers =
+                emptyActiveTransferTotals(TransferType.DOWNLOAD).copy(
+                    transferredBytes = expected.totalSizeTransferred - transfer.transferredBytes,
+                    totalBytes = expected.totalSizeToTransfer - transfer.totalBytes,
+                    totalFileTransfers = expected.pendingDownloads,
+                )
+
+            val flowsMap = stubActiveTransfersFlows()
+            underTest(
+                uploadsWorkerFlag = true,
+                activeTransfersInCameraUploadsFlag = false
+            ).test {
+                awaitItem() //ignore initial
+                flowsMap[TransferType.DOWNLOAD]?.update {
+                    it.copy(
+                        activeTransferTotals = eventFromActiveTransfers,
+                        transfersOverQuota = true,
+                    )
+                }
+                awaitItem() //ignore updated value
+                globalTransferFlow.emit(eventForLegacy)
+                val actual = awaitItem()
+
+                assertThat(actual).isEqualTo(expected)
+            }
+        }
+
+    @Test
+    fun `test that upload counter and paused are updated with legacy use cases on each new active transfer and each new transfer event when activeTransfersInCameraUploadsFlag is false`() =
+        runTest {
+            whenever(transferRepository.monitorTransferEvents()).thenReturn(globalTransferFlow)
+            val flowsMap = stubActiveTransfersFlows()
+            stubPendingUploadsAndPausedUseCases(0, false)
+            underTest(
+                uploadsWorkerFlag = true,
+                activeTransfersInCameraUploadsFlag = false
+            ).test {
+                awaitItem().assertPendingUploadsAndPaused(0, false)
+
+                stubPendingUploadsAndPausedUseCases(1, false)
+                flowsMap[TransferType.DOWNLOAD]?.update {
+                    it.copy(
+                        activeTransferTotals = emptyActiveTransferTotals(TransferType.DOWNLOAD),
+                        transfersOverQuota = true,
+                    )
+                }
+                awaitItem().assertPendingUploadsAndPaused(1, false)
+
+                stubPendingUploadsAndPausedUseCases(2, true)
+                flowsMap[TransferType.GENERAL_UPLOAD]?.update {
+                    it.copy(
+                        activeTransferTotals = emptyActiveTransferTotals(TransferType.GENERAL_UPLOAD),
+                        transfersOverQuota = true,
+                    )
+                }
+                awaitItem().assertPendingUploadsAndPaused(2, true)
+
+                stubPendingUploadsAndPausedUseCases(3, false)
+                globalTransferFlow.emit(
+                    TransferEvent.TransferUpdateEvent(
+                        transfer.copy(transferType = TransferType.CU_UPLOAD)
+                    )
+                )
+                awaitItem().assertPendingUploadsAndPaused(3, false)
+            }
+        }
+
+    private suspend fun stubPendingUploadsAndPausedUseCases(uploads: Int, paused: Boolean) {
+        whenever(getNumPendingUploadsUseCase()).thenReturn(uploads)
+        whenever(areTransfersPaused()).thenReturn(paused)
+    }
+
+    private fun TransfersStatusInfo.assertPendingUploadsAndPaused(
+        uploads: Int,
+        paused: Boolean,
+    ) {
+        assertThat(this.pendingUploads).isEqualTo(uploads)
+        assertThat(this.paused).isEqualTo(paused)
+    }
+
     private fun stubActiveTransfersFlows(paused: Boolean = false) =
         TransferType.entries.filterNot { it == TransferType.NONE }.associateWith { type ->
             MutableStateFlow(
                 MonitorOngoingActiveTransfersResult(
-                    activeTransferTotals = ActiveTransferTotals(
-                        transfersType = type,
-                        totalTransfers = 1,
-                        totalFileTransfers = 0,
-                        pausedFileTransfers = 0,
-                        totalFinishedTransfers = 0,
-                        totalFinishedFileTransfers = 0,
-                        totalCompletedFileTransfers = 0,
-                        totalBytes = 0L,
-                        transferredBytes = 0L,
-                        totalAlreadyDownloadedFiles = 0,
-                    ),
+                    activeTransferTotals = emptyActiveTransferTotals(type),
                     paused = paused,
                     storageOverQuota = false,
                     transfersOverQuota = false,
@@ -181,6 +283,19 @@ internal class MonitorTransfersStatusUseCaseTest {
                 whenever(monitorOngoingActiveTransfersUseCase(type)) doReturn flow
             }
         }
+
+    private fun emptyActiveTransferTotals(type: TransferType) = ActiveTransferTotals(
+        transfersType = type,
+        totalTransfers = 1,
+        totalFileTransfers = 0,
+        pausedFileTransfers = 0,
+        totalFinishedTransfers = 0,
+        totalFinishedFileTransfers = 0,
+        totalCompletedFileTransfers = 0,
+        totalBytes = 0L,
+        transferredBytes = 0L,
+        totalAlreadyDownloadedFiles = 0,
+    )
 
     @Nested
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -200,7 +315,10 @@ internal class MonitorTransfersStatusUseCaseTest {
                 val event = TransferEvent.TransferStartEvent(transfer)
                 val transfersStatusInfo = MutableStateFlow(TransfersStatusInfo())
                 val collectJob = launch(UnconfinedTestDispatcher()) {
-                    underTest.invokeLegacy().collect {
+                    underTest(
+                        uploadsWorkerFlag = false,
+                        activeTransfersInCameraUploadsFlag = false
+                    ).collect {
                         transfersStatusInfo.value = it
                     }
                 }
@@ -216,7 +334,10 @@ internal class MonitorTransfersStatusUseCaseTest {
                 val event = TransferEvent.TransferDataEvent(transfer, ByteArray(0))
                 val transfersStatusInfo = MutableStateFlow(TransfersStatusInfo())
                 val collectJob = launch(UnconfinedTestDispatcher()) {
-                    underTest.invokeLegacy().collect {
+                    underTest(
+                        uploadsWorkerFlag = false,
+                        activeTransfersInCameraUploadsFlag = false
+                    ).collect {
                         transfersStatusInfo.value = it
                     }
                 }
@@ -232,7 +353,10 @@ internal class MonitorTransfersStatusUseCaseTest {
                 val event = TransferEvent.TransferFinishEvent(transfer, MegaException(-1, null))
                 val transfersStatusInfo = MutableStateFlow(TransfersStatusInfo())
                 val collectJob = launch(UnconfinedTestDispatcher()) {
-                    underTest.invokeLegacy().collect {
+                    underTest(
+                        uploadsWorkerFlag = false,
+                        activeTransfersInCameraUploadsFlag = false
+                    ).collect {
                         transfersStatusInfo.value = it
                     }
                 }
@@ -249,7 +373,10 @@ internal class MonitorTransfersStatusUseCaseTest {
                     TransferEvent.TransferUpdateEvent(transfer)
                 val transfersStatusInfo = MutableStateFlow(TransfersStatusInfo())
                 val collectJob = launch(UnconfinedTestDispatcher()) {
-                    underTest.invokeLegacy().collect {
+                    underTest(
+                        uploadsWorkerFlag = false,
+                        activeTransfersInCameraUploadsFlag = false
+                    ).collect {
                         transfersStatusInfo.value = it
                     }
                 }
@@ -272,7 +399,10 @@ internal class MonitorTransfersStatusUseCaseTest {
                     TransferEvent.TransferUpdateEvent(transfer.copy(tag = 3))
                 val transfersStatusInfo = MutableStateFlow(TransfersStatusInfo())
                 val collectJob = launch(UnconfinedTestDispatcher()) {
-                    underTest.invokeLegacy().collect {
+                    underTest(
+                        uploadsWorkerFlag = false,
+                        activeTransfersInCameraUploadsFlag = false
+                    ).collect {
                         transfersStatusInfo.value = it
                     }
                 }
@@ -291,7 +421,11 @@ internal class MonitorTransfersStatusUseCaseTest {
                 val expectedPendingUploads = 4
                 whenever(getNumPendingUploadsUseCase()) doReturn expectedPendingUploads
                 whenever(getNumPendingDownloadsNonBackgroundUseCase()) doReturn expectedPendingDownloads
-                underTest.invokeLegacy().test {
+                underTest(
+                    uploadsWorkerFlag = false,
+                    activeTransfersInCameraUploadsFlag = false
+                ).test {
+                    awaitItem() //ignore first
                     globalTransferFlow.emit(TransferEvent.TransferUpdateEvent(transfer))
                     val actual = awaitItem()
 
@@ -305,7 +439,11 @@ internal class MonitorTransfersStatusUseCaseTest {
             runTest {
                 val expected = true
                 whenever(areTransfersPaused()) doReturn expected
-                underTest.invokeLegacy().test {
+                underTest(
+                    uploadsWorkerFlag = false,
+                    activeTransfersInCameraUploadsFlag = false
+                ).test {
+                    awaitItem() //ignore first
                     globalTransferFlow.emit(TransferEvent.TransferUpdateEvent(transfer))
                     val actual = awaitItem()
 

@@ -434,7 +434,7 @@ interface FileSystemRepository {
     suspend fun copyFilesToDocumentUri(
         source: File,
         destinationUri: UriPath,
-    )
+    ): Int
 
     /**
      * Copy files
@@ -445,5 +445,30 @@ interface FileSystemRepository {
     suspend fun copyFiles(
         source: File,
         destination: File,
-    )
+    ): Int
+
+    /**
+     * Get file type info for a given name
+     *
+     * @param name file name
+     * @param duration duration of the file
+     * @return [FileTypeInfo] object
+     */
+    fun getFileTypeInfoByName(name: String, duration: Int = 0): FileTypeInfo
+
+    /**
+     * Copy uri
+     *
+     * @param source
+     * @param destination
+     */
+    suspend fun copyUri(name: String, source: UriPath, destination: File)
+
+    /**
+     * Copy uri
+     *
+     * @param source
+     * @param destination
+     */
+    suspend fun copyUri(name: String, source: UriPath, destination: UriPath)
 }

@@ -38,7 +38,6 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.constants.EventConstants
 import mega.privacy.android.app.constants.EventConstants.EVENT_AUDIO_OUTPUT_CHANGE
-import mega.privacy.android.app.constants.EventConstants.EVENT_CHAT_TITLE_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_MEETING_CREATED
 import mega.privacy.android.app.extensions.updateItemAt
 import mega.privacy.android.app.featuretoggle.ApiFeatures
@@ -113,6 +112,7 @@ import mega.privacy.android.domain.usecase.meeting.EnableOrDisableVideoUseCase
 import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
+import mega.privacy.android.domain.usecase.meeting.MonitorCallEndedUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorScheduledMeetingUpdatesUseCase
@@ -224,6 +224,7 @@ class MeetingActivityViewModel @Inject constructor(
     private val startVideoDeviceUseCase: StartVideoDeviceUseCase,
     private val enableOrDisableVideoUseCase: EnableOrDisableVideoUseCase,
     private val enableOrDisableAudioUseCase: EnableOrDisableAudioUseCase,
+    private val monitorCallEndedUseCase: MonitorCallEndedUseCase,
     savedStateHandle: SavedStateHandle,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
@@ -330,15 +331,6 @@ class MeetingActivityViewModel @Inject constructor(
             MegaApplication.isWaitingForCall = true
         }
 
-    private val titleMeetingChangeObserver =
-        Observer<MegaChatRoom> { megaChatRoom ->
-            meetingActivityRepository.getChatRoom(_state.value.chatId)?.let { chatRoom ->
-                if (chatRoom.chatId == megaChatRoom.chatId) {
-                    _state.update { it.copy(meetingName = getTitleChat(chatRoom)) }
-                }
-            }
-        }
-
     /**
      * Set meeting action
      *
@@ -359,6 +351,16 @@ class MeetingActivityViewModel @Inject constructor(
     ).post(isVisible)
 
     init {
+        viewModelScope.launch {
+            monitorCallEndedUseCase()
+                .catch { Timber.e(it) }
+                .collect {
+                    if (it == state.value.chatId) {
+                        finishMeetingActivity()
+                    }
+                }
+        }
+
         viewModelScope.launch {
             runCatching {
                 getFeatureFlagValueUseCase(AppFeatures.RaiseToSpeak).let { flag ->
@@ -401,9 +403,6 @@ class MeetingActivityViewModel @Inject constructor(
 
         LiveEventBus.get(EVENT_AUDIO_OUTPUT_CHANGE, AppRTCAudioManager.AudioDevice::class.java)
             .observeForever(audioOutputStateObserver)
-
-        LiveEventBus.get(EVENT_CHAT_TITLE_CHANGE, MegaChatRoom::class.java)
-            .observeForever(titleMeetingChangeObserver)
 
         LiveEventBus.get(EVENT_MEETING_CREATED, Long::class.java)
             .observeForever(meetingCreatedObserver)
@@ -965,13 +964,24 @@ class MeetingActivityViewModel @Inject constructor(
 
                                     ChatCallStatus.TerminatingUserParticipation, ChatCallStatus.GenericNotification -> {
                                         Timber.d("Chat call termCode: ${call.termCode}")
-                                        if (call.termCode == ChatCallTermCodeType.CallUsersLimit) {
-                                            _state.update { state ->
+                                        when (call.termCode) {
+                                            ChatCallTermCodeType.CallUsersLimit -> _state.update { state ->
                                                 state.copy(
                                                     callEndedDueToFreePlanLimits = true
                                                 )
                                             }
+
+                                            ChatCallTermCodeType.TooManyParticipants,
+                                            ChatCallTermCodeType.TooManyClients,
+                                            -> _state.update { state ->
+                                                state.copy(
+                                                    callEndedDueToTooManyParticipants = true
+                                                )
+                                            }
+
+                                            else -> {}
                                         }
+
                                     }
 
                                     else -> {}
@@ -1518,10 +1528,6 @@ class MeetingActivityViewModel @Inject constructor(
         LiveEventBus.get(EVENT_AUDIO_OUTPUT_CHANGE, AppRTCAudioManager.AudioDevice::class.java)
             .removeObserver(audioOutputStateObserver)
 
-        LiveEventBus.get(
-            EVENT_CHAT_TITLE_CHANGE, MegaChatRoom::class.java
-        ).removeObserver(titleMeetingChangeObserver)
-
         LiveEventBus.get(EVENT_MEETING_CREATED, Long::class.java)
             .removeObserver(meetingCreatedObserver)
     }
@@ -1731,6 +1737,7 @@ class MeetingActivityViewModel @Inject constructor(
                             enabledAllowNonHostAddParticipantsOption = chat.isOpenInvite,
                             hasWaitingRoom = waitingRoomValue,
                             title = titleValue,
+                            meetingName = titleValue,
                             callType = when {
                                 chat.isMeeting -> CallType.Meeting
                                 !chat.isMeeting && chat.isGroup -> CallType.Group

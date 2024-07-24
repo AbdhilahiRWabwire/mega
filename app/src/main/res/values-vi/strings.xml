@@ -280,10 +280,6 @@
     <plurals name="upload_finish">
         <item quantity="other">%1$d phiên tải lên đã hoàn tất</item>
     </plurals>
-    <!-- Warning shown when it tries to download some empty folders. Plural -->
-    <plurals name="empty_folders">
-        <item quantity="other">Các thư mục trống.</item>
-    </plurals>
     <!-- Hint how to cancel the download -->
     <string name="download_touch_to_show">Xem các truyền tải</string>
     <!-- message when trying to open a downloaded file but there isn’t any app that open that file. Example: a user downloads a pdf but doesn’t have any app to read a pdf -->
@@ -1797,7 +1793,7 @@
     <!-- error message when importing multiple files from chat -->
     <string name="number_no_imported_from_chat">Chia sẻ %d tệp tin chưa được hoàn tất</string>
     <!-- button’s text to open a full screen image -->
-    <string name="preview_content">Xem trước nội dung</string>
+    <string name="preview_content">Mở</string>
     <!-- message shown when the user clicks on media file chat message, there is no network connection and the file is not been downloaded -->
     <string name="no_network_connection_on_play_file">Không có kết nối mạng. Tệp tin chưa được tải về và không thể truyền được.</string>
     <!-- message shown when the user open a file, the file is not been opened due to unknown reason -->
@@ -2383,7 +2379,7 @@
     <!-- The text of the notification button that is displayed when I receive a individual call and put the current one on hold and answer the other. -->
     <string name="hold_and_answer_call_incoming">Trả lời &amp;amp; Tạm dừng cuộc hiện tại</string>
     <!-- The text of the notification button that is displayed when I receive a group call and put the current one on hold and answer the other. -->
-    <string name="hold_and_join_call_incoming">Tham gia &amp;amp; Tạm dừng cuộc hiện tại</string>
+    <string name="hold_and_join_call_incoming">Tham gia và tạm dừng cuộc hiện tại</string>
     <!-- The text of the notification button that is displayed when I receive a individual call and hang the current one and answer the other. -->
     <string name="end_and_answer_call_incoming">Trả lời &amp;amp; Kết thúc cuộc hiện tại</string>
     <!-- The text of the notification button that is displayed when I receive a group call and hand the current one and answer the other. -->
@@ -4982,8 +4978,6 @@
     <string name="notifications_screen_notification_promo_expiration_time">Hết hạn vào %1$s lúc %2$s</string>
     <!-- Warning Message and upgrade link for organiser for Free Call -->
     <string name="meetings_free_call_organiser_number_of_participants_warning">Chỉ có 100 người mới có thể tham&#160;gia cuộc gọi. Bất kỳ người tham&#160;gia nào thêm sẽ chỉ có thể gửi và nhận tin&#160;nhắn. Yêu&#160;cầu ban tổ&#160;chức nâng&#160;cấp lên Pro để loại bỏ hạn&#160;chế này.</string>
-    <!-- Warning Message for non organiser for Free Call -->
-    <string name="meetings_free_call_non_organiser_number_of_participants_warning">Chỉ có 100 người mới có thể tham&#160;gia cuộc gọi. Bất kỳ người tham&#160;gia nào thêm sẽ chỉ có thể gửi và đọc các cuộc chat. Yêu&#160;cầu ban tổ&#160;chức để loại bỏ hạn&#160;chế này.</string>
     <!-- The Video Quality Option shown in a Dialog in Settings Camera Uploads, indicating that the Videos will be compressed to Low Quality before being uploaded by Camera Uploads -->
     <string name="settings_camera_uploads_video_quality_dialog_option_low">Thấp</string>
     <!-- The Video Quality Option shown in a Dialog in Settings Camera Uploads, indicating that the Videos will be compressed to Medium Quality before being uploaded by Camera Uploads -->
@@ -5102,4 +5096,8 @@
     <plurals name="hidden_nodes_items">
         <item quantity="other">Các mục ẩn</item>
     </plurals>
+    <!-- Image or Video map location title-->
+    <string name="file_properties_info_map_location">Vị&#160;trí</string>
+    <!-- Image or Video no map location info-->
+    <string name="file_properties_info_map_location_no_location_info">No location information</string>
 </resources>

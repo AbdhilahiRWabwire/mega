@@ -2,7 +2,6 @@ package mega.privacy.android.app.meeting.fragments
 
 import android.content.res.Configuration
 import android.os.Bundle
-import android.util.Pair
 import android.view.LayoutInflater
 import android.view.TextureView
 import android.view.View
@@ -11,17 +10,13 @@ import android.widget.ImageView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
-import androidx.lifecycle.Observer
 import com.google.android.material.bottomsheet.BottomSheetBehavior
-import com.jeremyliao.liveeventbus.LiveEventBus
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.RoundedImageView
-import mega.privacy.android.app.constants.EventConstants
-import mega.privacy.android.app.constants.EventConstants.EVENT_REMOTE_AVFLAGS_CHANGE
 import mega.privacy.android.app.databinding.IndividualCallFragmentBinding
 import mega.privacy.android.app.databinding.SelfFeedFloatingWindowFragmentBinding
 import mega.privacy.android.app.meeting.listeners.IndividualCallVideoListener
@@ -29,11 +24,11 @@ import mega.privacy.android.app.presentation.meeting.model.MeetingState
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.Util.getCurrentOrientation
+import mega.privacy.android.domain.entity.meeting.ChatCallStatus
+import mega.privacy.android.domain.entity.meeting.ChatSessionStatus
 import nz.mega.sdk.MegaChatApiJava.MEGACHAT_INVALID_HANDLE
 import nz.mega.sdk.MegaChatCall
 import nz.mega.sdk.MegaChatCall.CALL_STATUS_IN_PROGRESS
-import nz.mega.sdk.MegaChatSession
-import nz.mega.sdk.MegaChatSession.SESSION_STATUS_IN_PROGRESS
 import timber.log.Timber
 
 @AndroidEntryPoint
@@ -61,56 +56,6 @@ class IndividualCallFragment : MeetingBaseFragment() {
     private lateinit var inMeetingViewModel: InMeetingViewModel
 
     private var videoListener: IndividualCallVideoListener? = null
-
-    private val remoteAVFlagsObserver = Observer<Pair<Long, MegaChatSession>> {
-        val callId = it.first
-        val session = it.second
-
-        if (inMeetingViewModel.isOneToOneCall() && inMeetingViewModel.isSameCall(callId) && isAdded) {
-            Timber.d("Check changes in remote AVFlags")
-            when {
-                isFloatingWindow -> checkItIsOnlyAudio()
-
-                session.hasVideo() && session.status == SESSION_STATUS_IN_PROGRESS -> {
-                    Timber.d("Check if video should be on")
-                    checkVideoOn(
-                        session.peerid, session.clientid
-                    )
-                }
-
-                else -> {
-                    Timber.d("Video should be off")
-                    videoOffUI(peerId, clientId)
-                }
-            }
-        }
-    }
-
-    private val sessionHiResObserver =
-        Observer<Pair<Long, MegaChatSession>> { callAndSession ->
-            if (inMeetingViewModel.isSameCall(callAndSession.first) && !isFloatingWindow && inMeetingViewModel.isOneToOneCall() && isAdded) {
-                if (callAndSession.second.canRecvVideoHiRes() && callAndSession.second.isHiResVideo) {
-                    Timber.d("Can receive high-resolution video")
-
-                    if (inMeetingViewModel.sessionHasVideo(callAndSession.second.clientid)) {
-                        Timber.d("Session has video of client ID ${callAndSession.second.clientid}")
-                        addListener(callAndSession.second.clientid)
-                    }
-                } else {
-                    Timber.d("Can not receive high-resolution video of client ID ${callAndSession.second.clientid}")
-                    removeRemoteListener(
-                        callAndSession.second.peerid,
-                        callAndSession.second.clientid
-                    )
-
-                    //Ask for high resolution, if necessary
-                    if (inMeetingViewModel.sessionHasVideo(callAndSession.second.clientid)) {
-                        Timber.d("Asking for HiRes video of client ID ${callAndSession.second.clientid}")
-                        inMeetingViewModel.requestHiResVideo(callAndSession.second, chatId)
-                    }
-                }
-            }
-        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -141,16 +86,6 @@ class IndividualCallFragment : MeetingBaseFragment() {
             Timber.e("Error. Client id invalid")
             return
         }
-
-        initLiveEventBus()
-    }
-
-    private fun initLiveEventBus() {
-        LiveEventBus.get<Pair<Long, MegaChatSession>>(EVENT_REMOTE_AVFLAGS_CHANGE)
-            .observeSticky(this, remoteAVFlagsObserver)
-
-        LiveEventBus.get<Pair<Long, MegaChatSession>>(EventConstants.EVENT_SESSION_ON_HIRES_CHANGE)
-            .observe(this, sessionHiResObserver)
     }
 
     override fun onCreateView(
@@ -196,6 +131,7 @@ class IndividualCallFragment : MeetingBaseFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         collectFlows()
+
         inMeetingViewModel.getAvatarBitmap(peerId)?.let {
             avatarImageView.setImageBitmap(it)
         }
@@ -214,9 +150,7 @@ class IndividualCallFragment : MeetingBaseFragment() {
                     videoListener?.setAlpha(videoAlphaFloating)
                 }
             }
-
-            inMeetingViewModel.getCall()?.hasLocalAudio()
-                ?.let { showLocalFloatingViewMicroMutedIcon(!it) }
+            showLocalFloatingViewMicroMutedIcon(!inMeetingViewModel.state.value.hasLocalAudio)
         } else {
             videoListener?.setAlpha(videoAlpha)
         }
@@ -248,11 +182,63 @@ class IndividualCallFragment : MeetingBaseFragment() {
             }
         }
 
+        viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.changesInAVFlagsInSession }
+            .distinctUntilChanged()) {
+            it?.let { chatSession ->
+                if (inMeetingViewModel.isOneToOneCall()) {
+                    Timber.d("Check changes in remote AVFlags")
+                    when {
+                        isFloatingWindow -> checkItIsOnlyAudio()
+
+                        chatSession.hasVideo && chatSession.status == ChatSessionStatus.Progress -> {
+                            Timber.d("Check if video should be on")
+                            checkVideoOn(
+                                chatSession.peerId, chatSession.clientId
+                            )
+                        }
+
+                        else -> {
+                            Timber.d("Video should be off")
+                            videoOffUI(peerId, clientId)
+                        }
+                    }
+                }
+            }
+        }
+
         viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.isCallOnHold }
             .distinctUntilChanged()) {
             it?.let { isOnHold ->
                 Timber.d("Check changes in call on hold")
                 checkChangesInOnHold(isOnHold)
+            }
+        }
+
+        viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.changesInHiResInSession }
+            .distinctUntilChanged()) { session ->
+            session?.apply {
+                if (!isFloatingWindow && inMeetingViewModel.isOneToOneCall() && isAdded) {
+                    if (canReceiveVideoHiRes && isHiResVideo) {
+                        Timber.d("Can receive high-resolution video")
+
+                        if (inMeetingViewModel.sessionHasVideo(clientId)) {
+                            Timber.d("Session has video of client ID $clientId")
+                            addListener(clientId)
+                        }
+                    } else {
+                        Timber.d("Can not receive high-resolution video of client ID $clientId")
+                        removeRemoteListener(
+                            peerId,
+                            clientId
+                        )
+
+                        //Ask for high resolution, if necessary
+                        if (inMeetingViewModel.sessionHasVideo(clientId)) {
+                            Timber.d("Asking for HiRes video of client ID $clientId")
+                            inMeetingViewModel.requestHiResVideo(this, chatId)
+                        }
+                    }
+                }
             }
         }
     }
@@ -290,7 +276,7 @@ class IndividualCallFragment : MeetingBaseFragment() {
         Timber.d("Check the current UI status")
         inMeetingViewModel.getCall()?.let {
             if (inMeetingViewModel.isMe(peerId)) {
-                if (it.status == CALL_STATUS_IN_PROGRESS && it.hasLocalVideo()) {
+                if (it.status == ChatCallStatus.InProgress && it.hasLocalVideo) {
                     Timber.d("Check if local video should be on")
                     checkVideoOn(peerId, clientId)
                 } else {
@@ -298,9 +284,8 @@ class IndividualCallFragment : MeetingBaseFragment() {
                     videoOffUI(peerId, clientId)
                 }
             } else {
-                val session = inMeetingViewModel.getSession(clientId)
-                session?.let { participant ->
-                    if (session.status == SESSION_STATUS_IN_PROGRESS && participant.hasVideo()) {
+                inMeetingViewModel.getSessionByClientId(clientId)?.let { chatSession ->
+                    if (chatSession.status == ChatSessionStatus.Progress && chatSession.hasVideo) {
                         Timber.d("Check if remote video should be on")
                         checkVideoOn(peerId, clientId)
                     } else {
@@ -353,8 +338,8 @@ class IndividualCallFragment : MeetingBaseFragment() {
             hideAvatar(peerId, clientId)
             rootLayout.isVisible = false
         } else {
-            inMeetingViewModel.getCall()?.let {
-                if (!it.hasLocalVideo()) {
+            inMeetingViewModel.getCall()?.apply {
+                if (!hasLocalVideo) {
                     Timber.d("Not only audio call, show avatar")
                     showAvatar(peerId, clientId)
                 }
@@ -442,7 +427,7 @@ class IndividualCallFragment : MeetingBaseFragment() {
         if (isInvalid(peerId, clientId)) return
         val currentCall = inMeetingViewModel.getCall()
         val isOneToOneCall = inMeetingViewModel.isOneToOneCall()
-        if ((currentCall != null && currentCall.status != MegaChatCall.CALL_STATUS_JOINING && currentCall.status != CALL_STATUS_IN_PROGRESS) ||
+        if ((currentCall != null && currentCall.status != ChatCallStatus.Joining && currentCall.status != ChatCallStatus.InProgress) ||
             (!inMeetingViewModel.isMe(peerId) && inMeetingViewModel.isCallOrSessionOnHoldOfOneToOneCall()) ||
             (inMeetingViewModel.isMe(peerId) &&
                     ((isOneToOneCall && inMeetingViewModel.isCallOrSessionOnHoldOfOneToOneCall()) ||
@@ -511,16 +496,16 @@ class IndividualCallFragment : MeetingBaseFragment() {
                 )
                 Timber.d("Participant $clientId video listener created")
 
-                inMeetingViewModel.getSession(clientId)?.let {
-                    if (!it.canRecvVideoHiRes() && it.isHiResVideo) {
+                inMeetingViewModel.getSessionByClientId(clientId)?.let {
+                    if (!it.canReceiveVideoHiRes && it.isHiResVideo) {
                         Timber.d("Asking for HiRes video of client ID $clientId")
                         inMeetingViewModel.requestHiResVideo(it, this.chatId)
                     } else {
                         Timber.d("I am already receiving the HiRes video")
                         when {
-                            inMeetingViewModel.sessionHasVideo(it.clientid) -> {
+                            inMeetingViewModel.sessionHasVideo(it.clientId) -> {
                                 Timber.d("Session has video")
-                                addListener(it.clientid)
+                                addListener(it.clientId)
                             }
 
                             else -> {}
@@ -629,9 +614,9 @@ class IndividualCallFragment : MeetingBaseFragment() {
 
             videoListener = null
         } else {
-            inMeetingViewModel.getSession(clientId)?.let { session ->
+            inMeetingViewModel.getSessionByClientId(clientId)?.let { session ->
                 videoListener?.let {
-                    if (session.canRecvVideoHiRes()) {
+                    if (session.canReceiveVideoHiRes) {
                         Timber.d("Removing HiRes video of client ID $clientId")
                         inMeetingViewModel.stopHiResVideo(session, chatId)
                     }

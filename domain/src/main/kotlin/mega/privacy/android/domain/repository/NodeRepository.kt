@@ -217,6 +217,11 @@ interface NodeRepository {
     suspend fun getOfflineNodeInformation(nodeHandle: Long): OfflineNodeInformation?
 
     /**
+     * Start offline files sync worker
+     */
+    suspend fun startOfflineSyncWorker()
+
+    /**
      * Get the [UserId] of the owner of the node with [nodeId] if it's a inShare node
      * @param nodeId [NodeId]
      * @param recursive  if true it checks the root of the node with [nodeId],
@@ -590,11 +595,17 @@ interface NodeRepository {
     ): Boolean
 
     /**
-     * Get offline Node from parent id
+     * Get all offline Node stored in database
+     * @return list of [OfflineNodeInformation]
+     */
+    suspend fun getAllOfflineNodes(): List<OfflineNodeInformation>
+
+    /**
+     * Get offline Nodes from parent id
      * @param parentId
      * @return list of [OfflineNodeInformation]
      */
-    suspend fun getOfflineNodeByParentId(parentId: Int): List<OfflineNodeInformation>?
+    suspend fun getOfflineNodesByParentId(parentId: Int): List<OfflineNodeInformation>
 
     /**
      * Get offline folder info
@@ -614,6 +625,11 @@ interface NodeRepository {
      * Remove offline Node by ID
      */
     suspend fun removeOfflineNodeById(id: Int)
+
+    /**
+     * Remove offline Node by IDs
+     */
+    suspend fun removeOfflineNodeByIds(ids: List<Int>)
 
     /**
      * Set label for node
@@ -730,10 +746,13 @@ interface NodeRepository {
     /**
      * Get offline node information by query
      *
+     * When parentId is -1 and searchQuery is set, the search in entire table is performed
+     *
      * @param query
+     * @param parentId
      * @return list of offline nodes information
      */
-    suspend fun getOfflineByQuery(query: String): List<OfflineNodeInformation>?
+    suspend fun getOfflineNodesByQuery(query: String, parentId: Int): List<OfflineNodeInformation>
 
     /**
      * Update node tag
@@ -759,4 +778,18 @@ interface NodeRepository {
      * @param tag [String]
      */
     suspend fun removeNodeTag(nodeHandle: NodeId, tag: String)
+
+    /**
+     * Check if parent node contains any sensitive descendant
+     *
+     * @param nodeId [NodeId]
+     */
+    suspend fun hasSensitiveDescendant(nodeId: NodeId): Boolean
+
+    /**
+     * Check if node is sensitive inherited
+     *
+     * @param nodeId [NodeId]
+     */
+    suspend fun hasSensitiveInherited(nodeId: NodeId): Boolean
 }

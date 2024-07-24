@@ -21,6 +21,7 @@ import androidx.appcompat.app.ActionBar
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.Toolbar
 import androidx.coordinatorlayout.widget.CoordinatorLayout
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
@@ -34,7 +35,6 @@ import mega.privacy.android.app.ShareInfo
 import mega.privacy.android.app.activities.PasscodeActivity
 import mega.privacy.android.app.activities.contract.SelectFolderToCopyActivityContract
 import mega.privacy.android.app.arch.extensions.collectFlow
-import mega.privacy.android.app.components.saver.NodeSaver
 import mega.privacy.android.app.constants.BroadcastConstants.BROADCAST_ACTION_DESTROY_ACTION_MODE
 import mega.privacy.android.app.constants.BroadcastConstants.BROADCAST_ACTION_INTENT_MANAGE_SHARE
 import mega.privacy.android.app.featuretoggle.AppFeatures
@@ -54,13 +54,11 @@ import mega.privacy.android.app.presentation.extensions.uploadFilesManually
 import mega.privacy.android.app.presentation.extensions.uploadFolderManually
 import mega.privacy.android.app.presentation.movenode.mapper.MoveRequestMessageMapper
 import mega.privacy.android.app.presentation.transfers.starttransfer.StartDownloadViewModel
-import mega.privacy.android.app.usecase.GetNodeUseCase
 import mega.privacy.android.app.usecase.UploadUseCase
 import mega.privacy.android.app.usecase.exception.MegaNodeException.ChildDoesNotExistsException
 import mega.privacy.android.app.usecase.exception.MegaNodeException.ParentDoesNotExistException
 import mega.privacy.android.app.utils.AlertDialogUtil.dismissAlertDialogIfExists
 import mega.privacy.android.app.utils.AlertsAndWarnings.showOverDiskQuotaPaywallWarning
-import mega.privacy.android.app.utils.AlertsAndWarnings.showSaveToDeviceConfirmDialog
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.ContactUtil
 import mega.privacy.android.app.utils.MegaNodeDialogUtil.IS_NEW_FOLDER_DIALOG_SHOWN
@@ -88,6 +86,7 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.domain.usecase.node.GetNodeByHandleUseCase
 import nz.mega.documentscanner.DocumentScannerActivity
 import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaChatApiJava
@@ -114,7 +113,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
     lateinit var filePrepareUseCase: FilePrepareUseCase
 
     @Inject
-    lateinit var getNodeUseCase: GetNodeUseCase
+    lateinit var getNodeByHandleUseCase: GetNodeByHandleUseCase
 
     @Inject
     lateinit var checkNameCollisionUseCase: CheckNameCollisionUseCase
@@ -141,10 +140,6 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
     private var contact: MegaUser? = null
     private var fullName = ""
     private var contactFileListFragment: ContactFileListFragment? = null
-    private val nodeSaver = NodeSaver(
-        this, this, this,
-        showSaveToDeviceConfirmDialog(this)
-    )
     private var parentHandle: Long = -1
     private var newFolderDialog: AlertDialog? = null
     private var statusDialog: AlertDialog? = null
@@ -186,7 +181,6 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
     public override fun onSaveInstanceState(outState: Bundle) {
         outState.putLong(PARENT_HANDLE, parentHandle)
         checkNewTextFileDialogState(newTextFileDialog, outState)
-        nodeSaver.saveState(outState)
         newFolderDialog.checkNewFolderDialogState(outState)
         super.onSaveInstanceState(outState)
     }
@@ -319,7 +313,6 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
             setParentHandle(-1)
         } else {
             setParentHandle(savedInstanceState.getLong(PARENT_HANDLE, -1))
-            nodeSaver.restoreState(savedInstanceState)
         }
         megaApi.addGlobalListener(this)
         registerReceiver(manageShareReceiver, IntentFilter(BROADCAST_ACTION_INTENT_MANAGE_SHARE))
@@ -511,7 +504,6 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
                 onGetReadWritePermission()
             }
         }
-        nodeSaver.handleRequestPermissionsResult(requestCode)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -528,7 +520,6 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
         unregisterReceiver(manageShareReceiver)
         unregisterReceiver(destroyActionModeReceiver)
         dismissAlertDialogIfExists(newFolderDialog)
-        nodeSaver.destroy()
     }
 
     fun setParentHandle(parentHandle: Long) {
@@ -536,10 +527,10 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
     }
 
     fun downloadFile(nodes: List<MegaNode>) {
-            startDownloadViewModel.onDownloadClicked(
-                nodeIds = nodes.map { NodeId(it.handle) },
-                isHighPriority = true
-            )
+        startDownloadViewModel.onDownloadClicked(
+            nodeIds = nodes.map { NodeId(it.handle) },
+            isHighPriority = true
+        )
     }
 
     private fun moveToTrash(handleList: ArrayList<Long>) {
@@ -580,9 +571,6 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
         super.onActivityResult(requestCode, resultCode, intent)
-        if (nodeSaver.handleActivityResult(this, requestCode, resultCode, intent)) {
-            return
-        }
         if (requestCode == Constants.REQUEST_CODE_SELECT_FOLDER_TO_MOVE && resultCode == RESULT_OK) {
             if (intent == null) {
                 return
@@ -796,17 +784,18 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
     override fun onNodesUpdate(api: MegaApiJava, nodes: ArrayList<MegaNode>?) {
         for (node in nodes.orEmpty()) {
             if (node.isInShare && parentHandle == node.handle) {
-                composite.add(
-                    getNodeUseCase.get(parentHandle)
-                        .subscribeOn(Schedulers.io())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe { result: MegaNode?, throwable: Throwable? ->
-                            if (throwable == null) {
-                                updateNodes()
-                            } else {
-                                finish()
-                            }
-                        })
+                lifecycleScope.launch {
+                    runCatching {
+                        getNodeByHandleUseCase(
+                            handle = node.handle,
+                            attemptFromFolderApi = true
+                        )
+                    }.onSuccess {
+                        updateNodes()
+                    }.onFailure {
+                        finish()
+                    }
+                }
             } else {
                 updateNodes()
             }

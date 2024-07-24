@@ -13,7 +13,6 @@ import mega.privacy.android.app.meeting.adapter.GridViewPagerAdapter
 import mega.privacy.android.app.meeting.adapter.Participant
 import mega.privacy.android.domain.entity.meeting.ChatSession
 import mega.privacy.android.domain.entity.meeting.TypeRemoteAVFlagChange
-import nz.mega.sdk.MegaChatSession
 import timber.log.Timber
 
 class GridViewCallFragment : MeetingBaseFragment() {
@@ -294,12 +293,12 @@ class GridViewCallFragment : MeetingBaseFragment() {
      * Check changes in remote A/V flags
      *
      * @param type [TypeRemoteAVFlagChange]
-     * @param session MegaChatSession
+     * @param session [ChatSession]
      */
-    fun updateRemoteAudioVideo(type: TypeRemoteAVFlagChange, session: MegaChatSession) {
+    fun updateRemoteAudioVideo(type: TypeRemoteAVFlagChange, session: ChatSession) {
         (parentFragment as InMeetingFragment).inMeetingViewModel.getParticipant(
-            session.peerid,
-            session.clientid
+            session.peerId,
+            session.clientId
         )?.let {
             Timber.d("Update remote A/V")
             adapterPager.updateParticipantAudioVideo(

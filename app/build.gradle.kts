@@ -1,5 +1,6 @@
 import com.android.build.api.dsl.ApplicationExtension
 import com.google.firebase.appdistribution.gradle.AppDistributionExtension
+import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
 import mega.privacy.android.build.buildTypeMatches
 import mega.privacy.android.build.getAppGitHash
 import mega.privacy.android.build.getChatGitHash
@@ -31,10 +32,10 @@ plugins {
     alias(convention.plugins.mega.android.application.firebase)
     alias(convention.plugins.mega.lint)
     alias(convention.plugins.mega.android.hilt)
+    alias(plugin.plugins.de.mannodermaus.android.junit5)
     id("kotlin-parcelize")
     id("androidx.navigation.safeargs.kotlin")
     id("com.google.firebase.appdistribution")
-    id("de.mannodermaus.android-junit5")
     id("androidx.baselineprofile")
 }
 
@@ -69,16 +70,6 @@ android {
         resValue("string", "karere_version", "\"${getChatGitHash(megaSdkVersion, project)}\"")
 
         testInstrumentationRunner = "test.mega.privacy.android.app.HiltTestRunner"
-
-        withGroovyBuilder {
-            "firebaseCrashlytics" {
-                // Enable processing and uploading of native symbols to Crashlytics servers.
-                // This flag must be enabled to see properly-symbolicated native
-                // stack traces in the Crashlytics dashboard.
-                "nativeSymbolUploadEnabled"(true)
-                "unstrippedNativeLibsDir"(nativeLibsDir(project))
-            }
-        }
     }
 
     buildTypes {
@@ -94,6 +85,11 @@ android {
                 groups = readTesterGroupList()
                 testers = readTesters()
             }
+            configure<CrashlyticsExtension> {
+                nativeSymbolUploadEnabled = true
+                unstrippedNativeLibsDir = nativeLibsDir(project)
+            }
+
             buildConfigField("String", "ENVIRONMENT", "\"\"")
         }
 
@@ -220,6 +216,7 @@ dependencies {
     implementation(lib.coil.video)
     implementation(lib.coil.compose)
     implementation(androidx.paging.compose)
+    implementation(lib.kotlinx.collections.immutable)
 
     // Google
     implementation(google.gson)

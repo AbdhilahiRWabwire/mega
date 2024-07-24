@@ -19,6 +19,7 @@ import android.provider.MediaStore.MediaColumns.SIZE
 import android.provider.MediaStore.VOLUME_EXTERNAL
 import android.provider.MediaStore.VOLUME_INTERNAL
 import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import androidx.annotation.RequiresApi
 import androidx.core.content.FileProvider
 import androidx.core.net.toFile
@@ -218,8 +219,8 @@ internal class FileFacade @Inject constructor(
         }
     }
 
-    override suspend fun copyFileToFolder(source: File, destination: File) {
-        copyFilesToDocumentFolder(source, DocumentFile.fromFile(destination))
+    override suspend fun copyFileToFolder(source: File, destination: File): Int {
+        return copyFilesToDocumentFolder(source, DocumentFile.fromFile(destination))
     }
 
     override suspend fun createTempFile(rootPath: String, localPath: String, newPath: String) {
@@ -590,22 +591,49 @@ internal class FileFacade @Inject constructor(
     override suspend fun copyFilesToDocumentFolder(
         source: File,
         destination: DocumentFile,
-    ) {
+    ): Int {
         if (!destination.isDirectory) throw IllegalArgumentException("Destination is not a directory")
+        var totalFile = 0
         if (source.isDirectory) {
             val files = source.listFiles()
-            val newFolder = destination.createDirectory(source.name) ?: return
+            val newFolder = destination.createDirectory(source.name) ?: return 0
             files?.forEach {
-                copyFilesToDocumentFolder(it, newFolder)
+                totalFile += copyFilesToDocumentFolder(it, newFolder)
             }
         } else {
             val fileName = getFileNameIfHasNameCollision(destination, source.name)
-            val newFile = destination.createFile(source.extension, fileName)
+            val fileNameWithoutExtension = fileName.substringBeforeLast(".")
+            val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(source.extension)
+                ?: "application/octet-stream"
+            val newFile = destination.createFile(mimeType, fileNameWithoutExtension)
             newFile?.uri?.let { newUri ->
                 context.contentResolver.openOutputStream(newUri)?.use { output ->
                     source.inputStream().use { input ->
                         input.copyTo(output)
                     }
+                }
+            }
+            totalFile = 1
+        }
+        return totalFile
+    }
+
+    override suspend fun copyUriToDocumentFolder(
+        name: String,
+        source: Uri,
+        destination: DocumentFile,
+    ) {
+        val fileName = getFileNameIfHasNameCollision(destination, name)
+        val fileNameWithoutExtension = fileName.substringBeforeLast(".")
+        val extension = fileName.substringAfterLast(".", "")
+        val mimeType = context.contentResolver.getType(source)
+            ?: MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+            ?: "application/octet-stream"
+        val newFile = destination.createFile(mimeType, fileNameWithoutExtension)
+        newFile?.uri?.let { newUri ->
+            context.contentResolver.openInputStream(source)?.use { input ->
+                context.contentResolver.openOutputStream(newUri)?.use { output ->
+                    input.copyTo(output)
                 }
             }
         }
