@@ -1,13 +1,14 @@
 import mega.privacy.android.build.isServerBuild
 
 plugins {
+    alias(plugin.plugins.kotlin.compose) apply false
     alias(plugin.plugins.ksp) apply false
     alias(plugin.plugins.mega.android.cicd)
     alias(plugin.plugins.mega.android.release)
     alias(plugin.plugins.jfrog.artifactory) apply false
     alias(plugin.plugins.mega.artifactory.publish.convention) apply false
     alias(plugin.plugins.de.mannodermaus.android.junit5) apply false
-    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+    alias(plugin.plugins.jetbrains.kotlin.android) apply false
 }
 
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
@@ -15,7 +16,7 @@ buildscript {
     repositories {
         google()
         maven { url = uri("https://plugins.gradle.org/m2/") }
-        jcenter()
+        mavenCentral()
     }
     dependencies {
         classpath(plugin.build.tools)
@@ -41,7 +42,6 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        jcenter()
         maven {
             url = uri("https://jitpack.io")
         }
@@ -78,7 +78,7 @@ tasks.register("clean", Delete::class) {
 
 // Define versions in a single place
 // App
-extra["appVersion"] = "13.6.1"
+extra["appVersion"] = "14.1"
 
 // Sdk and tools
 extra["compileSdkVersion"] = 35
@@ -87,7 +87,7 @@ extra["targetSdkVersion"] = 34
 extra["buildTools"] = "35.0.0"
 
 // Prebuilt MEGA SDK version
-extra["megaSdkVersion"] = "20240718.035505-rel"
+extra["megaSdkVersion"] = "20240815.052610-rel"
 
 //JDK and Java Version
 extra["jdk"] = "17"

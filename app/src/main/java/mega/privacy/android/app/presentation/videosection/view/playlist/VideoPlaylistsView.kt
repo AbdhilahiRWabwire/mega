@@ -30,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -44,17 +45,18 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.videosection.model.VideoPlaylistUIEntity
-import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDialog
-import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaCircularProgressIndicator
-import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.shared.original.core.ui.theme.black
-import mega.privacy.android.shared.original.core.ui.theme.extensions.white_black
-import mega.privacy.android.shared.original.core.ui.theme.white
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
 import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
 import mega.privacy.android.legacy.core.ui.controls.lists.HeaderViewItem
+import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDialog
+import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaCircularProgressIndicator
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.theme.black
+import mega.privacy.android.shared.original.core.ui.theme.extensions.white_black
+import mega.privacy.android.shared.original.core.ui.theme.white
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -66,18 +68,15 @@ internal fun VideoPlaylistsView(
     lazyListState: LazyListState,
     sortOrder: String,
     isInputTitleValid: Boolean,
-    shouldCreateVideoPlaylistDialog: Boolean,
-    shouldDeleteVideoPlaylistDialog: Boolean,
-    shouldRenameVideoPlaylistDialog: Boolean,
+    showDeleteVideoPlaylistDialog: Boolean,
     inputPlaceHolderText: String,
     modifier: Modifier,
-    setShouldCreateVideoPlaylist: (Boolean) -> Unit,
-    setShouldDeleteVideoPlaylist: (Boolean) -> Unit,
-    setShouldRenameVideoPlaylist: (Boolean) -> Unit,
+    updateShowDeleteVideoPlaylist: (Boolean) -> Unit,
     setDialogInputPlaceholder: (String) -> Unit,
     onCreateDialogPositiveButtonClicked: (String) -> Unit,
     onRenameDialogPositiveButtonClicked: (playlistID: NodeId, newTitle: String) -> Unit,
     onDeleteDialogPositiveButtonClicked: (VideoPlaylistUIEntity) -> Unit,
+    onDeleteDialogNegativeButtonClicked: () -> Unit,
     onDeletePlaylistsDialogPositiveButtonClicked: () -> Unit,
     setInputValidity: (Boolean) -> Unit,
     onClick: (item: VideoPlaylistUIEntity, index: Int) -> Unit,
@@ -87,9 +86,18 @@ internal fun VideoPlaylistsView(
     errorMessage: Int? = null,
     onLongClick: ((item: VideoPlaylistUIEntity, index: Int) -> Unit) = { _, _ -> },
 ) {
+    var showCreateVideoPlaylistDialog by rememberSaveable { mutableStateOf(false) }
+    var showRenameVideoPlaylistDialog by rememberSaveable { mutableStateOf(false) }
+
     LaunchedEffect(items) {
         if (scrollToTop) {
             lazyListState.scrollToItem(0)
+        }
+        if (showRenameVideoPlaylistDialog) {
+            showRenameVideoPlaylistDialog = false
+        }
+        if (showCreateVideoPlaylistDialog) {
+            showCreateVideoPlaylistDialog = false
         }
     }
 
@@ -120,7 +128,7 @@ internal fun VideoPlaylistsView(
                 )
             }
             coroutineScope.launch {
-                snackBarHostState.showSnackbar(deletedMessage)
+                snackBarHostState.showAutoDurationSnackbar(deletedMessage)
             }
             onDeletedMessageShown()
         }
@@ -154,7 +162,7 @@ internal fun VideoPlaylistsView(
             CreateVideoPlaylistFabButton(
                 showFabButton = scrollNotInProgress,
                 onCreateVideoPlaylistClick = {
-                    setShouldCreateVideoPlaylist(true)
+                    showCreateVideoPlaylistDialog = true
                     setDialogInputPlaceholder(placeholderText)
                 }
             )
@@ -165,7 +173,7 @@ internal fun VideoPlaylistsView(
                 .fillMaxSize()
                 .padding(paddingValue)
         ) {
-            if (shouldCreateVideoPlaylistDialog) {
+            if (showCreateVideoPlaylistDialog) {
                 CreateVideoPlaylistDialog(
                     modifier = Modifier.testTag(CREATE_VIDEO_PLAYLIST_DIALOG_TEST_TAG),
                     title = stringResource(id = sharedR.string.video_section_playlists_create_playlist_dialog_title),
@@ -174,7 +182,7 @@ internal fun VideoPlaylistsView(
                     errorMessage = errorMessage,
                     onDialogInputChange = setInputValidity,
                     onDismissRequest = {
-                        setShouldCreateVideoPlaylist(false)
+                        showCreateVideoPlaylistDialog = false
                         setInputValidity(true)
                     },
                     onDialogPositiveButtonClicked = { titleOfNewVideoPlaylist ->
@@ -185,7 +193,7 @@ internal fun VideoPlaylistsView(
                 }
             }
 
-            if (shouldRenameVideoPlaylistDialog) {
+            if (showRenameVideoPlaylistDialog) {
                 CreateVideoPlaylistDialog(
                     modifier = Modifier.testTag(RENAME_VIDEO_PLAYLIST_DIALOG_TEST_TAG),
                     title = stringResource(id = sharedR.string.video_section_playlists_rename_playlist_dialog_title),
@@ -194,7 +202,7 @@ internal fun VideoPlaylistsView(
                     errorMessage = errorMessage,
                     onDialogInputChange = setInputValidity,
                     onDismissRequest = {
-                        setShouldRenameVideoPlaylist(false)
+                        showRenameVideoPlaylistDialog = false
                         setInputValidity(true)
                     },
                     initialInputText = {
@@ -214,7 +222,7 @@ internal fun VideoPlaylistsView(
                 }
             }
 
-            if (shouldDeleteVideoPlaylistDialog) {
+            if (showDeleteVideoPlaylistDialog) {
                 DeleteItemsDialog(
                     modifier = Modifier.testTag(DELETE_VIDEO_PLAYLIST_DIALOG_TEST_TAG),
                     title = stringResource(id = sharedR.string.video_section_playlists_delete_playlist_dialog_title),
@@ -229,7 +237,8 @@ internal fun VideoPlaylistsView(
                         clickedItem = -1
                     },
                     onDismiss = {
-                        setShouldDeleteVideoPlaylist(false)
+                        updateShowDeleteVideoPlaylist(false)
+                        onDeleteDialogNegativeButtonClicked()
                         clickedItem = -1
                     }
                 )
@@ -309,10 +318,10 @@ internal fun VideoPlaylistsView(
             modalSheetState = modalSheetState,
             coroutineScope = coroutineScope,
             onRenameVideoPlaylistClicked = {
-                setShouldRenameVideoPlaylist(true)
+                showRenameVideoPlaylistDialog = true
             },
             onDeleteVideoPlaylistClicked = {
-                setShouldDeleteVideoPlaylist(true)
+                updateShowDeleteVideoPlaylist(true)
             }
         )
     }
@@ -403,23 +412,20 @@ private fun VideoPlaylistsViewPreview() {
             lazyListState = LazyListState(),
             sortOrder = "Sort by name",
             isInputTitleValid = true,
-            shouldDeleteVideoPlaylistDialog = false,
-            shouldCreateVideoPlaylistDialog = false,
-            shouldRenameVideoPlaylistDialog = false,
+            showDeleteVideoPlaylistDialog = false,
             modifier = Modifier.fillMaxSize(),
             onClick = { _, _ -> },
             onSortOrderClick = {},
             inputPlaceHolderText = "New playlist",
             setDialogInputPlaceholder = {},
-            setShouldCreateVideoPlaylist = {},
-            setShouldDeleteVideoPlaylist = {},
-            setShouldRenameVideoPlaylist = {},
+            updateShowDeleteVideoPlaylist = {},
             onCreateDialogPositiveButtonClicked = {},
             onRenameDialogPositiveButtonClicked = { _, _ -> },
             onDeleteDialogPositiveButtonClicked = {},
             onDeletedMessageShown = {},
             setInputValidity = {},
-            onDeletePlaylistsDialogPositiveButtonClicked = {}
+            onDeletePlaylistsDialogPositiveButtonClicked = {},
+            onDeleteDialogNegativeButtonClicked = {}
         )
     }
 }
@@ -436,23 +442,20 @@ private fun VideoPlaylistsViewCreateDialogShownPreview() {
             lazyListState = LazyListState(),
             sortOrder = "Sort by name",
             isInputTitleValid = true,
-            shouldDeleteVideoPlaylistDialog = true,
-            shouldCreateVideoPlaylistDialog = true,
-            shouldRenameVideoPlaylistDialog = true,
+            showDeleteVideoPlaylistDialog = true,
             modifier = Modifier.fillMaxSize(),
             onClick = { _, _ -> },
             onSortOrderClick = {},
             inputPlaceHolderText = "New playlist",
             setDialogInputPlaceholder = {},
-            setShouldCreateVideoPlaylist = {},
-            setShouldDeleteVideoPlaylist = {},
-            setShouldRenameVideoPlaylist = {},
+            updateShowDeleteVideoPlaylist = {},
             onCreateDialogPositiveButtonClicked = {},
             onRenameDialogPositiveButtonClicked = { _, _ -> },
             onDeleteDialogPositiveButtonClicked = {},
             setInputValidity = {},
             onDeletedMessageShown = {},
-            onDeletePlaylistsDialogPositiveButtonClicked = {}
+            onDeletePlaylistsDialogPositiveButtonClicked = {},
+            onDeleteDialogNegativeButtonClicked = {}
         )
     }
 }

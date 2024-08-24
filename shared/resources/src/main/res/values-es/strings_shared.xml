@@ -65,7 +65,7 @@
     <!-- The name of the Device or Folder Sub State when its code is FAILURE_ACCESSING_PERSISTENT_STORAGE -->
     <string name="general_sync_failure_accessing_persistent_storage">No se ha podido leer la ubicación de la sincronización. Comprueba que se pueda acceder a la ubicación y que se hayan concedido los permisos para la ubicación de la carpeta.</string>
     <!-- The name for specific Sub States to indicate that an unknown error occurred -->
-    <string name="general_sync_message_unknown_error">Se ha producido un error. Ponte en contacto con soporte.</string>
+    <string name="general_sync_message_unknown_error">An unknown error occurred. Contact support@mega.nz.</string>
     <!-- The name for specific Sub States to indicate that something went wrong -->
     <string name="general_sync_message_something_went_wrong">Something went wrong.</string>
     <!-- The name for specific Sub States to indicate that the Node is in the Rubbish Bin -->
@@ -309,7 +309,7 @@
     <!-- Title of the synced folder list empty state -->
     <string name="device_center_sync_list_empty_state_title">Ninguna sincronización configurada</string>
     <!-- Message of the synced folder list empty state -->
-    <string name="device_center_sync_list_empty_state_message">Sincroniza una carpeta local en tu dispositivo con una carpeta de MEGA.</string>
+    <string name="device_center_sync_list_empty_state_message">Sync a folder on your device with a folder on MEGA.</string>
     <!-- Label for the button or menu option to add a new sync -->
     <string name="device_center_sync_add_new_syn_button_option">Añadir sincronización</string>
     <!-- Text for the Sync solved issues chip -->
@@ -440,8 +440,8 @@
     <string name="account_cancel_account_screen_plan_free_plan">Free</string>
     <!-- Row label for storage feature in the comparison table -->
     <string name="account_cancel_account_screen_plan_storage">Almacenamiento</string>
-    <!-- Storage amount available in the free plan -->
-    <string name="account_cancel_account_screen_plan_free_storage">20&#160;GB</string>
+    <!-- Storage amount available in the free plan. %1s represents the amount of storage in GB. -->
+    <string name="account_cancel_account_screen_plan_free_storage">%1s&#160;GB</string>
     <!-- Row label for transfer feature in the comparison table -->
     <string name="account_cancel_account_screen_plan_transfer">Transferencia</string>
     <!-- Transfer limit in the free plan -->
@@ -456,8 +456,8 @@
     <string name="account_cancel_account_screen_plan_rewind">Rebobinar</string>
     <!-- Rewind duration available in the free plan -->
     <string name="account_cancel_account_screen_plan_rewind_free">Hasta 30 días (solo lectura)</string>
-    <!-- Rewind duration available in the current plan -->
-    <string name="account_cancel_account_screen_plan_rewind_current">Hasta 180 días</string>
+    <!-- Rewind duration available in the current plan. %1s represents the number of days. -->
+    <string name="account_cancel_account_screen_plan_rewind_current">Up to %1s days</string>
     <!-- Feature indicating MEGA VPN availability, available in the pro plan -->
     <string name="account_cancel_account_screen_plan_mega_vpn">MEGA&#160;VPN</string>
     <!-- Row label for call and meeting duration in the comparison table -->
@@ -465,13 +465,13 @@
     <!-- Call and meeting duration limit in the free plan -->
     <string name="account_cancel_account_screen_plan_call_meeting_duration_free">Hasta 1 hora</string>
     <!-- Unlimited call and meeting duration available in the pro plan -->
-    <string name="cancel_account_plan_call_meeting_duration_pro">Ilimitado</string>
+    <string name="cancel_account_plan_call_meeting_duration_pro">Ilimitadas</string>
     <!-- Row label for call and meeting participants in the comparison table -->
     <string name="account_cancel_account_plan_call_meeting_participants">Call &amp;amp; meeting participants</string>
     <!-- Limit on call and meeting participants in the free plan -->
     <string name="account_cancel_account_free_plan_call_meeting_participants">Hasta 100</string>
     <!-- Unlimited call and meeting participants available in the pro plan -->
-    <string name="account_cancel_account_pro_plan_call_meeting_participants">Ilimitado</string>
+    <string name="account_cancel_account_pro_plan_call_meeting_participants">Ilimitados</string>
     <!-- Button label to keep the current pro plan -->
     <string name="account_cancel_account_plan_keep_pro_plan">Keep %1s</string>
     <!-- Button label to continue with the cancellation -->
@@ -493,17 +493,17 @@
     <!-- Message shown when cancelling the current plan in the instructions screen, informing the user about how to cancel subscription -->
     <string name="account_cancellation_instructions_message_apple_description">This is because you subscribed to MEGA via Apple. To cancel your subscription, you will need to:</string>
     <!-- Label for the subscription managed by App Store on Cancellation instructions screen-->
-    <string name="account_cancellation_instructions_ios_device">On a iOS Device</string>
+    <string name="account_cancellation_instructions_ios_device">On an iOS Device</string>
     <!-- Step 1: instruction step no.1 to Open the settings App to cancel the subscription from iOS device-->
-    <string name="account_cancellation_instructions_open_settings">1. Open the Settings app.</string>
+    <string name="account_cancellation_instructions_open_settings">1. Open the [A]Settings[/A] app.</string>
     <!-- Step 2: instruction step no.2 to Tap on the name in the iOS device-->
     <string name="account_cancellation_instructions_tap_on_name">2. Tap on your name.</string>
     <!-- Step 3: instruction step no.3 to Select subscriptions section in the iOS device-->
-    <string name="account_cancellation_instructions_select_subscriptions">3. Tap Subscriptions.</string>
+    <string name="account_cancellation_instructions_select_subscriptions">3. Tap [A]Subscriptions[/A].</string>
     <!-- Step 4: instruction step no.4 to Select MEGA subscription in the iOS device -->
     <string name="account_cancellation_instructions_select_mega_subscription">4. Tap your MEGA subscription.</string>
     <!-- Step 5: instruction step no.5 to Select Cancel subscription of the App inside subscription section in the iOS device-->
-    <string name="account_cancellation_instructions_open_select_cancel_subscription">5. Tap Cancel subscription.</string>
+    <string name="account_cancellation_instructions_open_select_cancel_subscription">5. Tap [A]Cancel subscription[/A].</string>
     <!-- Message description to provide the user with more details on how to cancel your subscription on a computer or other device. -->
     <string name="account_cancellation_instructions_detailed_instructions">[A]Tap here[/A] for detailed instructions on how to cancel your subscription on a computer or other device.</string>
     <!-- Title shown when needing to cancel the subscription using a web browser -->
@@ -521,7 +521,7 @@
     <!-- Step 2: instruction step no.2 to Log in to the MEGA account -->
     <string name="account_cancellation_instructions_login_account">2. Inicia sesión en tu cuenta de MEGA.</string>
     <!-- Step 3: instruction step no.3 to Click the main menu of the MEGA account on MEGA website-->
-    <string name="account_cancellation_instructions_click_main_menu">3. Click the main menu.</string>
+    <string name="account_cancellation_instructions_click_main_menu">3. Haz clic en el menú principal.</string>
     <!-- Step 4: instruction step no.4 to Click Settings of the MEGA account on MEGA website -->
     <string name="account_cancellation_instructions_click_settings">4. Click [A]Settings.[/A]</string>
     <!-- Step 5: instruction step no.5 to Click on Plan section of the MEGA account on MEGA website-->
@@ -558,4 +558,52 @@
     <string name="create_new_folder_dialog_error_existing_folder">Ya existe una carpeta con el mismo nombre</string>
     <!-- Error message when the user writes a character not allowed for naming a file or folder -->
     <string name="general_invalid_characters_defined">Los siguientes caracteres no están permitidos: %1$s</string>
+    <!-- Sync settings section title-->
+    <string name="settings_section_sync">Sincronizar</string>
+    <!-- Transfers scanning folders dialog title when the app is creating the needed folders -->
+    <string name="transfers_scanning_folders_dialog_creating_folders_title">Creando carpetas&#8230;</string>
+    <!-- Transfers scanning folders dialog title when the app is starting transfers but some files still needs to be added to the queue  -->
+    <string name="transfers_scanning_folders_dialog_starting_transfers_title">Starting transfers&#8230;</string>
+    <!-- Transfers scanning folders dialog info to explain why the app shouldn't be closed -->
+    <string name="transfers_scanning_folders_dialog_cancel_info_subtitle">No cierres la aplicación. Si la cierras, las transferencias que aún no estén en cola se perderán.</string>
+    <!-- Transfers scanning folders dialog sub-title when the app is scanning a single folder-->
+    <plurals name="transfers_scanning_folders_dialog_scanning_folder_subtitle">
+        <item quantity="one">Found 1 folder and %1$d file.</item>
+        <item quantity="other">Found 1 folder and %1$d files.</item>
+    </plurals>
+    <!-- Transfers scanning folders dialog sub-title when the app is scanning multiple folders. This is the folders pluralization part to implement double pluralization in transfers_scanning_folders_dialog_scanning_files_and_folders_subtitle. Example: "134 folders". Example with double pluralization in transfers_scanning_folders_dialog_scanning_files_and_folders_subtitle: "Found 134 folders and 5689 files."-->
+    <plurals name="transfers_scanning_folders_dialog_scanning_folders_subtitle">
+        <item quantity="one">%1$d folder</item>
+        <item quantity="other">%1$d folders</item>
+    </plurals>
+    <!-- Transfers scanning folders dialog sub-title when the app is creating the folders. This message will inform how many folders are already created together with the total amount of folders that will be created. Example: "1/134 folder" or "48/134 folders" -->
+    <plurals name="transfers_scanning_folders_dialog_creating_folders_subtitle">
+        <item quantity="one">%1$d/%2$d folder</item>
+        <item quantity="other">%1$d/%2$d folders</item>
+    </plurals>
+    <!-- Title of the clear debris item displayed in the sync settings menu -->
+    <string name="settings_sync_clear_debris_item_title">Clear .debris (local cache)</string>
+    <!-- Title of the dialog shown when user clicks to clear debris from settings menu -->
+    <string name="settings_sync_clear_debris_dialog_title">Clear debris?</string>
+    <!-- Body of the dialog shown when user clicks to clear debris from settings menu -->
+    <string name="settings_sync_clear_debris_dialog_body">Backups of the previous versions of your synced files will be permanently deleted from your device. \n\nCheck the .debris folder in your local device to see if you need to restore anything.</string>
+    <!-- Cancel button of the dialog shown when user clicks to clear debris from settings menu -->
+    <string name="settings_sync_clear_debris_dialog_cancel">Cancelar</string>
+    <!-- Continue button of the dialog shown when user clicks to clear debris from settings menu -->
+    <string name="settings_sync_clear_debris_dialog_continue">Continuar</string>
+    <!-- Snackbar message shown when user clears debris from settings menu -->
+    <string name="settings_sync_debris_cleared_message">.debris folder successfully cleared</string>
+    <!-- Transfers scanning folders dialog sub-title when the app is scanning multiple folders. This message will inform how many files and folders were found. Example: "Found 134 folders and 5689 files." As it has double pluralization, folders will be pluralized in another string resource: transfers_scanning_folders_dialog_scanning_folders_subtitle -->
+    <plurals name="transfers_scanning_folders_dialog_scanning_files_and_folders_subtitle">
+        <item quantity="one">Found %1$s folder and %2$d file.</item>
+        <item quantity="other">Found %1$s and %2$d files.</item>
+    </plurals>
+    <!-- Label for the file info information screen no tags label -->
+    <string name="file_info_information_no_tags_label">No tags</string>
+    <!-- Transfers scanning folders dialog title to inform that the transfers are being cancelled -->
+    <string name="transfers_scanning_folders_dialog_cancel_cancelling_title">Cancelando transferencias&#8230;</string>
+    <!-- error warning message for report issue when not enough characters are typed and user tries to send report-->
+    <string name="report_issue_error_minimum_characters">Enquiries must be at least 10 characters</string>
+    <!-- placeholder message for report issue-->
+    <string name="report_issue_description_placeholder_message">Describe the issue with at least 10 characters</string>
 </resources>

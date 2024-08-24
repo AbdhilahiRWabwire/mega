@@ -27,6 +27,7 @@ import mega.privacy.android.data.mapper.offline.OfflineEntityMapper
 import mega.privacy.android.data.mapper.offline.OfflineModelMapper
 import mega.privacy.android.data.mapper.transfer.active.ActiveTransferEntityMapper
 import mega.privacy.android.data.mapper.transfer.completed.CompletedTransferEntityMapper
+import mega.privacy.android.data.mapper.transfer.completed.CompletedTransferLegacyModelMapper
 import mega.privacy.android.data.mapper.transfer.completed.CompletedTransferModelMapper
 import mega.privacy.android.data.mapper.transfer.sd.SdTransferEntityMapper
 import mega.privacy.android.data.mapper.transfer.sd.SdTransferModelMapper
@@ -53,6 +54,7 @@ internal class MegaLocalRoomFacade @Inject constructor(
     private val activeTransferDao: ActiveTransferDao,
     private val completedTransferModelMapper: CompletedTransferModelMapper,
     private val completedTransferEntityMapper: CompletedTransferEntityMapper,
+    private val completedTransferLegacyModelMapper: CompletedTransferLegacyModelMapper,
     private val activeTransferEntityMapper: ActiveTransferEntityMapper,
     private val sdTransferDao: SdTransferDao,
     private val sdTransferModelMapper: SdTransferModelMapper,
@@ -131,7 +133,7 @@ internal class MegaLocalRoomFacade @Inject constructor(
         return entities.map { contactModelMapper(it) }
     }
 
-    override fun getAllCompletedTransfers(size: Int?) =
+    override fun getCompletedTransfers(size: Int?) =
         completedTransferDao.getAllCompletedTransfers()
             .map { list ->
                 list.map { completedTransferModelMapper(it) }
@@ -142,6 +144,15 @@ internal class MegaLocalRoomFacade @Inject constructor(
 
     override suspend fun addCompletedTransfer(transfer: CompletedTransfer) {
         completedTransferDao.insertOrUpdateCompletedTransfer(completedTransferEntityMapper(transfer))
+    }
+
+    override suspend fun addCompletedTransfers(transfers: List<CompletedTransfer>) {
+        transfers.map { completedTransferEntityMapper(it) }.let { mappedTransfers ->
+            completedTransferDao.insertOrUpdateCompletedTransfers(
+                mappedTransfers,
+                MAX_INSERT_LIST_SIZE
+            )
+        }
     }
 
     override suspend fun getCompletedTransfersCount() =
@@ -185,6 +196,18 @@ internal class MegaLocalRoomFacade @Inject constructor(
         }
     }
 
+    override suspend fun migrateLegacyCompletedTransfers() {
+        completedTransferDao.getAllLegacyCompletedTransfers()
+            .takeIf { it.isNotEmpty() }
+            ?.let { legacyEntities ->
+                val firstHundred = legacyEntities
+                    .sortedWith(compareByDescending { it.timestamp })
+                    .take(100)
+                addCompletedTransfers(firstHundred.map { completedTransferLegacyModelMapper(it) })
+                completedTransferDao.deleteAllLegacyCompletedTransfers()
+            }
+    }
+
     override suspend fun getActiveTransferByTag(tag: Int) =
         activeTransferDao.getActiveTransferByTag(tag)
 
@@ -198,6 +221,14 @@ internal class MegaLocalRoomFacade @Inject constructor(
 
     override suspend fun insertOrUpdateActiveTransfer(activeTransfer: ActiveTransfer) =
         activeTransferDao.insertOrUpdateActiveTransfer(activeTransferEntityMapper(activeTransfer))
+
+    override suspend fun insertOrUpdateActiveTransfers(activeTransfers: List<ActiveTransfer>) =
+        activeTransfers.map { activeTransferEntityMapper(it) }.let { mappedActiveTransfers ->
+            activeTransferDao.insertOrUpdateActiveTransfers(
+                mappedActiveTransfers,
+                MAX_INSERT_LIST_SIZE
+            )
+        }
 
     override suspend fun deleteAllActiveTransfersByType(transferType: TransferType) =
         activeTransferDao.deleteAllActiveTransfersByType(transferType)
@@ -401,9 +432,10 @@ internal class MegaLocalRoomFacade @Inject constructor(
     }
 
     private suspend fun deleteCompletedTransferBatch(ids: List<Int>) {
-        ids.chunked(50).forEach {
-            completedTransferDao.deleteCompletedTransferByIds(it)
-        }
+        completedTransferDao.deleteCompletedTransferByIds(
+            ids,
+            MAX_INSERT_LIST_SIZE
+        )
     }
 
     override suspend fun setChatPendingChanges(chatPendingChanges: ChatPendingChanges) {
@@ -418,5 +450,6 @@ internal class MegaLocalRoomFacade @Inject constructor(
 
     companion object {
         private const val MAX_COMPLETED_TRANSFER_ROWS = 100
+        internal const val MAX_INSERT_LIST_SIZE = 200
     }
 }

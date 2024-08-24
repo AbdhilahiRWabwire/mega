@@ -28,6 +28,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.ActionBar
 import androidx.appcompat.app.AlertDialog
@@ -99,7 +100,6 @@ import nz.mega.sdk.MegaTransfer
 import nz.mega.sdk.MegaTransferListenerInterface
 import nz.mega.sdk.MegaUser
 import nz.mega.sdk.MegaUserAlert
-import org.jetbrains.anko.displayMetrics
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -266,6 +266,7 @@ class FileProviderActivity : PasscodeFileProviderActivity(), MegaRequestListener
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate first")
         requestWindowFeature(Window.FEATURE_NO_TITLE)
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
         setStatusBarTextColor(this@FileProviderActivity)
@@ -344,7 +345,12 @@ class FileProviderActivity : PasscodeFileProviderActivity(), MegaRequestListener
                     setOnClickListener { finish() }
                     text = getString(R.string.general_cancel)
                     val cancelButtonParams = layoutParams as LinearLayout.LayoutParams
-                    cancelButtonParams.setMargins(Util.scaleWidthPx(10, displayMetrics), 0, 0, 0)
+                    cancelButtonParams.setMargins(
+                        /* left = */ Util.scaleWidthPx(10, resources.displayMetrics),
+                        /* top = */ 0,
+                        /* right = */ 0,
+                        /* bottom = */ 0
+                    )
                     layoutParams = cancelButtonParams
                 }
 
@@ -1405,7 +1411,7 @@ class FileProviderActivity : PasscodeFileProviderActivity(), MegaRequestListener
 
     private fun showSnackbar(s: String?) {
         if (scrollView != null) {
-            showSimpleSnackbar(displayMetrics, scrollView, s)
+            showSimpleSnackbar(resources.displayMetrics, scrollView, s)
         }
     }
 
@@ -1644,6 +1650,18 @@ class FileProviderActivity : PasscodeFileProviderActivity(), MegaRequestListener
         buffer: ByteArray,
     ): Boolean {
         return false
+    }
+
+    override fun onFolderTransferUpdate(
+        api: MegaApiJava,
+        transfer: MegaTransfer,
+        stage: Int,
+        folderCount: Long,
+        createdFolderCount: Long,
+        fileCount: Long,
+        currentFolder: String?,
+        currentFileLeafName: String?,
+    ) {
     }
 
     override fun onAccountUpdate(api: MegaApiJava) {}

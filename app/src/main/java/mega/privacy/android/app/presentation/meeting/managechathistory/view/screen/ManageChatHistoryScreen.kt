@@ -14,11 +14,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Scaffold
-import androidx.compose.material.SnackbarHost
 import androidx.compose.material.SnackbarHostState
+import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,17 +50,18 @@ import mega.privacy.android.app.presentation.meeting.managechathistory.model.Man
 import mega.privacy.android.app.presentation.meeting.managechathistory.view.dialog.ChatHistoryRetentionConfirmationDialog
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.DISABLED_RETENTION_TIME
-import mega.privacy.android.shared.original.core.ui.controls.controlssliders.MegaSwitch
 import mega.privacy.android.shared.original.core.ui.controls.appbar.AppBarType
 import mega.privacy.android.shared.original.core.ui.controls.appbar.MegaAppBar
 import mega.privacy.android.shared.original.core.ui.controls.buttons.TextMegaButton
+import mega.privacy.android.shared.original.core.ui.controls.controlssliders.MegaSwitch
 import mega.privacy.android.shared.original.core.ui.controls.dividers.DividerType
 import mega.privacy.android.shared.original.core.ui.controls.dividers.MegaDivider
 import mega.privacy.android.shared.original.core.ui.controls.lists.GenericTwoLineListItem
 import mega.privacy.android.shared.original.core.ui.controls.text.MegaText
 import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import java.util.Locale
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -87,7 +89,7 @@ internal fun ManageChatHistoryRoute(
 
     LaunchedEffect(uiState.statusMessageResId) {
         uiState.statusMessageResId?.let {
-            snackBarHostState.showSnackbar(
+            snackBarHostState.showAutoDurationSnackbar(
                 message = context.getString(it)
             )
             viewModel.onStatusMessageDisplayed()
@@ -96,16 +98,12 @@ internal fun ManageChatHistoryRoute(
 
     Box(modifier = modifier.semantics { testTagsAsResourceId = true }) {
         ManageChatHistoryScreen(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.systemBarsPadding().fillMaxSize(),
             uiState = uiState,
             onNavigateUp = onNavigateUp,
             onConfirmClearChatClick = viewModel::clearChatHistory,
-            onSetChatRetentionTime = viewModel::setChatRetentionTime
-        )
-
-        SnackbarHost(
-            modifier = Modifier.align(Alignment.BottomCenter),
-            hostState = snackBarHostState
+            onSetChatRetentionTime = viewModel::setChatRetentionTime,
+            snackbarHostState = snackBarHostState
         )
     }
 }
@@ -117,6 +115,7 @@ internal fun ManageChatHistoryScreen(
     onConfirmClearChatClick: (chatRoomId: Long) -> Unit,
     onSetChatRetentionTime: (period: Long) -> Unit,
     modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     var shouldShowCustomTimePicker by rememberSaveable { mutableStateOf(false) }
     var shouldShowClearChatConfirmation by rememberSaveable { mutableStateOf(false) }
@@ -125,6 +124,7 @@ internal fun ManageChatHistoryScreen(
 
     Scaffold(
         modifier = modifier,
+        scaffoldState = rememberScaffoldState(snackbarHostState = snackbarHostState),
         topBar = {
             MegaAppBar(
                 appBarType = AppBarType.BACK_NAVIGATION,

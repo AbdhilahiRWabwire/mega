@@ -13,8 +13,6 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.MegaApplication.Companion.getInstance
 import mega.privacy.android.app.constants.EventConstants.EVENT_ENABLE_OR_DISABLE_LOCAL_VIDEO_CHANGE
-import mega.privacy.android.app.constants.EventConstants.EVENT_NOT_OUTGOING_CALL
-import mega.privacy.android.app.constants.EventConstants.EVENT_OUTGOING_CALL
 import mega.privacy.android.app.constants.EventConstants.EVENT_UPDATE_WAITING_FOR_OTHERS
 import mega.privacy.android.app.listeners.ChatRoomListener
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
@@ -25,7 +23,7 @@ import mega.privacy.android.app.utils.VideoCaptureUtils
 import mega.privacy.android.domain.entity.statistics.EndedEmptyCallTimeout
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.usecase.chat.BroadcastJoinedSuccessfullyUseCase
-import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
+import mega.privacy.android.domain.usecase.call.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.SendStatisticsMeetingsUseCase
 import nz.mega.sdk.MegaChatApiAndroid
 import nz.mega.sdk.MegaChatApiJava
@@ -395,11 +393,6 @@ class ChatManagement @Inject constructor(
     fun setRequestSentCall(callId: Long, isRequestSent: Boolean) {
         if (isRequestSent(callId) == isRequestSent) return
         hashMapOutgoingCall[callId] = isRequestSent
-        if (isRequestSent) {
-            LiveEventBus.get(EVENT_OUTGOING_CALL, Long::class.java).post(callId)
-        } else {
-            LiveEventBus.get(EVENT_NOT_OUTGOING_CALL, Long::class.java).post(callId)
-        }
     }
 
     /**

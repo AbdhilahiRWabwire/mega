@@ -118,6 +118,26 @@
         android:theme="@style/Theme.Mega"
         android:usesCleartextTraffic="true">
         <activity
+            android:name=".presentation.upload.UploadDestinationActivity"
+            android:configChanges="orientation|screenSize"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+        <activity
             android:name=".presentation.cancelaccountplan.CancelAccountPlanActivity"
             android:exported="false"
             android:launchMode="singleTop" />
@@ -242,23 +262,9 @@
         <activity
             android:name=".main.FileExplorerActivity"
             android:configChanges="orientation|screenSize"
-            android:exported="true"
+            android:exported="false"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustNothing">
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-
-                <data android:mimeType="*/*" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND_MULTIPLE" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-
-                <data android:mimeType="*/*" />
-            </intent-filter>
         </activity>
         <activity android:name=".main.megachat.chat.explorer.ChatExplorerActivity" />
         <activity android:name=".main.megachat.NodeAttachmentHistoryActivity" />
@@ -433,6 +439,10 @@
             android:label="@string/section_photo_sync"
             android:launchMode="singleTop" />
         <activity
+            android:name="mega.privacy.android.feature.sync.ui.settings.SettingsSyncActivity"
+            android:label="@string/settings_section_sync"
+            android:launchMode="singleTop" />
+        <activity
             android:name=".activities.settingsActivities.ChatNotificationsPreferencesActivity"
             android:label="@string/title_properties_chat_notifications_contact"
             android:launchMode="singleTop" />
@@ -498,10 +508,10 @@
             android:launchMode="singleTop" />
         <activity
             android:name=".meeting.activity.MeetingActivity"
-            android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
+            android:supportsPictureInPicture="true"
             android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".meeting.activity.LeftMeetingActivity"
@@ -669,6 +679,11 @@
             android:name=".activities.settingsActivities.StartScreenPreferencesActivity"
             android:label="@string/start_screen_setting"
             android:launchMode="singleTop" />
+        <activity
+            android:name=".namecollision.LegacyNameCollisionActivity"
+            android:label="@string/title_duplicated_items"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.Mega.FullScreen.Viewer" />
         <activity
             android:name=".namecollision.NameCollisionActivity"
             android:label="@string/title_duplicated_items"

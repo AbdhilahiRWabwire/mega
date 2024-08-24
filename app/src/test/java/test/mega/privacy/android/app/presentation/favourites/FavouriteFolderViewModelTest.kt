@@ -6,7 +6,6 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.presentation.favourites.FavouriteFolderViewModel
@@ -18,11 +17,16 @@ import mega.privacy.android.app.presentation.favourites.model.mapper.FavouriteMa
 import mega.privacy.android.app.utils.wrapper.FetchNodeWrapper
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.FavouriteFolderInfo
+import mega.privacy.android.domain.entity.VideoFileTypeInfo
 import mega.privacy.android.domain.entity.account.AccountDetail
+import mega.privacy.android.domain.entity.node.NodeContentUri
+import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedFolderNode
+import mega.privacy.android.domain.usecase.GetFileTypeInfoByNameUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.favourites.GetFavouriteFolderInfoUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.domain.usecase.node.GetNodeContentUriUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
 import nz.mega.sdk.MegaNode
 import org.junit.jupiter.api.BeforeEach
@@ -34,9 +38,11 @@ import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.mockito.kotlin.wheneverBlocking
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 @ExtendWith(CoroutineMainDispatcherExtension::class)
 @ExperimentalCoroutinesApi
@@ -55,14 +61,16 @@ class FavouriteFolderViewModelTest {
     }
     private val monitorShowHiddenItemsUseCase = mock<MonitorShowHiddenItemsUseCase> {
         on {
-            runBlocking { invoke() }
+            invoke()
         }.thenReturn(flowOf(false))
     }
     private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase> {
-        on {
-            runBlocking { invoke(any()) }
+        onBlocking {
+            invoke(any())
         }.thenReturn(false)
     }
+    private val getFileTypeInfoByNameUseCase = mock<GetFileTypeInfoByNameUseCase>()
+    private val getNodeContentUriUseCase = mock<GetNodeContentUriUseCase>()
 
     private val megaNode: MegaNode = mock {
         on { handle }.thenReturn(123)
@@ -90,7 +98,14 @@ class FavouriteFolderViewModelTest {
 
     @BeforeEach
     fun setUp() {
-        reset(getFavouriteFolderInfoUseCase, megaUtilWrapper, fetchNodeWrapper, stringUtilWrapper)
+        reset(
+            getFavouriteFolderInfoUseCase,
+            megaUtilWrapper,
+            fetchNodeWrapper,
+            stringUtilWrapper,
+            getFileTypeInfoByNameUseCase,
+            getNodeContentUriUseCase
+        )
         wheneverBlocking { getFavouriteFolderInfoUseCase(any()) }.thenReturn(emptyFlow())
         initViewModel()
     }
@@ -109,6 +124,8 @@ class FavouriteFolderViewModelTest {
             monitorShowHiddenItemsUseCase = monitorShowHiddenItemsUseCase,
             getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             defaultDispatcher = UnconfinedTestDispatcher(),
+            getNodeContentUriUseCase = getNodeContentUriUseCase,
+            getFileTypeInfoByNameUseCase = getFileTypeInfoByNameUseCase,
         )
     }
 
@@ -206,5 +223,36 @@ class FavouriteFolderViewModelTest {
                 assertTrue(actual is ChildrenNodesLoadState.Success)
                 assertThat(actual.isBackPressedEnable).isTrue()
             }
+        }
+
+    @Test
+    fun `test that getFileTypeInfoByNameUseCase function is invoked and returns as expected`() =
+        runTest {
+            val mockName = "name"
+            val expectedFileTypeInfo = VideoFileTypeInfo("", "", 10.seconds)
+            whenever(getFileTypeInfoByNameUseCase(mockName)).thenReturn(expectedFileTypeInfo)
+            val actual = underTest.getFileTypeInfo(mockName)
+            assertThat(actual is VideoFileTypeInfo).isTrue()
+            verify(getFileTypeInfoByNameUseCase).invoke(mockName)
+        }
+
+    @Test
+    fun `test that getFileTypeInfoByNameUseCase returns null when an exception is thrown`() =
+        runTest {
+            val mockName = "name"
+            whenever(getFileTypeInfoByNameUseCase(mockName)).thenThrow(NullPointerException())
+            val actual = underTest.getFileTypeInfo(mockName)
+            assertThat(actual).isNull()
+        }
+
+    @Test
+    fun `test that GetNodeContentUriUseCase function is invoked and returns as expected`() =
+        runTest {
+            val mockTypedFileNode = mock<TypedFileNode>()
+            val expectedContentUri = NodeContentUri.RemoteContentUri("", false)
+            whenever(getNodeContentUriUseCase(any())).thenReturn(expectedContentUri)
+            val actual = underTest.getNodeContentUri(mockTypedFileNode)
+            assertThat(actual).isEqualTo(expectedContentUri)
+            verify(getNodeContentUriUseCase).invoke(mockTypedFileNode)
         }
 }

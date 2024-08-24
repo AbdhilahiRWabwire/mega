@@ -56,7 +56,7 @@ import mega.privacy.android.app.presentation.meeting.model.WaitingRoomManagement
 import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.chat.ChatParticipant
 import mega.privacy.android.domain.entity.contacts.ContactData
-import mega.privacy.android.domain.entity.meeting.CallType
+import mega.privacy.android.domain.entity.call.CallType
 import mega.privacy.android.domain.entity.meeting.ParticipantsSection
 import mega.privacy.android.legacy.core.ui.controls.chips.CallTextButtonChip
 import mega.privacy.android.shared.original.core.ui.controls.buttons.RaisedDefaultMegaButton
@@ -69,6 +69,7 @@ import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_200_gr
 import mega.privacy.android.shared.original.core.ui.theme.extensions.teal_300_teal_200
 import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorPrimary
 import mega.privacy.android.shared.original.core.ui.utils.isScreenOrientationLandscape
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import mega.privacy.mobile.analytics.event.ScheduledMeetingShareMeetingLinkButtonEvent
 
 /**
@@ -166,9 +167,8 @@ fun BottomPanelView(
     ) {
         if (!uiState.handRaisedSnackbarMsg.equals(consumed) && uiState.isBottomPanelExpanded) {
             coroutineScope.launch {
-                val result = snackbarHostState.showSnackbar(
+                val result = snackbarHostState.showAutoDurationSnackbar(
                     message = it,
-                    duration = SnackbarDuration.Short
                 )
 
                 if (result == SnackbarResult.Dismissed) {

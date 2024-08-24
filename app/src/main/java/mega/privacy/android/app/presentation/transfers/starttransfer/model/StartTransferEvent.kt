@@ -1,6 +1,5 @@
 package mega.privacy.android.app.presentation.transfers.starttransfer.model
 
-import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import mega.privacy.android.app.R
 
@@ -50,23 +49,6 @@ sealed interface StartTransferEvent {
     data object PausedTransfers : StartTransferEvent
 
     /**
-     * User needs to confirm large download
-     * @param sizeString: the size of the download
-     * @param transferTriggerEvent: the event to start again the download if confirmed
-     */
-    data class ConfirmLargeDownload(
-        val sizeString: String,
-        val transferTriggerEvent: TransferTriggerEvent.DownloadTriggerEvent,
-    ) : StartTransferEvent
-
-    /**
-     * Depending on Android version and user settings, download destination should be asked for each new download
-     * @param originalEvent original [TransferTriggerEvent.StartDownloadNode] event that triggered this event
-     */
-    data class AskDestination(val originalEvent: TransferTriggerEvent) :
-        StartTransferEvent
-
-    /**
      * A message should be shown
      * @param message the [StringRes] of the message to be shown
      * @param action the [StringRes] of the action, if any
@@ -102,11 +84,6 @@ sealed interface StartTransferEvent {
         data object TransferCancelled : Message(R.string.transfers_cancelled, null, null)
 
         /**
-         * Save offline has finished
-         */
-        data object FinishOffline : Message(R.string.file_available_offline, null, null)
-
-        /**
          * Copy uri has finished
          */
         data object FinishCopyUri : Message(R.string.copy_already_downloaded, null, null)
@@ -114,47 +91,18 @@ sealed interface StartTransferEvent {
         /**
          * Text file upload has finished
          *
-         * @property isSuccess True if the upload finished with success, false otherwise.
          * @property isEditMode True if the file is uploaded in edit mode, false otherwise.
          * @property isCloudFile True if the file is uploaded from home page, false otherwise.
          */
-        data class FinishTextFileUpload(
-            val isSuccess: Boolean,
+        data class FailedTextFileUpload(
             val isEditMode: Boolean,
             val isCloudFile: Boolean,
         ) : Message(
             when {
-                isSuccess && isEditMode -> R.string.file_updated
                 isEditMode -> R.string.file_update_failed
-                isSuccess && isCloudFile -> R.string.text_editor_creation_success
                 isCloudFile -> R.string.text_editor_creation_error
-                isSuccess -> R.string.file_created
                 else -> R.string.file_creation_failed
             }, null, null
         )
-    }
-
-    /**
-     * A message should be shown with plural resource
-     * @param message the [PluralsRes] of the message to be shown
-     * @param quantity
-     */
-    sealed class MessagePlural(
-        @PluralsRes val message: Int,
-        val quantity: Int,
-    ) : StartTransferEvent {
-        /**
-         * Save to device has finished
-         * @param totalNodes
-         */
-        data class FinishDownloading(val totalNodes: Int) :
-            MessagePlural(R.plurals.download_complete, totalNodes)
-
-        /**
-         * Upload has finished
-         * @param totalFiles
-         */
-        data class FinishUploading(val totalFiles: Int) :
-            MessagePlural(R.plurals.upload_finish, totalFiles)
     }
 }

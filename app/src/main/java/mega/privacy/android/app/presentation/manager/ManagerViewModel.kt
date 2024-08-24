@@ -40,12 +40,12 @@ import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.app.utils.livedata.SingleLiveEvent
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRestartMode
-import mega.privacy.android.domain.entity.chat.ChatCall
+import mega.privacy.android.domain.entity.call.ChatCall
 import mega.privacy.android.domain.entity.contacts.ContactRequest
 import mega.privacy.android.domain.entity.contacts.ContactRequestStatus
 import mega.privacy.android.domain.entity.environment.DevicePowerConnectionState
-import mega.privacy.android.domain.entity.meeting.ChatCallStatus
-import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
+import mega.privacy.android.domain.entity.call.ChatCallStatus
+import mega.privacy.android.domain.entity.call.ChatCallTermCodeType
 import mega.privacy.android.domain.entity.meeting.ScheduledMeetingStatus
 import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.FolderNode
@@ -82,11 +82,11 @@ import mega.privacy.android.domain.usecase.contact.SaveContactByEmailUseCase
 import mega.privacy.android.domain.usecase.environment.MonitorDevicePowerConnectionStateUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.login.MonitorFinishActivityUseCase
-import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
+import mega.privacy.android.domain.usecase.call.AnswerChatCallUseCase
+import mega.privacy.android.domain.usecase.call.GetChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
-import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
+import mega.privacy.android.domain.usecase.call.HangChatCallUseCase
+import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChatUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorUpgradeDialogClosedUseCase
@@ -118,7 +118,6 @@ import mega.privacy.android.domain.usecase.workers.StartCameraUploadUseCase
 import mega.privacy.android.domain.usecase.workers.StopCameraUploadsUseCase
 import mega.privacy.android.feature.sync.domain.usecase.sync.MonitorSyncStalledIssuesUseCase
 import mega.privacy.android.feature.sync.domain.usecase.sync.MonitorSyncsUseCase
-import mega.privacy.android.shared.sync.featuretoggle.SyncABTestFeatures
 import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
@@ -170,7 +169,7 @@ import javax.inject.Inject
  * @property dismissPsaUseCase Use case for dismissing PSA.
  * @property getRootNodeUseCase Use case for getting the root node.
  * @property getChatLinkContentUseCase Use case for getting the content of a chat link.
- * @property getScheduledMeetingByChat Use case for getting a scheduled meeting by chat.
+ * @property getScheduledMeetingByChatUseCase Use case for getting a scheduled meeting by chat.
  * @property getChatCallUseCase Use case for getting a chat call.
  * @property startMeetingInWaitingRoomChatUseCase Use case for starting a meeting in waiting room chat.
  * @property answerChatCallUseCase Use case for answering a chat call.
@@ -240,7 +239,7 @@ class ManagerViewModel @Inject constructor(
     private val dismissPsaUseCase: DismissPsaUseCase,
     private val getRootNodeUseCase: GetRootNodeUseCase,
     private val getChatLinkContentUseCase: GetChatLinkContentUseCase,
-    private val getScheduledMeetingByChat: GetScheduledMeetingByChat,
+    private val getScheduledMeetingByChatUseCase: GetScheduledMeetingByChatUseCase,
     private val getChatCallUseCase: GetChatCallUseCase,
     private val startMeetingInWaitingRoomChatUseCase: StartMeetingInWaitingRoomChatUseCase,
     private val answerChatCallUseCase: AnswerChatCallUseCase,
@@ -484,18 +483,12 @@ class ManagerViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            val androidSyncEnabled =
-                getFeatureFlagValueUseCase(SyncABTestFeatures.asyc)
-
-            if (androidSyncEnabled) {
-                monitorSyncsUseCase().catch { Timber.e(it) }.collect { syncFolders ->
-                    val isServiceEnabled = syncFolders.isNotEmpty()
-                    _state.update {
-                        it.copy(
-                            androidSyncServiceEnabled = isServiceEnabled,
-                            isSyncFeatureFlagEnabled = true
-                        )
-                    }
+            monitorSyncsUseCase().catch { Timber.e(it) }.collect { syncFolders ->
+                val isServiceEnabled = syncFolders.isNotEmpty()
+                _state.update {
+                    it.copy(
+                        androidSyncServiceEnabled = isServiceEnabled,
+                    )
                 }
             }
         }
@@ -526,9 +519,7 @@ class ManagerViewModel @Inject constructor(
                 )
             }.collect { state ->
                 Timber.d("The Device Power Connection State is $state")
-                if (state == DevicePowerConnectionState.Connected &&
-                    getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)
-                ) {
+                if (state == DevicePowerConnectionState.Connected) {
                     startCameraUploadUseCase()
                 }
             }
@@ -895,7 +886,7 @@ class ManagerViewModel @Inject constructor(
                     NodeNameCollisionType.RESTORE
                 )
             }.onSuccess { result ->
-                _state.update { it.copy(nodeNameCollisionResult = result) }
+                _state.update { it.copy(nodeNameCollisionsResult = result) }
             }.onFailure {
                 Timber.e(it)
             }
@@ -920,7 +911,7 @@ class ManagerViewModel @Inject constructor(
                     type
                 )
             }.onSuccess { result ->
-                _state.update { it.copy(nodeNameCollisionResult = result) }
+                _state.update { it.copy(nodeNameCollisionsResult = result) }
             }.onFailure {
                 Timber.e(it)
             }
@@ -968,7 +959,7 @@ class ManagerViewModel @Inject constructor(
      *
      */
     fun markHandleNodeNameCollisionResult() {
-        _state.update { it.copy(nodeNameCollisionResult = null) }
+        _state.update { it.copy(nodeNameCollisionsResult = null) }
     }
 
     private fun updateContactRequests(requests: List<ContactRequest>) {
@@ -1198,7 +1189,7 @@ class ManagerViewModel @Inject constructor(
                 }
                 if (scheduledMeetingStatus is ScheduledMeetingStatus.NotStarted) {
                     runCatching {
-                        getScheduledMeetingByChat(chatId)
+                        getScheduledMeetingByChatUseCase(chatId)
                     }.onSuccess { scheduledMeetingList ->
                         scheduledMeetingList?.first()?.schedId?.let { schedId ->
                             startSchedMeetingWithWaitingRoom(

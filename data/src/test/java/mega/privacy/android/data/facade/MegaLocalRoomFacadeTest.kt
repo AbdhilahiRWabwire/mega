@@ -15,11 +15,14 @@ import mega.privacy.android.data.database.dao.CompletedTransferDao
 import mega.privacy.android.data.database.dao.ContactDao
 import mega.privacy.android.data.database.dao.OfflineDao
 import mega.privacy.android.data.database.dao.SdTransferDao
+import mega.privacy.android.data.database.entity.ActiveTransferEntity
 import mega.privacy.android.data.database.entity.BackupEntity
 import mega.privacy.android.data.database.entity.CameraUploadsRecordEntity
 import mega.privacy.android.data.database.entity.ChatPendingChangesEntity
 import mega.privacy.android.data.database.entity.CompletedTransferEntity
+import mega.privacy.android.data.database.entity.CompletedTransferEntityLegacy
 import mega.privacy.android.data.database.entity.SdTransferEntity
+import mega.privacy.android.data.facade.MegaLocalRoomFacade.Companion.MAX_INSERT_LIST_SIZE
 import mega.privacy.android.data.mapper.backup.BackupEntityMapper
 import mega.privacy.android.data.mapper.backup.BackupInfoTypeIntMapper
 import mega.privacy.android.data.mapper.backup.BackupModelMapper
@@ -33,6 +36,7 @@ import mega.privacy.android.data.mapper.offline.OfflineEntityMapper
 import mega.privacy.android.data.mapper.offline.OfflineModelMapper
 import mega.privacy.android.data.mapper.transfer.active.ActiveTransferEntityMapper
 import mega.privacy.android.data.mapper.transfer.completed.CompletedTransferEntityMapper
+import mega.privacy.android.data.mapper.transfer.completed.CompletedTransferLegacyModelMapper
 import mega.privacy.android.data.mapper.transfer.completed.CompletedTransferModelMapper
 import mega.privacy.android.data.mapper.transfer.sd.SdTransferEntityMapper
 import mega.privacy.android.data.mapper.transfer.sd.SdTransferModelMapper
@@ -45,12 +49,17 @@ import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRecord
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRecordUploadStatus
 import mega.privacy.android.domain.entity.chat.ChatPendingChanges
 import mega.privacy.android.domain.entity.transfer.CompletedTransfer
+import mega.privacy.android.domain.entity.transfer.Transfer
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import org.mockito.kotlin.any
+import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -86,6 +95,7 @@ internal class MegaLocalRoomFacadeTest {
     private val chatPendingChangesDao: ChatPendingChangesDao = mock()
     private val chatRoomPendingChangesEntityMapper: ChatRoomPendingChangesEntityMapper = mock()
     private val chatRoomPendingChangesModelMapper: ChatRoomPendingChangesModelMapper = mock()
+    private val completedTransferLegacyModelMapper = mock<CompletedTransferLegacyModelMapper>()
 
     @BeforeAll
     fun setUp() {
@@ -100,6 +110,7 @@ internal class MegaLocalRoomFacadeTest {
             encryptData = encryptData,
             decryptData = decryptData,
             completedTransferEntityMapper = completedTransferEntityMapper,
+            completedTransferLegacyModelMapper = completedTransferLegacyModelMapper,
             sdTransferDao = sdTransferDao,
             sdTransferEntityMapper = sdTransferEntityMapper,
             sdTransferModelMapper = sdTransferModelMapper,
@@ -140,6 +151,7 @@ internal class MegaLocalRoomFacadeTest {
             chatPendingChangesDao,
             chatRoomPendingChangesEntityMapper,
             chatRoomPendingChangesModelMapper,
+            completedTransferLegacyModelMapper,
         )
     }
 
@@ -166,7 +178,7 @@ internal class MegaLocalRoomFacadeTest {
             val expected =
                 listOf(completedTransfers[1], completedTransfers[0], completedTransfers[2])
 
-            assertThat(underTest.getAllCompletedTransfers().single()).isEqualTo(expected)
+            assertThat(underTest.getCompletedTransfers().single()).isEqualTo(expected)
         }
 
 
@@ -188,7 +200,7 @@ internal class MegaLocalRoomFacadeTest {
                 whenever(completedTransferModelMapper(entity)).thenReturn(completedTransfer)
             }
 
-            assertThat(underTest.getAllCompletedTransfers(expectedSize).single().size)
+            assertThat(underTest.getCompletedTransfers(expectedSize).single().size)
                 .isEqualTo(expectedSize)
         }
 
@@ -209,7 +221,7 @@ internal class MegaLocalRoomFacadeTest {
                 whenever(completedTransferModelMapper(entity)).thenReturn(completedTransfer)
             }
 
-            assertThat(underTest.getAllCompletedTransfers().single().size)
+            assertThat(underTest.getCompletedTransfers().single().size)
                 .isEqualTo(completedTransferEntities.size)
         }
 
@@ -396,16 +408,16 @@ internal class MegaLocalRoomFacadeTest {
                 CompletedTransferEntity(
                     id = id,
                     fileName = "2023-03-24 00.13.20_1.jpg",
-                    type = "1",
-                    state = "6",
+                    type = 1,
+                    state = 6,
                     size = "3.57 MB",
-                    handle = "27169983390750",
+                    handle = 27169983390750L,
                     path = "Cloud drive/Camera uploads",
-                    isOffline = "false",
-                    timestamp = System.nanoTime().toString(),
+                    isOffline = false,
+                    timestamp = System.nanoTime(),
                     error = "No error",
                     originalPath = "/data/user/0/mega.privacy.android.app/cache/cu/53132573053997.2023-03-24 00.13.20_1.jpg",
-                    parentHandle = "11622336899311",
+                    parentHandle = 11622336899311L,
                     appData = "appData",
                 )
             }
@@ -413,17 +425,17 @@ internal class MegaLocalRoomFacadeTest {
                 whenever(completedTransferModelMapper(entity)).thenReturn(
                     CompletedTransfer(
                         id = entity.id,
-                        fileName = entity.fileName.orEmpty(),
-                        type = entity.type.orEmpty().toInt(),
-                        state = entity.state.orEmpty().toInt(),
-                        size = entity.size.orEmpty(),
-                        handle = entity.handle.orEmpty().toLong(),
-                        path = entity.path.orEmpty(),
-                        isOffline = entity.isOffline.toBoolean(),
-                        timestamp = entity.timestamp.orEmpty().toLong(),
+                        fileName = entity.fileName,
+                        type = entity.type,
+                        state = entity.state,
+                        size = entity.size,
+                        handle = entity.handle,
+                        path = entity.path,
+                        isOffline = entity.isOffline,
+                        timestamp = entity.timestamp,
                         error = entity.error,
-                        originalPath = entity.originalPath.orEmpty(),
-                        parentHandle = entity.parentHandle.orEmpty().toLong(),
+                        originalPath = entity.originalPath,
+                        parentHandle = entity.parentHandle,
                         appData = entity.appData,
                     )
                 )
@@ -435,7 +447,7 @@ internal class MegaLocalRoomFacadeTest {
             )
             underTest.deleteOldestCompletedTransfers()
             verify(completedTransferDao).deleteCompletedTransferByIds(deletedTransfers.mapNotNull { it.id }
-                .sortedDescending())
+                .sortedDescending(), MAX_INSERT_LIST_SIZE)
         }
 
     @Test
@@ -585,4 +597,109 @@ internal class MegaLocalRoomFacadeTest {
 
         assertThat(actual).isEqualTo(expected)
     }
+
+    @Test
+    fun `test that addCompletedTransfers insert the mapped entities`() = runTest {
+        val completedTransfers = (0..10).map {
+            mock<CompletedTransfer>()
+        }
+        val roomEntitiesMap = completedTransfers.associateWith { mock<CompletedTransferEntity>() }
+        completedTransfers.forEach {
+            whenever(completedTransferEntityMapper(it)) doReturn roomEntitiesMap.getValue(it)
+        }
+        val expected = roomEntitiesMap.values.toList()
+
+        underTest.addCompletedTransfers(completedTransfers)
+
+        verify(completedTransferDao).insertOrUpdateCompletedTransfers(
+            expected,
+            MAX_INSERT_LIST_SIZE
+        )
+    }
+
+    @Test
+    fun `test that insertOrUpdateActiveTransfers insert the mapped entities`() = runTest {
+        val activeTransfers = (0..10).map {
+            mock<Transfer>()
+        }
+        val roomEntitiesMap = activeTransfers.associateWith { mock<ActiveTransferEntity>() }
+        activeTransfers.forEach {
+            whenever(activeTransferEntityMapper(it)) doReturn roomEntitiesMap.getValue(it)
+        }
+        val expected = roomEntitiesMap.values.toList()
+
+        underTest.insertOrUpdateActiveTransfers(activeTransfers)
+
+        verify(activeTransferDao).insertOrUpdateActiveTransfers(expected, MAX_INSERT_LIST_SIZE)
+    }
+
+    @Test
+    fun `test that migrateLegacyCompletedTransfers get legacy transfers from legacy table and inserts the mapped entities to new table`() =
+        runTest {
+            val expected = mutableListOf<CompletedTransferEntity>()
+            val legacyTransfers = (0..10).map {
+                mock<CompletedTransferEntityLegacy>()
+            }
+            whenever(completedTransferDao.getAllLegacyCompletedTransfers()) doReturn legacyTransfers
+            whenever(completedTransferLegacyModelMapper(any())) doReturn mock()
+            whenever(completedTransferEntityMapper(any())) doAnswer {
+                mock<CompletedTransferEntity>().also { expected.add(it) }
+            }
+
+            underTest.migrateLegacyCompletedTransfers()
+
+            assertThat(expected).hasSize(legacyTransfers.size)
+            verify(completedTransferDao).insertOrUpdateCompletedTransfers(eq(expected), any())
+        }
+
+    @Test
+    fun `test that migrateLegacyCompletedTransfers migrates first 100 entities when there are more than 100 legacy entities`() =
+        runTest {
+            val expected = mutableListOf<CompletedTransferEntity>()
+            val legacyTransfers = (0..200).map {
+                mock<CompletedTransferEntityLegacy>()
+            }
+            whenever(completedTransferDao.getAllLegacyCompletedTransfers()) doReturn legacyTransfers
+            whenever(completedTransferLegacyModelMapper(any())) doReturn mock()
+            whenever(completedTransferEntityMapper(any())) doAnswer {
+                mock<CompletedTransferEntity> {
+                    on { it.timestamp } doReturn expected.size.toLong()
+                }.also { expected.add(it) }
+            }
+
+            underTest.migrateLegacyCompletedTransfers()
+
+            assertThat(expected).hasSize(100)
+            verify(completedTransferDao).insertOrUpdateCompletedTransfers(
+                eq(expected),
+                any()
+            )
+        }
+
+    @Test
+    fun `test that deleteAllLegacyCompletedTransfers is invoked when migrateLegacyCompletedTransfers is invoked and there are legacy entities`() =
+        runTest {
+            val legacyTransfers = (0..10).map {
+                mock<CompletedTransferEntityLegacy>()
+            }
+            whenever(completedTransferDao.getAllLegacyCompletedTransfers()) doReturn legacyTransfers
+            whenever(completedTransferLegacyModelMapper(any())) doReturn mock()
+            whenever(completedTransferEntityMapper(any())) doReturn mock()
+
+            underTest.migrateLegacyCompletedTransfers()
+
+            verify(completedTransferDao).deleteAllLegacyCompletedTransfers()
+        }
+
+    @Test
+    fun `test that deleteAllLegacyCompletedTransfers is not invoked when migrateLegacyCompletedTransfers is invoked and there are no legacy entities`() =
+        runTest {
+            whenever(completedTransferDao.getAllLegacyCompletedTransfers()) doReturn emptyList()
+            whenever(completedTransferLegacyModelMapper(any())) doReturn mock()
+            whenever(completedTransferEntityMapper(any())) doReturn mock()
+
+            underTest.migrateLegacyCompletedTransfers()
+
+            verify(completedTransferDao, never()).deleteAllLegacyCompletedTransfers()
+        }
 }

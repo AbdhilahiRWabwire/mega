@@ -24,7 +24,9 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.MethodSource
 import org.mockito.kotlin.KStubbing
+import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.verify
@@ -121,38 +123,6 @@ class HandleTransferEventUseCaseTest {
         }
 
     @Test
-    fun `test that upload sync transfer does not invoke repository nor GetTransferDestinationUriUseCase when event is TransferFinishEvent`() =
-        runTest {
-            val transfer = mock<Transfer> {
-                on { this.transferType } doReturn TransferType.GENERAL_UPLOAD
-                on { this.isSyncTransfer } doReturn true
-            }
-            val transferEvent = mock<TransferEvent.TransferFinishEvent> {
-                on { this.transfer }.thenReturn(transfer)
-            }
-
-            underTest.invoke(transferEvent)
-            verifyNoInteractions(getTransferDestinationUriUseCase)
-            verifyNoInteractions(transferRepository)
-        }
-
-    @Test
-    fun `test that download sync transfer does not invoke repository nor GetTransferDestinationUriUseCase when event is TransferFinishEvent`() =
-        runTest {
-            val transfer = mock<Transfer> {
-                on { this.transferType } doReturn TransferType.DOWNLOAD
-                on { this.isSyncTransfer } doReturn true
-            }
-            val transferEvent = mock<TransferEvent.TransferFinishEvent> {
-                on { this.transfer }.thenReturn(transfer)
-            }
-
-            underTest.invoke(transferEvent)
-            verifyNoInteractions(getTransferDestinationUriUseCase)
-            verifyNoInteractions(transferRepository)
-        }
-
-    @Test
     fun `test that backups transfer does not invoke repository nor GetTransferDestinationUriUseCase when event is TransferFinishEvent`() =
         runTest {
             val transfer = mock<Transfer> {
@@ -170,12 +140,44 @@ class HandleTransferEventUseCaseTest {
 
     @ParameterizedTest
     @MethodSource("provideStartPauseFinishEvents")
-    fun `test that invoke call insertOrUpdateActiveTransfer with the related transfer when the event is a start, pause, or finish event`(
+    fun `test that invoke call insertOrUpdateActiveTransfers with the related transfer when the event is a start, pause, or finish event`(
         transferEvent: TransferEvent,
     ) = runTest {
         underTest.invoke(transferEvent)
-        verify(transferRepository).insertOrUpdateActiveTransfer(transferEvent.transfer)
+        verify(transferRepository).insertOrUpdateActiveTransfers(eq(listOf(transferEvent.transfer)))
     }
+
+    @Test
+    fun `test that invoke call insertOrUpdateActiveTransfers with the last event of each transfer when multiple events are send`() =
+        runTest {
+            val events1 = listOf(
+                mockTransferEvent<TransferEvent.TransferStartEvent>(TransferType.DOWNLOAD, 1),
+                mockTransferEvent<TransferEvent.TransferPaused>(TransferType.DOWNLOAD, 1),
+                mockTransferEvent<TransferEvent.TransferFinishEvent>(TransferType.DOWNLOAD, 1),
+            )
+            val events2 = listOf(
+                mockTransferEvent<TransferEvent.TransferStartEvent>(TransferType.DOWNLOAD, 2),
+                mockTransferEvent<TransferEvent.TransferPaused>(TransferType.DOWNLOAD, 2) {
+                    on { paused } doReturn true
+                },
+                mockTransferEvent<TransferEvent.TransferPaused>(TransferType.DOWNLOAD, 2) {
+                    on { paused } doReturn false
+                },
+            )
+            val events3 = listOf(
+                mockTransferEvent<TransferEvent.TransferFinishEvent>(TransferType.DOWNLOAD, 3),
+            )
+            underTest.invoke(events = (events1 + events2 + events3).toTypedArray())
+            verify(transferRepository).insertOrUpdateActiveTransfers(
+                eq(
+                    listOf(
+                        events1.last().transfer,
+                        events2.last().transfer,
+                        events3.last().transfer,
+                    )
+                )
+            )
+        }
 
     @ParameterizedTest
     @MethodSource("provideUpdateFinishEvents")
@@ -292,12 +294,30 @@ class HandleTransferEventUseCaseTest {
 
     @ParameterizedTest
     @MethodSource("provideFinishEvents")
-    fun `test that invoke call addCompletedTransfer when the event is a finish event`(
+    fun `test that invoke call addCompletedTransfers when the event is a finish event`(
         transferEvent: TransferEvent.TransferFinishEvent,
     ) = runTest {
+        val destinationUriAndSubFolders = DestinationUriAndSubFolders("folder/file")
+        whenever(getTransferDestinationUriUseCase(transferEvent.transfer)) doReturn destinationUriAndSubFolders
+
         underTest.invoke(transferEvent)
-        verify(transferRepository).addCompletedTransfer(transferEvent.transfer, transferEvent.error)
+        verify(transferRepository).addCompletedTransfers(eq(mapOf(transferEvent to destinationUriAndSubFolders.toString())))
     }
+
+    @Test
+    fun `test that invoke call addCompletedTransfers with all events when multiple events are send`() =
+        runTest {
+            val destinationUriAndSubFolders = DestinationUriAndSubFolders("folder/file")
+            whenever(getTransferDestinationUriUseCase(any())) doReturn destinationUriAndSubFolders
+            val events = listOf(
+                mockTransferEvent<TransferEvent.TransferFinishEvent>(TransferType.DOWNLOAD, 1),
+                mockTransferEvent<TransferEvent.TransferFinishEvent>(TransferType.DOWNLOAD, 2),
+                mockTransferEvent<TransferEvent.TransferFinishEvent>(TransferType.DOWNLOAD, 3),
+            )
+            val expected = events.associateWith { destinationUriAndSubFolders.toString() }
+            underTest.invoke(events = events.toTypedArray())
+            verify(transferRepository).addCompletedTransfers(eq(expected))
+        }
 
     @ParameterizedTest
     @MethodSource("provideStartFinishEvents")
@@ -321,6 +341,47 @@ class HandleTransferEventUseCaseTest {
         verify(handleAvailableOfflineEventUseCase).invoke(transferEvent)
     }
 
+    @ParameterizedTest
+    @MethodSource("provideStartPauseUpdateEvents")
+    fun `test that updateInProgressTransfers in repository is invoked when start, pause or update event is received`(
+        transferEvent: TransferEvent,
+    ) = runTest {
+        underTest(transferEvent)
+        verify(transferRepository).updateInProgressTransfers(eq(listOf(transferEvent.transfer)))
+    }
+
+    @Test
+    fun `test that invoke calls updateInProgressTransfers with the last event of each transfer when multiple events are send`() =
+        runTest {
+            val events1 = listOf(
+                mockTransferEvent<TransferEvent.TransferStartEvent>(TransferType.DOWNLOAD, 1),
+                mockTransferEvent<TransferEvent.TransferPaused>(TransferType.DOWNLOAD, 1),
+                mockTransferEvent<TransferEvent.TransferUpdateEvent>(TransferType.DOWNLOAD, 1),
+            )
+            val events2 = listOf(
+                mockTransferEvent<TransferEvent.TransferStartEvent>(TransferType.DOWNLOAD, 2),
+                mockTransferEvent<TransferEvent.TransferPaused>(TransferType.DOWNLOAD, 2) {
+                    on { paused } doReturn true
+                },
+                mockTransferEvent<TransferEvent.TransferPaused>(TransferType.DOWNLOAD, 2) {
+                    on { paused } doReturn false
+                },
+            )
+            val events3 = listOf(
+                mockTransferEvent<TransferEvent.TransferUpdateEvent>(TransferType.DOWNLOAD, 3),
+            )
+            underTest.invoke(events = (events1 + events2 + events3).toTypedArray())
+            verify(transferRepository).updateInProgressTransfers(
+                eq(
+                    listOf(
+                        events1.last().transfer,
+                        events2.last().transfer,
+                        events3.last().transfer,
+                    )
+                )
+            )
+        }
+
     private fun provideStartPauseFinishEvents() =
         provideTransferEvents<TransferEvent.TransferStartEvent>() +
                 provideTransferEvents<TransferEvent.TransferPaused>() +
@@ -343,15 +404,32 @@ class HandleTransferEventUseCaseTest {
         provideTransferEvents<TransferEvent.TransferStartEvent>() +
                 provideTransferEvents<TransferEvent.TransferFinishEvent>()
 
+    private fun provideStartPauseUpdateEvents() =
+        provideTransferEvents<TransferEvent.TransferStartEvent>() +
+                provideTransferEvents<TransferEvent.TransferPaused>() +
+                provideTransferEvents<TransferEvent.TransferUpdateEvent>()
 
-    private inline fun <reified T : TransferEvent> provideTransferEvents(stubbing: KStubbing<T>.(T) -> Unit = {}) =
+
+    private inline fun <reified T : TransferEvent> provideTransferEvents(
+        transferTag: Int = 0,
+        stubbing: KStubbing<T>.(T) -> Unit = {},
+    ) =
         TransferType.entries.map { transferType ->
-            val transfer = mock<Transfer> {
-                on { this.transferType }.thenReturn(transferType)
-            }
-            mock<T> {
-                on { this.transfer }.thenReturn(transfer)
-                stubbing(it)
-            }
+            mockTransferEvent(transferType, transferTag, stubbing)
         }
+
+    private inline fun <reified T : TransferEvent> mockTransferEvent(
+        transferType: TransferType,
+        transferTag: Int = 0,
+        stubbing: KStubbing<T>.(T) -> Unit = {},
+    ): T {
+        val transfer = mock<Transfer> {
+            on { this.transferType }.thenReturn(transferType)
+            on { this.tag }.thenReturn(transferTag)
+        }
+        return mock<T> {
+            on { this.transfer }.thenReturn(transfer)
+            stubbing(it)
+        }
+    }
 }

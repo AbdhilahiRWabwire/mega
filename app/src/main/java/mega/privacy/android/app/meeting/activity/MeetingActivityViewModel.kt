@@ -15,11 +15,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.palm.composestateevents.consumed
 import de.palm.composestateevents.triggered
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
-import io.reactivex.rxjava3.disposables.CompositeDisposable
-import io.reactivex.rxjava3.kotlin.addTo
-import io.reactivex.rxjava3.kotlin.subscribeBy
-import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,9 +31,7 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
-import mega.privacy.android.app.constants.EventConstants
 import mega.privacy.android.app.constants.EventConstants.EVENT_AUDIO_OUTPUT_CHANGE
-import mega.privacy.android.app.constants.EventConstants.EVENT_MEETING_CREATED
 import mega.privacy.android.app.extensions.updateItemAt
 import mega.privacy.android.app.featuretoggle.ApiFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
@@ -50,6 +43,7 @@ import mega.privacy.android.app.main.megachat.AppRTCAudioManager
 import mega.privacy.android.app.meeting.adapter.Participant
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
 import mega.privacy.android.app.meeting.listeners.IndividualCallVideoListener
+import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.chat.model.AnswerCallResult
 import mega.privacy.android.app.presentation.contactinfo.model.ContactInfoUiState
 import mega.privacy.android.app.presentation.extensions.getState
@@ -57,11 +51,9 @@ import mega.privacy.android.app.presentation.mapper.GetPluralStringFromStringRes
 import mega.privacy.android.app.presentation.mapper.GetStringFromStringResMapper
 import mega.privacy.android.app.presentation.meeting.mapper.ChatParticipantMapper
 import mega.privacy.android.app.presentation.meeting.model.MeetingState
-import mega.privacy.android.app.usecase.call.GetCallUseCase
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.ChatUtil.amIParticipatingInAChat
-import mega.privacy.android.app.utils.ChatUtil.getTitleChat
 import mega.privacy.android.app.utils.Constants.AUDIO_MANAGER_CREATING_JOINING_MEETING
 import mega.privacy.android.app.utils.Constants.REQUEST_ADD_PARTICIPANTS
 import mega.privacy.android.app.utils.RunOnUIThreadUtils.runDelay
@@ -70,30 +62,41 @@ import mega.privacy.android.data.gateway.DeviceGateway
 import mega.privacy.android.domain.entity.ChatRequestParamType
 import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.StorageState
-import mega.privacy.android.domain.entity.chat.ChatCall
+import mega.privacy.android.domain.entity.call.CallType
+import mega.privacy.android.domain.entity.call.ChatCall
+import mega.privacy.android.domain.entity.call.ChatCallChanges
+import mega.privacy.android.domain.entity.call.ChatCallStatus
+import mega.privacy.android.domain.entity.call.ChatCallTermCodeType
+import mega.privacy.android.domain.entity.call.ChatSessionChanges
 import mega.privacy.android.domain.entity.chat.ChatParticipant
 import mega.privacy.android.domain.entity.chat.ChatRoomChange
 import mega.privacy.android.domain.entity.chat.ScheduledMeetingChanges
 import mega.privacy.android.domain.entity.contacts.InviteContactRequest
-import mega.privacy.android.domain.entity.meeting.CallType
-import mega.privacy.android.domain.entity.meeting.ChatCallChanges
-import mega.privacy.android.domain.entity.meeting.ChatCallStatus
-import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
-import mega.privacy.android.domain.entity.meeting.ChatSessionChanges
 import mega.privacy.android.domain.entity.meeting.MeetingParticipantNotInCallStatus
 import mega.privacy.android.domain.entity.meeting.ParticipantsSection
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.usecase.CheckChatLinkUseCase
-import mega.privacy.android.domain.usecase.CreateChatLink
 import mega.privacy.android.domain.usecase.GetChatParticipants
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.MonitorUserUpdates
-import mega.privacy.android.domain.usecase.QueryChatLink
+import mega.privacy.android.domain.usecase.QueryChatLinkUseCase
 import mega.privacy.android.domain.usecase.RemoveFromChat
-import mega.privacy.android.domain.usecase.SetOpenInvite
+import mega.privacy.android.domain.usecase.SetOpenInviteWithChatIdUseCase
 import mega.privacy.android.domain.usecase.account.GetCurrentSubscriptionPlanUseCase
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
+import mega.privacy.android.domain.usecase.call.AllowUsersJoinCallUseCase
+import mega.privacy.android.domain.usecase.call.AnswerChatCallUseCase
+import mega.privacy.android.domain.usecase.call.BroadcastCallEndedUseCase
+import mega.privacy.android.domain.usecase.meeting.BroadcastCallScreenOpenedUseCase
+import mega.privacy.android.domain.usecase.call.CreateMeetingUseCase
+import mega.privacy.android.domain.usecase.call.GetCallIdsOfOthersCallsUseCase
+import mega.privacy.android.domain.usecase.call.GetChatCallUseCase
+import mega.privacy.android.domain.usecase.call.HangChatCallUseCase
+import mega.privacy.android.domain.usecase.call.MonitorCallEndedUseCase
+import mega.privacy.android.domain.usecase.call.RingIndividualInACallUseCase
+import mega.privacy.android.domain.usecase.call.StartCallUseCase
+import mega.privacy.android.domain.usecase.chat.CreateChatLinkUseCase
 import mega.privacy.android.domain.usecase.chat.IsEphemeralPlusPlusUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatRoomUpdatesUseCase
 import mega.privacy.android.domain.usecase.chat.StartConversationUseCase
@@ -104,21 +107,14 @@ import mega.privacy.android.domain.usecase.contact.InviteContactWithHandleUseCas
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.login.LogoutUseCase
 import mega.privacy.android.domain.usecase.login.MonitorFinishActivityUseCase
-import mega.privacy.android.domain.usecase.meeting.AllowUsersJoinCallUseCase
-import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.BroadcastCallEndedUseCase
 import mega.privacy.android.domain.usecase.meeting.EnableOrDisableAudioUseCase
 import mega.privacy.android.domain.usecase.meeting.EnableOrDisableVideoUseCase
-import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
-import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.MonitorCallEndedUseCase
+import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChatUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorScheduledMeetingUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MuteAllPeersUseCase
 import mega.privacy.android.domain.usecase.meeting.MutePeersUseCase
-import mega.privacy.android.domain.usecase.meeting.RingIndividualInACallUseCase
 import mega.privacy.android.domain.usecase.meeting.StartVideoDeviceUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
@@ -139,7 +135,6 @@ import javax.inject.Inject
  *
  * @property meetingActivityRepository                      [MeetingActivityRepository]
  * @property answerChatCallUseCase                          [AnswerChatCallUseCase]
- * @property getCallUseCase                                 [GetCallUseCase]
  * @property rtcAudioManagerGateway                         [RTCAudioManagerGateway]
  * @property getChatParticipants                            [GetChatParticipants]
  * @property chatManagement                                 [ChatManagement]
@@ -150,12 +145,12 @@ import javax.inject.Inject
  * @property monitorChatCallUpdatesUseCase                  [MonitorChatCallUpdatesUseCase]
  * @property getChatRoomUseCase                             [GetChatRoomUseCase]
  * @property getChatCallUseCase                             [GetChatCallUseCase]
- * @property setOpenInvite                                  [SetOpenInvite]
+ * @property setOpenInviteWithChatIdUseCase                 [SetOpenInviteWithChatIdUseCase]
  * @property chatParticipantMapper                          [ChatParticipantMapper]
  * @property monitorChatRoomUpdatesUseCase                  [MonitorChatRoomUpdatesUseCase]
- * @property queryChatLink                                  [QueryChatLink]
+ * @property queryChatLinkUseCase                           [QueryChatLinkUseCase]
  * @property isEphemeralPlusPlusUseCase                     [IsEphemeralPlusPlusUseCase]
- * @property createChatLink                                 [CreateChatLink]
+ * @property createChatLinkUseCase                          [CreateChatLinkUseCase]
  * @property inviteContactWithHandleUseCase                           [InviteContactWithHandleUseCase]
  * @property updateChatPermissionsUseCase                   [UpdateChatPermissionsUseCase]
  * @property removeFromChaUseCase                           [RemoveFromChat]
@@ -164,6 +159,7 @@ import javax.inject.Inject
  * @property monitorStorageStateEventUseCase                [MonitorStorageStateEventUseCase]
  * @property hangChatCallUseCase                            [HangChatCallUseCase]
  * @property broadcastCallEndedUseCase                      [BroadcastCallEndedUseCase]
+ * @property broadcastCallScreenOpenedUseCase               [BroadcastCallScreenOpenedUseCase]
  * @property monitorScheduledMeetingUpdatesUseCase          [MonitorScheduledMeetingUpdatesUseCase]
  * @property getMyFullNameUseCase                           [GetMyFullNameUseCase]
  * @property deviceGateway                                  [DeviceGateway]
@@ -180,7 +176,7 @@ import javax.inject.Inject
 class MeetingActivityViewModel @Inject constructor(
     private val meetingActivityRepository: MeetingActivityRepository,
     private val answerChatCallUseCase: AnswerChatCallUseCase,
-    private val getCallUseCase: GetCallUseCase,
+    private val getCallIdsOfOthersCallsUseCase: GetCallIdsOfOthersCallsUseCase,
     private val getChatCallUseCase: GetChatCallUseCase,
     private val rtcAudioManagerGateway: RTCAudioManagerGateway,
     private val chatManagement: ChatManagement,
@@ -194,11 +190,11 @@ class MeetingActivityViewModel @Inject constructor(
     private val monitorChatSessionUpdatesUseCase: MonitorChatSessionUpdatesUseCase,
     private val getChatRoomUseCase: GetChatRoomUseCase,
     private val monitorChatRoomUpdatesUseCase: MonitorChatRoomUpdatesUseCase,
-    private val queryChatLink: QueryChatLink,
-    private val setOpenInvite: SetOpenInvite,
+    private val queryChatLinkUseCase: QueryChatLinkUseCase,
+    private val setOpenInviteWithChatIdUseCase: SetOpenInviteWithChatIdUseCase,
     private val chatParticipantMapper: ChatParticipantMapper,
     private val isEphemeralPlusPlusUseCase: IsEphemeralPlusPlusUseCase,
-    private val createChatLink: CreateChatLink,
+    private val createChatLinkUseCase: CreateChatLinkUseCase,
     private val inviteContactWithHandleUseCase: InviteContactWithHandleUseCase,
     private val updateChatPermissionsUseCase: UpdateChatPermissionsUseCase,
     private val removeFromChaUseCase: RemoveFromChat,
@@ -207,7 +203,8 @@ class MeetingActivityViewModel @Inject constructor(
     private val monitorStorageStateEventUseCase: MonitorStorageStateEventUseCase,
     private val hangChatCallUseCase: HangChatCallUseCase,
     private val broadcastCallEndedUseCase: BroadcastCallEndedUseCase,
-    private val getScheduledMeetingByChat: GetScheduledMeetingByChat,
+    private val broadcastCallScreenOpenedUseCase: BroadcastCallScreenOpenedUseCase,
+    private val getScheduledMeetingByChatUseCase: GetScheduledMeetingByChatUseCase,
     private val getMyFullNameUseCase: GetMyFullNameUseCase,
     private val monitorUserUpdates: MonitorUserUpdates,
     private val monitorScheduledMeetingUpdatesUseCase: MonitorScheduledMeetingUpdatesUseCase,
@@ -225,12 +222,12 @@ class MeetingActivityViewModel @Inject constructor(
     private val enableOrDisableVideoUseCase: EnableOrDisableVideoUseCase,
     private val enableOrDisableAudioUseCase: EnableOrDisableAudioUseCase,
     private val monitorCallEndedUseCase: MonitorCallEndedUseCase,
+    private val createMeetingUseCase: CreateMeetingUseCase,
+    private val startCallUseCase: StartCallUseCase,
+    private val passcodeManagement: PasscodeManagement,
     savedStateHandle: SavedStateHandle,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
-
-    private val composite = CompositeDisposable()
-
     private val _state = MutableStateFlow(
         MeetingState(
             chatId = savedStateHandle[MeetingActivity.MEETING_CHAT_ID]
@@ -325,12 +322,6 @@ class MeetingActivityViewModel @Inject constructor(
             }
         }
 
-    private val meetingCreatedObserver =
-        Observer<Long> {
-            updateChatRoomId(it)
-            MegaApplication.isWaitingForCall = true
-        }
-
     /**
      * Set meeting action
      *
@@ -339,16 +330,6 @@ class MeetingActivityViewModel @Inject constructor(
     fun setAction(action: String?) {
         _state.update { it.copy(action = action) }
     }
-
-    /**
-     * Send event that in Meeting fragment is visible or not
-     *
-     * @param isVisible True if the fragment it visible, false otherwise.
-     */
-    fun sendEnterCallEvent(isVisible: Boolean) = LiveEventBus.get(
-        EventConstants.EVENT_ENTER_IN_MEETING,
-        Boolean::class.java
-    ).post(isVisible)
 
     init {
         viewModelScope.launch {
@@ -403,23 +384,6 @@ class MeetingActivityViewModel @Inject constructor(
 
         LiveEventBus.get(EVENT_AUDIO_OUTPUT_CHANGE, AppRTCAudioManager.AudioDevice::class.java)
             .observeForever(audioOutputStateObserver)
-
-        LiveEventBus.get(EVENT_MEETING_CREATED, Long::class.java)
-            .observeForever(meetingCreatedObserver)
-
-        getCallUseCase.getCallEnded()
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy(
-                onNext = { chatIdOfCallEnded ->
-                    if (chatIdOfCallEnded == _state.value.chatId) {
-                        viewModelScope.launch { broadcastCallEndedUseCase(chatIdOfCallEnded) }
-                        finishMeetingActivity()
-                    }
-                },
-                onError = Timber::e
-            )
-            .addTo(composite)
 
         // Show the default avatar (the Alphabet avatar) above all, then load the actual avatar
         showDefaultAvatar().invokeOnCompletion {
@@ -640,7 +604,7 @@ class MeetingActivityViewModel @Inject constructor(
     private fun getScheduledMeeting() =
         viewModelScope.launch {
             runCatching {
-                getScheduledMeetingByChat(state.value.chatId)
+                getScheduledMeetingByChatUseCase(state.value.chatId)
             }.onFailure {
                 Timber.d("Scheduled meeting does not exist")
                 _state.update {
@@ -979,9 +943,16 @@ class MeetingActivityViewModel @Inject constructor(
                                                 )
                                             }
 
-                                            else -> {}
+                                            else -> if (call.status == ChatCallStatus.TerminatingUserParticipation) {
+                                                broadcastCallEndedUseCase(_state.value.chatId)
+                                                finishMeetingActivity()
+                                            }
                                         }
+                                    }
 
+                                    ChatCallStatus.Destroyed -> {
+                                        broadcastCallEndedUseCase(_state.value.chatId)
+                                        finishMeetingActivity()
                                     }
 
                                     else -> {}
@@ -1106,6 +1077,15 @@ class MeetingActivityViewModel @Inject constructor(
     }
 
     /**
+     * Send event that in Meeting fragment is visible or not
+     *
+     * @param isVisible True if the fragment it visible, false otherwise.
+     */
+    fun sendEnterCallEvent(isVisible: Boolean) = viewModelScope.launch {
+        broadcastCallScreenOpenedUseCase(isVisible)
+    }
+
+    /**
      * Get chat session updates
      */
     private fun startMonitorChatSessionUpdates() =
@@ -1163,12 +1143,14 @@ class MeetingActivityViewModel @Inject constructor(
      * @param shouldEndCurrentCall if the current call should be finish
      */
     private fun checkAnotherCalls(shouldEndCurrentCall: Boolean) {
-        val chatId =
-            getCallUseCase.getChatIdOfAnotherCallInProgress(_state.value.chatId).blockingGet()
-        if (chatId != MEGACHAT_INVALID_HANDLE && chatId != _state.value.chatId && _switchCall.value != chatId) {
-            _switchCall.value = chatId
-        } else if (shouldEndCurrentCall) {
-            finishMeetingActivity()
+        viewModelScope.launch {
+            val chatId =
+                runCatching { getCallIdsOfOthersCallsUseCase(_state.value.chatId).first() }.getOrElse { MEGACHAT_INVALID_HANDLE }
+            if (chatId != MEGACHAT_INVALID_HANDLE && chatId != _state.value.chatId && _switchCall.value != chatId) {
+                _switchCall.value = chatId
+            } else if (shouldEndCurrentCall) {
+                finishMeetingActivity()
+            }
         }
     }
 
@@ -1214,6 +1196,93 @@ class MeetingActivityViewModel @Inject constructor(
                         showDefaultAvatar()
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Method to start or create a meeting
+     *
+     * @param title Meeting title
+     * @param video True, if the video should be activated. False, if not
+     * @param audio True, if the audio should be activated. False, if not
+     */
+    fun startOrCreateMeeting(title: String, video: Boolean, audio: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                getChatRoomUseCase(_state.value.chatId)
+            }.onSuccess { chatRoom ->
+                chatRoom?.let { chat ->
+                    Timber.d("The chat exists")
+                    if (CallUtil.isStatusConnected(
+                            MegaApplication.getInstance().applicationContext,
+                            chat.chatId
+                        )
+                    ) {
+                        runCatching {
+                            getChatCallUseCase(chat.chatId)
+                        }.onSuccess { chatCall ->
+                            chatCall?.let { call ->
+                                Timber.d("There is a call, open it")
+                                CallUtil.openMeetingInProgress(
+                                    MegaApplication.getInstance().applicationContext,
+                                    call.chatId,
+                                    true,
+                                    passcodeManagement
+                                )
+                                _state.update {
+                                    it.copy(
+                                        startedMeetingChatId = call.chatId
+                                    )
+                                }
+                            } ?: run {
+                                Timber.d("Chat status is connected and the call does not exist")
+                                MegaApplication.isWaitingForCall = false
+                                setChatVideoInDevice(
+                                    chatId = chat.chatId,
+                                    shouldStartMeeting = true,
+                                    shouldVideoBeEnabled = video,
+                                    shouldAudioBeEnabled = audio
+                                )
+                            }
+
+                        }.onFailure { exception ->
+                            Timber.e(exception)
+                        }
+                    }
+                } ?: run {
+                    Timber.d("The chat does not exist, create meeting")
+                    createMeeting(title)
+                }
+
+            }.onFailure { exception ->
+                Timber.e(exception)
+            }
+        }
+    }
+
+    /**
+     * Create meeting
+     *
+     * @param title Meeting title
+     */
+    private fun createMeeting(title: String) {
+        viewModelScope.launch {
+            runCatching {
+                createMeetingUseCase(
+                    title = title,
+                    speakRequest = false,
+                    waitingRoom = false,
+                    openInvite = true
+                )
+            }.onSuccess {
+                if (it.number.toInt() == 1) {
+                    Timber.d("Meeting created,  chat id ${it.chatHandle}")
+                    updateChatRoomId(it.chatHandle)
+                    MegaApplication.isWaitingForCall = true
+                }
+            }.onFailure { exception ->
+                Timber.e(exception)
             }
         }
     }
@@ -1274,21 +1343,12 @@ class MeetingActivityViewModel @Inject constructor(
     }
 
     /**
-     * Method for setting a name for the meeting
-     *
-     * @param name The name
-     */
-    fun setMeetingsName(name: String) =
-        _state.update {
-            it.copy(meetingName = name)
-        }
-
-    /**
      * Response of clicking mic fab
      *
      * @param shouldAudioBeEnabled True, if audio should be enabled. False, otherwise
      */
     fun clickMic(shouldAudioBeEnabled: Boolean) {
+        Timber.d("click mic shouldAudioBeEnabled: $shouldAudioBeEnabled")
         // Check audio permission. If haven't been granted, ask for the permission and return
         if (!_recordAudioGranted.value) {
             _recordAudioPermissionCheck.value = true
@@ -1321,6 +1381,26 @@ class MeetingActivityViewModel @Inject constructor(
             return
         }
 
+        setChatVideoInDevice(
+            shouldStartMeeting = false,
+            shouldVideoBeEnabled = shouldVideoBeEnabled,
+        )
+    }
+
+    /**
+     * Set chat video in device
+     *
+     * @param chatId    Chat id
+     * @param shouldStartMeeting    Should start the meeting
+     * @param shouldVideoBeEnabled  True, if the video should be activated. False, if not
+     * @param shouldAudioBeEnabled  True, if the audio should be activated. False, if not     *
+     */
+    private fun setChatVideoInDevice(
+        chatId: Long = -1,
+        shouldStartMeeting: Boolean,
+        shouldVideoBeEnabled: Boolean,
+        shouldAudioBeEnabled: Boolean = false
+    ) {
         viewModelScope.launch {
             runCatching {
                 setChatVideoInDeviceUseCase()
@@ -1328,11 +1408,56 @@ class MeetingActivityViewModel @Inject constructor(
                 Timber.e(exception)
             }.onSuccess {
                 when {
+                    shouldStartMeeting -> {
+                        startMeeting(
+                            chatId,
+                            enableAudio = shouldAudioBeEnabled,
+                            enableVideo = shouldVideoBeEnabled
+                        )
+                    }
+
                     isChatCreatedAndIParticipating() -> enableVideo(enable = shouldVideoBeEnabled)
                     else -> enableDeviceCamera(
                         enable = shouldVideoBeEnabled,
                         isReleasingVideo = false
                     )
+                }
+            }
+        }
+    }
+
+    /**
+     * Start meeting
+     *
+     * @param chatId        Chat id
+     * @param enableAudio   Audio on or off
+     * @param enableVideo   Video on or off
+     */
+    private fun startMeeting(
+        chatId: Long,
+        enableVideo: Boolean,
+        enableAudio: Boolean,
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                startCallUseCase(
+                    chatId = chatId,
+                    audio = enableAudio,
+                    video = enableVideo
+                )
+            }.onFailure { exception ->
+                Timber.e(exception)
+            }.onSuccess { chatCall ->
+                chatCall?.apply {
+                    chatManagement.setSpeakerStatus(chatId, hasLocalVideo)
+                    if (isOutgoing) {
+                        chatManagement.setRequestSentCall(callId, isRequestSent = true)
+                    }
+                    _state.update {
+                        it.copy(
+                            startedMeetingChatId = chatId
+                        )
+                    }
                 }
             }
         }
@@ -1346,6 +1471,7 @@ class MeetingActivityViewModel @Inject constructor(
      */
     private fun enableDeviceCamera(enable: Boolean, isReleasingVideo: Boolean) =
         viewModelScope.launch {
+            Timber.d("Enable device camera: $enable and isReleasingVideo: $isReleasingVideo")
             runCatching {
                 startVideoDeviceUseCase(enable)
             }.onFailure { exception ->
@@ -1364,13 +1490,13 @@ class MeetingActivityViewModel @Inject constructor(
      */
     private fun enableVideo(enable: Boolean) {
         state.value.currentCall?.apply {
-            val enableVideo = enable && !hasLocalVideo
+            Timber.d("Enable video: $enable and has Local Video $hasLocalVideo")
             if (enable && hasLocalVideo) {
                 return
             }
             viewModelScope.launch {
                 runCatching {
-                    enableOrDisableVideoUseCase(chatId = chatId, enable = enableVideo)
+                    enableOrDisableVideoUseCase(chatId = chatId, enable = enable)
                 }.onFailure { exception ->
                     Timber.e(exception)
                 }.onSuccess { chatRequest ->
@@ -1391,10 +1517,13 @@ class MeetingActivityViewModel @Inject constructor(
      */
     private fun enableAudio(enable: Boolean) {
         state.value.currentCall?.apply {
-            val enableAudio = enable && !hasLocalAudio
+            Timber.d("Enable audio: $enable and has Local Audio $hasLocalAudio")
+            if (enable && hasLocalAudio) {
+                return
+            }
             viewModelScope.launch {
                 runCatching {
-                    enableOrDisableAudioUseCase(chatId, enableAudio)
+                    enableOrDisableAudioUseCase(chatId, enable)
                 }.onFailure { exception ->
                     Timber.e(exception)
                 }
@@ -1523,13 +1652,8 @@ class MeetingActivityViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
 
-        composite.clear()
-
         LiveEventBus.get(EVENT_AUDIO_OUTPUT_CHANGE, AppRTCAudioManager.AudioDevice::class.java)
             .removeObserver(audioOutputStateObserver)
-
-        LiveEventBus.get(EVENT_MEETING_CREATED, Long::class.java)
-            .removeObserver(meetingCreatedObserver)
     }
 
     fun inviteToChat(context: Context, requestCode: Int, resultCode: Int, intent: Intent?) {
@@ -1643,7 +1767,7 @@ class MeetingActivityViewModel @Inject constructor(
                     if (call == null) {
                         finishMeetingActivity()
                     } else {
-                        chatManagement.setSpeakerStatus(call.chatId, call.hasLocalVideo)
+                        chatManagement.setSpeakerStatus(call.chatId, speakerAudio)
                         chatManagement.setRequestSentCall(call.callId, false)
                         CallUtil.clearIncomingCallNotification(call.callId)
 
@@ -1682,7 +1806,7 @@ class MeetingActivityViewModel @Inject constructor(
      * @param list MegaHandleList with the call ID
      * @return True, if the meeting is finished. False, if not.
      */
-    fun isMeetingEnded(list: List<Long>?): Boolean =
+    private fun isMeetingEnded(list: List<Long>?): Boolean =
         list == null || list[0] == MEGACHAT_INVALID_HANDLE
 
     /**
@@ -1795,7 +1919,7 @@ class MeetingActivityViewModel @Inject constructor(
             _state.value.chatId.let { id ->
                 viewModelScope.launch {
                     runCatching {
-                        queryChatLink(id)
+                        queryChatLinkUseCase(id)
                     }.onFailure {
                         if (state.value.hasHostPermission() && shouldShareMeetingLink) {
                             createChatLink()
@@ -1821,7 +1945,7 @@ class MeetingActivityViewModel @Inject constructor(
         _state.value.chatId.let { id ->
             viewModelScope.launch {
                 runCatching {
-                    createChatLink(id)
+                    createChatLinkUseCase(id)
                 }.onFailure { exception ->
                     Timber.e(exception)
                 }.onSuccess { request ->
@@ -1899,7 +2023,7 @@ class MeetingActivityViewModel @Inject constructor(
         }
         viewModelScope.launch {
             runCatching {
-                setOpenInvite(state.value.chatId)
+                setOpenInviteWithChatIdUseCase(state.value.chatId)
             }.onFailure { exception ->
                 Timber.e(exception)
             }.onSuccess { isAllowAddParticipantsEnabled ->

@@ -1,7 +1,8 @@
 package mega.privacy.android.app.presentation.pdfviewer
 
-import mega.privacy.android.app.namecollision.data.NameCollision
+import mega.privacy.android.app.namecollision.data.NameCollisionUiEntity
 import mega.privacy.android.domain.entity.AccountType
+import mega.privacy.android.domain.entity.node.NameCollision
 
 /**
  * Pdf viewer UI state

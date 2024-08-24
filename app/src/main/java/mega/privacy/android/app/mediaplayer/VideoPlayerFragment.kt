@@ -49,7 +49,6 @@ import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.dragger.DragToExitSupport
 import mega.privacy.android.app.databinding.FragmentVideoPlayerBinding
 import mega.privacy.android.app.di.mediaplayer.VideoPlayer
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.mediaplayer.gateway.MediaPlayerGateway
 import mega.privacy.android.app.mediaplayer.model.MediaPlaySources
 import mega.privacy.android.app.mediaplayer.model.SpeedPlaybackItem
@@ -75,7 +74,6 @@ import mega.privacy.mobile.analytics.event.SnapshotButtonPressedEvent
 import mega.privacy.mobile.analytics.event.UnlockButtonPressedEvent
 import mega.privacy.mobile.analytics.event.VideoPlayerFullScreenPressedEvent
 import mega.privacy.mobile.analytics.event.VideoPlayerOriginalPressedEvent
-import org.jetbrains.anko.configuration
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -295,7 +293,7 @@ class VideoPlayerFragment : Fragment() {
                 ) { isFullScreen ->
                     playerViewHolder?.updateFullScreenUI(isFullScreen)
                     binding.playerView.resizeMode = if (isFullScreen) {
-                        if (activity?.configuration?.orientation == ORIENTATION_LANDSCAPE) {
+                        if (resources.configuration.orientation == ORIENTATION_LANDSCAPE) {
                             RESIZE_MODE_FIXED_WIDTH
                         } else {
                             RESIZE_MODE_FIXED_HEIGHT
@@ -333,7 +331,7 @@ class VideoPlayerFragment : Fragment() {
             videoPlayerView = viewHolder.playerView
             videoPlayerView?.keepScreenOn = !viewModel.mediaPlaybackState.value
             with(viewHolder) {
-                setTrackNameVisible(activity?.configuration?.orientation != ORIENTATION_LANDSCAPE)
+                setTrackNameVisible(resources.configuration.orientation != ORIENTATION_LANDSCAPE)
 
                 // we need setup control buttons again, because reset player would reset PlayerControlView
                 setupPlaylistButton(viewModel.getPlaylistItems()) {
@@ -341,12 +339,7 @@ class VideoPlayerFragment : Fragment() {
                     findNavController().let {
                         viewLifecycleOwner.lifecycleScope.launch {
                             if (it.currentDestination?.id == R.id.video_main_player) {
-                                it.navigate(
-                                    if (getFeatureFlagValueUseCase(AppFeatures.NewVideoQueue))
-                                        VideoPlayerFragmentDirections.actionVideoPlayerToQueue()
-                                    else
-                                        VideoPlayerFragmentDirections.actionVideoPlayerToPlaylist()
-                                )
+                                it.navigate(VideoPlayerFragmentDirections.actionVideoPlayerToQueue())
                             }
                         }
                     }
@@ -473,7 +466,7 @@ class VideoPlayerFragment : Fragment() {
         }
         val screenWidth = requireActivity().getScreenWidth()
         val screenHeight = requireActivity().getScreenHeight()
-        val currentOrientation = activity?.configuration?.orientation
+        val currentOrientation = resources.configuration.orientation
 
         // Re-compute the size based on screen size
         val (width, height) = if (currentOrientation == ORIENTATION_LANDSCAPE

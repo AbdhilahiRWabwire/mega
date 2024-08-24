@@ -2,9 +2,9 @@ package mega.privacy.android.app.presentation.contact
 
 import de.palm.composestateevents.StateEventWithContent
 import de.palm.composestateevents.consumed
-import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.domain.entity.node.MoveRequestResult
+import mega.privacy.android.domain.entity.node.NameCollision
 
 /**
  * Contact file list ui state

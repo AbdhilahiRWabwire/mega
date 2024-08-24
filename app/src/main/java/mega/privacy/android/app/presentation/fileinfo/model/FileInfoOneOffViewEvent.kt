@@ -4,7 +4,7 @@ import mega.privacy.android.shared.resources.R as sharedR
 import android.content.Context
 import androidx.annotation.StringRes
 import mega.privacy.android.app.R
-import mega.privacy.android.app.namecollision.data.NameCollision
+import mega.privacy.android.domain.entity.node.NameCollision
 
 /**
  * Represents events in the File info screen

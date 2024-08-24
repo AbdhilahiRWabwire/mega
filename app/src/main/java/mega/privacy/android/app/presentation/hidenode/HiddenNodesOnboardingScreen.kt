@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,7 @@ import androidx.compose.material.Scaffold
 import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
@@ -34,6 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.shared.original.core.ui.theme.black
 import mega.privacy.android.shared.original.core.ui.theme.dark_grey
@@ -45,6 +48,8 @@ import mega.privacy.android.shared.original.core.ui.theme.teal_300
 import mega.privacy.android.shared.original.core.ui.theme.teal_300_alpha_038
 import mega.privacy.android.shared.original.core.ui.theme.white
 import mega.privacy.android.shared.original.core.ui.theme.white_alpha_054
+import mega.privacy.mobile.analytics.event.HideNodeOnboardingScreenEvent
+import mega.privacy.mobile.analytics.event.HideNodeUpgradeScreenEvent
 
 @Composable
 internal fun HiddenNodesOnboardingScreen(
@@ -52,7 +57,13 @@ internal fun HiddenNodesOnboardingScreen(
     onClickBack: () -> Unit,
     onClickContinue: () -> Unit,
 ) {
+    LaunchedEffect(Unit) {
+        Analytics.tracker.trackEvent(
+            if (isOnboarding) HideNodeOnboardingScreenEvent else HideNodeUpgradeScreenEvent
+        )
+    }
     Scaffold(
+        modifier = Modifier.systemBarsPadding().fillMaxSize(),
         topBar = {
             HiddenNodesOnboardingAppBar(
                 onClickBack = onClickBack,

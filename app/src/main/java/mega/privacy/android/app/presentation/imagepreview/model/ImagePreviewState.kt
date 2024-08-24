@@ -2,10 +2,10 @@ package mega.privacy.android.app.presentation.imagepreview.model
 
 import de.palm.composestateevents.StateEventWithContent
 import de.palm.composestateevents.consumed
-import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.domain.entity.account.AccountDetail
 import mega.privacy.android.domain.entity.node.ImageNode
+import mega.privacy.android.domain.entity.node.NameCollision
 
 data class ImagePreviewState(
     val isInitialized: Boolean = false,
@@ -15,7 +15,6 @@ data class ImagePreviewState(
     val isCurrentImageNodeAvailableOffline: Boolean = false,
     val showAppBar: Boolean = true,
     val inFullScreenMode: Boolean = false,
-    val transferMessage: String = "",
     val resultMessage: String = "",
     val copyMoveException: Throwable? = null,
     val nameCollision: NameCollision? = null,
@@ -23,4 +22,5 @@ data class ImagePreviewState(
     val showDeletedMessage: Boolean = false,
     val accountDetail: AccountDetail? = null,
     val isHiddenNodesOnboarded: Boolean? = null,
+    val isMagnifierMode: Boolean = false,
 )

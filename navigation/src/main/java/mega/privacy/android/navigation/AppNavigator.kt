@@ -5,6 +5,8 @@ import android.content.Context
 import androidx.annotation.StringRes
 import mega.privacy.android.domain.entity.FileTypeInfo
 import mega.privacy.android.domain.entity.SortOrder
+import mega.privacy.android.domain.entity.chat.messages.NodeAttachmentMessage
+import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.NodeContentUri
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import java.io.File
@@ -131,20 +133,20 @@ interface AppNavigator {
      * @param sortOrder SortOrder
      * @param viewType the adapter type of the view
      * @param isFolderLink whether the file is a folder link
+     * @param isMediaQueueAvailable whether the media queue is available
      * @param searchedItems the list of searched items, this is only used under the search mode
      * @param mediaQueueTitle the title of the media queue
-     * @param onError Callback called when error occurs
      */
-    fun openMediaPlayerActivityByFileNode(
+    suspend fun openMediaPlayerActivityByFileNode(
         context: Context,
         contentUri: NodeContentUri,
         fileNode: TypedFileNode,
         viewType: Int,
         sortOrder: SortOrder = SortOrder.ORDER_NONE,
         isFolderLink: Boolean = false,
+        isMediaQueueAvailable: Boolean = true,
         searchedItems: List<Long>? = null,
         mediaQueueTitle: String? = null,
-        onError: () -> Unit = {},
     )
 
     /**
@@ -156,21 +158,88 @@ interface AppNavigator {
      * @param viewType the adapter type of the view
      * @param handle the handle of the node
      * @param parentId the parent id of the node
+     * @param offlineParentId the parent id of the offline
      * @param sortOrder SortOrder
      * @param isFolderLink whether the file is a folder link
+     * @param isMediaQueueAvailable whether the media queue is available
      * @param searchedItems the list of searched items, this is only used under the search mode
-     * @param onError Callback called when error occurs
      */
-    fun openMediaPlayerActivityByLocalFile(
+    suspend fun openMediaPlayerActivityByLocalFile(
         context: Context,
         localFile: File,
-        fileTypeInfo: FileTypeInfo,
-        viewType: Int,
         handle: Long,
-        parentId: Long,
+        viewType: Int? = null,
+        parentId: Long = -1L,
+        offlineParentId: Int? = null,
+        fileTypeInfo: FileTypeInfo? = null,
         sortOrder: SortOrder = SortOrder.ORDER_NONE,
         isFolderLink: Boolean = false,
+        isMediaQueueAvailable: Boolean = true,
         searchedItems: List<Long>? = null,
-        onError: () -> Unit = {},
+    )
+
+    /**
+     * Open media player from Chat
+     *
+     * @param context Context
+     * @param contentUri [NodeContentUri]
+     * @param message [NodeAttachmentMessage]
+     * @param fileNode [FileNode]
+     */
+    suspend fun openMediaPlayerActivityFromChat(
+        context: Context,
+        contentUri: NodeContentUri,
+        message: NodeAttachmentMessage,
+        fileNode: FileNode,
+    )
+
+    /**
+     * Open media player from Chat
+     *
+     * @param context Context
+     * @param contentUri [NodeContentUri]
+     * @param message [NodeAttachmentMessage]
+     * @param fileNode [FileNode]
+     */
+    suspend fun openMediaPlayerActivityFromChat(
+        context: Context,
+        contentUri: NodeContentUri,
+        handle: Long,
+        messageId: Long,
+        chatId: Long,
+        name: String,
+    )
+
+    /**
+     * Open media player by file node
+     *
+     * @param context Context
+     * @param contentUri NodeContentUri
+     * @param name the name of the node
+     * @param handle the handle of the node
+     * @param parentId the parent id of the node
+     * @param fileTypeInfo FileTypeInfo
+     * @param sortOrder SortOrder
+     * @param viewType the adapter type of the view
+     * @param isFolderLink whether the file is a folder link
+     * @param isMediaQueueAvailable whether the media queue is available
+     * @param searchedItems the list of searched items, this is only used under the search mode
+     * @param mediaQueueTitle the title of the media queue
+     * @param nodeHandles node handle list
+     */
+    suspend fun openMediaPlayerActivity(
+        context: Context,
+        contentUri: NodeContentUri,
+        name: String,
+        handle: Long,
+        viewType: Int? = null,
+        parentId: Long = -1L,
+        fileTypeInfo: FileTypeInfo? = null,
+        sortOrder: SortOrder = SortOrder.ORDER_NONE,
+        isFolderLink: Boolean = false,
+        isMediaQueueAvailable: Boolean = true,
+        searchedItems: List<Long>? = null,
+        mediaQueueTitle: String? = null,
+        nodeHandles: List<Long>? = null,
     )
 }

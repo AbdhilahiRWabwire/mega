@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -30,7 +31,6 @@ import mega.privacy.android.app.upgradeAccount.view.ChooseAccountView
 import mega.privacy.android.app.upgradeAccount.view.VariantAOnboardingDialogView
 import mega.privacy.android.app.upgradeAccount.view.VariantBOnboardingDialogView
 import mega.privacy.android.app.utils.billing.PaymentUtils
-import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.android.data.qualifier.MegaApi
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.ThemeMode
@@ -38,6 +38,7 @@ import mega.privacy.android.domain.entity.billing.BillingEvent
 import mega.privacy.android.domain.entity.billing.MegaPurchase
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.mobile.analytics.event.OnboardingUpsellingDialogVariantAViewProPlansButtonEvent
 import mega.privacy.mobile.analytics.event.OnboardingUpsellingDialogVariantBFreePlanContinueButtonPressedEvent
 import mega.privacy.mobile.analytics.event.OnboardingUpsellingDialogVariantBProIIIPlanContinueButtonPressedEvent
@@ -66,7 +67,7 @@ class ChooseAccountFragment : Fragment() {
 
     private val billingViewModel by activityViewModels<BillingViewModel>()
 
-    internal lateinit var chooseAccountActivity: ChooseAccountActivity
+    private lateinit var chooseAccountActivity: ChooseAccountActivity
 
 
     @Inject
@@ -99,6 +100,11 @@ class ChooseAccountFragment : Fragment() {
         val mode by getThemeMode()
             .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
         OriginalTempTheme(isDark = mode.isDarkMode()) {
+            val modifier = Modifier
+                .semantics {
+                    testTagsAsResourceId = true
+                }
+                .systemBarsPadding()
             if (uiState.enableVariantAUI) {
                 VariantAOnboardingDialogView(
                     state = uiState,
@@ -109,9 +115,7 @@ class ChooseAccountFragment : Fragment() {
                         )
                         chooseAccountActivity.onPlanClicked(AccountType.PRO_I)
                     },
-                    modifier = Modifier.semantics {
-                        testTagsAsResourceId = true
-                    },
+                    modifier = modifier,
                 )
             } else if (uiState.enableVariantBUI) {
                 VariantBOnboardingDialogView(
@@ -119,14 +123,12 @@ class ChooseAccountFragment : Fragment() {
                     onBackPressed = chooseAccountActivity::onFreeClick,
                     onContinueClicked = {
                         callContinueButtonAnalytics(uiState.chosenPlan)
-                        val chosenPlan =
-                            UpgradeAccountFragment.convertAccountTypeToInt(uiState.chosenPlan)
                         if (uiState.chosenPlan === AccountType.FREE) {
                             chooseAccountActivity.onFreeClick()
                         } else {
                             billingViewModel.startPurchase(
                                 chooseAccountActivity,
-                                getProductId(uiState.isMonthlySelected, chosenPlan),
+                                getProductId(uiState.isMonthlySelected, uiState.chosenPlan),
                             )
                         }
                     },
@@ -138,18 +140,14 @@ class ChooseAccountFragment : Fragment() {
                             OnboardingUpsellingDialogVariantBProPlanIIIDisplayedEvent
                         )
                     },
-                    modifier = Modifier.semantics {
-                        testTagsAsResourceId = true
-                    },
+                    modifier = modifier,
                 )
             } else {
                 ChooseAccountView(
                     state = uiState,
                     onBackPressed = chooseAccountActivity::onFreeClick,
                     onPlanClicked = chooseAccountActivity::onPlanClicked,
-                    modifier = Modifier.semantics {
-                        testTagsAsResourceId = true
-                    },
+                    modifier = modifier,
                 )
             }
         }

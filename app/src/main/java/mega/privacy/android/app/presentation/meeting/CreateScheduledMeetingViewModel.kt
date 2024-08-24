@@ -40,20 +40,19 @@ import mega.privacy.android.domain.entity.meeting.WaitingRoomReminders
 import mega.privacy.android.domain.entity.meeting.WeekOfMonth
 import mega.privacy.android.domain.entity.meeting.Weekday
 import mega.privacy.android.domain.entity.user.UserId
-import mega.privacy.android.domain.usecase.CreateChatLink
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.GetVisibleContactsUseCase
-import mega.privacy.android.domain.usecase.QueryChatLink
-import mega.privacy.android.domain.usecase.RemoveChatLink
-import mega.privacy.android.domain.usecase.SetOpenInvite
+import mega.privacy.android.domain.usecase.QueryChatLinkUseCase
+import mega.privacy.android.domain.usecase.chat.CreateChatLinkUseCase
 import mega.privacy.android.domain.usecase.chat.InviteParticipantToChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatRoomUpdatesUseCase
 import mega.privacy.android.domain.usecase.chat.RemoveParticipantFromChatUseCase
 import mega.privacy.android.domain.usecase.chat.SetOpenInviteUseCase
+import mega.privacy.android.domain.usecase.chat.link.RemoveChatLinkUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactFromEmailUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactItem
 import mega.privacy.android.domain.usecase.meeting.CreateChatroomAndSchedMeetingUseCase
-import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
+import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChatUseCase
 import mega.privacy.android.domain.usecase.meeting.SetWaitingRoomRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.SetWaitingRoomUseCase
 import mega.privacy.android.domain.usecase.meeting.UpdateScheduledMeetingUseCase
@@ -69,21 +68,21 @@ import javax.inject.Inject
  * CreateScheduledMeetingActivity view model.
  * @property monitorConnectivityUseCase                 [MonitorConnectivityUseCase]
  * @property getVisibleContactsUseCase                  [GetVisibleContactsUseCase]
- * @property getScheduledMeetingByChat                  [GetScheduledMeetingByChat]
+ * @property getScheduledMeetingByChatUseCase           [GetScheduledMeetingByChatUseCase]
  * @property getContactFromEmailUseCase                 [GetContactFromEmailUseCase]
  * @property getContactItem                             [GetContactItem]
  * @property getChatRoomUseCase                         [GetChatRoomUseCase]
  * @property createChatroomAndSchedMeetingUseCase       [CreateChatroomAndSchedMeetingUseCase]
  * @property updateScheduledMeetingUseCase              [UpdateScheduledMeetingUseCase]
- * @property createChatLink                             [CreateChatLink]
- * @property removeChatLink                             [RemoveChatLink]
+ * @property createChatLinkUseCase                      [CreateChatLinkUseCase]
+ * @property removeChatLinkUseCase                      [RemoveChatLinkUseCase]
  * @property recurrenceDialogOptionMapper               [RecurrenceDialogOptionMapper]
  * @property weekDayMapper                              [WeekDayMapper]
  * @property deviceGateway                              [DeviceGateway]
  * @property getStringFromStringResMapper               [GetStringFromStringResMapper]
  * @property getPluralStringFromStringResMapper         [GetPluralStringFromStringResMapper]
- * @property setOpenInvite                              [SetOpenInvite]
- * @property queryChatLink                              [QueryChatLink]
+ * @property setOpenInviteUseCase                       [SetOpenInviteUseCase]
+ * @property queryChatLinkUseCase                       [QueryChatLinkUseCase]
  * @property removeParticipantFromChat                  [RemoveParticipantFromChatUseCase]
  * @property inviteParticipantToChat                    [InviteParticipantToChatUseCase]
  * @property monitorChatRoomUpdatesUseCase              [MonitorChatRoomUpdatesUseCase]
@@ -96,15 +95,15 @@ class CreateScheduledMeetingViewModel @Inject constructor(
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
     private val isConnectedToInternetUseCase: IsConnectedToInternetUseCase,
     private val getVisibleContactsUseCase: GetVisibleContactsUseCase,
-    private val getScheduledMeetingByChat: GetScheduledMeetingByChat,
+    private val getScheduledMeetingByChatUseCase: GetScheduledMeetingByChatUseCase,
     private val getContactFromEmailUseCase: GetContactFromEmailUseCase,
     private val getContactItem: GetContactItem,
     private val getChatRoomUseCase: GetChatRoomUseCase,
     private val createChatroomAndSchedMeetingUseCase: CreateChatroomAndSchedMeetingUseCase,
     private val updateScheduledMeetingUseCase: UpdateScheduledMeetingUseCase,
-    private val createChatLink: CreateChatLink,
-    private val removeChatLink: RemoveChatLink,
-    private val queryChatLink: QueryChatLink,
+    private val createChatLinkUseCase: CreateChatLinkUseCase,
+    private val removeChatLinkUseCase: RemoveChatLinkUseCase,
+    private val queryChatLinkUseCase: QueryChatLinkUseCase,
     private val recurrenceDialogOptionMapper: RecurrenceDialogOptionMapper,
     private val weekDayMapper: WeekDayMapper,
     private val deviceGateway: DeviceGateway,
@@ -220,7 +219,7 @@ class CreateScheduledMeetingViewModel @Inject constructor(
     private fun getScheduledMeeting(chatId: Long) =
         viewModelScope.launch {
             runCatching {
-                getScheduledMeetingByChat(chatId)
+                getScheduledMeetingByChatUseCase(chatId)
             }.onFailure { exception ->
                 Timber.e("Scheduled meeting does not exist $exception")
             }.onSuccess { scheduledMeetingList ->
@@ -961,7 +960,7 @@ class CreateScheduledMeetingViewModel @Inject constructor(
     private fun createMeetingLink(chatId: Long) =
         viewModelScope.launch {
             runCatching {
-                createChatLink(chatId)
+                createChatLinkUseCase(chatId)
             }.onFailure { exception ->
                 Timber.e(exception)
             }
@@ -975,7 +974,7 @@ class CreateScheduledMeetingViewModel @Inject constructor(
     private fun removeMeetingLink(chatId: Long) =
         viewModelScope.launch {
             runCatching {
-                removeChatLink(chatId)
+                removeChatLinkUseCase(chatId)
             }.onFailure { exception ->
                 Timber.e(exception)
             }
@@ -987,7 +986,7 @@ class CreateScheduledMeetingViewModel @Inject constructor(
     private fun checkMeetingLink(chatId: Long) =
         viewModelScope.launch {
             runCatching {
-                queryChatLink(chatId)
+                queryChatLinkUseCase(chatId)
             }.onFailure { exception ->
                 Timber.e(exception)
             }.onSuccess { request ->

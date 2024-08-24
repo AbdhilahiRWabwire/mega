@@ -14,18 +14,18 @@ plugins {
 }
 
 android {
-
     defaultConfig {
-
         val appVersion: String by rootProject.extra
         resValue("string", "app_version", "\"${appVersion}\"")
-
         consumerProguardFiles("consumer-rules.pro")
     }
-
     sourceSets {
         // Adds exported schema location as test app assets.
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+    lint {
+        abortOnError = true
+        warningsAsErrors = true
     }
     namespace = "mega.privacy.android.data"
 }
@@ -39,6 +39,10 @@ dependencies {
     implementation(project(":domain"))
     implementation(project(":shared:sync"))
     implementation("com.google.guava:guava:33.0.0-jre")
+
+    //Test Modules
+    testImplementation(project(":core-test"))
+
     preBuiltSdkDependency(rootProject.extra)
 
     implementation(lib.coroutines.core)

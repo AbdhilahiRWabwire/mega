@@ -76,7 +76,6 @@ abstract class MediaPlayerActivity : PasscodeActivity() {
             val toHandle = result.data?.getLongExtra(INTENT_EXTRA_KEY_IMPORT_TO, INVALID_HANDLE)
             if (node != null && toHandle != null && messageId != null) {
                 viewModel.importChatNode(
-                    node = node,
                     chatId = chatId,
                     messageId = messageId,
                     newParentHandle = NodeId(toHandle)
@@ -242,5 +241,20 @@ abstract class MediaPlayerActivity : PasscodeActivity() {
 
         internal const val TIMEOUT_FOR_DEFAULT_MENU_ITEM: Long = 100
         internal const val TIMEOUT_FOR_SHARED_MENU_ITEM: Long = 500
+
+        /**
+         * The previous type of media item
+         */
+        const val TYPE_PREVIOUS = 1
+
+        /**
+         * The playing type playing media item
+         */
+        const val TYPE_PLAYING = 2
+
+        /**
+         * The next type next media item
+         */
+        const val TYPE_NEXT = 3
     }
 }

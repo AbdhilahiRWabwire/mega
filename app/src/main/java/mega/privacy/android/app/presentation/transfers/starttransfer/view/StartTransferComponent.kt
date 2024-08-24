@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
@@ -35,6 +36,8 @@ import com.google.accompanist.permissions.shouldShowRationale
 import de.palm.composestateevents.EventEffect
 import de.palm.composestateevents.StateEventWithContent
 import de.palm.composestateevents.consumed
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -49,7 +52,6 @@ import mega.privacy.android.app.presentation.settings.model.TargetPreference
 import mega.privacy.android.app.presentation.snackbar.LegacySnackBarWrapper
 import mega.privacy.android.app.presentation.transfers.starttransfer.StartTransfersComponentViewModel
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.StartTransferEvent
-import mega.privacy.android.app.presentation.transfers.starttransfer.model.StartTransferJobInProgress
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.StartTransferViewState
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.dialog.ResumeTransfersDialog
@@ -63,7 +65,7 @@ import mega.privacy.android.shared.original.core.ui.controls.dialogs.Confirmatio
 import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDialog
 import mega.privacy.android.shared.original.core.ui.navigation.launchFolderPicker
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
-import mega.privacy.android.shared.original.core.ui.utils.MinimumTimeVisibility
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import timber.log.Timber
 
 /**
@@ -133,13 +135,8 @@ internal fun StartTransferComponent(
     StartTransferComponent(
         uiState = uiState,
         onOneOffEventConsumed = viewModel::consumeOneOffEvent,
-        onCancelledConfirmed = viewModel::cancelCurrentJob,
-        onDownloadConfirmed = { transferTriggerEventPrimary, saveDoNotAskAgain ->
-            viewModel.startDownloadWithoutConfirmation(
-                transferTriggerEventPrimary,
-                saveDoNotAskAgain
-            )
-        },
+        onCancelled = viewModel::cancelCurrentTransfersJob,
+        onLargeDownloadAnswered = viewModel::largeDownloadAnswered,
         onDestinationSet = viewModel::startDownloadWithDestination,
         onPromptSaveDestinationConsumed = viewModel::consumePromptSaveDestination,
         onSaveDestination = viewModel::saveDestination,
@@ -188,9 +185,9 @@ fun createStartTransferView(
 private fun StartTransferComponent(
     uiState: StartTransferViewState,
     onOneOffEventConsumed: () -> Unit,
-    onCancelledConfirmed: () -> Unit,
-    onDownloadConfirmed: (TransferTriggerEvent.DownloadTriggerEvent, saveDoNotAskAgain: Boolean) -> Unit,
-    onDestinationSet: (TransferTriggerEvent, destination: Uri) -> Unit,
+    onCancelled: () -> Unit,
+    onLargeDownloadAnswered: (TransferTriggerEvent.DownloadTriggerEvent?, saveDoNotAskAgain: Boolean) -> Unit,
+    onDestinationSet: (destination: Uri?) -> Unit,
     onPromptSaveDestinationConsumed: () -> Unit,
     onSaveDestination: (String) -> Unit,
     onDoNotPromptToSaveDestinationAgain: () -> Unit,
@@ -200,24 +197,22 @@ private fun StartTransferComponent(
     onScanningFinished: (StartTransferEvent) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var showOfflineAlertDialog by rememberSaveable { mutableStateOf(false) }
     var showResumeTransfersAlertDialog by rememberSaveable { mutableStateOf(false) }
-    val showQuotaExceededDialog = remember { mutableStateOf<StorageState?>(null) }
-    var showConfirmLargeTransfer by remember {
-        mutableStateOf<StartTransferEvent.ConfirmLargeDownload?>(null)
+    val showQuotaExceededDialog = rememberSaveable(stateSaver = storageStateSaver) {
+        mutableStateOf(null)
     }
-    var showAskDestinationDialog by remember {
-        mutableStateOf<TransferTriggerEvent?>(null)
+    var launchFolderPickerForDownloadDestination by rememberSaveable(uiState.askDestinationForDownload != null) {
+        mutableStateOf(uiState.askDestinationForDownload != null)
     }
+
     val folderPicker = launchFolderPicker(
         onCancel = {
-            showAskDestinationDialog = null
+            onDestinationSet(null)
         },
         onFolderSelected = { uri ->
-            showAskDestinationDialog?.let { event ->
-                onDestinationSet(event, uri)
-                showAskDestinationDialog = null
-            }
+            onDestinationSet(uri)
         },
     )
 
@@ -243,14 +238,11 @@ private fun StartTransferComponent(
                         it.totalFiles,
                         it.totalFiles,
                     )
-                    snackBarHostState.showSnackbar(message)
+                    snackBarHostState.showAutoDurationSnackbar(message)
                     onScanningFinished(it)
                 }
 
                 is StartTransferEvent.Message ->
-                    consumeMessage(it, snackBarHostState, context)
-
-                is StartTransferEvent.MessagePlural ->
                     consumeMessage(it, snackBarHostState, context)
 
                 StartTransferEvent.NotConnected -> {
@@ -259,14 +251,6 @@ private fun StartTransferComponent(
 
                 StartTransferEvent.PausedTransfers -> {
                     showResumeTransfersAlertDialog = true
-                }
-
-                is StartTransferEvent.ConfirmLargeDownload -> {
-                    showConfirmLargeTransfer = it
-                }
-
-                is StartTransferEvent.AskDestination -> {
-                    showAskDestinationDialog = it.originalEvent
                 }
             }
         })
@@ -279,9 +263,12 @@ private fun StartTransferComponent(
             showPromptSaveDestinationDialog = it
         }
     )
-    MinimumTimeVisibility(visible = uiState.jobInProgressState == StartTransferJobInProgress.ScanningTransfers) {
-        TransferInProgressDialog(onCancelConfirmed = onCancelledConfirmed)
-    }
+
+    TransferInProgressDialog(
+        uiState.jobInProgressState,
+        onCancel = onCancelled,
+    )
+
     if (showOfflineAlertDialog) {
         MegaAlertDialog(
             text = stringResource(id = R.string.error_server_connection_problem),
@@ -311,7 +298,7 @@ private fun StartTransferComponent(
             onClose = { showQuotaExceededDialog.value = null },
         )
     }
-    showConfirmLargeTransfer?.let {
+    uiState.confirmLargeDownload?.let {
         ConfirmationDialog(
             title = stringResource(id = R.string.transfers_confirm_large_download_title),
             text = stringResource(id = R.string.alert_larger_file, it.sizeString),
@@ -319,22 +306,21 @@ private fun StartTransferComponent(
             buttonOption2Text = stringResource(id = R.string.transfers_confirm_large_download_button_start_always),
             cancelButtonText = stringResource(id = R.string.general_cancel),
             onOption1 = {
-                onDownloadConfirmed(it.transferTriggerEvent, false)
-                showConfirmLargeTransfer = null
+                onLargeDownloadAnswered(it.transferTriggerEvent, false)
             },
             onOption2 = {
-                onDownloadConfirmed(it.transferTriggerEvent, true)
-                showConfirmLargeTransfer = null
+                onLargeDownloadAnswered(it.transferTriggerEvent, true)
             },
-            onDismiss = { showConfirmLargeTransfer = null },
+            onDismiss = { onLargeDownloadAnswered(null, false) },
         )
     }
-    LaunchedEffect(showAskDestinationDialog) {
-        if (showAskDestinationDialog != null) {
-            runCatching {
-                folderPicker.launch(null)
-            }.onFailure {
-                snackBarHostState.showSnackbar(context.getString(R.string.general_warning_no_picker))
+    if (launchFolderPickerForDownloadDestination) {
+        launchFolderPickerForDownloadDestination = false
+        runCatching {
+            folderPicker.launch(null)
+        }.onFailure {
+            coroutineScope.launch {
+                snackBarHostState.showAutoDurationSnackbar(context.getString(R.string.general_warning_no_picker))
             }
         }
     }
@@ -374,6 +360,11 @@ private fun StartTransferComponent(
     }
 }
 
+private val storageStateSaver = Saver<StorageState?, Int>(
+    save = { it?.ordinal },
+    restore = { StorageState.entries.getOrNull(it) }
+)
+
 private suspend fun consumeFinishProcessing(
     event: StartTransferEvent.FinishDownloadProcessing,
     snackBarHostState: SnackbarHostState,
@@ -381,6 +372,7 @@ private suspend fun consumeFinishProcessing(
     context: Context,
     transferTriggerEvent: TransferTriggerEvent?,
 ) {
+    var delayed = false
     when (event.exception) {
         null -> {
             val message = when {
@@ -389,6 +381,8 @@ private suspend fun consumeFinishProcessing(
                 }
 
                 event.totalAlreadyDownloaded == 0 -> {
+                    // Delayed to avoid showing the snackbar and the transfers widget just at the same time because it sometimes causes a flick animation
+                    delayed = true
                     context.resources.getQuantityString(
                         R.plurals.download_started,
                         event.totalNodes,
@@ -436,7 +430,16 @@ private suspend fun consumeFinishProcessing(
                     ).toString()
                 }
             }
-            snackBarHostState.showSnackbar(message)
+            if (delayed) {
+                coroutineScope {
+                    launch {
+                        delay(100)
+                        snackBarHostState.showAutoDurationSnackbar(message)
+                    }
+                }
+            } else {
+                snackBarHostState.showAutoDurationSnackbar(message)
+            }
         }
 
         is QuotaExceededMegaException -> {
@@ -449,7 +452,7 @@ private suspend fun consumeFinishProcessing(
 
         else -> {
             Timber.e(event.exception)
-            snackBarHostState.showSnackbar(context.getString(R.string.general_error))
+            snackBarHostState.showAutoDurationSnackbar(context.getString(R.string.general_error))
         }
     }
 }
@@ -460,7 +463,7 @@ private suspend fun consumeMessage(
     context: Context,
 ) {
     //show snack bar with an optional action
-    val result = snackBarHostState.showSnackbar(
+    val result = snackBarHostState.showAutoDurationSnackbar(
         context.getString(event.message),
         event.action?.let { context.getString(it) }
     )
@@ -470,17 +473,6 @@ private suspend fun consumeMessage(
             context
         )
     }
-}
-
-private suspend fun consumeMessage(
-    event: StartTransferEvent.MessagePlural,
-    snackBarHostState: SnackbarHostState,
-    context: Context,
-) {
-    //show snack bar
-    snackBarHostState.showSnackbar(
-        context.resources.getQuantityString(event.message, event.quantity, event.quantity)
-    )
 }
 
 private fun consumeMessageAction(

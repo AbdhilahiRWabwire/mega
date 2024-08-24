@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,6 +74,9 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.getLink.CopyrightFragment
 import mega.privacy.android.app.getLink.GetLinkViewModel
 import mega.privacy.android.app.utils.LinksUtil
+import mega.privacy.android.domain.entity.photos.Album
+import mega.privacy.android.domain.entity.photos.Photo
+import mega.privacy.android.shared.original.core.ui.controls.controlssliders.MegaSwitch
 import mega.privacy.android.shared.original.core.ui.controls.dialogs.ConfirmationDialog
 import mega.privacy.android.shared.original.core.ui.theme.grey_alpha_012
 import mega.privacy.android.shared.original.core.ui.theme.grey_alpha_054
@@ -82,9 +86,7 @@ import mega.privacy.android.shared.original.core.ui.theme.white
 import mega.privacy.android.shared.original.core.ui.theme.white_alpha_012
 import mega.privacy.android.shared.original.core.ui.theme.white_alpha_054
 import mega.privacy.android.shared.original.core.ui.theme.white_alpha_087
-import mega.privacy.android.domain.entity.photos.Album
-import mega.privacy.android.domain.entity.photos.Photo
-import mega.privacy.android.shared.original.core.ui.controls.controlssliders.MegaSwitch
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import mega.privacy.mobile.analytics.event.SingleAlbumLinkScreenEvent
 
 private typealias ImageDownloader = (photo: Photo, callback: (Boolean) -> Unit) -> Unit
@@ -185,6 +187,7 @@ internal fun AlbumGetLinkScreen(
     }
 
     Scaffold(
+        modifier = Modifier.systemBarsPadding(),
         scaffoldState = scaffoldState,
         topBar = {
             AlbumGetLinkTopBar(
@@ -223,7 +226,7 @@ internal fun AlbumGetLinkScreen(
                     clipboardManager.setText(AnnotatedString(link))
 
                     coroutineScope.launch {
-                        scaffoldState.snackbarHostState.showSnackbar(
+                        scaffoldState.snackbarHostState.showAutoDurationSnackbar(
                             message = context.resources.getQuantityString(
                                 R.plurals.album_share_links_copied,
                                 1,
@@ -235,7 +238,7 @@ internal fun AlbumGetLinkScreen(
                     clipboardManager.setText(AnnotatedString(key))
 
                     coroutineScope.launch {
-                        scaffoldState.snackbarHostState.showSnackbar(
+                        scaffoldState.snackbarHostState.showAutoDurationSnackbar(
                             message = context.getString(R.string.key_copied_clipboard),
                         )
                     }

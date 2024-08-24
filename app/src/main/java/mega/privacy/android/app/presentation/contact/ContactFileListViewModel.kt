@@ -11,17 +11,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.ShareInfo
-import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.presentation.extensions.getState
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.node.NodeId
-import mega.privacy.android.domain.entity.node.NodeNameCollisionResult
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
+import mega.privacy.android.domain.entity.node.NodeNameCollisionsResult
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodesUseCase
+import mega.privacy.android.domain.usecase.node.GetNodeContentUriByHandleUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodesToRubbishUseCase
 import mega.privacy.android.domain.usecase.node.MoveNodesUseCase
 import timber.log.Timber
@@ -39,6 +39,7 @@ class ContactFileListViewModel @Inject constructor(
     private val checkNodesNameCollisionUseCase: CheckNodesNameCollisionUseCase,
     private val moveNodesUseCase: MoveNodesUseCase,
     private val copyNodesUseCase: CopyNodesUseCase,
+    private val getNodeContentUriByHandleUseCase: GetNodeContentUriByHandleUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ContactFileListUiState())
 
@@ -115,7 +116,7 @@ class ContactFileListViewModel @Inject constructor(
             }
         }
 
-    private suspend fun initiateCopyOrMoveForNonConflictNodes(result: NodeNameCollisionResult) {
+    private suspend fun initiateCopyOrMoveForNonConflictNodes(result: NodeNameCollisionsResult) {
         if (result.type == NodeNameCollisionType.MOVE) {
             moveNodes(result.noConflictNodes)
         } else {
@@ -123,14 +124,8 @@ class ContactFileListViewModel @Inject constructor(
         }
     }
 
-    private fun updateStateWithConflictNodes(result: NodeNameCollisionResult) = runCatching {
-        result.conflictNodes.values.map {
-            when (result.type) {
-                NodeNameCollisionType.MOVE -> NameCollision.Movement.getMovementCollision(it)
-                NodeNameCollisionType.COPY -> NameCollision.Copy.getCopyCollision(it)
-                else -> throw UnsupportedOperationException("Invalid collision result")
-            }
-        }
+    private fun updateStateWithConflictNodes(result: NodeNameCollisionsResult) = runCatching {
+        result.conflictNodes.values.toList()
     }.onSuccess { collisions ->
         _state.update {
             it.copy(copyMoveAlertTextId = null, nodeNameCollisionResult = collisions)
@@ -224,6 +219,8 @@ class ContactFileListViewModel @Inject constructor(
             )
         }
     }
+
+    internal suspend fun getNodeContentUri(handle: Long) = getNodeContentUriByHandleUseCase(handle)
 
     /**
      * Consume upload event

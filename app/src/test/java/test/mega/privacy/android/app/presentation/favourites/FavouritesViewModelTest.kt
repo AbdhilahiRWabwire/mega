@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNot
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.presentation.favourites.FavouritesViewModel
@@ -22,20 +21,24 @@ import mega.privacy.android.app.presentation.favourites.model.mapper.HeaderMappe
 import mega.privacy.android.app.utils.wrapper.FetchNodeWrapper
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.SortOrder
+import mega.privacy.android.domain.entity.VideoFileTypeInfo
 import mega.privacy.android.domain.entity.account.AccountDetail
 import mega.privacy.android.domain.entity.favourite.FavouriteSortOrder
+import mega.privacy.android.domain.entity.node.NodeContentUri
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
+import mega.privacy.android.domain.usecase.GetFileTypeInfoByNameUseCase
 import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
-import mega.privacy.android.domain.usecase.node.IsHidingActionAllowedUseCase
 import mega.privacy.android.domain.usecase.favourites.GetAllFavoritesUseCase
 import mega.privacy.android.domain.usecase.favourites.GetFavouriteSortOrderUseCase
 import mega.privacy.android.domain.usecase.favourites.IsAvailableOfflineUseCase
 import mega.privacy.android.domain.usecase.favourites.MapFavouriteSortOrderUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
+import mega.privacy.android.domain.usecase.node.GetNodeContentUriUseCase
+import mega.privacy.android.domain.usecase.node.IsHidingActionAllowedUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
 import nz.mega.sdk.MegaNode
 import org.junit.jupiter.api.BeforeEach
@@ -45,7 +48,9 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mockito
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import kotlin.time.Duration.Companion.seconds
 
 @ExtendWith(CoroutineMainDispatcherExtension::class)
 @ExperimentalCoroutinesApi
@@ -115,33 +120,38 @@ class FavouritesViewModelTest {
     }
 
     private val isHiddenNodesOnboardedUseCase = mock<IsHiddenNodesOnboardedUseCase> {
-        on {
-            runBlocking { invoke() }
+        onBlocking {
+            invoke()
         }.thenReturn(false)
     }
 
     private val monitorShowHiddenItemsUseCase = mock<MonitorShowHiddenItemsUseCase> {
         on {
-            runBlocking { invoke() }
+            invoke()
         }.thenReturn(flowOf(false))
     }
 
     private val getFeatureFlagValueUseCase = mock<GetFeatureFlagValueUseCase> {
-        on {
-            runBlocking { invoke(any()) }
+        onBlocking {
+            invoke(any())
         }.thenReturn(false)
     }
 
-    private val isHidingActionAllowedUseCase = mock<IsHidingActionAllowedUseCase>() {
-        on {
-            runBlocking { invoke(NodeId(any())) }
+    private val isHidingActionAllowedUseCase = mock<IsHidingActionAllowedUseCase> {
+        onBlocking {
+            invoke(NodeId(any()))
         }.thenReturn(false)
     }
+
+    private val getFileTypeInfoByNameUseCase = mock<GetFileTypeInfoByNameUseCase>()
+    private val getNodeContentUriUseCase = mock<GetNodeContentUriUseCase>()
 
     @BeforeEach
     fun setUp() {
         Mockito.reset(
-            mapFavouriteSortOrderUseCase
+            mapFavouriteSortOrderUseCase,
+            getFileTypeInfoByNameUseCase,
+            getNodeContentUriUseCase
         )
         initViewModel()
     }
@@ -171,6 +181,8 @@ class FavouritesViewModelTest {
             getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             defaultDispatcher = UnconfinedTestDispatcher(),
             isHidingActionAllowedUseCase = isHidingActionAllowedUseCase,
+            getNodeContentUriUseCase = getNodeContentUriUseCase,
+            getFileTypeInfoByNameUseCase = getFileTypeInfoByNameUseCase
         )
     }
 
@@ -438,4 +450,34 @@ class FavouritesViewModelTest {
         }
     }
 
+    @Test
+    fun `test that getFileTypeInfoByNameUseCase function is invoked and returns as expected`() =
+        runTest {
+            val mockName = "name"
+            val expectedFileTypeInfo = VideoFileTypeInfo("", "", 10.seconds)
+            whenever(getFileTypeInfoByNameUseCase(mockName)).thenReturn(expectedFileTypeInfo)
+            val actual = underTest.getFileTypeInfo(mockName)
+            assertThat(actual is VideoFileTypeInfo).isTrue()
+            verify(getFileTypeInfoByNameUseCase).invoke(mockName)
+        }
+
+    @Test
+    fun `test that getFileTypeInfoByNameUseCase returns null when an exception is thrown`() =
+        runTest {
+            val mockName = "name"
+            whenever(getFileTypeInfoByNameUseCase(mockName)).thenThrow(NullPointerException())
+            val actual = underTest.getFileTypeInfo(mockName)
+            assertThat(actual).isNull()
+        }
+
+    @Test
+    fun `test that GetNodeContentUriUseCase function is invoked and returns as expected`() =
+        runTest {
+            val mockTypedFileNode = mock<TypedFileNode>()
+            val expectedContentUri = NodeContentUri.RemoteContentUri("", false)
+            whenever(getNodeContentUriUseCase(any())).thenReturn(expectedContentUri)
+            val actual = underTest.getNodeContentUri(mockTypedFileNode)
+            assertThat(actual).isEqualTo(expectedContentUri)
+            verify(getNodeContentUriUseCase).invoke(mockTypedFileNode)
+        }
 }

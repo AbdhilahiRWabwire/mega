@@ -41,10 +41,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mega.privacy.android.analytics.Analytics
-import mega.privacy.android.app.MegaOffline
 import mega.privacy.android.app.R
 import mega.privacy.android.app.di.mediaplayer.VideoPlayer
-import mega.privacy.android.app.featuretoggle.AppFeatures
+import mega.privacy.android.app.mediaplayer.MediaPlayerActivity.Companion.TYPE_NEXT
+import mega.privacy.android.app.mediaplayer.MediaPlayerActivity.Companion.TYPE_PLAYING
+import mega.privacy.android.app.mediaplayer.MediaPlayerActivity.Companion.TYPE_PREVIOUS
 import mega.privacy.android.app.mediaplayer.gateway.MediaPlayerGateway
 import mega.privacy.android.app.mediaplayer.mapper.PlaylistItemMapper
 import mega.privacy.android.app.mediaplayer.model.MediaPlaySources
@@ -53,19 +54,16 @@ import mega.privacy.android.app.mediaplayer.model.SpeedPlaybackItem
 import mega.privacy.android.app.mediaplayer.model.SubtitleDisplayState
 import mega.privacy.android.app.mediaplayer.model.VideoControllerPadding
 import mega.privacy.android.app.mediaplayer.model.VideoPlayerUiState
-import mega.privacy.android.app.mediaplayer.playlist.PlaylistAdapter.Companion.TYPE_NEXT
-import mega.privacy.android.app.mediaplayer.playlist.PlaylistAdapter.Companion.TYPE_PLAYING
-import mega.privacy.android.app.mediaplayer.playlist.PlaylistAdapter.Companion.TYPE_PREVIOUS
 import mega.privacy.android.app.mediaplayer.playlist.PlaylistItem
 import mega.privacy.android.app.mediaplayer.playlist.finalizeItem
 import mega.privacy.android.app.mediaplayer.playlist.updateNodeName
 import mega.privacy.android.app.mediaplayer.service.Metadata
 import mega.privacy.android.app.presentation.extensions.getStateFlow
-import mega.privacy.android.app.presentation.extensions.parcelableArrayList
 import mega.privacy.android.app.search.callback.SearchCallback
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.BACKUPS_ADAPTER
 import mega.privacy.android.app.utils.Constants.CONTACT_FILE_ADAPTER
+import mega.privacy.android.app.utils.Constants.FAVOURITES_ADAPTER
 import mega.privacy.android.app.utils.Constants.FILE_BROWSER_ADAPTER
 import mega.privacy.android.app.utils.Constants.FILE_LINK_ADAPTER
 import mega.privacy.android.app.utils.Constants.FOLDER_LINK_ADAPTER
@@ -75,7 +73,6 @@ import mega.privacy.android.app.utils.Constants.FROM_IMAGE_VIEWER
 import mega.privacy.android.app.utils.Constants.FROM_MEDIA_DISCOVERY
 import mega.privacy.android.app.utils.Constants.INCOMING_SHARES_ADAPTER
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE
-import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ARRAY_OFFLINE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_FILE_NAME
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_FROM_DOWNLOAD_SERVICE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_HANDLE
@@ -103,10 +100,7 @@ import mega.privacy.android.app.utils.Constants.VIDEO_BROWSE_ADAPTER
 import mega.privacy.android.app.utils.Constants.ZIP_ADAPTER
 import mega.privacy.android.app.utils.FileUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
-import mega.privacy.android.app.utils.OfflineUtils
-import mega.privacy.android.app.utils.OfflineUtils.getOfflineFile
 import mega.privacy.android.app.utils.ThumbnailUtils
-import mega.privacy.android.app.utils.wrapper.GetOfflineThumbnailFileWrapper
 import mega.privacy.android.data.model.MimeTypeList
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.VideoFileTypeInfo
@@ -184,7 +178,6 @@ class LegacyVideoPlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     @VideoPlayer private val mediaPlayerGateway: MediaPlayerGateway,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
-    private val offlineThumbnailFileWrapper: GetOfflineThumbnailFileWrapper,
     private val monitorTransferEventsUseCase: MonitorTransferEventsUseCase,
     private val playlistItemMapper: PlaylistItemMapper,
     private val trackPlaybackPositionUseCase: TrackPlaybackPositionUseCase,
@@ -734,10 +727,6 @@ class LegacyVideoPlayerViewModel @Inject constructor(
             _playerSourcesState.value = playSource
         }
 
-        val isOfflineComposeEnabled = runCatching {
-            getFeatureFlagValueUseCase(AppFeatures.OfflineCompose)
-        }.getOrDefault(false)
-
         if (intent.getBooleanExtra(INTENT_EXTRA_KEY_IS_PLAYLIST, true)) {
             if (type != OFFLINE_ADAPTER && type != ZIP_ADAPTER) {
                 needStopStreamingServer =
@@ -746,30 +735,20 @@ class LegacyVideoPlayerViewModel @Inject constructor(
             viewModelScope.launch(ioDispatcher) {
                 when (type) {
                     OFFLINE_ADAPTER -> {
-                        if (isOfflineComposeEnabled) {
-                            val parentId = intent.getIntExtra(INTENT_EXTRA_KEY_PARENT_ID, -1)
-                            _playlistTitleState.update {
-                                if (parentId == -1) {
-                                    context.getString(R.string.section_saved_for_offline_new)
-                                } else {
-                                    runCatching {
-                                        getOfflineNodeInformationByIdUseCase(parentId)
-                                    }.getOrNull()?.name ?: ""
-                                }
+                        val parentId = intent.getIntExtra(INTENT_EXTRA_KEY_PARENT_ID, -1)
+                        _playlistTitleState.update {
+                            if (parentId == -1) {
+                                context.getString(R.string.section_saved_for_offline_new)
+                            } else {
+                                runCatching {
+                                    getOfflineNodeInformationByIdUseCase(parentId)
+                                }.getOrNull()?.name ?: ""
                             }
-                            buildPlaylistFromOfflineNodes(
-                                parentId = parentId,
-                                firstPlayHandle = firstPlayHandle
-                            )
-                        } else {
-                            _playlistTitleState.update {
-                                OfflineUtils.getOfflineFolderName(
-                                    context,
-                                    firstPlayHandle
-                                )
-                            }
-                            buildPlaylistFromLegacyOfflineNodes(intent, firstPlayHandle)
                         }
+                        buildPlaylistFromOfflineNodes(
+                            parentId = parentId,
+                            firstPlayHandle = firstPlayHandle
+                        )
                     }
 
                     VIDEO_BROWSE_ADAPTER -> {
@@ -793,6 +772,7 @@ class LegacyVideoPlayerViewModel @Inject constructor(
                     FROM_MEDIA_DISCOVERY,
                     FROM_IMAGE_VIEWER,
                     FROM_ALBUM_SHARING,
+                    FAVOURITES_ADAPTER,
                     -> {
                         val parentHandle =
                             intent.getLongExtra(INTENT_EXTRA_KEY_PARENT_NODE_HANDLE, INVALID_HANDLE)
@@ -976,20 +956,9 @@ class LegacyVideoPlayerViewModel @Inject constructor(
 
             val node = getVideoNodeByHandleUseCase(firstPlayHandle)
             val thumbnail = when {
-                type == OFFLINE_ADAPTER -> {
-                    if (isOfflineComposeEnabled) {
-                        getThumbnailUseCase(firstPlayHandle)
-                    } else {
-                        offlineThumbnailFileWrapper.getThumbnailFile(
-                            context,
-                            firstPlayHandle.toString()
-                        )
-                    }
-                }
+                type == OFFLINE_ADAPTER -> getThumbnailUseCase(firstPlayHandle)
 
-                node == null -> {
-                    null
-                }
+                node == null -> null
 
                 else -> {
                     File(
@@ -1069,58 +1038,6 @@ class LegacyVideoPlayerViewModel @Inject constructor(
         }.onFailure {
             Timber.e(it)
         }
-    }
-
-    /**
-     * Build play sources by node OfflineNodes
-     *
-     * @param intent Intent
-     * @param firstPlayHandle the index of first playing item
-     */
-    @Deprecated("Should be removed when legacy Offline feature is removed")
-    private fun buildPlaylistFromLegacyOfflineNodes(
-        intent: Intent,
-        firstPlayHandle: Long,
-    ) {
-        intent.parcelableArrayList<MegaOffline>(INTENT_EXTRA_KEY_ARRAY_OFFLINE)
-            ?.let { offlineFiles ->
-                playlistItems.clear()
-
-                val mediaItems = mutableListOf<MediaItem>()
-                var firstPlayIndex = 0
-
-                offlineFiles.filter {
-                    getOfflineFile(context, it).let { file ->
-                        FileUtil.isFileAvailable(file) && file.isFile && filterByNodeName(it.name)
-                    }
-                }.mapIndexed { currentIndex, megaOffline ->
-                    mediaItems.add(
-                        mediaItemFromFile(
-                            getOfflineFile(context, megaOffline),
-                            megaOffline.handle
-                        )
-                    )
-                    if (megaOffline.handle.toLong() == firstPlayHandle) {
-                        firstPlayIndex = currentIndex
-                    }
-
-                    playlistItemMapper(
-                        megaOffline.handle.toLong(),
-                        megaOffline.name,
-                        offlineThumbnailFileWrapper.getThumbnailFile(context, megaOffline),
-                        currentIndex,
-                        TYPE_NEXT,
-                        megaOffline.getSize(context),
-                        0.seconds,
-                        MimeTypeList.typeForName(megaOffline.name).extension
-                    )
-                        .let { playlistItem ->
-                            playlistItems.add(playlistItem)
-                        }
-                }
-
-                updatePlaySources(mediaItems, playlistItems, firstPlayIndex)
-            }
     }
 
     /**

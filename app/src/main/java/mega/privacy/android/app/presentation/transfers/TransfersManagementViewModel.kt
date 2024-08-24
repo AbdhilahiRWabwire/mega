@@ -49,7 +49,6 @@ class TransfersManagementViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(TransferManagementUiState())
     private val shouldShowCompletedTab = SingleLiveEvent<Boolean>()
-    private var lastTransfersStatusInfo = TransfersStatusInfo()
 
     /**
      * is network connected
@@ -74,7 +73,6 @@ class TransfersManagementViewModel @Inject constructor(
             } else {
                 flow
             }.collect { transfersInfo ->
-                lastTransfersStatusInfo = transfersInfo
                 updateUiState(transfersInfo)
             }
         }
@@ -84,18 +82,6 @@ class TransfersManagementViewModel @Inject constructor(
      * Notifies about updates on if should show or not the Completed tab.
      */
     fun onGetShouldCompletedTab(): LiveData<Boolean> = shouldShowCompletedTab
-
-    /**
-     * Checks transfers info.
-     */
-    fun checkTransfersInfo(unHideWidget: Boolean = false) {
-        if (unHideWidget) {
-            _state.update {
-                it.copy(hideTransfersWidget = false)
-            }
-        }
-        updateUiState(lastTransfersStatusInfo)
-    }
 
     /**
      * get pending download and upload
@@ -130,11 +116,20 @@ class TransfersManagementViewModel @Inject constructor(
     }
 
     /**
-     * updates UI state to hide the transfers widget
+     * Updates UI state to hide the transfers widget. It will be hide regardless of whether there are active transfers or not
      */
     fun hideTransfersWidget() {
         _state.update {
             it.copy(hideTransfersWidget = true)
+        }
+    }
+
+    /**
+     * Updates UI state to show the transfers widget when there are active transfers
+     */
+    fun showTransfersWidget() {
+        _state.update {
+            it.copy(hideTransfersWidget = false)
         }
     }
 

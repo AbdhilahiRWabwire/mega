@@ -47,17 +47,17 @@ import mega.privacy.android.domain.entity.StorageStateEvent
 import mega.privacy.android.domain.entity.UserAlert
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadFolderType
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRestartMode
-import mega.privacy.android.domain.entity.chat.ChatCall
+import mega.privacy.android.domain.entity.call.ChatCall
 import mega.privacy.android.domain.entity.chat.ChatLinkContent
 import mega.privacy.android.domain.entity.contacts.ContactRequest
 import mega.privacy.android.domain.entity.contacts.ContactRequestStatus
 import mega.privacy.android.domain.entity.environment.DevicePowerConnectionState
-import mega.privacy.android.domain.entity.meeting.ChatCallStatus
-import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
+import mega.privacy.android.domain.entity.call.ChatCallStatus
+import mega.privacy.android.domain.entity.call.ChatCallTermCodeType
 import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.MoveRequestResult
 import mega.privacy.android.domain.entity.node.NodeId
-import mega.privacy.android.domain.entity.node.NodeNameCollisionResult
+import mega.privacy.android.domain.entity.node.NodeNameCollisionsResult
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.entity.node.NodeSourceType
 import mega.privacy.android.domain.entity.node.NodeUpdate
@@ -91,11 +91,11 @@ import mega.privacy.android.domain.usecase.chat.link.GetChatLinkContentUseCase
 import mega.privacy.android.domain.usecase.contact.SaveContactByEmailUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.login.MonitorFinishActivityUseCase
-import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
+import mega.privacy.android.domain.usecase.call.AnswerChatCallUseCase
+import mega.privacy.android.domain.usecase.call.GetChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
-import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
+import mega.privacy.android.domain.usecase.call.HangChatCallUseCase
+import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChatUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorUpgradeDialogClosedUseCase
@@ -128,7 +128,6 @@ import mega.privacy.android.feature.sync.domain.entity.FolderPair
 import mega.privacy.android.feature.sync.domain.entity.RemoteFolder
 import mega.privacy.android.feature.sync.domain.entity.SyncStatus
 import mega.privacy.android.feature.sync.domain.usecase.sync.MonitorSyncStalledIssuesUseCase
-import mega.privacy.android.shared.sync.featuretoggle.SyncABTestFeatures
 import nz.mega.sdk.MegaNode
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -304,7 +303,7 @@ class ManagerViewModelTest {
     private val dismissPsaUseCase = mock<DismissPsaUseCase>()
     private val rootNodeUseCase = mock<GetRootNodeUseCase>()
     private val getChatLinkContentUseCase: GetChatLinkContentUseCase = mock()
-    private val getScheduledMeetingByChat: GetScheduledMeetingByChat = mock()
+    private val getScheduledMeetingByChatUseCase: GetScheduledMeetingByChatUseCase = mock()
     private val getChatCallUseCase: GetChatCallUseCase = mock()
     private val startMeetingInWaitingRoomChatUseCase: StartMeetingInWaitingRoomChatUseCase = mock()
     private val answerChatCallUseCase: AnswerChatCallUseCase = mock()
@@ -393,7 +392,7 @@ class ManagerViewModelTest {
             dismissPsaUseCase = dismissPsaUseCase,
             getRootNodeUseCase = rootNodeUseCase,
             getChatLinkContentUseCase = getChatLinkContentUseCase,
-            getScheduledMeetingByChat = getScheduledMeetingByChat,
+            getScheduledMeetingByChatUseCase = getScheduledMeetingByChatUseCase,
             getChatCallUseCase = getChatCallUseCase,
             startMeetingInWaitingRoomChatUseCase = startMeetingInWaitingRoomChatUseCase,
             answerChatCallUseCase = answerChatCallUseCase,
@@ -449,7 +448,7 @@ class ManagerViewModelTest {
             dismissPsaUseCase,
             rootNodeUseCase,
             getChatLinkContentUseCase,
-            getScheduledMeetingByChat,
+            getScheduledMeetingByChatUseCase,
             getChatCallUseCase,
             startMeetingInWaitingRoomChatUseCase,
             answerChatCallUseCase,
@@ -1054,7 +1053,7 @@ class ManagerViewModelTest {
                 on { handle }.thenReturn(1L)
                 on { restoreHandle }.thenReturn(100L)
             }
-            val result = mock<NodeNameCollisionResult>()
+            val result = mock<NodeNameCollisionsResult>()
             whenever(
                 checkNodesNameCollisionUseCase(
                     mapOf(node.handle to node.restoreHandle),
@@ -1067,7 +1066,7 @@ class ManagerViewModelTest {
                 assertThat(state.restoreNodeResult).isNull()
                 underTest.checkRestoreNodesNameCollision(listOf(node))
                 val updatedState = awaitItem()
-                assertThat(updatedState.nodeNameCollisionResult).isNotNull()
+                assertThat(updatedState.nodeNameCollisionsResult).isNotNull()
             }
         }
 
@@ -1131,7 +1130,7 @@ class ManagerViewModelTest {
             testScheduler.advanceUntilIdle()
             val nodes = listOf(1L, 2L)
             val targetNode = 100L
-            val result = mock<NodeNameCollisionResult>()
+            val result = mock<NodeNameCollisionsResult>()
             whenever(
                 checkNodesNameCollisionUseCase(
                     mapOf(1L to 100L, 2L to 100L),
@@ -1141,10 +1140,10 @@ class ManagerViewModelTest {
 
             underTest.state.test {
                 val state = awaitItem()
-                assertThat(state.nodeNameCollisionResult).isNull()
+                assertThat(state.nodeNameCollisionsResult).isNull()
                 underTest.checkNodesNameCollision(nodes, targetNode, NodeNameCollisionType.MOVE)
                 val updatedState = awaitItem()
-                assertThat(updatedState.nodeNameCollisionResult).isNotNull()
+                assertThat(updatedState.nodeNameCollisionsResult).isNotNull()
             }
         }
 
@@ -1333,7 +1332,6 @@ class ManagerViewModelTest {
                 SyncStatus.SYNCING
             )
             testScheduler.advanceUntilIdle()
-            whenever(getFeatureFlagValueUseCase(SyncABTestFeatures.asyc)).thenReturn(true)
             monitorSyncsUseCaseFakeFlow.emit(listOf(mockFolderPair))
             testScheduler.advanceUntilIdle()
             underTest
@@ -1346,21 +1344,7 @@ class ManagerViewModelTest {
     @Test
     fun `test that if Android Sync feature is on and syncs are empty Sync service is disabled`() =
         runTest {
-            whenever(getFeatureFlagValueUseCase(SyncABTestFeatures.asyc)).thenReturn(true)
             monitorSyncsUseCaseFakeFlow.emit(listOf())
-            testScheduler.advanceUntilIdle()
-
-            underTest
-                .state
-                .test {
-                    assertThat(awaitItem().androidSyncServiceEnabled).isFalse()
-                }
-        }
-
-    @Test
-    fun `test that if Android Sync feature is off Sync service is disabled`() =
-        runTest {
-            whenever(getFeatureFlagValueUseCase(SyncABTestFeatures.asyc)).thenReturn(false)
             testScheduler.advanceUntilIdle()
 
             underTest
@@ -1438,11 +1422,8 @@ class ManagerViewModelTest {
     )
 
     @Test
-    fun `test that camera uploads automatically starts when the device begins charging and the charging feature flag is enabled`() =
+    fun `test that camera uploads automatically starts when the device begins charging`() =
         runTest {
-            whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
-                true
-            )
             monitorDevicePowerConnectionFakeFlow.emit(DevicePowerConnectionState.Connected)
             testScheduler.advanceUntilIdle()
 
@@ -1450,23 +1431,8 @@ class ManagerViewModelTest {
         }
 
     @Test
-    fun `test that camera uploads does not automatically start when the device begins charging and the charging feature flag is disabled`() =
+    fun `test that camera uploads does not automatically start when the device is not charging`() =
         runTest {
-            whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
-                false
-            )
-            monitorDevicePowerConnectionFakeFlow.emit(DevicePowerConnectionState.Connected)
-            testScheduler.advanceUntilIdle()
-
-            verifyNoInteractions(startCameraUploadUseCase)
-        }
-
-    @Test
-    fun `test that camera uploads does not automatically start when the device is not charging and the charging feature flag is enabled`() =
-        runTest {
-            whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
-                true
-            )
             monitorDevicePowerConnectionFakeFlow.emit(DevicePowerConnectionState.Disconnected)
             testScheduler.advanceUntilIdle()
 
@@ -1474,35 +1440,8 @@ class ManagerViewModelTest {
         }
 
     @Test
-    fun `test that camera uploads does not automatically start when the device is not charging and the charging feature flag is disabled`() =
+    fun `test that camera uploads does not automatically start when the device charging state is unknown`() =
         runTest {
-            whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
-                false
-            )
-            monitorDevicePowerConnectionFakeFlow.emit(DevicePowerConnectionState.Disconnected)
-            testScheduler.advanceUntilIdle()
-
-            verifyNoInteractions(startCameraUploadUseCase)
-        }
-
-    @Test
-    fun `test that camera uploads does not automatically start when the device charging state is unknown and the feature flag is enabled`() =
-        runTest {
-            whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
-                true
-            )
-            monitorDevicePowerConnectionFakeFlow.emit(DevicePowerConnectionState.Unknown)
-            testScheduler.advanceUntilIdle()
-
-            verifyNoInteractions(startCameraUploadUseCase)
-        }
-
-    @Test
-    fun `test that camera uploads does not automatically start when the device charging state is unknown and the feature flag is disabled`() =
-        runTest {
-            whenever(getFeatureFlagValueUseCase(AppFeatures.SettingsCameraUploadsUploadWhileCharging)).thenReturn(
-                false
-            )
             monitorDevicePowerConnectionFakeFlow.emit(DevicePowerConnectionState.Unknown)
             testScheduler.advanceUntilIdle()
 

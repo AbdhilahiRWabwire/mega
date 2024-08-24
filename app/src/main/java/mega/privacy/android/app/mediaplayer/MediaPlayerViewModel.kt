@@ -14,40 +14,30 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
-import mega.privacy.android.app.domain.usecase.CheckNameCollision
 import mega.privacy.android.app.mediaplayer.model.MediaPlayerMenuClickedEvent
 import mega.privacy.android.app.mediaplayer.model.MediaPlayerState
 import mega.privacy.android.app.mediaplayer.service.Metadata
-import mega.privacy.android.app.namecollision.data.NameCollision
-import mega.privacy.android.app.namecollision.data.NameCollisionType
-import mega.privacy.android.app.namecollision.usecase.CheckNameCollisionUseCase
 import mega.privacy.android.app.presentation.photos.util.LegacyPublicAlbumPhotoNodeProvider
-import mega.privacy.android.app.usecase.exception.MegaNodeException
 import mega.privacy.android.app.utils.livedata.SingleLiveEvent
+import mega.privacy.android.domain.entity.node.NameCollision
 import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.domain.entity.node.NodeNameCollisionType
+import mega.privacy.android.domain.exception.node.NodeDoesNotExistsException
 import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
-import mega.privacy.android.domain.usecase.node.CopyChatNodeUseCase
-import mega.privacy.android.domain.usecase.node.CopyNodeUseCase
-import mega.privacy.android.domain.usecase.node.MoveNodeUseCase
+import mega.privacy.android.domain.usecase.node.CheckChatNodesNameCollisionAndCopyUseCase
+import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionWithActionUseCase
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
 import javax.inject.Inject
 
 /**
  * ViewModel for business logic regarding the toolbar.
- *
- * @property checkNameCollision Required for checking name collisions.
- * @property copyNodeUseCase Required for copying nodes.
- * @property moveNodeUseCase Required for moving nodes.
  */
 @HiltViewModel
 class MediaPlayerViewModel @Inject constructor(
-    private val checkNameCollision: CheckNameCollision,
-    private val copyNodeUseCase: CopyNodeUseCase,
-    private val moveNodeUseCase: MoveNodeUseCase,
-    private val copyChatNodeUseCase: CopyChatNodeUseCase,
-    private val checkNameCollisionUseCase: CheckNameCollisionUseCase,
+    private val checkNodesNameCollisionWithActionUseCase: CheckNodesNameCollisionWithActionUseCase,
+    private val checkChatNodesNameCollisionAndCopyUseCase: CheckChatNodesNameCollisionAndCopyUseCase,
     private val legacyPublicAlbumPhotoNodeProvider: LegacyPublicAlbumPhotoNodeProvider,
     private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
     private val isHiddenNodesOnboardedUseCase: IsHiddenNodesOnboardedUseCase,
@@ -131,33 +121,37 @@ class MediaPlayerViewModel @Inject constructor(
     /**
      * Copies a node if there is no name collision.
      *
-     * @param node              Node to copy.
      * @param nodeHandle        Node handle to copy.
      * @param newParentHandle   Parent handle in which the node will be copied.
      */
     fun copyNode(
-        node: MegaNode? = null,
         nodeHandle: Long? = null,
         newParentHandle: Long,
     ) {
+        if (nodeHandle == null) return
         viewModelScope.launch {
-            val nodeId = node?.handle ?: nodeHandle ?: return@launch
-            checkForNameCollision(
-                nodeHandle = nodeId,
-                newParentHandle = newParentHandle,
-                type = NameCollisionType.COPY
-            ) {
-                runCatching {
-                    copyNodeUseCase(
-                        nodeToCopy = NodeId(nodeId),
-                        newNodeParent = NodeId(newParentHandle),
-                        newNodeName = null,
-                    )
-                }.onSuccess {
-                    snackbarMessage.value = R.string.context_correctly_copied
-                }.onFailure {
+            runCatching {
+                checkNodesNameCollisionWithActionUseCase(
+                    nodes = mapOf(nodeHandle to newParentHandle),
+                    type = NodeNameCollisionType.COPY,
+                )
+            }.onSuccess {
+                it.firstNodeCollisionOrNull?.let { item ->
+                    collision.value = item
+                }
+                it.moveRequestResult?.let { result ->
+                    snackbarMessage.value = if (result.isSuccess) {
+                        R.string.context_correctly_copied
+                    } else {
+                        R.string.context_no_copied
+                    }
+                }
+            }.onFailure {
+                Timber.e("Error not copied", it)
+                if (it is NodeDoesNotExistsException) {
+                    snackbarMessage.value = R.string.general_error
+                } else {
                     throwable.value = it
-                    Timber.e("Error not copied $it")
                 }
             }
         }
@@ -166,59 +160,37 @@ class MediaPlayerViewModel @Inject constructor(
     /**
      * Imports a chat node if there is no name collision.
      *
-     * @param node              Node handle to copy.
      * @param chatId            Chat ID where the node is.
      * @param messageId         Message ID where the node is.
      * @param newParentHandle   Parent handle in which the node will be copied.
      */
     fun importChatNode(
-        node: MegaNode,
         chatId: Long,
         messageId: Long,
         newParentHandle: NodeId,
     ) = viewModelScope.launch {
         runCatching {
-            checkNameCollisionUseCase.check(
-                node = node,
-                parentHandle = newParentHandle.longValue,
-                type = NameCollisionType.COPY,
+            checkChatNodesNameCollisionAndCopyUseCase(
+                chatId = chatId,
+                messageIds = listOf(messageId),
+                newNodeParent = newParentHandle,
             )
-        }.onSuccess { collisionResult ->
-            collision.value = collisionResult
-        }.onFailure { throwable ->
-            when (throwable) {
-                is MegaNodeException.ChildDoesNotExistsException -> {
-                    copyChatNode(chatId, messageId, newParentHandle)
+        }.onSuccess {
+            it.firstChatNodeCollisionOrNull?.let { item ->
+                collision.value = item
+            }
+            it.moveRequestResult?.let { result ->
+                snackbarMessage.value = if (result.isSuccess) {
+                    R.string.context_correctly_copied
+                } else {
+                    R.string.context_no_copied
                 }
-
-                else -> Timber.e(throwable)
             }
+        }.onFailure {
+            throwable.value = it
+            Timber.e(it)
         }
     }
-
-    /**
-     * Copies a chat node
-     * @param chatId Chat ID where the node is.
-     * @param messageId Message ID where the node is.
-     * @param newParentNodeId Parent handle in which the node will be copied.
-     */
-    private fun copyChatNode(chatId: Long, messageId: Long, newParentNodeId: NodeId) {
-        viewModelScope.launch {
-            runCatching {
-                copyChatNodeUseCase(
-                    chatId = chatId,
-                    messageId = messageId,
-                    newNodeParent = newParentNodeId,
-                )
-            }.onSuccess {
-                snackbarMessage.value = R.string.context_correctly_copied
-            }.onFailure { copyError ->
-                Timber.e(copyError, "The chat node is not copied")
-                throwable.value = copyError
-            }
-        }
-    }
-
 
     /**
      * Moves a node if there is no name collision.
@@ -228,56 +200,30 @@ class MediaPlayerViewModel @Inject constructor(
      */
     fun moveNode(nodeHandle: Long, newParentHandle: Long) {
         viewModelScope.launch {
-            checkForNameCollision(
-                nodeHandle = nodeHandle,
-                newParentHandle = newParentHandle,
-                type = NameCollisionType.MOVE,
-            ) {
-                runCatching {
-                    moveNodeUseCase(
-                        nodeToMove = NodeId(nodeHandle),
-                        newNodeParent = NodeId(newParentHandle)
-                    )
-                }.onSuccess {
-                    _itemToRemove.value = nodeHandle
-                    snackbarMessage.value = R.string.context_correctly_moved
-                }.onFailure {
-                    throwable.value = it
-                    Timber.e("Error not moved $it")
+            runCatching {
+                checkNodesNameCollisionWithActionUseCase(
+                    nodes = mapOf(nodeHandle to newParentHandle),
+                    type = NodeNameCollisionType.MOVE,
+                )
+            }.onSuccess {
+                it.firstNodeCollisionOrNull?.let { item ->
+                    collision.value = item
                 }
-            }
-        }
-    }
-
-    /**
-     * Checks if there is a name collision before proceeding with the action.
-     *
-     * @param nodeHandle        Handle of the node to check the name collision.
-     * @param newParentHandle   Handle of the parent folder in which the action will be performed.
-     * @param completeAction    Action to complete after checking the name collision.
-     */
-    private suspend fun checkForNameCollision(
-        nodeHandle: Long,
-        newParentHandle: Long,
-        type: NameCollisionType,
-        completeAction: suspend (() -> Unit),
-    ) {
-        runCatching {
-            checkNameCollision(
-                nodeHandle = NodeId(nodeHandle),
-                parentHandle = NodeId(newParentHandle),
-                type = type,
-            )
-        }.onSuccess {
-            collision.value = it
-        }.onFailure {
-            when (it) {
-                is MegaNodeException.ChildDoesNotExistsException -> completeAction.invoke()
-                is MegaNodeException.ParentDoesNotExistException -> {
+                it.moveRequestResult?.let {
+                    if (it.isSuccess) {
+                        _itemToRemove.value = nodeHandle
+                        snackbarMessage.value = R.string.context_correctly_moved
+                    } else {
+                        snackbarMessage.value = R.string.context_no_moved
+                    }
+                }
+            }.onFailure {
+                Timber.e("Error not copied", it)
+                if (it is NodeDoesNotExistsException) {
                     snackbarMessage.value = R.string.general_error
+                } else {
+                    throwable.value = it
                 }
-
-                else -> Timber.e(it)
             }
         }
     }

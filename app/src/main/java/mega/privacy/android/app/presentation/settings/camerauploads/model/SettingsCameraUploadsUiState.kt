@@ -10,16 +10,15 @@ import mega.privacy.android.domain.entity.account.EnableCameraUploadsStatus
  *
  * @property businessAccountPromptType The type of prompt to be shown when a Business Account User
  * attempts to enable Camera Uploads
- * @property canChangeChargingWhenUploadingContentState Checks if the User can change whether or not
- * charging is required when the active Camera Uploads begins uploading content
  * @property isCameraUploadsEnabled true if Camera Uploads is enabled
  * @property isMediaUploadsEnabled true if Media Uploads is enabled
  * @property maximumNonChargingVideoCompressionSize The maximum aggregated Video Size that can be
  * compressed without having to charge the Device
  * @property primaryFolderName The Camera Uploads Cloud Drive Folder name, which can be null
  * @property primaryFolderPath The Camera Uploads Local Primary Folder Path
- * @property requestPermissions State Event that triggers a request to grant Camera Uploads
- * permissions
+ * @property requestLocationPermission State Event that triggers a request to grant the Location
+ * Permission
+ * @property requestMediaPermissions State Event that triggers a request to grant Media Permissions
  * @property requireChargingDuringVideoCompression If true, the Device needs to be charged when
  * compressing Videos
  * @property requireChargingWhenUploadingContent If true, the Device needs to be charged for the
@@ -38,13 +37,13 @@ import mega.privacy.android.domain.entity.account.EnableCameraUploadsStatus
  */
 internal data class SettingsCameraUploadsUiState(
     val businessAccountPromptType: EnableCameraUploadsStatus? = null,
-    val canChangeChargingWhenUploadingContentState: Boolean = false,
     val isCameraUploadsEnabled: Boolean = false,
     val isMediaUploadsEnabled: Boolean = false,
     val maximumNonChargingVideoCompressionSize: Int = 200,
     val primaryFolderName: String? = null,
     val primaryFolderPath: String = "",
-    val requestPermissions: StateEvent = consumed,
+    val requestLocationPermission: StateEvent = consumed,
+    val requestMediaPermissions: StateEvent = consumed,
     val requireChargingDuringVideoCompression: Boolean = true,
     val requireChargingWhenUploadingContent: Boolean = false,
     val secondaryFolderName: String? = null,

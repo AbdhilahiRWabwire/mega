@@ -3,13 +3,15 @@ package mega.privacy.android.app.presentation.meeting.model
 import de.palm.composestateevents.StateEventWithContent
 import de.palm.composestateevents.consumed
 import mega.privacy.android.app.meeting.adapter.Participant
-import mega.privacy.android.domain.entity.chat.ChatCall
-import mega.privacy.android.domain.entity.meeting.AnotherCallType
-import mega.privacy.android.domain.entity.meeting.CallOnHoldType
-import mega.privacy.android.domain.entity.meeting.CallUIStatusType
-import mega.privacy.android.domain.entity.meeting.ChatCallStatus
-import mega.privacy.android.domain.entity.meeting.ChatSession
+import mega.privacy.android.domain.entity.call.AnotherCallType
+import mega.privacy.android.domain.entity.call.CallOnHoldType
+import mega.privacy.android.domain.entity.call.CallUIStatusType
+import mega.privacy.android.domain.entity.call.ChatCall
+import mega.privacy.android.domain.entity.call.ChatCallStatus
+import mega.privacy.android.domain.entity.call.ChatSession
+import mega.privacy.android.domain.entity.chat.ChatRoom
 import mega.privacy.android.domain.entity.meeting.SubtitleCallType
+import timber.log.Timber
 
 /**
  * In meeting UI state
@@ -18,6 +20,7 @@ import mega.privacy.android.domain.entity.meeting.SubtitleCallType
  * @property isOpenInvite                           True if it's enabled, false if not.
  * @property callUIStatus                           [CallUIStatusType]
  * @property call                                   [ChatCall]
+ * @property chat                                   [ChatRoom]
  * @property currentChatId                          Chat Id
  * @property previousState                          [ChatCallStatus]
  * @property isSpeakerSelectionAutomatic            True, if is speaker selection automatic. False, if it's manual.
@@ -30,7 +33,6 @@ import mega.privacy.android.domain.entity.meeting.SubtitleCallType
  * @property anotherChatTitle                       Chat title of another call.
  * @property updateModeratorsName                   Update moderator's name
  * @property updateNumParticipants                  Update the num of participants
- * @property isOneToOneCall                         True, if it's one to one call. False, if it's a group call or a meeting.
  * @property showMeetingInfoFragment                True to show meeting info fragment or False otherwise
  * @property snackbarInSpeakerViewMessage           Message to show in Snackbar in speaker view.
  * @property addScreensSharedParticipantsList       List of [Participant] to add the screen shared in the carousel
@@ -62,12 +64,14 @@ import mega.privacy.android.domain.entity.meeting.SubtitleCallType
  * @property changesInLowResInSession               [ChatSession] with changes in low resolution video
  * @property changesInStatusInSession               [ChatSession] with changes in status
  * @property shouldCheckChildFragments              True, if should update fragments. False, if not.
+ * @property callAnsweredInAnotherClient            True, if the call was answered in another client.
  */
 data class InMeetingUiState(
     val error: Int? = null,
     val isOpenInvite: Boolean? = null,
     var callUIStatus: CallUIStatusType = CallUIStatusType.None,
     val call: ChatCall? = null,
+    val chat: ChatRoom? = null,
     val currentChatId: Long = -1L,
     val previousState: ChatCallStatus = ChatCallStatus.Initial,
     val isSpeakerSelectionAutomatic: Boolean = true,
@@ -80,7 +84,6 @@ data class InMeetingUiState(
     val anotherChatTitle: String = " ",
     val updateModeratorsName: String = " ",
     val updateNumParticipants: Int = 1,
-    val isOneToOneCall: Boolean = true,
     val showMeetingInfoFragment: Boolean = false,
     val snackbarInSpeakerViewMessage: StateEventWithContent<String> = consumed(),
     val addScreensSharedParticipantsList: List<Participant>? = null,
@@ -112,7 +115,17 @@ data class InMeetingUiState(
     val changesInLowResInSession: ChatSession? = null,
     val changesInStatusInSession: ChatSession? = null,
     val shouldCheckChildFragments: Boolean = false,
+    val callAnsweredInAnotherClient: Boolean = false,
 ) {
+    /**
+     * Check if it's one to one call
+     * @return True, if it's one to one call. False, if it's a group call or a meeting.
+     */
+    val isOneToOneCall
+        get():Boolean = chat?.let {
+            it.isMeeting.not() && it.isGroup.not()
+        } ?: run { false }
+
     /**
      * Is call on hold
      */
@@ -135,7 +148,7 @@ data class InMeetingUiState(
      * Has local audio
      */
     val hasLocalAudio
-        get():Boolean = call?.hasLocalAudio == true
+        get():Boolean = call?.hasLocalAudio ?: run { false }
 
     /**
      * Check session is on hold in one to one call
@@ -173,6 +186,7 @@ data class InMeetingUiState(
      */
     fun getSessionByClientId(clientId: Long): ChatSession? {
         call?.apply {
+            Timber.d("Call $call and Sessions $sessionsClientId")
             return sessionByClientId[clientId]
         }
 

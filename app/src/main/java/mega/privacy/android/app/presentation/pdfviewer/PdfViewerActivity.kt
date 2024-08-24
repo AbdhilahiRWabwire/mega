@@ -30,7 +30,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
-import androidx.core.content.ContextCompat
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.github.barteksc.pdfviewer.listener.OnLoadCompleteListener
@@ -43,24 +43,28 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.BaseActivity
-import mega.privacy.android.app.LegacyDatabaseHandler
 import mega.privacy.android.app.MegaApplication.Companion.getInstance
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.OfflineFileInfoActivity
+import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.arch.extensions.collectFlow
-import mega.privacy.android.app.components.attacher.MegaAttacher
 import mega.privacy.android.app.components.dragger.DragToExitSupport
 import mega.privacy.android.app.databinding.ActivityPdfviewerBinding
+import mega.privacy.android.app.extensions.enableEdgeToEdgeAndConsumeInsets
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.interfaces.ActionNodeCallback
 import mega.privacy.android.app.interfaces.SnackbarShower
+import mega.privacy.android.app.interfaces.showSnackbarWithChat
 import mega.privacy.android.app.main.FileExplorerActivity
 import mega.privacy.android.app.main.controllers.ChatController
 import mega.privacy.android.app.main.controllers.NodeController
 import mega.privacy.android.app.presentation.fileinfo.FileInfoActivity
 import mega.privacy.android.app.presentation.hidenode.HiddenNodesOnboardingActivity
 import mega.privacy.android.app.presentation.security.PasscodeCheck
+import mega.privacy.android.app.presentation.transfers.attach.NodeAttachmentViewModel
+import mega.privacy.android.app.presentation.transfers.attach.createNodeAttachmentView
 import mega.privacy.android.app.presentation.transfers.starttransfer.StartDownloadViewModel
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.createStartTransferView
 import mega.privacy.android.app.utils.AlertDialogUtil.dismissAlertDialogIfExists
@@ -68,6 +72,7 @@ import mega.privacy.android.app.utils.AlertDialogUtil.isAlertDialogShown
 import mega.privacy.android.app.utils.AlertsAndWarnings.showTakenDownAlert
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.HANDLE
+import mega.privacy.android.app.utils.Constants.SNACKBAR_TYPE
 import mega.privacy.android.app.utils.FileUtil
 import mega.privacy.android.app.utils.LinksUtil
 import mega.privacy.android.app.utils.MegaNodeDialogUtil.moveToRubbishOrRemove
@@ -84,8 +89,10 @@ import mega.privacy.android.app.utils.permission.PermissionUtils.checkNotificati
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.mobile.analytics.event.DocumentPreviewHideNodeMenuItemEvent
 import nz.mega.sdk.MegaApiAndroid
 import nz.mega.sdk.MegaApiJava
+import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import nz.mega.sdk.MegaChatApiJava
 import nz.mega.sdk.MegaChatMessage
 import nz.mega.sdk.MegaContactRequest
@@ -110,7 +117,6 @@ import javax.inject.Inject
  * PDF viewer.
  *
  * @property passCodeFacade            [PasscodeCheck]
- * @property dbH                       [LegacyDatabaseHandler]
  * @property password                  Typed password
  * @property maxIntents                Max of intents for a wrong password.
  * @property pdfFileName               Name of the PDF.
@@ -157,7 +163,6 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
     private var renamed = false
     private var path: String? = null
     private var pathNavigation: String? = null
-    private val nodeAttacher = MegaAttacher(this)
 
     // it's only used for enter animation
     private val dragToExit = DragToExitSupport(this, lifecycleScope, null, null)
@@ -183,17 +188,36 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
 
     private val viewModel by viewModels<PdfViewerViewModel>()
     private val startDownloadViewModel by viewModels<StartDownloadViewModel>()
+    private val nodeAttachmentViewModel by viewModels<NodeAttachmentViewModel>()
 
     private var isHiddenNodesEnabled: Boolean = false
     private var tempNodeId: NodeId? = null
+
+    private val nameCollisionActivityContract = registerForActivityResult(
+        NameCollisionActivityContract()
+    ) { result ->
+        result?.let {
+            showSnackbar(SNACKBAR_TYPE, it, INVALID_HANDLE)
+        }
+    }
 
     @Inject
     lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
 
     override fun shouldSetStatusBarTextColor() = false
 
+    /**
+     * Attach base context
+     *
+     */
+    override fun attachBaseContext(newBase: Context?) {
+        delegate.localNightMode = AppCompatDelegate.MODE_NIGHT_YES
+        super.attachBaseContext(newBase)
+    }
+
     public override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate")
+        enableEdgeToEdgeAndConsumeInsets()
         super.onCreate(savedInstanceState)
         if (intent == null) {
             Timber.w("Intent null")
@@ -212,10 +236,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
         }
 
         with(window) {
-            navigationBarColor = ContextCompat.getColor(this@PdfViewerActivity, R.color.black)
-            statusBarColor = ContextCompat.getColor(this@PdfViewerActivity, R.color.black)
             addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         }
 
         registerReceiver(
@@ -236,7 +257,6 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
             isToolbarVisible = savedInstanceState.getBoolean("toolbarVisible", isToolbarVisible)
             password = savedInstanceState.getString("password")
             maxIntents = savedInstanceState.getInt("maxIntents", 3)
-            nodeAttacher.restoreState(savedInstanceState)
         } else {
             currentPage = 1
             isDeleteDialogShow = false
@@ -302,7 +322,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
                     }
                     if (node == null || url == null || uri == null) {
                         showSnackbar(
-                            Constants.SNACKBAR_TYPE,
+                            SNACKBAR_TYPE,
                             getString(R.string.error_streaming),
                             MegaChatApiJava.MEGACHAT_INVALID_HANDLE
                         )
@@ -315,7 +335,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
                 if (node == null) {
                     Timber.w("CurrentDocumentAuth is null")
                     showSnackbar(
-                        Constants.SNACKBAR_TYPE,
+                        SNACKBAR_TYPE,
                         getString(R.string.error_streaming) + ": node not authorized",
                         -1
                     )
@@ -361,7 +381,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
                 if (snackBarMessage != null) {
                     dismissAlertDialogIfExists(statusDialog)
                     showSnackbar(
-                        Constants.SNACKBAR_TYPE,
+                        SNACKBAR_TYPE,
                         getString(snackBarMessage),
                         MegaChatApiJava.MEGACHAT_INVALID_HANDLE
                     )
@@ -380,7 +400,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
                 }
                 if (nameCollision != null) {
                     dismissAlertDialogIfExists(statusDialog)
-                    nameCollisionActivityContract?.launch(arrayListOf(nameCollision))
+                    nameCollisionActivityContract.launch(arrayListOf(nameCollision))
                 }
                 if (pdfStreamData != null) {
                     try {
@@ -410,7 +430,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
         dismissAlertDialogIfExists(statusDialog)
         if (!manageCopyMoveException(copyMoveError)) {
             showSnackbar(
-                Constants.SNACKBAR_TYPE,
+                SNACKBAR_TYPE,
                 getString(if (isCopy) R.string.context_no_copied else R.string.context_no_moved),
                 MegaChatApiJava.MEGACHAT_INVALID_HANDLE
             )
@@ -455,6 +475,17 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
             setToolbarVisibilityHide(0L)
         }
         addStartDownloadTransferView()
+        addNodeAttachmentView()
+    }
+
+    private fun addNodeAttachmentView() {
+        binding.root.addView(
+            createNodeAttachmentView(
+                this,
+                nodeAttachmentViewModel,
+                ::showSnackbarWithChat
+            )
+        )
     }
 
     private fun addStartDownloadTransferView() {
@@ -592,7 +623,6 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
         dragToExit.runEnterAnimation(intent, pdfView) { animationStart: Boolean ->
             if (animationStart) {
                 if (supportActionBar?.isShowing == true) {
-                    window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
                     toolbarPdfViewer.animate().translationY(-220f).setDuration(0)
                         .withEndAction { supportActionBar?.hide() }.start()
                     pdfViewerLayoutBottom.animate().translationY(220f).setDuration(0)
@@ -620,7 +650,6 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
             putString("password", password)
             putInt("maxIntents", maxIntents)
         }
-        nodeAttacher.saveState(outState)
     }
 
     override fun onUsersUpdate(api: MegaApiJava, users: ArrayList<MegaUser>?) {}
@@ -1215,7 +1244,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
 
             R.id.pdf_viewer_download -> download()
 
-            R.id.pdf_viewer_chat -> nodeAttacher.attachNode(handle)
+            R.id.pdf_viewer_chat -> nodeAttachmentViewModel.startAttachNodes(listOf(NodeId(handle)))
 
             R.id.pdf_viewer_properties -> showPropertiesActivity()
 
@@ -1246,6 +1275,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
             }
 
             R.id.pdf_viewer_hide -> {
+                Analytics.tracker.trackEvent(DocumentPreviewHideNodeMenuItemEvent)
                 handleHideNodeClick(playingHandle = handle)
             }
 
@@ -1466,16 +1496,13 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
     override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
         super.onActivityResult(requestCode, resultCode, intent)
         Timber.d("onActivityResult: ${requestCode}____$resultCode")
-        if (nodeAttacher.handleActivityResult(requestCode, resultCode, intent, this)) {
-            return
-        }
         if (intent == null) {
             return
         }
         if (requestCode == Constants.REQUEST_CODE_SELECT_FOLDER_TO_MOVE && resultCode == RESULT_OK) {
             if (!Util.isOnline(this)) {
                 showSnackbar(
-                    Constants.SNACKBAR_TYPE,
+                    SNACKBAR_TYPE,
                     getString(R.string.error_server_connection_problem),
                     -1
                 )
@@ -1496,7 +1523,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
         } else if (requestCode == Constants.REQUEST_CODE_SELECT_FOLDER_TO_COPY && resultCode == RESULT_OK) {
             if (!Util.isOnline(this)) {
                 showSnackbar(
-                    Constants.SNACKBAR_TYPE,
+                    SNACKBAR_TYPE,
                     getString(R.string.error_server_connection_problem),
                     -1
                 )
@@ -1523,7 +1550,7 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
                     ex.printStackTrace()
                 }
                 showSnackbar(
-                    Constants.SNACKBAR_TYPE,
+                    SNACKBAR_TYPE,
                     getString(R.string.error_server_connection_problem),
                     -1
                 )
@@ -1533,7 +1560,6 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
             node?.let { megaNode ->
                 if (fromChat)
                     viewModel.importChatNode(
-                        node = megaNode,
                         chatId = chatId,
                         messageId = msgId,
                         newParentHandle = NodeId(toHandle)
@@ -1712,6 +1738,18 @@ class PdfViewerActivity : BaseActivity(), MegaGlobalListenerInterface, OnPageCha
         transfer: MegaTransfer,
         buffer: ByteArray,
     ): Boolean = false
+
+    override fun onFolderTransferUpdate(
+        api: MegaApiJava,
+        transfer: MegaTransfer,
+        stage: Int,
+        folderCount: Long,
+        createdFolderCount: Long,
+        fileCount: Long,
+        currentFolder: String?,
+        currentFileLeafName: String?,
+    ) {
+    }
 
     private fun handleHideNodeClick(playingHandle: Long) {
         val (isPaid, isHiddenNodesOnboarded) = with(viewModel.uiState.value) {

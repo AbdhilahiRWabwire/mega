@@ -2,12 +2,6 @@ package mega.privacy.android.app.presentation.filelink.view
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.TweenSpec
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +23,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import de.palm.composestateevents.EventEffect
 import mega.privacy.android.app.R
-import mega.privacy.android.app.components.transferWidget.TransfersWidgetView
 import mega.privacy.android.app.constants.IntentConstants
 import mega.privacy.android.app.main.dialog.storagestatus.StorageStatusDialogView
 import mega.privacy.android.app.myAccount.MyAccountActivity
@@ -43,16 +36,18 @@ import mega.privacy.android.app.presentation.filelink.model.FileLinkState
 import mega.privacy.android.app.presentation.transfers.TransferManagementUiState
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.utils.AlertsAndWarnings
+import mega.privacy.android.domain.entity.StorageState
+import mega.privacy.android.legacy.core.ui.controls.dialogs.LoadingDialog
 import mega.privacy.android.shared.original.core.ui.controls.buttons.TextMegaButton
 import mega.privacy.android.shared.original.core.ui.controls.dialogs.ConfirmationDialog
 import mega.privacy.android.shared.original.core.ui.controls.dialogs.MegaAlertDialog
 import mega.privacy.android.shared.original.core.ui.controls.layouts.ScaffoldWithCollapsibleHeader
 import mega.privacy.android.shared.original.core.ui.controls.snackbars.MegaSnackbar
+import mega.privacy.android.shared.original.core.ui.controls.widgets.TransfersWidgetViewAnimated
 import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
-import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_020_grey_700
-import mega.privacy.android.domain.entity.StorageState
-import mega.privacy.android.legacy.core.ui.controls.dialogs.LoadingDialog
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_020_grey_700
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 
 /**
  * View to render the File Link Screen, including toolbar, content, etc.
@@ -89,7 +84,7 @@ internal fun FileLinkView(
         event = viewState.errorMessage,
         onConsumed = onErrorMessageConsumed
     ) {
-        snackBarHostState.showSnackbar(context.resources.getString(it))
+        snackBarHostState.showAutoDurationSnackbar(context.resources.getString(it))
     }
 
     EventEffect(event = viewState.overQuotaError, onConsumed = onOverQuotaErrorConsumed) {
@@ -150,15 +145,9 @@ internal fun FileLinkView(
             }
         },
         floatingActionButton = {
-            AnimatedVisibility(
-                visible = transferState.widgetVisible,
-                enter = scaleIn(animationSpecs, initialScale = animationScale) +
-                        fadeIn(animationSpecs),
-                exit = scaleOut(animationSpecs, targetScale = animationScale) +
-                        fadeOut(animationSpecs),
-            ) {
-                TransfersWidgetView(
-                    transfersData = transferState.transfersInfo,
+            if (!transferState.hideTransfersWidget) {
+                TransfersWidgetViewAnimated(
+                    transfersInfo = transferState.transfersInfo,
                     onClick = onTransferWidgetClick,
                 )
             }
@@ -294,8 +283,5 @@ private fun PreviewFileLinkView() {
     }
 }
 
-internal const val animationDuration = 300
-internal const val animationScale = 0.2f
-internal val animationSpecs = TweenSpec<Float>(durationMillis = animationDuration)
 private const val MAX_HEADER_HEIGHT = 96
 private const val APP_BAR_HEIGHT = 56

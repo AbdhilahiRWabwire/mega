@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,7 +14,6 @@ import androidx.activity.viewModels
 import androidx.compose.material.SnackbarHostState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
@@ -22,14 +22,15 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication.Companion.isClosedChat
 import mega.privacy.android.app.MimeTypeList.Companion.typeForName
 import mega.privacy.android.app.R
+import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.extensions.isPortrait
 import mega.privacy.android.app.featuretoggle.ABTestFeatures
+import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.DecryptAlertDialog
 import mega.privacy.android.app.main.FileExplorerActivity
 import mega.privacy.android.app.main.ManagerActivity
-import mega.privacy.android.app.mediaplayer.AudioPlayerActivity
-import mega.privacy.android.app.mediaplayer.LegacyVideoPlayerActivity
+import mega.privacy.android.app.main.ManagerActivity.Companion.TRANSFERS_TAB
 import mega.privacy.android.app.presentation.advertisements.model.AdsSlotIDs
 import mega.privacy.android.app.presentation.clouddrive.FileLinkViewModel
 import mega.privacy.android.app.presentation.extensions.isDarkMode
@@ -39,15 +40,24 @@ import mega.privacy.android.app.presentation.imagepreview.fetcher.PublicFileImag
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewFetcherSource
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewMenuSource
 import mega.privacy.android.app.presentation.login.LoginActivity
+import mega.privacy.android.app.presentation.manager.model.TransfersTab
 import mega.privacy.android.app.presentation.pdfviewer.PdfViewerActivity
 import mega.privacy.android.app.presentation.transfers.TransfersManagementActivity
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.StartTransferComponent
+import mega.privacy.android.app.presentation.transfers.view.IN_PROGRESS_TAB_INDEX
 import mega.privacy.android.app.textEditor.TextEditorActivity
 import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.app.utils.Constants.ACTION_SHOW_TRANSFERS
+import mega.privacy.android.app.utils.Constants.FILE_LINK_ADAPTER
+import mega.privacy.android.app.utils.Constants.SNACKBAR_TYPE
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.domain.entity.ThemeMode
+import mega.privacy.android.domain.entity.node.TypedFileNode
+import mega.privacy.android.navigation.MegaNavigator
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import timber.log.Timber
+import javax.inject.Inject
 
 /**
  * FileLinkActivity with compose view
@@ -55,6 +65,12 @@ import timber.log.Timber
 @AndroidEntryPoint
 class FileLinkComposeActivity : TransfersManagementActivity(),
     DecryptAlertDialog.DecryptDialogListener {
+
+    /**
+     * MegaNavigator
+     */
+    @Inject
+    lateinit var megaNavigator: MegaNavigator
 
     private val viewModel: FileLinkViewModel by viewModels()
 
@@ -70,13 +86,18 @@ class FileLinkComposeActivity : TransfersManagementActivity(),
         selectImportFolderResult
     )
 
-    override val isOnFileManagementManagerSection: Boolean
-        get() = true
+    private val nameCollisionActivityLauncher = registerForActivityResult(
+        NameCollisionActivityContract()
+    ) { result ->
+        result?.let {
+            showSnackbar(SNACKBAR_TYPE, it, INVALID_HANDLE)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate()")
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         viewModel.handleIntent(intent)
         viewModel.checkLoginRequired()
@@ -172,7 +193,7 @@ class FileLinkComposeActivity : TransfersManagementActivity(),
                 }
 
                 it.collision != null -> {
-                    nameCollisionActivityContract?.launch(arrayListOf(it.collision))
+                    nameCollisionActivityLauncher.launch(arrayListOf(it.collision))
                     viewModel.resetCollision()
                 }
 
@@ -209,6 +230,35 @@ class FileLinkComposeActivity : TransfersManagementActivity(),
             startActivity(Intent(this@FileLinkComposeActivity, ManagerActivity::class.java))
         }
         finish()
+    }
+
+    /**
+     * Handle widget click
+     */
+    private fun onTransfersWidgetClick() {
+        transfersManagement.setAreFailedTransfers(false)
+        if (transfersManagement.isOnTransferOverQuota()) {
+            transfersManagement.setHasNotToBeShowDueToTransferOverQuota(true)
+        }
+        lifecycleScope.launch {
+            val credentials = runCatching { getAccountCredentialsUseCase() }.getOrNull()
+            if (megaApi.isLoggedIn == 0 || credentials == null) {
+                Timber.w("Not logged in, no action.")
+                return@launch
+            }
+            if (getFeatureFlagValueUseCase(AppFeatures.TransfersSection)) {
+                navigator.openTransfers(this@FileLinkComposeActivity, IN_PROGRESS_TAB_INDEX)
+            } else {
+                startActivity(
+                    Intent(this@FileLinkComposeActivity, ManagerActivity::class.java)
+                        .setAction(ACTION_SHOW_TRANSFERS)
+                        .putExtra(TRANSFERS_TAB, TransfersTab.PENDING_TAB)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+            finish()
+        }
     }
 
     /**
@@ -269,23 +319,26 @@ class FileLinkComposeActivity : TransfersManagementActivity(),
                 }
 
                 nameType.isVideoMimeType || nameType.isAudio -> {
-                    val intent =
-                        if (nameType.isVideoNotSupported || nameType.isAudioNotSupported) {
-                            Intent(Intent.ACTION_VIEW)
-                        } else {
-                            if (nameType.isAudio) {
-                                Intent(
-                                    this@FileLinkComposeActivity,
-                                    AudioPlayerActivity::class.java
+                    lifecycleScope.launch {
+                        if (fileNode is TypedFileNode) {
+                            runCatching {
+                                val contentUri = viewModel.getNodeContentUri()
+                                megaNavigator.openMediaPlayerActivityByFileNode(
+                                    context = this@FileLinkComposeActivity,
+                                    contentUri = contentUri,
+                                    fileNode = fileNode,
+                                    isFolderLink = true,
+                                    viewType = FILE_LINK_ADAPTER,
                                 )
-                            } else {
-                                Intent(
+                            }.onFailure {
+                                Toast.makeText(
                                     this@FileLinkComposeActivity,
-                                    LegacyVideoPlayerActivity::class.java
-                                )
+                                    getString(R.string.intent_not_available),
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                         }
-                    viewModel.updateAudioVideoIntent(intent, nameType)
+                    }
                 }
 
                 nameType.isPdf -> {

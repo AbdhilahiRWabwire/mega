@@ -12,22 +12,22 @@ import mega.privacy.android.app.presentation.meeting.mapper.WeekDayMapper
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.data.gateway.DeviceGateway
 import mega.privacy.android.domain.entity.account.AccountDetail
-import mega.privacy.android.domain.usecase.CreateChatLink
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.GetVisibleContactsUseCase
-import mega.privacy.android.domain.usecase.QueryChatLink
-import mega.privacy.android.domain.usecase.RemoveChatLink
+import mega.privacy.android.domain.usecase.QueryChatLinkUseCase
 import mega.privacy.android.domain.usecase.account.GetCurrentSubscriptionPlanUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
+import mega.privacy.android.domain.usecase.chat.CreateChatLinkUseCase
 import mega.privacy.android.domain.usecase.chat.InviteParticipantToChatUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatRoomUpdatesUseCase
 import mega.privacy.android.domain.usecase.chat.RemoveParticipantFromChatUseCase
 import mega.privacy.android.domain.usecase.chat.SetOpenInviteUseCase
+import mega.privacy.android.domain.usecase.chat.link.RemoveChatLinkUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactFromEmailUseCase
 import mega.privacy.android.domain.usecase.contact.GetContactItem
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.meeting.CreateChatroomAndSchedMeetingUseCase
-import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
+import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChatUseCase
 import mega.privacy.android.domain.usecase.meeting.SetWaitingRoomRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.SetWaitingRoomUseCase
 import mega.privacy.android.domain.usecase.meeting.UpdateScheduledMeetingUseCase
@@ -60,15 +60,15 @@ class CreateScheduledMeetingViewModelTest {
 
     private val isConnectedToInternetUseCase: IsConnectedToInternetUseCase = mock()
     private val getVisibleContactsUseCase: GetVisibleContactsUseCase = mock()
-    private val getScheduledMeetingByChat: GetScheduledMeetingByChat = mock()
+    private val getScheduledMeetingByChatUseCase: GetScheduledMeetingByChatUseCase = mock()
     private val getContactFromEmailUseCase: GetContactFromEmailUseCase = mock()
     private val getContactItem: GetContactItem = mock()
     private val getChatRoomUseCase: GetChatRoomUseCase = mock()
     private val createChatroomAndSchedMeetingUseCase: CreateChatroomAndSchedMeetingUseCase = mock()
     private val updateScheduledMeetingUseCase: UpdateScheduledMeetingUseCase = mock()
-    private val createChatLink: CreateChatLink = mock()
-    private val removeChatLink: RemoveChatLink = mock()
-    private val queryChatLink: QueryChatLink = mock()
+    private val createChatLinkUseCase: CreateChatLinkUseCase = mock()
+    private val removeChatLinkUseCase: RemoveChatLinkUseCase = mock()
+    private val queryChatLinkUseCase: QueryChatLinkUseCase = mock()
     private val recurrenceDialogOptionMapper: RecurrenceDialogOptionMapper = mock()
     private val weekDayMapper: WeekDayMapper = mock()
     private val deviceGateway: DeviceGateway = mock()
@@ -101,15 +101,15 @@ class CreateScheduledMeetingViewModelTest {
             monitorConnectivityUseCase = monitorConnectivityUseCase,
             isConnectedToInternetUseCase = isConnectedToInternetUseCase,
             getVisibleContactsUseCase = getVisibleContactsUseCase,
-            getScheduledMeetingByChat = getScheduledMeetingByChat,
+            getScheduledMeetingByChatUseCase = getScheduledMeetingByChatUseCase,
             getContactFromEmailUseCase = getContactFromEmailUseCase,
             getContactItem = getContactItem,
             getChatRoomUseCase = getChatRoomUseCase,
             createChatroomAndSchedMeetingUseCase = createChatroomAndSchedMeetingUseCase,
             updateScheduledMeetingUseCase = updateScheduledMeetingUseCase,
-            createChatLink = createChatLink,
-            removeChatLink = removeChatLink,
-            queryChatLink = queryChatLink,
+            createChatLinkUseCase = createChatLinkUseCase,
+            removeChatLinkUseCase = removeChatLinkUseCase,
+            queryChatLinkUseCase = queryChatLinkUseCase,
             recurrenceDialogOptionMapper = recurrenceDialogOptionMapper,
             weekDayMapper = weekDayMapper,
             deviceGateway = deviceGateway,
@@ -130,15 +130,15 @@ class CreateScheduledMeetingViewModelTest {
             monitorConnectivityUseCase,
             isConnectedToInternetUseCase,
             getVisibleContactsUseCase,
-            getScheduledMeetingByChat,
+            getScheduledMeetingByChatUseCase,
             getContactFromEmailUseCase,
             getContactItem,
             getChatRoomUseCase,
             createChatroomAndSchedMeetingUseCase,
             updateScheduledMeetingUseCase,
-            createChatLink,
-            removeChatLink,
-            queryChatLink,
+            createChatLinkUseCase,
+            removeChatLinkUseCase,
+            queryChatLinkUseCase,
             recurrenceDialogOptionMapper,
             weekDayMapper,
             deviceGateway,

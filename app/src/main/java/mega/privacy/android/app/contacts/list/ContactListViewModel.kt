@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -26,7 +27,6 @@ import mega.privacy.android.app.contacts.list.data.ContactActionItem.Type
 import mega.privacy.android.app.contacts.list.data.ContactItem
 import mega.privacy.android.app.contacts.list.data.ContactListState
 import mega.privacy.android.app.contacts.mapper.ContactItemDataMapper
-import mega.privacy.android.app.contacts.usecase.GetContactsUseCase
 import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.app.utils.CallUtil
@@ -36,9 +36,10 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.account.contactrequest.MonitorContactRequestsUseCase
 import mega.privacy.android.domain.usecase.chat.Get1On1ChatIdUseCase
+import mega.privacy.android.domain.usecase.contact.GetContactsUseCase
 import mega.privacy.android.domain.usecase.contact.RemoveContactByEmailUseCase
-import mega.privacy.android.domain.usecase.meeting.MonitorSFUServerUpgradeUseCase
-import mega.privacy.android.domain.usecase.meeting.StartCallUseCase
+import mega.privacy.android.domain.usecase.call.MonitorSFUServerUpgradeUseCase
+import mega.privacy.android.domain.usecase.call.StartCallUseCase
 import mega.privacy.android.domain.usecase.shares.CreateShareKeyUseCase
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
@@ -110,9 +111,10 @@ internal class ContactListViewModel @Inject constructor(
                 } else {
                     list.filter { it.matches(query) }
                 }
-            }.collectLatest {
-                contacts.value = it
-            }
+            }.distinctUntilChanged()
+                .collectLatest {
+                    contacts.value = it
+                }
         }
         retrieveContactActions()
     }

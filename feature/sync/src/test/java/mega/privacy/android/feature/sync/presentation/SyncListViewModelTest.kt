@@ -31,7 +31,6 @@ import mega.privacy.android.feature.sync.domain.usecase.sync.option.MonitorSyncB
 import mega.privacy.android.feature.sync.domain.usecase.sync.option.SetSyncByWiFiUseCase
 import mega.privacy.android.feature.sync.ui.mapper.stalledissue.StalledIssueItemMapper
 import mega.privacy.android.feature.sync.ui.model.StalledIssueUiItem
-import mega.privacy.android.feature.sync.ui.model.SyncOption
 import mega.privacy.android.feature.sync.ui.synclist.SyncListAction
 import mega.privacy.android.feature.sync.ui.synclist.SyncListViewModel
 import org.junit.jupiter.api.AfterEach
@@ -57,13 +56,13 @@ class SyncListViewModelTest {
     private val stalledIssueItemMapper: StalledIssueItemMapper = mock()
     private val monitorSyncSolvedIssuesUseCase: MonitorSyncSolvedIssuesUseCase = mock()
     private val clearSyncSolvedIssuesUseCase: ClearSyncSolvedIssuesUseCase = mock()
-    private val setSyncByWiFiUseCase: SetSyncByWiFiUseCase = mock()
     private val monitorSyncByWiFiUseCase: MonitorSyncByWiFiUseCase = mock()
     private val getAccountTypeUseCase: GetAccountTypeUseCase = mock()
     private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase = mock()
 
     private val stalledIssues = listOf(
         StalledIssue(
+            syncId = 3L,
             nodeIds = listOf(NodeId(3L)),
             localPaths = listOf("/storage/emulated/0/DCIM"),
             issueType = StallIssueType.DownloadIssue,
@@ -74,7 +73,7 @@ class SyncListViewModelTest {
 
     private val solvedIssues = listOf(
         SolvedIssue(
-            nodeIds = listOf(), localPaths = listOf(), resolutionExplanation = ""
+            syncId = 1L, nodeIds = listOf(), localPaths = listOf(), resolutionExplanation = ""
         )
     )
 
@@ -179,50 +178,6 @@ class SyncListViewModelTest {
             }
         }
 
-    @Test
-    fun `test that state changes when sync option is selected`() = runTest {
-        val monitorSyncByWiFiStateFlow = MutableStateFlow(false)
-        whenever(monitorSyncByWiFiUseCase()).thenReturn(monitorSyncByWiFiStateFlow)
-        initViewModel()
-
-        underTest.state.test {
-            assertThat(awaitItem().selectedSyncOption).isEqualTo(SyncOption.WI_FI_OR_MOBILE_DATA)
-        }
-
-        underTest.handleAction(SyncListAction.SyncOptionsSelected(SyncOption.WI_FI_ONLY))
-        monitorSyncByWiFiStateFlow.emit(true)
-
-        underTest.state.test {
-            assertThat(awaitItem().selectedSyncOption).isEqualTo(SyncOption.WI_FI_ONLY)
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `test that set sync by wifi usecase is invoked when sync option is selected`() = runTest {
-        val monitorSyncByWiFiStateFlow = MutableStateFlow(false)
-        whenever(monitorSyncByWiFiUseCase()).thenReturn(monitorSyncByWiFiStateFlow)
-        initViewModel()
-
-        underTest.handleAction(SyncListAction.SyncOptionsSelected(SyncOption.WI_FI_ONLY))
-
-        verify(setSyncByWiFiUseCase).invoke(true)
-    }
-
-
-    @Test
-    fun `test that snackbar is shown when sync option is selected`() = runTest {
-        val monitorSyncByWiFiStateFlow = MutableStateFlow(false)
-        whenever(monitorSyncByWiFiUseCase()).thenReturn(monitorSyncByWiFiStateFlow)
-        initViewModel()
-
-        underTest.handleAction(SyncListAction.SyncOptionsSelected(SyncOption.WI_FI_ONLY))
-
-        underTest.state.test {
-            assertThat(awaitItem().snackbarMessage).isEqualTo(R.string.sync_options_changed_to_wifi_only)
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
 
     private fun initViewModel() {
         underTest = SyncListViewModel(
@@ -232,7 +187,6 @@ class SyncListViewModelTest {
             stalledIssueItemMapper = stalledIssueItemMapper,
             monitorSyncSolvedIssuesUseCase = monitorSyncSolvedIssuesUseCase,
             clearSyncSolvedIssuesUseCase = clearSyncSolvedIssuesUseCase,
-            setSyncByWiFiUseCase = setSyncByWiFiUseCase,
             monitorSyncByWiFiUseCase = monitorSyncByWiFiUseCase,
             getAccountTypeUseCase = getAccountTypeUseCase,
             monitorAccountDetailUseCase = monitorAccountDetailUseCase,

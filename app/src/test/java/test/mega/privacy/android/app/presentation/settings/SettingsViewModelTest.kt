@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -34,8 +33,6 @@ import mega.privacy.android.domain.usecase.account.IsMultiFactorAuthEnabledUseCa
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsCameraUploadsEnabledUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
-import mega.privacy.android.domain.usecase.logging.AreChatLogsEnabledUseCase
-import mega.privacy.android.domain.usecase.logging.AreSdkLogsEnabledUseCase
 import mega.privacy.android.domain.usecase.login.GetSessionTransferURLUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.audioplayer.SetAudioBackgroundPlayEnabledUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
@@ -83,8 +80,6 @@ class SettingsViewModelTest {
     private val monitorConnectivityUseCase = mock<MonitorConnectivityUseCase>()
     private val monitorStartScreenPreference = mock<MonitorStartScreenPreference>()
     private val isMultiFactorAuthAvailable = mock<IsMultiFactorAuthAvailable>()
-    private val areSdkLogsEnabledUseCase = mock<AreSdkLogsEnabledUseCase>()
-    private val areChatLogsEnabledUseCase = mock<AreChatLogsEnabledUseCase>()
     private val isCameraUploadsEnabledUseCase = mock<IsCameraUploadsEnabledUseCase>()
     private val setSubFolderMediaDiscoveryEnabledUseCase =
         mock<SetSubFolderMediaDiscoveryEnabledUseCase>()
@@ -142,10 +137,6 @@ class SettingsViewModelTest {
 
         isMultiFactorAuthAvailable.stub { on { invoke() }.thenReturn(true) }
 
-        areSdkLogsEnabledUseCase.stub { on { invoke() }.thenReturn(emptyFlow()) }
-
-        areChatLogsEnabledUseCase.stub { on { invoke() }.thenReturn(emptyFlow()) }
-
         isCameraUploadsEnabledUseCase.stub { onBlocking { invoke() }.thenReturn(false) }
 
         getSessionTransferURLUseCase.stub { onBlocking { invoke(any()) }.thenReturn(null) }
@@ -163,10 +154,8 @@ class SettingsViewModelTest {
             getAccountDetailsUseCase = getAccountDetailsUseCase,
             canDeleteAccount = mock { on { invoke(TEST_USER_ACCOUNT) }.thenReturn(true) },
             refreshPasscodeLockPreference = refreshPasscodeLockPreference,
-            areSdkLogsEnabledUseCase = areSdkLogsEnabledUseCase,
-            areChatLogsEnabledUseCase = areChatLogsEnabledUseCase,
             isCameraUploadsEnabledUseCase = isCameraUploadsEnabledUseCase,
-            rootNodeExistsUseCase = mock { on { runBlocking { invoke() } }.thenReturn(true) },
+            rootNodeExistsUseCase = mock { onBlocking { invoke() }.thenReturn(true) },
             isMultiFactorAuthAvailable = isMultiFactorAuthAvailable,
             monitorAutoAcceptQRLinks = monitorAutoAcceptQRLinks,
             isMultiFactorAuthEnabledUseCase = isMultiFactorAuthEnabledUseCase,
@@ -179,8 +168,6 @@ class SettingsViewModelTest {
             monitorConnectivityUseCase = monitorConnectivityUseCase,
             requestAccountDeletion = mock(),
             isChatLoggedIn = isChatLoggedIn,
-            setSdkLogsEnabled = mock(),
-            setChatLoggingEnabled = mock(),
             getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             monitorPasscodeLockPreferenceUseCase = monitorPasscodeLockPreferenceUseCase,
             setSubFolderMediaDiscoveryEnabledUseCase = setSubFolderMediaDiscoveryEnabledUseCase,

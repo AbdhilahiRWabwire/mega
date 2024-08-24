@@ -27,10 +27,7 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.components.textFormatter.TextFormatterUtils.INVALID_INDEX
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.globalmanagement.TransfersManagement
-import mega.privacy.android.app.namecollision.data.NameCollision
-import mega.privacy.android.app.namecollision.data.NameCollisionChoice
-import mega.privacy.android.app.namecollision.data.NameCollisionResult
-import mega.privacy.android.app.namecollision.usecase.CheckNameCollisionUseCase
+import mega.privacy.android.app.namecollision.data.NameCollisionResultUiEntity
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.app.uploadFolder.list.data.FolderContent
 import mega.privacy.android.app.uploadFolder.usecase.GetFolderContentUseCase
@@ -38,7 +35,9 @@ import mega.privacy.android.app.utils.notifyObserver
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.document.DocumentEntity
 import mega.privacy.android.domain.entity.document.DocumentFolder
+import mega.privacy.android.domain.entity.node.NameCollision
 import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.domain.entity.node.namecollision.NameCollisionChoice
 import mega.privacy.android.domain.entity.uri.UriPath
 import mega.privacy.android.domain.exception.EmptyFolderException
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
@@ -55,13 +54,11 @@ import kotlin.time.Duration.Companion.milliseconds
  * ViewModel which manages data of [UploadFolderActivity].
  *
  * @property getFolderContentUseCase    Required for getting folder content.
- * @property checkNameCollisionUseCase  Required for checking name collisions.
  * @property transfersManagement        Required for checking transfers status.
  */
 @HiltViewModel
 class UploadFolderViewModel @Inject constructor(
     private val getFolderContentUseCase: GetFolderContentUseCase,
-    private val checkNameCollisionUseCase: CheckNameCollisionUseCase,
     private val getFilesInDocumentFolderUseCase: GetFilesInDocumentFolderUseCase,
     private val applySortOrderToDocumentFolderUseCase: ApplySortOrderToDocumentFolderUseCase,
     private val transfersManagement: TransfersManagement,
@@ -389,9 +386,7 @@ class UploadFolderViewModel @Inject constructor(
                     parentNodeId = NodeId(parentHandle)
                 )
             }.onSuccess { fileCollisions ->
-                collisions.value = ArrayList(fileCollisions.map {
-                    NameCollision.Upload.getUploadCollision(it)
-                })
+                collisions.value = ArrayList(fileCollisions)
                 pendingUploads.addAll(files)
             }.onFailure {
                 Timber.e(it, "Cannot check name collisions")
@@ -407,7 +402,7 @@ class UploadFolderViewModel @Inject constructor(
      */
     fun proceedWithUpload(
         context: Context,
-        collisionsResolution: List<NameCollisionResult>? = null,
+        collisionsResolution: List<NameCollisionResultUiEntity>? = null,
     ) = viewModelScope.launch {
         if (getFeatureFlagValueUseCase(AppFeatures.UploadWorker)) {
             val collisionRename =

@@ -11,7 +11,6 @@ import mega.privacy.android.app.di.settings.SettingsModule
 import mega.privacy.android.app.di.settings.SettingsUseCases
 import mega.privacy.android.app.di.settings.startscreen.TempStartScreenUseCaseStaticModule
 import mega.privacy.android.app.presentation.settings.model.PreferenceResource
-import mega.privacy.android.app.utils.wrapper.GetOfflineThumbnailFileWrapper
 import mega.privacy.android.domain.usecase.CanDeleteAccount
 import mega.privacy.android.domain.usecase.FetchAutoAcceptQRLinks
 import mega.privacy.android.domain.usecase.GetChatImageQuality
@@ -26,14 +25,10 @@ import mega.privacy.android.domain.usecase.PutPreference
 import mega.privacy.android.domain.usecase.RefreshPasscodeLockPreference
 import mega.privacy.android.domain.usecase.RequestAccountDeletion
 import mega.privacy.android.domain.usecase.SetChatImageQuality
-import mega.privacy.android.domain.usecase.SetChatLogsEnabled
 import mega.privacy.android.domain.usecase.SetMediaDiscoveryView
-import mega.privacy.android.domain.usecase.SetSdkLogsEnabled
 import mega.privacy.android.domain.usecase.ToggleAutoAcceptQRLinks
-import mega.privacy.android.domain.usecase.logging.AreChatLogsEnabledUseCase
-import mega.privacy.android.domain.usecase.logging.AreSdkLogsEnabledUseCase
-import mega.privacy.android.domain.usecase.meeting.GetCallsSoundNotifications
-import mega.privacy.android.domain.usecase.meeting.SetCallsSoundNotifications
+import mega.privacy.android.domain.usecase.call.GetCallsSoundNotifications
+import mega.privacy.android.domain.usecase.call.SetCallsSoundNotifications
 import mega.privacy.android.domain.usecase.setting.EnableFileVersionsOption
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
@@ -61,8 +56,6 @@ object TestSettingsModule {
         mock<MonitorMediaDiscoveryView> { on { invoke() }.thenReturn(emptyFlow()) }
     val getChatImageQuality = mock<GetChatImageQuality> { on { invoke() }.thenReturn(emptyFlow()) }
     val setChatImageQuality = mock<SetChatImageQuality>()
-    val getOfflineThumbnailFileWrapper = mock<GetOfflineThumbnailFileWrapper>()
-
     val getCallsSoundNotifications =
         mock<GetCallsSoundNotifications> { on { invoke() }.thenReturn(emptyFlow()) }
     val setCallsSoundNotifications = mock<SetCallsSoundNotifications>()
@@ -73,14 +66,6 @@ object TestSettingsModule {
     @Provides
     fun provideRefreshPasscodeLockPreference(): RefreshPasscodeLockPreference =
         mock()
-
-    @Provides
-    fun provideIsLoggingEnabled(): AreSdkLogsEnabledUseCase =
-        mock { on { invoke() }.thenReturn(flowOf(true)) }
-
-    @Provides
-    fun provideIsChatLoggingEnabled(): AreChatLogsEnabledUseCase =
-        mock { on { invoke() }.thenReturn(flowOf(true)) }
 
     @Provides
     fun provideIsMultiFactorAuthAvailable(): IsMultiFactorAuthAvailable =
@@ -111,12 +96,6 @@ object TestSettingsModule {
 
     @Provides
     fun provideIsChatLoggedIn(): IsChatLoggedIn = mock { on { invoke() }.thenReturn(flowOf(true)) }
-
-    @Provides
-    fun provideSetLoggingEnabled(): SetSdkLogsEnabled = mock()
-
-    @Provides
-    fun provideSetChatLoggingEnabled(): SetChatLogsEnabled = mock()
 
     @Provides
     fun provide(): MonitorAutoAcceptQRLinks = mock {

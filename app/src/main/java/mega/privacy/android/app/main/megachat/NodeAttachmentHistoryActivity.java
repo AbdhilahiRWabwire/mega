@@ -12,7 +12,6 @@ import static mega.privacy.android.app.utils.Constants.AUTHORITY_STRING_FILE_PRO
 import static mega.privacy.android.app.utils.Constants.FORWARD_ONLY_OPTION;
 import static mega.privacy.android.app.utils.Constants.FROM_CHAT;
 import static mega.privacy.android.app.utils.Constants.ID_MESSAGES;
-import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_IS_PLAYLIST;
 import static mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_NEED_STOP_HTTP_SERVER;
 import static mega.privacy.android.app.utils.Constants.REQUEST_CODE_SELECT_CHAT;
 import static mega.privacy.android.app.utils.Constants.REQUEST_CODE_SELECT_IMPORT_FOLDER;
@@ -22,7 +21,6 @@ import static mega.privacy.android.app.utils.Constants.SNACKBAR_TYPE;
 import static mega.privacy.android.app.utils.FileUtil.getLocalFile;
 import static mega.privacy.android.app.utils.MegaApiUtils.isIntentAvailable;
 import static mega.privacy.android.app.utils.Util.changeToolBarElevation;
-import static mega.privacy.android.app.utils.Util.getMediaIntent;
 import static mega.privacy.android.app.utils.Util.noChangeRecyclerViewItemAnimator;
 import static nz.mega.sdk.MegaApiJava.INVALID_HANDLE;
 import static nz.mega.sdk.MegaChatApiJava.MEGACHAT_INVALID_HANDLE;
@@ -52,6 +50,8 @@ import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import androidx.activity.EdgeToEdge;
+import androidx.activity.result.ActivityResultLauncher;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.view.ActionMode;
@@ -77,12 +77,11 @@ import java.util.Map;
 import javax.inject.Inject;
 
 import dagger.hilt.android.AndroidEntryPoint;
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
-import io.reactivex.rxjava3.schedulers.Schedulers;
 import kotlin.Unit;
 import mega.privacy.android.app.MimeTypeList;
 import mega.privacy.android.app.R;
 import mega.privacy.android.app.activities.PasscodeActivity;
+import mega.privacy.android.app.activities.contract.NameCollisionActivityContract;
 import mega.privacy.android.app.arch.extensions.ViewExtensionsKt;
 import mega.privacy.android.app.components.NewGridRecyclerView;
 import mega.privacy.android.app.components.SimpleDividerItemDecoration;
@@ -93,8 +92,6 @@ import mega.privacy.android.app.main.controllers.ChatController;
 import mega.privacy.android.app.main.listeners.MultipleForwardChatProcessor;
 import mega.privacy.android.app.main.megachat.chatAdapters.NodeAttachmentHistoryAdapter;
 import mega.privacy.android.app.modalbottomsheet.chatmodalbottomsheet.NodeAttachmentBottomSheetDialogFragment;
-import mega.privacy.android.app.namecollision.data.NameCollision;
-import mega.privacy.android.app.namecollision.usecase.CheckNameCollisionUseCase;
 import mega.privacy.android.app.presentation.chat.NodeAttachmentHistoryViewModel;
 import mega.privacy.android.app.presentation.copynode.mapper.CopyRequestMessageMapper;
 import mega.privacy.android.app.presentation.imagepreview.ImagePreviewActivity;
@@ -107,6 +104,7 @@ import mega.privacy.android.app.utils.ColorUtils;
 import mega.privacy.android.app.utils.MegaProgressDialogUtil;
 import mega.privacy.android.app.utils.permission.PermissionUtils;
 import mega.privacy.android.domain.entity.StorageState;
+import mega.privacy.android.domain.entity.node.NameCollision;
 import nz.mega.sdk.MegaApiAndroid;
 import nz.mega.sdk.MegaChatApi;
 import nz.mega.sdk.MegaChatApiJava;
@@ -126,9 +124,6 @@ import timber.log.Timber;
 public class NodeAttachmentHistoryActivity extends PasscodeActivity implements
         MegaChatRequestListenerInterface, MegaChatNodeHistoryListenerInterface,
         StoreDataBeforeForward<ArrayList<MegaChatMessage>>, SnackbarShower {
-
-    @Inject
-    CheckNameCollisionUseCase checkNameCollisionUseCase;
 
     @Inject
     CopyRequestMessageMapper copyRequestMessageMapper;
@@ -188,6 +183,15 @@ public class NodeAttachmentHistoryActivity extends PasscodeActivity implements
 
     private NodeAttachmentBottomSheetDialogFragment bottomSheetDialogFragment;
 
+    private final ActivityResultLauncher<ArrayList<NameCollision>> nameCollisionActivityLauncher = registerForActivityResult(
+            new NameCollisionActivityContract(),
+            result -> {
+                if (result != null) {
+                    showSnackbar(SNACKBAR_TYPE, result, INVALID_HANDLE);
+                }
+            }
+    );
+
     private final BroadcastReceiver errorCopyingNodesReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -203,6 +207,7 @@ public class NodeAttachmentHistoryActivity extends PasscodeActivity implements
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Timber.d("onCreate");
+        EdgeToEdge.enable(this);
         super.onCreate(savedInstanceState);
 
         viewModel = new ViewModelProvider(this).get(NodeAttachmentHistoryViewModel.class);
@@ -385,6 +390,25 @@ public class NodeAttachmentHistoryActivity extends PasscodeActivity implements
             viewModel.copyResultConsumed();
             return Unit.INSTANCE;
         });
+
+        // Observe node collision result
+        ViewExtensionsKt.collectFlow(this, viewModel.getCollisionsFlow(), Lifecycle.State.STARTED, collisions -> {
+            if (collisions == null) return Unit.INSTANCE;
+            dismissAlertDialogIfExists(statusDialog);
+            if (!collisions.isEmpty() && nameCollisionActivityLauncher != null) {
+                nameCollisionActivityLauncher.launch(new ArrayList<>(collisions));
+                viewModel.nodeCollisionsConsumed();
+            }
+            return Unit.INSTANCE;
+        });
+
+        ViewExtensionsKt.collectFlow(this, viewModel.getMediaPlayerOpenedErrorFlow(), Lifecycle.State.STARTED, errorState -> {
+            if (errorState == null) return Unit.INSTANCE;
+            Timber.w("No available Intent");
+            showNodeAttachmentBottomSheet(errorState.getMessage(), errorState.getPosition());
+            viewModel.updateMediaPlayerOpenedError(null);
+            return Unit.INSTANCE;
+        });
     }
 
     private void addStartDownloadTransferView() {
@@ -533,98 +557,14 @@ public class NodeAttachmentHistoryActivity extends PasscodeActivity implements
                                 showNodeAttachmentBottomSheet(m, position);
                             }
                         } else if (MimeTypeList.typeForName(node.getName()).isVideoMimeType() || MimeTypeList.typeForName(node.getName()).isAudio()) {
-                            Timber.d("isFile:isVideoReproducibleOrIsAudio");
-                            String mimeType = MimeTypeList.typeForName(node.getName()).getType();
-                            Timber.d("FILE HANDLE: %d, TYPE: %s", node.getHandle(), mimeType);
-
-                            Intent mediaIntent;
-                            boolean internalIntent;
-                            boolean opusFile = false;
-                            if (MimeTypeList.typeForName(node.getName()).isVideoNotSupported() || MimeTypeList.typeForName(node.getName()).isAudioNotSupported()) {
-                                mediaIntent = new Intent(Intent.ACTION_VIEW);
-                                internalIntent = false;
-                                String[] s = node.getName().split("\\.");
-                                if (s != null && s.length > 1 && s[s.length - 1].equals("opus")) {
-                                    opusFile = true;
-                                }
-                            } else {
-                                Timber.d("setIntentToAudioVideoPlayer");
-                                mediaIntent = getMediaIntent(this, node.getName());
-                                internalIntent = true;
-                            }
-
-                            mediaIntent.putExtra("adapterType", FROM_CHAT);
-                            mediaIntent.putExtra(INTENT_EXTRA_KEY_IS_PLAYLIST, false);
-                            mediaIntent.putExtra("msgId", m.getMsgId());
-                            mediaIntent.putExtra("chatId", chatId);
-
-                            mediaIntent.putExtra("FILENAME", node.getName());
-
-                            String localPath = getLocalFile(node);
-
-                            if (localPath != null) {
-                                File mediaFile = new File(localPath);
-                                if (localPath.contains(Environment.getExternalStorageDirectory().getPath())) {
-                                    Timber.d("FileProviderOption");
-                                    Uri mediaFileUri = FileProvider.getUriForFile(this, AUTHORITY_STRING_FILE_PROVIDER, mediaFile);
-                                    if (mediaFileUri == null) {
-                                        Timber.e("ERROR: NULL media file Uri");
-                                        showSnackbar(SNACKBAR_TYPE, getString(R.string.general_text_error));
-                                    } else {
-                                        mediaIntent.setDataAndType(mediaFileUri, MimeTypeList.typeForName(node.getName()).getType());
-                                    }
-                                } else {
-                                    Uri mediaFileUri = Uri.fromFile(mediaFile);
-                                    if (mediaFileUri == null) {
-                                        Timber.e("ERROR :NULL media file Uri");
-                                        showSnackbar(SNACKBAR_TYPE, getString(R.string.general_text_error));
-                                    } else {
-                                        mediaIntent.setDataAndType(mediaFileUri, MimeTypeList.typeForName(node.getName()).getType());
-                                    }
-                                }
-                                mediaIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                            } else {
-                                Timber.w("Local Path NULL");
-                                if (viewModel.isOnline()) {
-                                    if (megaApi.httpServerIsRunning() == 0) {
-                                        megaApi.httpServerStart();
-                                        mediaIntent.putExtra(INTENT_EXTRA_KEY_NEED_STOP_HTTP_SERVER, true);
-                                    } else {
-                                        Timber.w("ERROR: HTTP server already running");
-                                    }
-
-                                    String url = megaApi.httpServerGetLocalLink(node);
-                                    if (url != null) {
-                                        Uri parsedUri = Uri.parse(url);
-                                        if (parsedUri != null) {
-                                            mediaIntent.setDataAndType(parsedUri, mimeType);
-                                        } else {
-                                            Timber.e("ERROR: HTTP server get local link");
-                                            showSnackbar(SNACKBAR_TYPE, getString(R.string.general_text_error));
-                                        }
-                                    } else {
-                                        Timber.e("ERROR: HTTP server get local link");
-                                        showSnackbar(SNACKBAR_TYPE, getString(R.string.general_text_error));
-                                    }
-                                } else {
-                                    showSnackbar(SNACKBAR_TYPE, getString(R.string.error_server_connection_problem) + ". " + getString(R.string.no_network_connection_on_play_file));
-                                }
-                            }
-                            mediaIntent.putExtra("HANDLE", node.getHandle());
-                            if (opusFile) {
-                                mediaIntent.setDataAndType(mediaIntent.getData(), "audio/*");
-                            }
-                            if (internalIntent) {
-                                startActivity(mediaIntent);
-                            } else {
-                                Timber.d("External Intent");
-                                if (isIntentAvailable(this, mediaIntent)) {
-                                    startActivity(mediaIntent);
-                                } else {
-                                    Timber.w("No available Intent");
-                                    showNodeAttachmentBottomSheet(m, position);
-                                }
-                            }
+                            viewModel.openMediaPlayer(
+                                    this,
+                                    node.getHandle(),
+                                    m,
+                                    chatId,
+                                    node.getName(),
+                                    position
+                            );
                         } else if (MimeTypeList.typeForName(node.getName()).isPdf()) {
                             Timber.d("isFile:isPdf");
                             String mimeType = MimeTypeList.typeForName(node.getName()).getType();
@@ -1034,16 +974,12 @@ public class NodeAttachmentHistoryActivity extends PasscodeActivity implements
             if (!viewModel.isOnline() || megaApi == null) {
                 try {
                     statusDialog.dismiss();
-                } catch (Exception ex) {
+                } catch (Exception ignored) {
                 }
-                ;
-
                 showSnackbar(SNACKBAR_TYPE, getString(R.string.error_server_connection_problem));
                 return;
             }
-
             final long toHandle = intent.getLongExtra("IMPORT_TO", 0);
-
             final long[] importMessagesHandles = intent.getLongArrayExtra("HANDLES_IMPORT_CHAT");
 
             importNodes(toHandle, importMessagesHandles);
@@ -1051,9 +987,8 @@ public class NodeAttachmentHistoryActivity extends PasscodeActivity implements
             if (!viewModel.isOnline()) {
                 try {
                     statusDialog.dismiss();
-                } catch (Exception ex) {
+                } catch (Exception ignored) {
                 }
-                ;
 
                 showSnackbar(SNACKBAR_TYPE, getString(R.string.error_server_connection_problem));
                 return;
@@ -1122,30 +1057,12 @@ public class NodeAttachmentHistoryActivity extends PasscodeActivity implements
     }
 
     public void importNodes(final long toHandle, final long[] importMessagesHandles) {
+        if (importMessagesHandles == null) return;
         statusDialog = MegaProgressDialogUtil.createProgressDialog(this, getString(R.string.general_importing));
         statusDialog.show();
-
-        composite.add(checkNameCollisionUseCase.checkMessagesToImport(importMessagesHandles, chatId, toHandle)
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe((result, throwable) -> {
-                    if (throwable == null) {
-                        ArrayList<NameCollision> collisions = result.getFirst();
-                        if (nameCollisionActivityContract != null && !collisions.isEmpty()) {
-                            dismissAlertDialogIfExists(statusDialog);
-                            nameCollisionActivityContract.launch(collisions);
-                        }
-
-                        List<MegaNode> nodesWithoutCollision = result.getSecond();
-                        if (!nodesWithoutCollision.isEmpty()) {
-                            List<Long> messageIds = new ArrayList<>();
-                            for (long id : importMessagesHandles) messageIds.add(id);
-                            viewModel.copyChatNodes(chatId, messageIds, toHandle);
-                        }
-                    } else {
-                        showSnackbar(SNACKBAR_TYPE, getString(R.string.import_success_error), MEGACHAT_INVALID_HANDLE);
-                    }
-                }));
+        List<Long> messageIds = new ArrayList<>();
+        for (long id : importMessagesHandles) messageIds.add(id);
+        viewModel.importChatNodes(chatId, messageIds, toHandle);
     }
 
     @Override
@@ -1193,13 +1110,13 @@ public class NodeAttachmentHistoryActivity extends PasscodeActivity implements
                 isLoadingHistory = false;
             } else {
                 Timber.d("Less Number Received");
-                if ((stateHistory != MegaChatApi.SOURCE_NONE) && (stateHistory != MegaChatApi.SOURCE_ERROR)) {
+                if ((stateHistory != MegaChatApi.SOURCE_NONE) && (stateHistory != MegaChatApi.SOURCE_ERROR) && stateHistory != MegaChatApi.SOURCE_INVALID_CHAT) {
                     Timber.d("But more history exists --> loadAttachments");
                     isLoadingHistory = true;
                     stateHistory = megaChatApi.loadAttachments(chatId, NUMBER_MESSAGES_TO_LOAD);
                     Timber.d("New state of history: %s", stateHistory);
                     getMoreHistory = false;
-                    if (stateHistory == MegaChatApi.SOURCE_NONE || stateHistory == MegaChatApi.SOURCE_ERROR) {
+                    if (stateHistory == MegaChatApi.SOURCE_NONE || stateHistory == MegaChatApi.SOURCE_ERROR || stateHistory == MegaChatApi.SOURCE_INVALID_CHAT) {
                         fullHistoryReceivedOnLoad();
                         isLoadingHistory = false;
                     }

@@ -633,7 +633,7 @@
     <!-- Caption of a title, in the context of “About MEGA” or “About us” -->
     <string name="settings_about">Version</string>
     <!-- Preference screen item action button -->
-    <string name="settings_about_privacy_policy">Datenschutzerklärung</string>
+    <string name="settings_about_privacy_policy">Datenschutzrichtlinien</string>
     <!--  -->
     <string name="settings_about_terms_of_service">Allgemeine Geschäftsbedingungen</string>
     <!-- App means “Application” -->
@@ -3796,7 +3796,7 @@
     <!-- This is the Body of the Dialog that appears when the user has denied the Media Permissions in Settings Camera Uploads -->
     <string name="settings_camera_uploads_grant_media_permissions_body">Um die Kamera-Uploads zu aktivieren, gewähren Sie MEGA Zugriff auf Fotos und andere Medien auf Ihrem Gerät.</string>
     <!-- This is the "Positive Button" of the Dialog that appears when the user has denied the Media Permissions in Settings Camera Uploads. Upon click, the Android OS will attempt to request the Media Permission again -->
-    <string name="settings_camera_uploads_grant_media_permissions_positive_button">Zugriff freigeben</string>
+    <string name="settings_camera_uploads_grant_media_permissions_positive_button">Zugriff erlauben</string>
     <!-- This is the "Positive Button" of the Dialog that appears when the user has denied the Media Permissions in Settings Camera Uploads. Upon click, the Dialog will simply be dismissed. -->
     <string name="settings_camera_uploads_grant_media_permissions_negative_button">Nicht gewähren</string>
     <!--  -->
@@ -5122,7 +5122,7 @@
     <!-- Text content for the chat bottom sheet when gallery permission is not granted -->
     <string name="chat_toolbar_bottom_sheet_allow_gallery_access_title">Gewähren Sie Zugriff auf Ihre Galerie</string>
     <!-- Button text to grant permission in the chat bottom sheet -->
-    <string name="chat_toolbar_bottom_sheet_grant_gallery_access_button">Zugriff freigeben</string>
+    <string name="chat_toolbar_bottom_sheet_grant_gallery_access_button">Zugriff erlauben</string>
     <!-- The title of the Dialog shown to Update the application from playstore -->
     <string name="meetings_chat_screen_app_update_dialog_title">Update erforderlich</string>
     <!-- The Body of the Dialog shown to Update the application from playstore -->
@@ -5176,13 +5176,13 @@
     <!-- Free plan limitation text for scheduled meetings calls longer than 60 minutes in edit occurrence dialog. -->
     <string name="meetings_edit_occurrence_free_plan_60_minute_limit_warning">[A]Bei Ihrem kostenlosen Paket sind Meetings auf 60 Minuten begrenzt. Pro-Pakete unterliegen keinen zeitlichen Begrenzungen und erlauben bis zu 1000 Teilnehmer.[/A] [B]Jetzt upgraden.[/B]</string>
     <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user selects monthly subscription. The placeholders %1$s and %2$s will be replaced with localised price and currency sign (based on Google localisation), for example $4.99. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string. -->
-    <string name="account_upgrade_account_subscription_details_body_monthly_with_price">Ihnen werden sofort %1$s abgebucht, und Ihr Abonnement wird nach einem Monat automatisch für %2$s pro Monat verlängert. Die Verlängerung wird innerhalb von 24 Stunden vor Ende des Abrechnungszeitraums von Ihrem Google-Play-Account abgebucht. Um Ihr Abonnement zu kündigen, müssen Sie die automatische Verlängerung Ihres MEGA-Pro-Abonnements mindestens 24 Stunden vor Ablauf Ihres Abrechnungszeitraums in [A]Google&#160;Play[/A] unter Abonnements deaktivieren.\nIndem Sie Ihren Account upgraden, erklären Sie sich mit den [B]Nutzungsbedingungen[/B] und der [C]Datenschutzerklärung[/C] von MEGA einverstanden.</string>
+    <string name="account_upgrade_account_subscription_details_body_monthly_with_price">Ihnen werden sofort %1$s abgebucht, und Ihr Abonnement wird nach einem Monat automatisch für %2$s pro Monat verlängert. Die Verlängerung wird innerhalb von 24 Stunden vor Ende des Abrechnungszeitraums von Ihrem Google-Play-Account abgebucht. Um Ihr Abonnement zu kündigen, müssen Sie die automatische Verlängerung Ihres MEGA-Pro-Abonnements mindestens 24 Stunden vor Ablauf Ihres Abrechnungszeitraums in [A]Google&#160;Play[/A] unter Abonnements deaktivieren.\nIndem Sie Ihren Account upgraden, erklären Sie sich mit den [B]Nutzungsbedingungen[/B] und den [C]Datenschutzrichtlinien[/C] von MEGA einverstanden.</string>
     <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user selects yearly subscription. The placeholders %1$s and %2$s will be replaced with localised price and currency sign (based on Google localisation), for example $4.99. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string. -->
-    <string name="account_upgrade_account_subscription_details_body_yearly_with_price">Ihnen werden sofort %1$s abgebucht, und Ihr Abonnement wird nach 12 Monaten automatisch für %2$s pro Jahr verlängert. Die Verlängerung wird innerhalb von 24 Stunden vor Ende des Abrechnungszeitraums von Ihrem Google-Play-Account abgebucht. Um Ihr Abonnement zu kündigen, müssen Sie die automatische Verlängerung Ihres MEGA-Pro-Abonnements mindestens 24 Stunden vor Ablauf Ihres Abrechnungszeitraums in [A]Google&#160;Play[/A] unter Abonnements deaktivieren.\nIndem Sie Ihren Account upgraden, erklären Sie sich mit den [B]Nutzungsbedingungen[/B] und der [C]Datenschutzerklärung[/C] von MEGA einverstanden.</string>
+    <string name="account_upgrade_account_subscription_details_body_yearly_with_price">Ihnen werden sofort %1$s abgebucht, und Ihr Abonnement wird nach 12 Monaten automatisch für %2$s pro Jahr verlängert. Die Verlängerung wird innerhalb von 24 Stunden vor Ende des Abrechnungszeitraums von Ihrem Google-Play-Account abgebucht. Um Ihr Abonnement zu kündigen, müssen Sie die automatische Verlängerung Ihres MEGA-Pro-Abonnements mindestens 24 Stunden vor Ablauf Ihres Abrechnungszeitraums in [A]Google&#160;Play[/A] unter Abonnements deaktivieren.\nIndem Sie Ihren Account upgraden, erklären Sie sich mit den [B]Nutzungsbedingungen[/B] und den [C]Datenschutzrichtlinien[/C] von MEGA einverstanden.</string>
     <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user is in monthly tab and no subscription plan was selected. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string. -->
-    <string name="account_upgrade_account_subscription_details_body_monthly_without_price">Die Abbuchung erfolgt sofort, und Ihr Abonnement wird nach einem Monat automatisch verlängert. Die Verlängerung wird innerhalb von 24 Stunden vor Ende des Abrechnungszeitraums von Ihrem Google-Play-Account abgebucht. Um Ihr Abonnement zu kündigen, müssen Sie die automatische Verlängerung Ihres MEGA-Pro-Abonnements mindestens 24 Stunden vor Ablauf Ihres Abrechnungszeitraums in [A]Google&#160;Play[/A] unter Abonnements deaktivieren.\nIndem Sie Ihren Account upgraden, erklären Sie sich mit den [B]Nutzungsbedingungen[/B] und der [C]Datenschutzerklärung[/C] von MEGA einverstanden.</string>
+    <string name="account_upgrade_account_subscription_details_body_monthly_without_price">Die Abbuchung erfolgt sofort, und Ihr Abonnement wird nach einem Monat automatisch verlängert. Die Verlängerung wird innerhalb von 24 Stunden vor Ende des Abrechnungszeitraums von Ihrem Google-Play-Account abgebucht. Um Ihr Abonnement zu kündigen, müssen Sie die automatische Verlängerung Ihres MEGA-Pro-Abonnements mindestens 24 Stunden vor Ablauf Ihres Abrechnungszeitraums in [A]Google&#160;Play[/A] unter Abonnements deaktivieren.\nIndem Sie Ihren Account upgraden, erklären Sie sich mit den [B]Nutzungsbedingungen[/B] und den [C]Datenschutzrichtlinien[/C] von MEGA einverstanden.</string>
     <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user is in yearly tab and no subscription plan was selected. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string -->
-    <string name="account_upgrade_account_subscription_details_body_yearly_without_price">Die Abbuchung erfolgt sofort, und Ihr Abonnement wird nach 12 Monaten automatisch verlängert. Die Verlängerung wird innerhalb von 24 Stunden vor Ende des Abrechnungszeitraums von Ihrem Google-Play-Account abgebucht. Um Ihr Abonnement zu kündigen, müssen Sie die automatische Verlängerung Ihres MEGA-Pro-Abonnements mindestens 24 Stunden vor Ablauf Ihres Abrechnungszeitraums in [A]Google&#160;Play[/A] unter Abonnements deaktivieren.\nIndem Sie Ihren Account upgraden, erklären Sie sich mit den [B]Nutzungsbedingungen[/B] und der [C]Datenschutzerklärung[/C] von MEGA einverstanden.</string>
+    <string name="account_upgrade_account_subscription_details_body_yearly_without_price">Die Abbuchung erfolgt sofort, und Ihr Abonnement wird nach 12&#160;Monaten automatisch verlängert. Die Verlängerung wird innerhalb von 24&#160;Stunden vor Ende des Abrechnungszeitraums von Ihrem Google-Play-Account abgebucht. Um Ihr Abonnement zu kündigen, müssen Sie die automatische Verlängerung Ihres MEGA-Pro-Abonnements mindestens 24&#160;Stunden vor Ablauf Ihres Abrechnungszeitraums in [A]Google&#160;Play[/A] unter Abonnements deaktivieren.\nIndem Sie Ihren Account upgraden, erklären Sie sich mit den [B]Nutzungsbedingungen[/B] und den [C]Datenschutzrichtlinien[/C] von MEGA einverstanden.</string>
     <!-- The title of the Dialog shown to a suspended Business Account User, regardless if the User is a Sub-User or Administrator -->
     <string name="account_business_account_deactivated_dialog_title">Business-Account deaktiviert</string>
     <!-- The body of the Dialog shown to a suspended Business Account Sub-User -->
@@ -5268,7 +5268,7 @@
     <!-- Search drop down chips filter type date added -->
     <string name="search_dropdown_chip_filter_type_date_added">Hinzugefügt</string>
     <!-- Search drop down chips filter type last modified -->
-    <string name="search_dropdown_chip_filter_type_last_modified">Zuletzt bearbeitet am</string>
+    <string name="search_dropdown_chip_filter_type_last_modified">Letzte Änderung</string>
     <!-- Search drop down chips filter type date modified today -->
     <string name="search_dropdown_chip_filter_type_date_today">Heute</string>
     <!-- Search drop down chips filter type date modified last 7 days -->
@@ -5337,5 +5337,5 @@
     <!-- Image or Video map location title-->
     <string name="file_properties_info_map_location">Ort</string>
     <!-- Image or Video no map location info-->
-    <string name="file_properties_info_map_location_no_location_info">No location information</string>
+    <string name="file_properties_info_map_location_no_location_info">Keine Standortdaten</string>
 </resources>

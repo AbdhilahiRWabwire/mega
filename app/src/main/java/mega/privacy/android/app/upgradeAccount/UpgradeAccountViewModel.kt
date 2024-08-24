@@ -32,7 +32,6 @@ import mega.privacy.android.domain.usecase.billing.GetPaymentMethodUseCase
 import mega.privacy.android.domain.usecase.billing.GetYearlySubscriptionsUseCase
 import mega.privacy.android.domain.usecase.billing.IsBillingAvailableUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
-import mega.privacy.android.shared.sync.featuretoggle.SyncABTestFeatures
 import nz.mega.sdk.MegaApiJava
 import timber.log.Timber
 import javax.inject.Inject
@@ -115,7 +114,7 @@ class UpgradeAccountViewModel @Inject constructor(
                     it.copy(
                         showBuyNewSubscriptionDialog = false,
                         currentPayment = UpgradePayment(
-                            upgradeType = Constants.INVALID_VALUE,
+                            upgradeType = AccountType.UNKNOWN,
                             currentPayment = currentPayment
                         )
                     )
@@ -165,32 +164,19 @@ class UpgradeAccountViewModel @Inject constructor(
                 Timber.e("Failed to fetch feature flags or ab_ads test flag with error: ${it.message}")
             }
         }
-        viewModelScope.launch {
-            runCatching {
-                val showAndroidSyncString =
-                    getFeatureFlagValueUseCase(SyncABTestFeatures.asyc)
-                _state.update { state ->
-                    state.copy(
-                        showAndroidSyncString = showAndroidSyncString
-                    )
-                }
-            }.onFailure {
-                Timber.e("Failed to fetch feature flag ShowStringsForNewFeatures with error: ${it.message}")
-            }
-        }
     }
 
     /**
      * Check the current payment
      * @param upgradeType upgrade type
      */
-    fun currentPaymentCheck(upgradeType: Int) {
+    fun currentPaymentCheck(upgradeType: AccountType) {
         viewModelScope.launch {
             val currentPayment = getCurrentPaymentUseCase()
             currentPayment?.let {
                 _state.update {
                     it.copy(
-                        showBuyNewSubscriptionDialog = upgradeType != Constants.INVALID_VALUE && currentPayment.platformType != PaymentPlatformType.SUBSCRIPTION_FROM_GOOGLE_PLATFORM,
+                        showBuyNewSubscriptionDialog = upgradeType != AccountType.UNKNOWN && currentPayment.platformType != PaymentPlatformType.SUBSCRIPTION_FROM_GOOGLE_PLATFORM,
                         currentPayment = UpgradePayment(
                             upgradeType = upgradeType,
                             currentPayment = currentPayment
@@ -236,9 +222,19 @@ class UpgradeAccountViewModel @Inject constructor(
          * Get product id for payment
          *
          */
-        fun getProductId(isMonthly: Boolean, upgradeType: Int): String {
-            val skus = getSkus(upgradeType)
+        fun getProductId(isMonthly: Boolean, upgradeType: AccountType): String {
+            val skus = getSkus(convertAccountTypeToInt(upgradeType))
             return if (isMonthly) skus.first else skus.second
+        }
+
+        private fun convertAccountTypeToInt(accountType: AccountType): Int {
+            return when (accountType) {
+                AccountType.PRO_LITE -> Constants.PRO_LITE
+                AccountType.PRO_I -> Constants.PRO_I
+                AccountType.PRO_II -> Constants.PRO_II
+                AccountType.PRO_III -> Constants.PRO_III
+                else -> Constants.INVALID_VALUE
+            }
         }
 
         private fun getSkus(upgradeType: Int) = when (upgradeType) {

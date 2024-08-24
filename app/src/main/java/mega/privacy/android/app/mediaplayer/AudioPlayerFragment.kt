@@ -22,7 +22,6 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.databinding.FragmentAudioPlayerBinding
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.mediaplayer.gateway.AudioPlayerServiceViewModelGateway
 import mega.privacy.android.app.mediaplayer.gateway.MediaPlayerServiceGateway
 import mega.privacy.android.app.mediaplayer.service.AudioPlayerService
@@ -154,7 +153,11 @@ class AudioPlayerFragment : Fragment() {
                     viewLifecycleOwner.collectFlow(it.playlistUpdate()) { info ->
                         Timber.d("MediaPlayerService observed playlist ${info.first.size} items")
 
-                        playerViewHolder?.togglePlaylistEnabled(requireContext(), info.first)
+                        playerViewHolder?.togglePlaylistEnabled(
+                            requireContext(),
+                            info.first,
+                            it.shuffleEnabled()
+                        )
                     }
 
                     viewLifecycleOwner.collectFlow(it.retryUpdate()) { isRetry ->
@@ -196,16 +199,15 @@ class AudioPlayerFragment : Fragment() {
             }
 
             serviceViewModelGateway?.run {
-                viewHolder.setupPlaylistButton(requireContext(), getPlaylistItems()) {
+                viewHolder.setupPlaylistButton(
+                    requireContext(),
+                    getPlaylistItems(),
+                    shuffleEnabled()
+                ) {
                     findNavController().let {
                         viewLifecycleOwner.lifecycleScope.launch {
                             if (it.currentDestination?.id == R.id.audio_main_player) {
-                                it.navigate(
-                                    if (getFeatureFlagValueUseCase(AppFeatures.NewAudioQueue))
-                                        AudioPlayerFragmentDirections.actionAudioPlayerToQueue()
-                                    else
-                                        AudioPlayerFragmentDirections.actionAudioPlayerToPlaylist()
-                                )
+                                it.navigate(AudioPlayerFragmentDirections.actionAudioPlayerToQueue())
                             }
                         }
                     }

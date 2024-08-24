@@ -111,11 +111,11 @@ interface MegaLocalRoomGateway {
     suspend fun getAllContacts(): List<Contact>
 
     /**
-     * Get all completed transfers
+     * Get completed transfers
      *
-     * @param size the limit size of the list. If null, the limit does not apply
+     * @param size the limit size of the list. If null, the limit does not apply and gets all.
      */
-    fun getAllCompletedTransfers(size: Int? = null): Flow<List<CompletedTransfer>>
+    fun getCompletedTransfers(size: Int? = null): Flow<List<CompletedTransfer>>
 
     /**
      * Add a completed transfer
@@ -123,6 +123,13 @@ interface MegaLocalRoomGateway {
      * @param transfer the completed transfer to add
      */
     suspend fun addCompletedTransfer(transfer: CompletedTransfer)
+
+    /**
+     * Add a list of completed transfer
+     *
+     * @param transfers the completed transfers to add
+     */
+    suspend fun addCompletedTransfers(transfers: List<CompletedTransfer>)
 
     /**
      * Get the completed transfers count
@@ -163,6 +170,11 @@ interface MegaLocalRoomGateway {
     suspend fun deleteOldestCompletedTransfers()
 
     /**
+     * Migrate legacy completed transfers
+     */
+    suspend fun migrateLegacyCompletedTransfers()
+
+    /**
      * Get active transfer by tag
      */
     suspend fun getActiveTransferByTag(tag: Int): ActiveTransfer?
@@ -183,6 +195,11 @@ interface MegaLocalRoomGateway {
      * Insert a new active transfer or replace it if there's already an active transfer with the same tag
      */
     suspend fun insertOrUpdateActiveTransfer(activeTransfer: ActiveTransfer)
+
+    /**
+     * Insert (or replace  if there's already an active transfer with the same tag) a list of active transfers
+     */
+    suspend fun insertOrUpdateActiveTransfers(activeTransfers: List<ActiveTransfer>)
 
     /**
      * Delete all active transfer by type

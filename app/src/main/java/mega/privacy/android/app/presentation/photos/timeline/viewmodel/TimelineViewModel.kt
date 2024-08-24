@@ -70,7 +70,6 @@ import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
 import mega.privacy.android.domain.usecase.workers.StartCameraUploadUseCase
 import mega.privacy.android.domain.usecase.workers.StopCameraUploadsUseCase
 import nz.mega.sdk.MegaNode
-import org.jetbrains.anko.collections.forEachWithIndex
 import timber.log.Timber
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
@@ -447,7 +446,7 @@ class TimelineViewModel @Inject constructor(
     private fun handleAllPhotoItems(showingPhotos: List<Photo>): List<PhotoListItem> {
         val currentZoomLevel = _state.value.currentZoomLevel
         val photoListItem = mutableListOf<PhotoListItem>()
-        showingPhotos.forEachWithIndex { index, photo ->
+        showingPhotos.forEachIndexed { index, photo ->
             val shouldShowDate = if (index == 0)
                 true
             else
@@ -491,9 +490,9 @@ class TimelineViewModel @Inject constructor(
 
     private fun sortPhotos(photos: List<Photo>): List<Photo> {
         return if (_state.value.currentSort == Sort.NEWEST) {
-            photos.sortedByDescending { it.modificationTime }
+            photos.sortedWith(compareByDescending<Photo> { it.modificationTime }.thenByDescending { it.id })
         } else {
-            photos.sortedBy { it.modificationTime }
+            photos.sortedWith(compareBy<Photo> { it.modificationTime }.thenByDescending { it.id })
         }
     }
 

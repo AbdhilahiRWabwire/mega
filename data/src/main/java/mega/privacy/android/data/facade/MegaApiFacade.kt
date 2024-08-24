@@ -293,7 +293,28 @@ internal class MegaApiFacade @Inject constructor(
             },
             onTransferData = { transfer, buffer ->
                 trySend(GlobalTransfer.OnTransferData(transfer, buffer))
-            }
+            },
+            onFolderTransferUpdate = {
+                    transfer,
+                    stage,
+                    folderCount,
+                    createdFolderCount,
+                    fileCount,
+                    currentFolder,
+                    currentFileLeafName,
+                ->
+                trySend(
+                    GlobalTransfer.OnFolderTransferUpdate(
+                        transfer,
+                        stage,
+                        folderCount,
+                        createdFolderCount,
+                        fileCount,
+                        currentFolder,
+                        currentFileLeafName
+                    )
+                )
+            },
         )
 
         megaApi.addTransferListener(listener)
@@ -1117,7 +1138,8 @@ internal class MegaApiFacade @Inject constructor(
         listener: MegaRequestListenerInterface,
     ) = megaApi.getPublicNode(nodeFileLink, listener)
 
-    override suspend fun cancelTransfers(direction: Int) = megaApi.cancelTransfers(direction)
+    override fun cancelTransfers(direction: Int, listener: MegaRequestListenerInterface) =
+        megaApi.cancelTransfers(direction, listener)
 
     override suspend fun getVerifiedPhoneNumber(): String? = megaApi.smsVerifiedPhoneNumber()
 
@@ -1513,4 +1535,9 @@ internal class MegaApiFacade @Inject constructor(
         listener: MegaRequestListenerInterface?,
     ): MegaFlag? =
         megaApi.getFlag(flagName, commit, listener)
+
+    override fun getAllNodeTags(
+        searchString: String,
+        cancelToken: MegaCancelToken?,
+    ): MegaStringList? = megaApi.getAllNodeTags(searchString, cancelToken)
 }

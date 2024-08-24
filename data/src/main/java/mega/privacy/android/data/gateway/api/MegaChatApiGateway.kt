@@ -1001,6 +1001,7 @@ interface MegaChatApiGateway {
      * @param count The number of requested messages to load (Range 1 - 256)
      *
      * @return Return the source of the messages that is going to be fetched. The possible values are:
+     *   - MegaChatApi::SOURCE_INVALID_CHAT = -2: not available chat with the given chatId
      *   - MegaChatApi::SOURCE_ERROR = -1: history has to be fetched from server, but we are not logged in yet
      *   - MegaChatApi::SOURCE_NONE = 0: there's no more history available (not even in the server)
      *   - MegaChatApi::SOURCE_LOCAL: messages will be fetched locally (RAM or DB)
@@ -1093,6 +1094,21 @@ interface MegaChatApiGateway {
      * @return          Flow of [ChatVideoUpdate]
      */
     fun getChatLocalVideoUpdates(chatId: Long): Flow<ChatVideoUpdate>
+
+    /**
+     * Register a listener to receive video from remote device for an specific chat room.
+     * This listener will be deregistered automatically.
+     *
+     * @param chatId    Chat Room Id
+     * @param clientId  Client Id
+     * @param
+     * @return          Flow of [ChatVideoUpdate]
+     */
+    fun getChatRemoteVideoUpdates(
+        chatId: Long,
+        clientId: Long,
+        hiRes: Boolean,
+    ): Flow<ChatVideoUpdate>
 
     /**
      * Open video device
@@ -1999,5 +2015,22 @@ interface MegaChatApiGateway {
      * @param chatId MegaChatHandle that identifies the chat room
      * @return true if call can be marked as ignored, otherwise return false.
      */
-    fun setIgnoredCall(chatId: Long, listener: MegaChatRequestListenerInterface)
+    suspend fun setIgnoredCall(chatId: Long): Boolean
+
+    /**
+     * Create meeting
+     *
+     * @param title         Meeting title
+     * @param speakRequest  Speak request enable
+     * @param waitingRoom   Waiting room enable
+     * @param openInvite    Open invite enable
+     * @param listener      MegaChatRequestListener to track this request. This is an optional parameter
+     */
+    fun createMeeting(
+        title: String,
+        speakRequest: Boolean,
+        waitingRoom: Boolean,
+        openInvite: Boolean,
+        listener: MegaChatRequestListenerInterface,
+    )
 }

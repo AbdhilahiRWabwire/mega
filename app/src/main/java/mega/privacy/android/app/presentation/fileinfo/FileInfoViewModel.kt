@@ -1,23 +1,28 @@
 package mega.privacy.android.app.presentation.fileinfo
 
+import android.content.Context
+import android.location.Address
+import android.location.Geocoder
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.palm.composestateevents.consumed
 import de.palm.composestateevents.triggered
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import mega.privacy.android.app.domain.usecase.CheckNameCollision
+import kotlinx.coroutines.withContext
 import mega.privacy.android.app.domain.usecase.GetNodeLocationInfo
 import mega.privacy.android.app.domain.usecase.shares.GetOutShares
 import mega.privacy.android.app.featuretoggle.AppFeatures
-import mega.privacy.android.app.namecollision.data.NameCollisionType
 import mega.privacy.android.app.presentation.extensions.getState
 import mega.privacy.android.app.presentation.fileinfo.model.FileInfoExtraAction
 import mega.privacy.android.app.presentation.fileinfo.model.FileInfoJobInProgressState
@@ -27,13 +32,15 @@ import mega.privacy.android.app.presentation.fileinfo.model.getNodeIcon
 import mega.privacy.android.app.presentation.fileinfo.model.mapper.NodeActionMapper
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent.StartDownloadForOffline
-import mega.privacy.android.app.usecase.exception.MegaNodeException
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.wrapper.FileUtilWrapper
 import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.data.gateway.ClipboardGateway
 import mega.privacy.android.data.repository.MegaNodeRepository
+import mega.privacy.android.domain.entity.AccountType
+import mega.privacy.android.domain.entity.ImageFileTypeInfo
 import mega.privacy.android.domain.entity.StorageState
+import mega.privacy.android.domain.entity.VideoFileTypeInfo
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeChanges.Description
@@ -47,18 +54,22 @@ import mega.privacy.android.domain.entity.node.NodeChanges.Remove
 import mega.privacy.android.domain.entity.node.NodeChanges.Tags
 import mega.privacy.android.domain.entity.node.NodeChanges.Timestamp
 import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.shares.AccessPermission
 import mega.privacy.android.domain.entity.user.UserChanges
+import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.usecase.GetFolderTreeInfo
+import mega.privacy.android.domain.usecase.GetImageNodeByIdUseCase
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
+import mega.privacy.android.domain.usecase.IsBusinessAccountActive
 import mega.privacy.android.domain.usecase.MonitorChildrenUpdates
 import mega.privacy.android.domain.usecase.MonitorContactUpdates
 import mega.privacy.android.domain.usecase.MonitorNodeUpdatesById
 import mega.privacy.android.domain.usecase.MonitorOfflineFileAvailabilityUseCase
-import mega.privacy.android.domain.usecase.account.IsProAccountUseCase
+import mega.privacy.android.domain.usecase.account.GetAccountTypeUseCase
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetPrimarySyncHandleUseCase
 import mega.privacy.android.domain.usecase.camerauploads.GetSecondarySyncHandleUseCase
@@ -73,11 +84,10 @@ import mega.privacy.android.domain.usecase.filenode.DeleteNodeVersionsUseCase
 import mega.privacy.android.domain.usecase.filenode.GetNodeVersionsByHandleUseCase
 import mega.privacy.android.domain.usecase.filenode.MoveNodeToRubbishBinUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
-import mega.privacy.android.domain.usecase.node.CopyNodeUseCase
+import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionWithActionUseCase
 import mega.privacy.android.domain.usecase.node.GetAvailableNodeActionsUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInBackupsUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
-import mega.privacy.android.domain.usecase.node.MoveNodeUseCase
 import mega.privacy.android.domain.usecase.node.SetNodeDescriptionUseCase
 import mega.privacy.android.domain.usecase.offline.RemoveOfflineNodeUseCase
 import mega.privacy.android.domain.usecase.shares.GetContactItemFromInShareFolder
@@ -90,7 +100,9 @@ import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaShare
 import timber.log.Timber
 import java.io.File
+import java.util.Locale
 import javax.inject.Inject
+import kotlin.coroutines.resume
 
 /**
  * View Model class for [FileInfoActivity]
@@ -103,9 +115,7 @@ class FileInfoViewModel @Inject constructor(
     private val isConnectedToInternetUseCase: IsConnectedToInternetUseCase,
     private val isNodeInBackupsUseCase: IsNodeInBackupsUseCase,
     private val isNodeInRubbishBinUseCase: IsNodeInRubbishBinUseCase,
-    private val checkNameCollision: CheckNameCollision,
-    private val moveNodeUseCase: MoveNodeUseCase,
-    private val copyNodeUseCase: CopyNodeUseCase,
+    private val checkNodesNameCollisionWithActionUseCase: CheckNodesNameCollisionWithActionUseCase,
     private val moveNodeToRubbishBinUseCase: MoveNodeToRubbishBinUseCase,
     private val deleteNodeByHandleUseCase: DeleteNodeByHandleUseCase,
     private val deleteNodeVersionsUseCase: DeleteNodeVersionsUseCase,
@@ -138,7 +148,10 @@ class FileInfoViewModel @Inject constructor(
     private val monitorOfflineFileAvailabilityUseCase: MonitorOfflineFileAvailabilityUseCase,
     private val getContactVerificationWarningUseCase: GetContactVerificationWarningUseCase,
     private val fileTypeIconMapper: FileTypeIconMapper,
-    private val isProAccountUseCase: IsProAccountUseCase,
+    private val getAccountTypeUseCase: GetAccountTypeUseCase,
+    private val isBusinessAccountActive: IsBusinessAccountActive,
+    private val getImageNodeByNodeId: GetImageNodeByIdUseCase,
+    @IoDispatcher private val iODispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FileInfoViewState())
@@ -171,8 +184,9 @@ class FileInfoViewModel @Inject constructor(
 
     init {
         checkDescriptionFlag()
+        checkMapLocationFeatureFlag()
         checkTagsFeatureFlag()
-        checkIsProAccount()
+        checkAccountStatus()
         viewModelScope.launch {
             val isRemindersForContactVerificationEnabled =
                 getContactVerificationWarningUseCase()
@@ -180,13 +194,23 @@ class FileInfoViewModel @Inject constructor(
         }
     }
 
-    private fun checkIsProAccount() = viewModelScope.launch {
+    private fun checkAccountStatus() = viewModelScope.launch {
         runCatching {
-            isProAccountUseCase()
+            getAccountTypeUseCase()
         }.onSuccess { result ->
-            _uiState.update { it.copy(isProAccount = result) }
+            if (result == AccountType.BUSINESS) {
+                runCatching {
+                    isBusinessAccountActive()
+                }.onSuccess { isBusinessAccountActive ->
+                    _uiState.update { it.copy(isBusinessAccountActive = isBusinessAccountActive) }
+                }.onFailure {
+                    Timber.e("Get isBusinessAccountActive failed with error: $it")
+                }
+            } else {
+                _uiState.update { it.copy(isProAccount = result != AccountType.FREE) }
+            }
         }.onFailure {
-            Timber.e("Get isProAccount failed $it")
+            Timber.e("Get getAccountType failed with error: $it")
         }
     }
 
@@ -194,7 +218,15 @@ class FileInfoViewModel @Inject constructor(
         runCatching { getFeatureFlagValueUseCase(AppFeatures.NodeWithTags) }.onSuccess { flag ->
             _uiState.update { it.copy(tagsEnabled = flag) }
         }.onFailure {
-            Timber.e("Get feature flag failed $it")
+            Timber.e("Get tag feature flag failed $it")
+        }
+    }
+
+    private fun checkMapLocationFeatureFlag() = viewModelScope.launch {
+        runCatching { getFeatureFlagValueUseCase(AppFeatures.MapLocation) }.onSuccess { flag ->
+            _uiState.update { it.copy(mapLocationEnabled = flag) }
+        }.onFailure {
+            Timber.e("Get gis feature flag failed $it")
         }
     }
 
@@ -307,12 +339,22 @@ class FileInfoViewModel @Inject constructor(
      */
     fun moveNodeCheckingCollisions(parentHandle: NodeId) =
         performBlockSettingProgress(FileInfoJobInProgressState.Moving) {
-            if (checkCollision(parentHandle, NameCollisionType.MOVE)) {
-                runCatching {
-                    moveNodeUseCase(typedNode.id, parentHandle)
+            runCatching {
+                checkNodesNameCollisionWithActionUseCase(
+                    nodes = mapOf(typedNode.id.longValue to parentHandle.longValue),
+                    type = NodeNameCollisionType.MOVE
+                ).also {
+                    if (it.moveRequestResult?.isAllRequestError == true) {
+                        throw IllegalStateException("Move request failed")
+                    }
                 }
-            } else {
-                null
+            }.onSuccess {
+                it.firstNodeCollisionOrNull?.let { collision ->
+                    _uiState.updateEventAndClearProgress(
+                        FileInfoOneOffViewEvent.CollisionDetected(collision)
+                    )
+                    return@performBlockSettingProgress null
+                }
             }
         }
 
@@ -324,16 +366,22 @@ class FileInfoViewModel @Inject constructor(
      */
     fun copyNodeCheckingCollisions(parentHandle: NodeId) =
         performBlockSettingProgress(FileInfoJobInProgressState.Copying) {
-            if (checkCollision(parentHandle, NameCollisionType.COPY)) {
-                runCatching {
-                    copyNodeUseCase(
-                        nodeToCopy = typedNode.id,
-                        newNodeParent = parentHandle,
-                        newNodeName = null
-                    )
+            runCatching {
+                checkNodesNameCollisionWithActionUseCase(
+                    nodes = mapOf(typedNode.id.longValue to parentHandle.longValue),
+                    type = NodeNameCollisionType.COPY
+                ).also {
+                    if (it.moveRequestResult?.isAllRequestError == true) {
+                        throw IllegalStateException("Copy request failed")
+                    }
                 }
-            } else {
-                null
+            }.onSuccess {
+                it.firstNodeCollisionOrNull?.let { collision ->
+                    _uiState.updateEventAndClearProgress(
+                        FileInfoOneOffViewEvent.CollisionDetected(collision)
+                    )
+                    return@performBlockSettingProgress null
+                }
             }
         }
 
@@ -815,6 +863,7 @@ class FileInfoViewModel @Inject constructor(
         updateOwner()
         updateOutShares()
         updateLocation()
+        updateMapLocationInfo()
     }
 
     private fun updateHistory() {
@@ -896,6 +945,36 @@ class FileInfoViewModel @Inject constructor(
         }
     }
 
+    private fun isPhoto(): Boolean {
+        return (typedNode as? TypedFileNode)?.type.let { fileType ->
+            isFile() && (fileType is ImageFileTypeInfo || fileType is VideoFileTypeInfo)
+        }
+    }
+
+    private fun updateMapLocationInfo() = viewModelScope.launch {
+        if (isPhoto()) {
+            runCatching {
+                getImageNodeByNodeId(typedNode.id)?.let { imageNode ->
+                    _uiState.update {
+                        it.copy(
+                            longitude = imageNode.longitude,
+                            latitude = imageNode.latitude,
+                            isPhoto = true,
+                        )
+                    }
+                } ?: _uiState.update {
+                    it.copy(isPhoto = false)
+                }
+            }.onFailure { exception ->
+                Timber.e(exception)
+            }
+        } else {
+            _uiState.update {
+                it.copy(isPhoto = false)
+            }
+        }
+    }
+
     private fun updateTypedNode() {
         updateState {
             getNodeByIdUseCase(typedNode.id)?.let { updateTypedNode ->
@@ -973,35 +1052,6 @@ class FileInfoViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Checks if there is a name collision before moving or copying the node.
-     *
-     * @param parentHandle Parent handle of the node in which the node will be moved or copied.
-     * @param type         Type of name collision to check.
-     * @return true if there are no collision detected, so it can go ahead with the move or copy
-     */
-    private suspend fun checkCollision(parentHandle: NodeId, type: NameCollisionType) =
-        try {
-            val nameCollision = checkNameCollision(
-                typedNode.id,
-                parentHandle,
-                type
-            )
-            _uiState.updateEventAndClearProgress(
-                FileInfoOneOffViewEvent.CollisionDetected(
-                    nameCollision
-                )
-            )
-            false
-        } catch (throwable: Throwable) {
-            if (throwable is MegaNodeException.ChildDoesNotExistsException) {
-                true
-            } else {
-                _uiState.updateEventAndClearProgress(FileInfoOneOffViewEvent.GeneralError)
-                false
-            }
-        }
-
     private fun MutableStateFlow<FileInfoViewState>.updateEventAndClearProgress(event: FileInfoOneOffViewEvent?) =
         this.update {
             it.copy(
@@ -1037,4 +1087,33 @@ class FileInfoViewModel @Inject constructor(
         }
     }
 
+    suspend fun getAddress(
+        context: Context,
+        latitude: Double,
+        longitude: Double,
+    ): Address? = withContext(iODispatcher) {
+        try {
+            val geocoder = Geocoder(context.applicationContext, Locale.getDefault())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                suspendCancellableCoroutine { cont ->
+                    geocoder.getFromLocation(latitude, longitude, 1) {
+                        if (cont.isActive) {
+                            cont.resume(it.firstOrNull())
+                        }
+                    }
+                }
+            } else {
+                suspendCancellableCoroutine { cont ->
+                    @Suppress("DEPRECATION")
+                    val address = geocoder.getFromLocation(latitude, longitude, 1)?.firstOrNull()
+                    if (cont.isActive) {
+                        cont.resume(address)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e)
+            null
+        }
+    }
 }

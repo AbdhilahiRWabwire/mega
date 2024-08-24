@@ -14,6 +14,23 @@ import mega.privacy.android.domain.featuretoggle.FeatureFlagValueProvider
  */
 enum class AppFeatures(override val description: String, private val defaultValue: Boolean) :
     Feature {
+
+    /**
+     * Enables document scanner
+     */
+    DocumentScanner(
+        "Enable new document scanner implementation",
+        false
+    ),
+
+    /**
+     * Enables Map location
+     */
+    MapLocation(
+        "Enable map location feature",
+        false,
+    ),
+
     /**
      * Enables new video player
      */
@@ -23,34 +40,10 @@ enum class AppFeatures(override val description: String, private val defaultValu
     ),
 
     /**
-     * Enables new video queue
-     */
-    NewZipBrowser(
-        "Enable new zip browser",
-        true,
-    ),
-
-    /**
-     * Enables new video queue
-     */
-    NewVideoQueue(
-        "Enable new video queue",
-        true,
-    ),
-
-    /**
      * Enables report issue via email in login screen
      */
     ReportIssueViaEmail(
         "Enable report issue via email in login screen",
-        true,
-    ),
-
-    /**
-     * Enables new audio queue
-     */
-    NewAudioQueue(
-        "Enable new audio queue",
         true,
     ),
 
@@ -71,20 +64,11 @@ enum class AppFeatures(override val description: String, private val defaultValu
     ),
 
     /**
-     * Shows the "Upload only while charging" Option in the refactored Settings Camera Uploads screen
-     */
-    SettingsCameraUploadsUploadWhileCharging(
-        description = "Shows the Upload only while charging Option in the refactored Settings Camera " +
-                "Uploads screen.",
-        defaultValue = true,
-    ),
-
-    /**
      * Enables new video section flag
      */
     NewVideoSection(
         "Enable new video section flag",
-        false
+        true
     ),
 
     /**
@@ -146,19 +130,9 @@ enum class AppFeatures(override val description: String, private val defaultValu
     AppTest("This is a test toggle. It does nothing", false),
 
     /**
-     * To switch into new Offline Screen Compose UI
-     */
-    OfflineCompose("Enable compose for Offline Screen", true),
-
-    /**
      * Meeting notification settings
      */
     MeetingNotificationSettings("Enable Meeting notification settings", false),
-
-    /**
-     * Search implementation with dropdown chips
-     */
-    DropdownChips("Search implementation with dropdown chips and bottom sheet", true),
 
     /**
      * To enable showing promo notifications in Notifications screen
@@ -200,7 +174,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
     /**
      * Raise to speak in a call
      */
-    RaiseToSpeak("Raise to speak in a call or a meeting", false),
+    RaiseToSpeak("Raise to speak in a call or a meeting", true),
 
     /**
      * Enables UploadWorker for upload files, instead of UploadService. This is a work in progress feature.
@@ -215,7 +189,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     ActiveTransfersInCameraUploads(
         "Camera Uploads uses Active transfers to monitor the transfer progress",
-        false,
+        true,
     ),
 
     /**
@@ -263,6 +237,14 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     TransfersSection(
         "Enable new transfers fragment",
+        false
+    ),
+
+    /**
+     * New import section
+     */
+    NewUploadDestinationActivity(
+        "Enable upload destination activity",
         false
     );
 

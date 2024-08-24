@@ -9,6 +9,7 @@ import mega.privacy.android.app.activities.ManageChatHistoryActivity
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.mediaplayer.AudioPlayerActivity
 import mega.privacy.android.app.mediaplayer.LegacyVideoPlayerActivity
+import mega.privacy.android.app.mediaplayer.VideoPlayerComposeActivity
 import mega.privacy.android.app.presentation.contact.invite.InviteContactActivity
 import mega.privacy.android.app.presentation.contact.invite.InviteContactActivityV2
 import mega.privacy.android.app.presentation.contact.invite.InviteContactViewModel
@@ -25,28 +26,36 @@ import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.EXTRA_HANDLE_ZIP
 import mega.privacy.android.app.utils.Constants.EXTRA_PATH_ZIP
+import mega.privacy.android.app.utils.Constants.FROM_CHAT
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE
+import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_CHAT_ID
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_FILE_NAME
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_HANDLE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_HANDLES_NODES_SEARCH
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_IS_FOLDER_LINK
+import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_IS_PLAYLIST
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_MEDIA_QUEUE_TITLE
+import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_MSG_ID
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_OFFLINE_PATH_DIRECTORY
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ORDER_GET_CHILDREN
+import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_PARENT_ID
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_PARENT_NODE_HANDLE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_PATH
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_PLACEHOLDER
-import mega.privacy.android.app.zippreview.ui.ZipBrowserActivity
+import mega.privacy.android.app.utils.Constants.NODE_HANDLES
 import mega.privacy.android.domain.entity.AudioFileTypeInfo
 import mega.privacy.android.domain.entity.FileTypeInfo
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.VideoFileTypeInfo
+import mega.privacy.android.domain.entity.chat.messages.NodeAttachmentMessage
+import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.NodeContentUri
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.qualifier.ApplicationScope
+import mega.privacy.android.domain.usecase.GetFileTypeInfoByNameUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.domain.usecase.file.GetFileTypeInfoUseCase
 import mega.privacy.android.navigation.MegaNavigator
-import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
 
@@ -59,6 +68,8 @@ internal class MegaNavigatorImpl @Inject constructor(
     @ApplicationScope private val applicationScope: CoroutineScope,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val nodeContentUriIntentMapper: NodeContentUriIntentMapper,
+    private val getFileTypeInfoUseCase: GetFileTypeInfoUseCase,
+    private val getFileTypeInfoByNameUseCase: GetFileTypeInfoByNameUseCase,
 ) : MegaNavigator,
     AppNavigatorImpl {
     override fun openSettingsCameraUploads(activity: Activity) {
@@ -154,20 +165,12 @@ internal class MegaNavigatorImpl @Inject constructor(
         onError: () -> Unit,
     ) {
         applicationScope.launch {
-            if (getFeatureFlagValueUseCase(AppFeatures.NewZipBrowser)) {
-                if (ZipBrowserComposeActivity.zipFileFormatCheck(context, zipFilePath)) {
-                    ZipBrowserComposeActivity::class.java
-                } else null
-            } else {
-                if (ZipBrowserActivity.zipFileFormatCheck(context, zipFilePath)) {
-                    ZipBrowserActivity::class.java
-                } else null
-            }?.let { activity ->
-                context.startActivity(Intent(context, activity).apply {
+            if (ZipBrowserComposeActivity.zipFileFormatCheck(context, zipFilePath)) {
+                context.startActivity(Intent(context, ZipBrowserComposeActivity::class.java).apply {
                     putExtra(EXTRA_PATH_ZIP, zipFilePath)
                     putExtra(EXTRA_HANDLE_ZIP, nodeHandle)
                 })
-            } ?: run {
+            } else {
                 onError()
             }
         }
@@ -194,72 +197,69 @@ internal class MegaNavigatorImpl @Inject constructor(
         }.let(context::startActivity)
     }
 
-    override fun openMediaPlayerActivityByFileNode(
+    override suspend fun openMediaPlayerActivityByFileNode(
         context: Context,
         contentUri: NodeContentUri,
         fileNode: TypedFileNode,
         viewType: Int,
         sortOrder: SortOrder,
         isFolderLink: Boolean,
+        isMediaQueueAvailable: Boolean,
         searchedItems: List<Long>?,
         mediaQueueTitle: String?,
-        onError: () -> Unit,
     ) {
-        applicationScope.launch {
-            runCatching {
-                manageMediaIntent(
-                    context = context,
-                    contentUri = contentUri,
-                    fileTypeInfo = fileNode.type,
-                    sortOrder = sortOrder,
-                    viewType = viewType,
-                    name = fileNode.name,
-                    handle = fileNode.id.longValue,
-                    parentHandle = fileNode.parentId.longValue,
-                    isFolderLink = isFolderLink,
-                    searchedItems = searchedItems,
-                    mediaQueueTitle = mediaQueueTitle
-                )
-            }.onFailure {
-                Timber.e(it)
-                onError()
-            }
-        }
+        manageMediaIntent(
+            context = context,
+            contentUri = contentUri,
+            fileTypeInfo = fileNode.type,
+            sortOrder = sortOrder,
+            viewType = viewType,
+            name = fileNode.name,
+            handle = fileNode.id.longValue,
+            parentHandle = fileNode.parentId.longValue,
+            isFolderLink = isFolderLink,
+            isMediaQueueAvailable = isMediaQueueAvailable,
+            searchedItems = searchedItems,
+            mediaQueueTitle = mediaQueueTitle
+        )
     }
 
-    private fun manageMediaIntent(
+    private suspend fun manageMediaIntent(
         context: Context,
         contentUri: NodeContentUri,
         fileTypeInfo: FileTypeInfo,
         sortOrder: SortOrder,
-        viewType: Int,
         name: String,
         handle: Long,
         parentHandle: Long,
         isFolderLink: Boolean,
+        isMediaQueueAvailable: Boolean,
+        viewType: Int? = null,
         path: String? = null,
+        offlineParentId: Int? = null,
         offlineParent: String? = null,
         searchedItems: List<Long>? = null,
         mediaQueueTitle: String? = null,
+        nodeHandles: List<Long>? = null,
     ) {
-        val intent = when {
-            fileTypeInfo.isSupported && fileTypeInfo is VideoFileTypeInfo ->
-                Intent(context, LegacyVideoPlayerActivity::class.java)
-
-            fileTypeInfo.isSupported && fileTypeInfo is AudioFileTypeInfo ->
-                Intent(context, AudioPlayerActivity::class.java)
-
-            else -> Intent(Intent.ACTION_VIEW)
-        }.apply {
+        val intent = getIntent(context, fileTypeInfo).apply {
             putExtra(INTENT_EXTRA_KEY_ORDER_GET_CHILDREN, sortOrder)
             putExtra(INTENT_EXTRA_KEY_PLACEHOLDER, 0)
-            putExtra(INTENT_EXTRA_KEY_ADAPTER_TYPE, viewType)
             putExtra(INTENT_EXTRA_KEY_FILE_NAME, name)
             putExtra(INTENT_EXTRA_KEY_HANDLE, handle)
-            putExtra(INTENT_EXTRA_KEY_PARENT_NODE_HANDLE, parentHandle)
             putExtra(INTENT_EXTRA_KEY_IS_FOLDER_LINK, isFolderLink)
+            viewType?.let {
+                putExtra(INTENT_EXTRA_KEY_ADAPTER_TYPE, viewType)
+            }
+            if (isMediaQueueAvailable) {
+                putExtra(INTENT_EXTRA_KEY_PARENT_NODE_HANDLE, parentHandle)
+            }
+            putExtra(INTENT_EXTRA_KEY_IS_PLAYLIST, isMediaQueueAvailable)
             path?.let {
                 putExtra(INTENT_EXTRA_KEY_PATH, path)
+            }
+            offlineParentId?.let {
+                putExtra(INTENT_EXTRA_KEY_PARENT_ID, it)
             }
             offlineParent?.let {
                 putExtra(INTENT_EXTRA_KEY_OFFLINE_PATH_DIRECTORY, offlineParent)
@@ -270,6 +270,9 @@ internal class MegaNavigatorImpl @Inject constructor(
             mediaQueueTitle?.let {
                 putExtra(INTENT_EXTRA_KEY_MEDIA_QUEUE_TITLE, it)
             }
+            nodeHandles?.let {
+                putExtra(NODE_HANDLES, it.toLongArray())
+            }
             addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         val mimeType =
@@ -278,37 +281,131 @@ internal class MegaNavigatorImpl @Inject constructor(
         context.startActivity(intent)
     }
 
-    override fun openMediaPlayerActivityByLocalFile(
+    private suspend fun getIntent(context: Context, fileTypeInfo: FileTypeInfo) = when {
+        fileTypeInfo.isSupported && fileTypeInfo is VideoFileTypeInfo ->
+            Intent(
+                context,
+                if (getFeatureFlagValueUseCase(AppFeatures.NewVideoPlayer))
+                    VideoPlayerComposeActivity::class.java
+                else
+                    LegacyVideoPlayerActivity::class.java
+            )
+
+        fileTypeInfo.isSupported && fileTypeInfo is AudioFileTypeInfo ->
+            Intent(context, AudioPlayerActivity::class.java)
+
+        else -> Intent(Intent.ACTION_VIEW)
+    }
+
+    override suspend fun openMediaPlayerActivityByLocalFile(
         context: Context,
         localFile: File,
-        fileTypeInfo: FileTypeInfo,
-        viewType: Int,
         handle: Long,
+        viewType: Int?,
         parentId: Long,
+        offlineParentId: Int?,
+        fileTypeInfo: FileTypeInfo?,
         sortOrder: SortOrder,
         isFolderLink: Boolean,
+        isMediaQueueAvailable: Boolean,
         searchedItems: List<Long>?,
-        onError: () -> Unit,
     ) {
-        runCatching {
-            val contentUri = NodeContentUri.LocalContentUri(localFile)
-            manageMediaIntent(
-                context = context,
-                contentUri = contentUri,
-                fileTypeInfo = fileTypeInfo,
-                sortOrder = sortOrder,
-                viewType = viewType,
-                name = localFile.name,
-                handle = handle,
-                parentHandle = parentId,
-                isFolderLink = isFolderLink,
-                path = localFile.absolutePath,
-                offlineParent = localFile.parent,
-                searchedItems = searchedItems
-            )
-        }.onFailure {
-            Timber.e(it)
-            onError()
+        val contentUri = NodeContentUri.LocalContentUri(localFile)
+        val info = fileTypeInfo ?: getFileTypeInfoUseCase(localFile)
+        manageMediaIntent(
+            context = context,
+            contentUri = contentUri,
+            fileTypeInfo = info,
+            sortOrder = sortOrder,
+            viewType = viewType,
+            name = localFile.name,
+            handle = handle,
+            parentHandle = parentId,
+            isFolderLink = isFolderLink,
+            isMediaQueueAvailable = isMediaQueueAvailable,
+            path = localFile.absolutePath,
+            offlineParentId = offlineParentId,
+            offlineParent = localFile.parent,
+            searchedItems = searchedItems
+        )
+
+    }
+
+    override suspend fun openMediaPlayerActivityFromChat(
+        context: Context,
+        contentUri: NodeContentUri,
+        message: NodeAttachmentMessage,
+        fileNode: FileNode,
+    ) {
+        val intent = getIntent(context, fileNode.type).apply {
+            putExtra(INTENT_EXTRA_KEY_ADAPTER_TYPE, FROM_CHAT)
+            putExtra(INTENT_EXTRA_KEY_IS_PLAYLIST, false)
+            putExtra(INTENT_EXTRA_KEY_MSG_ID, message.msgId)
+            putExtra(INTENT_EXTRA_KEY_CHAT_ID, message.chatId)
+            putExtra(INTENT_EXTRA_KEY_FILE_NAME, fileNode.name)
+            putExtra(INTENT_EXTRA_KEY_HANDLE, fileNode.id.longValue)
         }
+
+        val mimeType =
+            if (fileNode.type.extension == "opus") "audio/*" else fileNode.type.mimeType
+        nodeContentUriIntentMapper(intent, contentUri, mimeType, fileNode.type.isSupported)
+        context.startActivity(intent)
+    }
+
+    override suspend fun openMediaPlayerActivityFromChat(
+        context: Context,
+        contentUri: NodeContentUri,
+        handle: Long,
+        messageId: Long,
+        chatId: Long,
+        name: String,
+    ) {
+        val fileType = getFileTypeInfoByNameUseCase(name)
+        val intent = getIntent(context, fileType).apply {
+            putExtra(INTENT_EXTRA_KEY_ADAPTER_TYPE, FROM_CHAT)
+            putExtra(INTENT_EXTRA_KEY_IS_PLAYLIST, false)
+            putExtra(INTENT_EXTRA_KEY_MSG_ID, messageId)
+            putExtra(INTENT_EXTRA_KEY_CHAT_ID, chatId)
+            putExtra(INTENT_EXTRA_KEY_FILE_NAME, name)
+            putExtra(INTENT_EXTRA_KEY_HANDLE, handle)
+        }
+
+        val mimeType =
+            if (fileType.extension == "opus") "audio/*" else fileType.mimeType
+        nodeContentUriIntentMapper(intent, contentUri, mimeType, fileType.isSupported)
+        context.startActivity(intent)
+    }
+
+    override suspend fun openMediaPlayerActivity(
+        context: Context,
+        contentUri: NodeContentUri,
+        name: String,
+        handle: Long,
+        viewType: Int?,
+        parentId: Long,
+        fileTypeInfo: FileTypeInfo?,
+        sortOrder: SortOrder,
+        isFolderLink: Boolean,
+        isMediaQueueAvailable: Boolean,
+        searchedItems: List<Long>?,
+        mediaQueueTitle: String?,
+        nodeHandles: List<Long>?,
+    ) {
+        val info = fileTypeInfo ?: getFileTypeInfoByNameUseCase(name)
+        manageMediaIntent(
+            context = context,
+            contentUri = contentUri,
+            fileTypeInfo = info,
+            sortOrder = sortOrder,
+            viewType = viewType,
+            name = name,
+            handle = handle,
+            parentHandle = parentId,
+            isFolderLink = isFolderLink,
+            isMediaQueueAvailable = isMediaQueueAvailable,
+            searchedItems = searchedItems,
+            mediaQueueTitle = mediaQueueTitle,
+            nodeHandles = nodeHandles
+        )
     }
 }

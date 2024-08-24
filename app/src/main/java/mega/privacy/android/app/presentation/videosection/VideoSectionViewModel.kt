@@ -6,13 +6,17 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -57,6 +61,7 @@ import mega.privacy.android.domain.usecase.videosection.MonitorVideoPlaylistSets
 import mega.privacy.android.domain.usecase.videosection.RemoveVideoPlaylistsUseCase
 import mega.privacy.android.domain.usecase.videosection.RemoveVideosFromPlaylistUseCase
 import mega.privacy.android.domain.usecase.videosection.UpdateVideoPlaylistTitleUseCase
+import mega.privacy.android.legacy.core.ui.model.SearchWidgetState
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
 import javax.inject.Inject
@@ -107,7 +112,6 @@ class VideoSectionViewModel @Inject constructor(
      */
     val tabState = _tabState.asStateFlow()
 
-    private var searchQuery = ""
     private val originalData = mutableListOf<TypedVideoNode>()
     private val originalEntities = mutableListOf<VideoUIEntity>()
 
@@ -115,6 +119,7 @@ class VideoSectionViewModel @Inject constructor(
     private val originalPlaylistEntities = mutableListOf<VideoPlaylistUIEntity>()
 
     private var createVideoPlaylistJob: Job? = null
+    private var searchQueryJob: Job? = null
 
     init {
         refreshNodesIfAnyUpdates()
@@ -137,6 +142,14 @@ class VideoSectionViewModel @Inject constructor(
             if (getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)) {
                 handleHiddenNodesUIFlow()
                 monitorIsHiddenNodesOnboarded()
+            }
+        }
+
+        viewModelScope.launch {
+            _state.map { it.selectedVideoHandles }.distinctUntilChanged().collectLatest {
+                if (it.isNotEmpty()) {
+                    checkActionsVisible()
+                }
             }
         }
     }
@@ -207,7 +220,7 @@ class VideoSectionViewModel @Inject constructor(
 
     private fun List<VideoPlaylistUIEntity>.filterVideoPlaylistsBySearchQuery() =
         filter { playlist ->
-            playlist.title.contains(searchQuery, true)
+            playlist.title.contains(_state.value.query ?: "", true)
         }
 
     private fun setPendingRefreshNodes() = _state.update { it.copy(isPendingRefresh = true) }
@@ -217,10 +230,10 @@ class VideoSectionViewModel @Inject constructor(
             items = getVideoUIEntityList(),
             showHiddenItems = this@VideoSectionViewModel.showHiddenItems,
             isPaid = _state.value.accountDetail?.levelDetail?.accountType?.isPaid,
-        ).updateOriginalEntities()
-            .filterVideosBySearchQuery()
-            .filterVideosByDuration()
+        ).filterVideosByDuration()
             .filterVideosByLocation()
+            .updateOriginalEntities()
+            .filterVideosBySearchQuery()
 
         val sortOrder = getCloudSortOrder()
         _state.update {
@@ -245,7 +258,7 @@ class VideoSectionViewModel @Inject constructor(
 
     private fun List<VideoUIEntity>.filterVideosBySearchQuery() =
         filter { video ->
-            video.name.contains(searchQuery, true)
+            video.name.contains(_state.value.query ?: "", true)
         }
 
     private fun List<VideoUIEntity>.updateOriginalEntities() = also { data ->
@@ -276,7 +289,6 @@ class VideoSectionViewModel @Inject constructor(
     private fun List<VideoUIEntity>.filterVideosByDuration() =
         filter {
             val seconds = it.duration.inWholeSeconds
-            val minutes = it.duration.inWholeMinutes
             when (_state.value.durationSelectedFilterOption) {
                 DurationFilterOption.AllDurations -> true
 
@@ -284,11 +296,11 @@ class VideoSectionViewModel @Inject constructor(
 
                 DurationFilterOption.Between10And60Seconds -> seconds in 10..60
 
-                DurationFilterOption.Between1And4 -> minutes in 1..4
+                DurationFilterOption.Between1And4 -> seconds in 60..240
 
-                DurationFilterOption.Between4And20 -> minutes in 4..20
+                DurationFilterOption.Between4And20 -> seconds in 241..1200
 
-                DurationFilterOption.MoreThan20 -> minutes > 20
+                DurationFilterOption.MoreThan20 -> seconds > 1200
             }
         }
 
@@ -298,11 +310,12 @@ class VideoSectionViewModel @Inject constructor(
         if (selectTab == VideoSectionTab.Playlists && originalPlaylistEntities.isEmpty()) {
             loadVideoPlaylists()
         }
-        if (_state.value.searchMode) {
+        if (_state.value.searchState == SearchWidgetState.EXPANDED) {
             exitSearch()
         }
-        if (_state.value.actionMode) {
-            setActionMode(false)
+        if (_state.value.isInSelection) {
+            clearAllSelectedVideos()
+            clearAllSelectedVideoPlaylists()
         }
         _tabState.update {
             it.copy(selectedTab = selectTab)
@@ -326,30 +339,27 @@ class VideoSectionViewModel @Inject constructor(
     internal fun shouldShowSearchMenu() =
         _state.value.currentVideoPlaylist == null && _state.value.allVideos.isNotEmpty()
 
-    internal fun searchReady() {
-        if (_state.value.searchMode)
-            return
+    internal fun searchQuery(queryString: String) {
+        searchQueryJob?.cancel()
+        searchQueryJob = viewModelScope.launch {
+            delay(200)
+            _state.update {
+                it.copy(
+                    query = queryString
+                )
+            }
 
-        _state.update { it.copy(searchMode = true) }
-        searchQuery = ""
-    }
-
-    internal fun searchQuery(query: String) {
-        if (searchQuery == query)
-            return
-
-        searchQuery = query
-
-        if (_tabState.value.selectedTab == VideoSectionTab.All) {
-            searchNodeByQueryString()
-        } else {
-            searchPlaylistByQueryString()
+            if (_tabState.value.selectedTab == VideoSectionTab.All) {
+                searchNodeByQueryString()
+            } else {
+                searchPlaylistByQueryString()
+            }
         }
     }
 
     private fun searchNodeByQueryString() {
         val videos = originalEntities.filter { video ->
-            video.name.contains(searchQuery, true)
+            video.name.contains(_state.value.query ?: "", true)
         }
         _state.update {
             it.copy(
@@ -361,7 +371,7 @@ class VideoSectionViewModel @Inject constructor(
 
     private fun searchPlaylistByQueryString() {
         val playlists = originalPlaylistEntities.filter { playlist ->
-            playlist.title.contains(searchQuery, true)
+            playlist.title.contains(_state.value.query ?: "", true)
         }
         _state.update {
             it.copy(
@@ -372,14 +382,27 @@ class VideoSectionViewModel @Inject constructor(
     }
 
     internal fun exitSearch() {
-        _state.update { it.copy(searchMode = false) }
-        searchQuery = ""
+        _state.update {
+            it.copy(
+                query = null,
+                searchState = SearchWidgetState.COLLAPSED
+            )
+        }
 
         if (_tabState.value.selectedTab == VideoSectionTab.All) {
             refreshNodes()
         } else {
             loadVideoPlaylists()
         }
+    }
+
+    internal fun searchWidgetStateUpdate() {
+        val searchState = when (_state.value.searchState) {
+            SearchWidgetState.EXPANDED -> SearchWidgetState.COLLAPSED
+
+            SearchWidgetState.COLLAPSED -> SearchWidgetState.EXPANDED
+        }
+        _state.update { it.copy(searchState = searchState) }
     }
 
     internal fun clearAllSelectedVideos() {
@@ -622,7 +645,6 @@ class VideoSectionViewModel @Inject constructor(
             .takeIf { it.isNotEmpty() && checkVideoPlaylistTitleValidity(it) }
             ?.let { playlistTitle ->
                 createVideoPlaylistJob = viewModelScope.launch {
-                    setShouldCreateVideoPlaylist(false)
                     runCatching {
                         createVideoPlaylistUseCase(playlistTitle)
                     }.onSuccess { videoPlaylist ->
@@ -660,8 +682,6 @@ class VideoSectionViewModel @Inject constructor(
                 _state.update {
                     it.copy(
                         deletedVideoPlaylistTitles = deletedPlaylistTitles,
-                        shouldDeleteVideoPlaylist = false,
-                        shouldDeleteSingleVideoPlaylist = false,
                         areVideoPlaylistsRemovedSuccessfully = true
                     )
                 }
@@ -670,8 +690,6 @@ class VideoSectionViewModel @Inject constructor(
                 Timber.e(exception)
                 _state.update {
                     it.copy(
-                        shouldDeleteVideoPlaylist = false,
-                        shouldDeleteSingleVideoPlaylist = false,
                         areVideoPlaylistsRemovedSuccessfully = false
                     )
                 }
@@ -750,19 +768,9 @@ class VideoSectionViewModel @Inject constructor(
                         updateVideoPlaylistTitleUseCase(playlistID, title)
                     }.onSuccess { title ->
                         Timber.d("Updated video playlist title: $title")
-                        _state.update {
-                            it.copy(
-                                shouldRenameVideoPlaylist = false
-                            )
-                        }
                         refreshVideoPlaylistsWithUpdatedTitle(title)
                     }.onFailure { exception ->
                         Timber.e(exception)
-                        _state.update {
-                            it.copy(
-                                shouldRenameVideoPlaylist = false
-                            )
-                        }
                     }
                 }
             }
@@ -784,18 +792,10 @@ class VideoSectionViewModel @Inject constructor(
             }
         }
 
-    internal fun setShouldRenameVideoPlaylist(value: Boolean) = _state.update {
-        it.copy(shouldRenameVideoPlaylist = value)
-    }
-
     internal fun updateCurrentVideoPlaylist(playlist: VideoPlaylistUIEntity?) {
         _state.update {
             it.copy(currentVideoPlaylist = playlist)
         }
-    }
-
-    internal fun setShouldCreateVideoPlaylist(value: Boolean) = _state.update {
-        it.copy(shouldCreateVideoPlaylist = value)
     }
 
     internal fun setPlaceholderTitle(placeholderTitle: String) {
@@ -843,30 +843,12 @@ class VideoSectionViewModel @Inject constructor(
         return isTitleValid
     }
 
-    internal fun setActionMode(value: Boolean) = _state.update { it.copy(actionMode = value) }
-
     internal fun setIsVideoPlaylistCreatedSuccessfully(value: Boolean) = _state.update {
         it.copy(isVideoPlaylistCreatedSuccessfully = value)
     }
 
-    internal fun setShouldDeleteVideoPlaylist(value: Boolean) = _state.update {
-        it.copy(shouldDeleteVideoPlaylist = value)
-    }
-
-    internal fun setShouldDeleteVideosFromPlaylist(value: Boolean) = _state.update {
-        it.copy(shouldDeleteVideosFromPlaylist = value)
-    }
-
-    internal fun setShouldDeleteSingleVideoPlaylist(value: Boolean) = _state.update {
-        it.copy(shouldDeleteSingleVideoPlaylist = value)
-    }
-
     internal fun clearDeletedVideoPlaylistTitles() = _state.update {
         it.copy(deletedVideoPlaylistTitles = emptyList())
-    }
-
-    internal fun setShouldShowMoreVideoPlaylistOptions(value: Boolean) = _state.update {
-        it.copy(shouldShowMoreVideoPlaylistOptions = value)
     }
 
     internal fun setAreVideoPlaylistsRemovedSuccessfully(value: Boolean) = _state.update {
@@ -956,12 +938,8 @@ class VideoSectionViewModel @Inject constructor(
         }
     }
 
-    internal suspend fun getNodeContentUri(fileNode: TypedFileNode) = runCatching {
+    internal suspend fun getNodeContentUri(fileNode: TypedFileNode) =
         FileNodeContent.AudioOrVideo(uri = getNodeContentUriUseCase(fileNode)).uri
-    }.recover {
-        Timber.e(it)
-        null
-    }.getOrNull()
 
     internal fun getTypedVideoNodeById(id: NodeId) = originalData.firstOrNull { it.id == id }
 
@@ -981,6 +959,43 @@ class VideoSectionViewModel @Inject constructor(
     internal fun playAllButtonClicked() {
         val clickedItem = _state.value.currentVideoPlaylist?.videos?.firstOrNull() ?: return
         updateClickedPlaylistDetailItem(getTypedVideoNodeOfPlaylistById(clickedItem.id))
+    }
+
+    internal suspend fun checkActionsVisible() {
+        var isHideMenuActionVisible = false
+        var isUnhideMenuActionVisible = false
+        var isRemoveLinkMenuActionVisible = false
+
+        if (_tabState.value.selectedTab == VideoSectionTab.All) {
+            val selectedNodes = getSelectedNodes()
+            val isHiddenNodesEnabled = getFeatureFlagValueUseCase(AppFeatures.HiddenNodes)
+            val includeSensitiveInheritedNode = selectedNodes.any { it.isSensitiveInherited }
+
+            if (isHiddenNodesEnabled && !includeSensitiveInheritedNode) {
+                val hasNonSensitiveNode =
+                    getSelectedNodes().any { !it.isMarkedSensitive }
+                val isPaid =
+                    _state.value.accountDetail?.levelDetail?.accountType?.isPaid ?: false
+                isHideMenuActionVisible = hasNonSensitiveNode || !isPaid
+                isUnhideMenuActionVisible = !hasNonSensitiveNode && isPaid
+            }
+
+            isRemoveLinkMenuActionVisible = if (selectedNodes.size == 1) {
+                selectedNodes.firstOrNull()?.let {
+                    it.exportedData != null
+                } ?: false
+            } else {
+                false
+            }
+        }
+
+        _state.update {
+            it.copy(
+                isHideMenuActionVisible = isHideMenuActionVisible,
+                isUnhideMenuActionVisible = isUnhideMenuActionVisible,
+                isRemoveLinkMenuActionVisible = isRemoveLinkMenuActionVisible
+            )
+        }
     }
 
     companion object {

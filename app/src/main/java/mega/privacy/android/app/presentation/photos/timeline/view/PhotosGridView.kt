@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.Text
@@ -29,13 +28,13 @@ import mega.privacy.android.app.presentation.photos.model.ZoomLevel
 import mega.privacy.android.app.presentation.photos.timeline.model.PhotoListItem
 import mega.privacy.android.app.presentation.photos.timeline.model.TimelineViewState
 import mega.privacy.android.domain.entity.photos.Photo
+import mega.privacy.android.shared.original.core.ui.controls.layouts.FastScrollLazyVerticalGrid
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
-const val DATE_FORMAT_YEAR = "uuuu"
 const val DATE_FORMAT_YEAR_WITH_MONTH = "yyyy"
 const val DATE_FORMAT_MONTH = "LLLL"
 const val DATE_FORMAT_DAY = "dd"
@@ -68,16 +67,40 @@ fun PhotosGridView(
         }
     }
 
+    val enableCameraUploadsBanner =
+        timelineViewState.enableCameraUploadButtonShowing
+                && !timelineViewState.showCameraUploadsWarning
+                && timelineViewState.selectedPhotoCount == 0
+    val isCameraUploadsLimitedAccess = timelineViewState.isCameraUploadsLimitedAccess
+
     val context = LocalContext.current
     val uiPhotoList = timelineViewState.photosListItems
+    val currentZoomLevel = timelineViewState.currentZoomLevel
+    val potentialItems =
+        if (enableCameraUploadsBanner) 1 else 0 + if (isCameraUploadsLimitedAccess) 1 else 0
+    val totalItems = potentialItems + uiPhotoList.size + 1
 
-    LazyVerticalGrid(
+    FastScrollLazyVerticalGrid(
+        totalItems = totalItems,
         columns = GridCells.Fixed(spanCount),
-        modifier = modifier
-            .fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         state = lazyGridState,
+        tooltipText = { index ->
+            val item = uiPhotoList.getOrNull(index)
+            item?.let {
+                val modificationTime = when (it) {
+                    is PhotoListItem.Separator -> it.modificationTime
+                    is PhotoListItem.PhotoGridItem -> it.photo.modificationTime
+                }
+                dateText(
+                    modificationTime = modificationTime,
+                    currentZoomLevel = currentZoomLevel,
+                    locale = context.resources.configuration.locales[0],
+                )
+            } ?: ""
+        },
     ) {
-        if (timelineViewState.isCameraUploadsLimitedAccess) {
+        if (isCameraUploadsLimitedAccess) {
             item(
                 key = "camera-uploads-limited-access-banner",
                 span = { GridItemSpan(maxLineSpan) },
@@ -89,7 +112,7 @@ fun PhotosGridView(
             }
         }
 
-        if (timelineViewState.enableCameraUploadButtonShowing && !timelineViewState.showCameraUploadsWarning && timelineViewState.selectedPhotoCount == 0) {
+        if (enableCameraUploadsBanner) {
             item(
                 key = "enable-camera-uploads-banner",
                 span = { GridItemSpan(maxLineSpan) },

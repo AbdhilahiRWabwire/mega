@@ -3,12 +3,18 @@ package mega.privacy.android.app.presentation.zipbrowser
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.constraintlayout.compose.ConstraintLayout
+import androidx.constraintlayout.compose.Dimension
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,20 +36,17 @@ import mega.privacy.android.app.presentation.imagepreview.fetcher.ZipImageNodeFe
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewFetcherSource
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewMenuSource
 import mega.privacy.android.app.presentation.pdfviewer.PdfViewerActivity
+import mega.privacy.android.app.presentation.search.view.MiniAudioPlayerView
 import mega.privacy.android.app.presentation.zipbrowser.view.ZipBrowserScreen
 import mega.privacy.android.app.textEditor.TextEditorActivity
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.EXTRA_PATH_ZIP
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_FILE_NAME
-import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_HANDLE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_OFFLINE_PATH_DIRECTORY
-import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_ORDER_GET_CHILDREN
-import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_PARENT_NODE_HANDLE
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_PATH
 import mega.privacy.android.app.utils.Constants.ZIP_ADAPTER
 import mega.privacy.android.app.utils.MegaApiUtils
-import mega.privacy.android.app.utils.Util.getMediaIntent
 import mega.privacy.android.data.model.MimeTypeList
 import mega.privacy.android.data.model.MimeTypeList.Companion.typeForName
 import mega.privacy.android.domain.entity.SortOrder
@@ -52,6 +55,7 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.zipbrowser.ZipEntryType
 import mega.privacy.android.domain.monitoring.CrashReporter
 import mega.privacy.android.domain.usecase.GetThemeMode
+import mega.privacy.android.navigation.MegaNavigator
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import timber.log.Timber
 import java.io.File
@@ -70,19 +74,47 @@ class ZipBrowserComposeActivity : PasscodeActivity() {
     @Inject
     lateinit var getThemeMode: GetThemeMode
 
+    /**
+     * [MegaNavigator] injection
+     */
+    @Inject
+    lateinit var megaNavigator: MegaNavigator
+
     private val viewModel by viewModels<ZipBrowserViewModel>()
 
     /**
      * onCreate
      */
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
             val themeMode by getThemeMode().collectAsStateWithLifecycle(
                 initialValue = ThemeMode.System
             )
             OriginalTempTheme(isDark = themeMode.isDarkMode()) {
-                ZipBrowserScreen(viewModel = viewModel)
+                ConstraintLayout(
+                    modifier = Modifier.systemBarsPadding().fillMaxSize()
+                ) {
+                    val (audioPlayer, audioSectionComposeView) = createRefs()
+                    MiniAudioPlayerView(
+                        modifier = Modifier
+                            .constrainAs(audioPlayer) {
+                                bottom.linkTo(parent.bottom)
+                            }
+                            .fillMaxWidth(),
+                        lifecycle = lifecycle,
+                    )
+                    ZipBrowserScreen(
+                        modifier = Modifier
+                            .constrainAs(audioSectionComposeView) {
+                                top.linkTo(parent.top)
+                                bottom.linkTo(audioPlayer.top)
+                                height = Dimension.fillToConstraints
+                            }
+                            .fillMaxWidth(),
+                        viewModel = viewModel)
+                }
             }
         }
 
@@ -151,34 +183,23 @@ class ZipBrowserComposeActivity : PasscodeActivity() {
         }
     }
 
-    private fun MimeTypeList.openMediaFile(file: File) {
-        val intent = getIntent(file)
-        runCatching {
-            FileProvider.getUriForFile(
-                this@ZipBrowserComposeActivity,
-                Constants.AUTHORITY_STRING_FILE_PROVIDER,
-                file
-            )
-        }.onFailure {
-            Uri.fromFile(file)
-        }.map { mediaFileUri ->
-            intent.setDataAndType(mediaFileUri, type)
-            intent.flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+    private fun openMediaFile(file: File) {
+        lifecycleScope.launch {
+            runCatching {
+                val fileTypeInfo = viewModel.getFileTypeInfo(file)
+                megaNavigator.openMediaPlayerActivityByLocalFile(
+                    context = this@ZipBrowserComposeActivity,
+                    localFile = file,
+                    fileTypeInfo = fileTypeInfo,
+                    viewType = ZIP_ADAPTER,
+                    handle = file.name.hashCode().toLong(),
+                    parentId = -1L,
+                    sortOrder = SortOrder.ORDER_DEFAULT_ASC
+                )
+            }.onFailure {
+                Timber.e(it)
+            }
         }
-        startActivity(intent)
-    }
-
-    private fun getIntent(
-        file: File,
-    ) = getMediaIntent(this, file.name).apply {
-        putExtra(INTENT_EXTRA_KEY_FILE_NAME, file.name)
-        putExtra(INTENT_EXTRA_KEY_HANDLE, file.name.hashCode().toLong())
-        putExtra(INTENT_EXTRA_KEY_PATH, file.absolutePath)
-        putExtra(INTENT_EXTRA_KEY_ADAPTER_TYPE, ZIP_ADAPTER)
-        putExtra(INTENT_EXTRA_KEY_PARENT_NODE_HANDLE, -1L)
-        putExtra(INTENT_EXTRA_KEY_OFFLINE_PATH_DIRECTORY, file.absolutePath)
-        putExtra(INTENT_EXTRA_KEY_ORDER_GET_CHILDREN, SortOrder.ORDER_DEFAULT_ASC)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 
     /**

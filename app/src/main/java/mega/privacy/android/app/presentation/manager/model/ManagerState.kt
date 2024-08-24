@@ -8,7 +8,7 @@ import mega.privacy.android.domain.entity.chat.ChatLinkContent
 import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.MoveRequestResult
 import mega.privacy.android.domain.entity.node.NodeId
-import mega.privacy.android.domain.entity.node.NodeNameCollisionResult
+import mega.privacy.android.domain.entity.node.NodeNameCollisionsResult
 import mega.privacy.android.domain.entity.node.RestoreNodeResult
 
 
@@ -26,7 +26,7 @@ import mega.privacy.android.domain.entity.node.RestoreNodeResult
  * @property isPushNotificationSettingsUpdatedEvent
  * @property titleChatArchivedEvent
  * @property restoreNodeResult
- * @property nodeNameCollisionResult
+ * @property nodeNameCollisionsResult
  * @property moveRequestResult
  * @property message
  * @property chatLinkContent                            Result of check link request
@@ -39,7 +39,6 @@ import mega.privacy.android.domain.entity.node.RestoreNodeResult
  * @property isCallUnlimitedProPlanFeatureFlagEnabled   True, if Call Unlimited Pro Plan feature flag enabled. False, otherwise.
  * @property usersCallLimitReminders                    [UsersCallLimitReminders]
  * @property searchQuery                                Search query
- * @property isSyncFeatureFlagEnabled                   True if Android Sync feature flag is enabled. False otherwise.
  * @property uploadEvent                                Event to trigger upload actions
  */
 data class ManagerState(
@@ -54,7 +53,7 @@ data class ManagerState(
     val isPushNotificationSettingsUpdatedEvent: Boolean = false,
     val titleChatArchivedEvent: String? = null,
     val restoreNodeResult: Result<RestoreNodeResult>? = null,
-    val nodeNameCollisionResult: NodeNameCollisionResult? = null,
+    val nodeNameCollisionsResult: NodeNameCollisionsResult? = null,
     val moveRequestResult: Result<MoveRequestResult>? = null,
     val message: InfoToShow? = null,
     val chatLinkContent: Result<ChatLinkContent>? = null,
@@ -67,6 +66,5 @@ data class ManagerState(
     val isCallUnlimitedProPlanFeatureFlagEnabled: Boolean = false,
     val usersCallLimitReminders: UsersCallLimitReminders = UsersCallLimitReminders.Enabled,
     val searchQuery: String = "",
-    val isSyncFeatureFlagEnabled: Boolean = false,
     val uploadEvent: StateEventWithContent<TransferTriggerEvent.StartUpload> = consumed(),
 )

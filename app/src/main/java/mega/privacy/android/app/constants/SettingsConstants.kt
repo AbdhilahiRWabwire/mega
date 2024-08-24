@@ -7,6 +7,7 @@ object SettingsConstants {
     /* General settings */
 
     const val KEY_FEATURES_CAMERA_UPLOAD = "settings_features_camera_upload"
+    const val KEY_FEATURES_SYNC = "settings_features_sync"
     const val KEY_FEATURES_CHAT = "settings_features_chat"
     const val KEY_STORAGE_DOWNLOAD = "settings_nested_download_location"
     const val KEY_STORAGE_FILE_MANAGEMENT = "settings_storage_file_management"
@@ -22,8 +23,6 @@ object SettingsConstants {
     const val KEY_COOKIE_SETTINGS = "settings_cookie"
     const val KEY_ABOUT_TOS = "settings_about_terms_of_service"
     const val KEY_ABOUT_CODE_LINK = "settings_about_code_link"
-    const val KEY_ABOUT_SDK_VERSION = "settings_about_sdk_version"
-    const val KEY_ABOUT_KARERE_VERSION = "settings_about_karere_version"
     const val KEY_ABOUT_APP_VERSION = "settings_about_app_version"
     const val KEY_CANCEL_ACCOUNT = "settings_about_cancel_account"
     const val KEY_AUDIO_BACKGROUND_PLAY_ENABLED = "settings_audio_background_play_enabled"

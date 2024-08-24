@@ -1,12 +1,11 @@
 package mega.privacy.android.feature.sync.ui
 
+import mega.privacy.android.icon.pack.R as iconPackR
 import mega.privacy.android.shared.resources.R as sharedResR
-import mega.privacy.android.shared.sync.R as sharedSyncR
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -152,7 +151,7 @@ class SyncFragment : Fragment() {
                 )
             }, content = { _ ->
                 SyncEmptyState(
-                    iconId = sharedSyncR.drawable.ic_no_cloud,
+                    iconId = iconPackR.drawable.ic_no_cloud,
                     iconSize = 144.dp,
                     iconDescription = "No network connectivity state",
                     textId = sharedResR.string.sync_no_network_state,
@@ -162,15 +161,7 @@ class SyncFragment : Fragment() {
         )
     }
 
-    /**
-     * Is current theme mode a dark theme
-     */
-    @Composable
-    fun ThemeMode.isDarkMode() = when (this) {
-        ThemeMode.Light -> false
-        ThemeMode.Dark -> true
-        ThemeMode.System -> isSystemInDarkTheme()
-    }
+
 }
 
 internal const val SYNC_NO_NETWORK_STATE = "sync:no_network_state"

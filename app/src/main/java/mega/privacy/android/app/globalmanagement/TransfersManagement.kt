@@ -50,7 +50,7 @@ import mega.privacy.android.domain.usecase.transfers.BroadcastStopTransfersWorkU
 import mega.privacy.android.domain.usecase.transfers.GetTransferByTagUseCase
 import mega.privacy.android.domain.usecase.transfers.completed.AddCompletedTransferIfNotExistUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
-import mega.privacy.android.domain.usecase.transfers.paused.PauseAllTransfersUseCase
+import mega.privacy.android.domain.usecase.transfers.paused.PauseTransfersQueueUseCase
 import mega.privacy.android.domain.usecase.transfers.sd.DeleteSdTransferByTagUseCase
 import mega.privacy.android.domain.usecase.transfers.sd.GetAllSdTransfersUseCase
 import nz.mega.sdk.MegaApiAndroid
@@ -83,7 +83,7 @@ class TransfersManagement @Inject constructor(
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val getTransferByTagUseCase: GetTransferByTagUseCase,
     private val completedTransferMapper: CompletedTransferMapper,
-    private val pauseAllTransfersUseCase: PauseAllTransfersUseCase,
+    private val pauseTransfersQueueUseCase: PauseTransfersQueueUseCase,
 ) {
 
     companion object {
@@ -135,7 +135,6 @@ class TransfersManagement @Inject constructor(
     private var networkTimer: CountDownTimer? = null
 
     private var transferOverQuotaTimestamp: Long = 0
-    private var hasNotToBeShowDueToTransferOverQuota = false
     var isCurrentTransferOverQuota = false
     var isOnTransfersSection = false
     private var areFailedTransfers = false
@@ -157,7 +156,6 @@ class TransfersManagement @Inject constructor(
     fun resetDefaults() {
         networkTimer = null
         transferOverQuotaTimestamp = 0
-        hasNotToBeShowDueToTransferOverQuota = false
         isCurrentTransferOverQuota = false
         isOnTransfersSection = false
         areFailedTransfers = false
@@ -230,7 +228,6 @@ class TransfersManagement @Inject constructor(
      * has been opened from the transfers widget, false otherwise
      */
     fun setHasNotToBeShowDueToTransferOverQuota(hasNotToBeShowDueToTransferOverQuota: Boolean) {
-        this.hasNotToBeShowDueToTransferOverQuota = hasNotToBeShowDueToTransferOverQuota
         isTransferOverQuotaBannerShown = hasNotToBeShowDueToTransferOverQuota
     }
 
@@ -283,7 +280,7 @@ class TransfersManagement @Inject constructor(
             //Queue of transfers should be paused.
             applicationScope.launch {
                 runCatching {
-                    pauseAllTransfersUseCase(true)
+                    pauseTransfersQueueUseCase(true)
                 }.onFailure {
                     Timber.e(it)
                 }

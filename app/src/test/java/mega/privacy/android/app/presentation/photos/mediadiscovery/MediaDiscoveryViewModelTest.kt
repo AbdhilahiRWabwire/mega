@@ -10,15 +10,12 @@ import de.palm.composestateevents.StateEventWithContentTriggered
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import mega.privacy.android.app.domain.usecase.AuthorizeNode
 import mega.privacy.android.app.domain.usecase.GetNodeByHandle
 import mega.privacy.android.app.domain.usecase.GetNodeListByIds
 import mega.privacy.android.app.domain.usecase.GetPublicNodeListByIds
 import mega.privacy.android.app.featuretoggle.AppFeatures
-import mega.privacy.android.app.namecollision.usecase.CheckNameCollisionUseCase
 import mega.privacy.android.app.presentation.copynode.mapper.CopyRequestMessageMapper
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
@@ -26,6 +23,7 @@ import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.account.AccountDetail
 import mega.privacy.android.domain.entity.account.AccountLevelDetail
+import mega.privacy.android.domain.entity.node.NodeContentUri
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.photos.Photo
@@ -46,7 +44,8 @@ import mega.privacy.android.domain.usecase.folderlink.GetPublicChildNodeFromIdUs
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunningUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
-import mega.privacy.android.domain.usecase.node.CopyNodesUseCase
+import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionWithActionUseCase
+import mega.privacy.android.domain.usecase.node.GetNodeContentUriByHandleUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.photos.GetPhotosByFolderIdUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
@@ -87,9 +86,8 @@ class MediaDiscoveryViewModelTest {
     private val getFileUrlByNodeHandleUseCase = mock<GetFileUrlByNodeHandleUseCase>()
     private val getLocalFolderLinkFromMegaApiUseCase = mock<GetLocalFolderLinkFromMegaApiUseCase>()
     private val monitorConnectivityUseCase = mock<MonitorConnectivityUseCase>()
-    private val checkNameCollisionUseCase = mock<CheckNameCollisionUseCase>()
-    private val authorizeNode = mock<AuthorizeNode>()
-    private val copyNodesUseCase = mock<CopyNodesUseCase>()
+    private val checkNodesNameCollisionWithActionUseCase =
+        mock<CheckNodesNameCollisionWithActionUseCase>()
     private val copyRequestMessageMapper = mock<CopyRequestMessageMapper>()
     private val hasCredentialsUseCase = mock<HasCredentialsUseCase>()
     private val getPublicNodeListByIds = mock<GetPublicNodeListByIds>()
@@ -108,10 +106,11 @@ class MediaDiscoveryViewModelTest {
         }.thenReturn(flowOf(AccountDetail()))
     }
     private val isHiddenNodesOnboardedUseCase = mock<IsHiddenNodesOnboardedUseCase> {
-        on {
-            runBlocking { invoke() }
+        onBlocking {
+            invoke()
         }.thenReturn(false)
     }
+    private val getNodeContentUriByHandleUseCase = mock<GetNodeContentUriByHandleUseCase>()
 
     @BeforeAll
     fun setup() {
@@ -136,9 +135,7 @@ class MediaDiscoveryViewModelTest {
             getFileUrlByNodeHandleUseCase = getFileUrlByNodeHandleUseCase,
             getLocalFolderLinkFromMegaApiUseCase = getLocalFolderLinkFromMegaApiUseCase,
             monitorConnectivityUseCase = monitorConnectivityUseCase,
-            checkNameCollisionUseCase = checkNameCollisionUseCase,
-            authorizeNode = authorizeNode,
-            copyNodesUseCase = copyNodesUseCase,
+            checkNodesNameCollisionWithActionUseCase = checkNodesNameCollisionWithActionUseCase,
             copyRequestMessageMapper = copyRequestMessageMapper,
             hasCredentialsUseCase = hasCredentialsUseCase,
             getPublicNodeListByIds = getPublicNodeListByIds,
@@ -153,6 +150,7 @@ class MediaDiscoveryViewModelTest {
             getFeatureFlagValueUseCase = getFeatureFlagValueUseCase,
             defaultDispatcher = UnconfinedTestDispatcher(),
             isHiddenNodesOnboardedUseCase = isHiddenNodesOnboardedUseCase,
+            getNodeContentUriByHandleUseCase = getNodeContentUriByHandleUseCase
         )
     }
 
@@ -183,9 +181,7 @@ class MediaDiscoveryViewModelTest {
         getFileUrlByNodeHandleUseCase,
         getLocalFolderLinkFromMegaApiUseCase,
         monitorConnectivityUseCase,
-        checkNameCollisionUseCase,
-        authorizeNode,
-        copyNodesUseCase,
+        checkNodesNameCollisionWithActionUseCase,
         copyRequestMessageMapper,
         hasCredentialsUseCase,
         getPublicNodeListByIds,
@@ -197,6 +193,7 @@ class MediaDiscoveryViewModelTest {
         getPublicChildNodeFromIdUseCase,
         monitorAccountDetailUseCase,
         monitorShowHiddenItemsUseCase,
+        getNodeContentUriByHandleUseCase
     )
 
     @Test
@@ -482,4 +479,15 @@ class MediaDiscoveryViewModelTest {
             on { this.isSensitiveInherited } doReturn isSensitiveInherited
         }
     }
+
+    @Test
+    fun `test that getNodeContentUriByHandleUseCase is invoked and returns as expected`() =
+        runTest {
+            val paramHandle = 1L
+            val expectedContentUri = NodeContentUri.RemoteContentUri("", false)
+            whenever(getNodeContentUriByHandleUseCase(paramHandle)).thenReturn(expectedContentUri)
+            val actual = underTest.getNodeContentUri(paramHandle)
+            assertThat(actual).isEqualTo(expectedContentUri)
+            verify(getNodeContentUriByHandleUseCase).invoke(paramHandle)
+        }
 }

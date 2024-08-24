@@ -16,6 +16,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageView
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -64,7 +65,6 @@ import mega.privacy.android.app.utils.Util.isOnline
 import mega.privacy.android.app.utils.Util.showAlert
 import mega.privacy.android.app.utils.Util.showKeyboardDelayed
 import mega.privacy.android.app.utils.ViewUtils.hideKeyboard
-import mega.privacy.android.domain.entity.account.business.BusinessAccountStatus
 import mega.privacy.mobile.analytics.event.CancelSubscriptionMenuToolbarEvent
 import mega.privacy.mobile.analytics.event.ToolbarOverflowMenuItemEvent
 import nz.mega.sdk.MegaApiJava
@@ -128,6 +128,7 @@ class MyAccountActivity : PasscodeActivity(),
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         if (shouldRefreshSessionDueToSDK()) {
@@ -254,6 +255,7 @@ class MyAccountActivity : PasscodeActivity(),
     override fun onResume() {
         super.onResume()
         viewModel.refreshAccountInfo()
+        refreshMenuOptionsVisibility()
     }
 
     override fun onPostResume() {
@@ -338,7 +340,7 @@ class MyAccountActivity : PasscodeActivity(),
                 menu.toggleAllMenuItemsVisibility(true)
 
                 if (viewModel.isNewCancelSubscriptionFeatureEnabled()) {
-                    if (!viewModel.isStandardProAccount() || (isProFlexiAccount && viewModel.getBusinessProFlexiStatus() == BusinessAccountStatus.Expired)) {
+                    if (!viewModel.isStandardProAccount()) {
                         menu.findItem(R.id.action_cancel_subscriptions).isVisible = false
                     }
                 } else {
@@ -508,11 +510,13 @@ class MyAccountActivity : PasscodeActivity(),
         startActivity(
             Intent(this, CancelAccountPlanActivity::class.java)
                 .putExtra(
-                    CancelAccountPlanActivity.EXTRA_ACCOUNT_TYPE, accountType
+                    CancelAccountPlanActivity.EXTRA_ACCOUNT_TYPE, accountType.name
                 ).putExtra(
                     CancelAccountPlanActivity.EXTRA_TRANSFER_QUOTA, totalTransfer
                 ).putExtra(
                     CancelAccountPlanActivity.EXTRA_STORAGE_QUOTA, totalStorage
+                ).putExtra(
+                    CancelAccountPlanActivity.EXTRA_USED_STORAGE, viewModel.getUsedStorage()
                 )
         )
     }

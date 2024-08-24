@@ -23,6 +23,7 @@ import mega.privacy.android.data.listener.OptionalMegaTransferListenerInterface
 import mega.privacy.android.data.mapper.node.MegaNodeMapper
 import mega.privacy.android.data.mapper.transfer.AppDataTypeConstants
 import mega.privacy.android.data.mapper.transfer.CompletedTransferMapper
+import mega.privacy.android.data.mapper.transfer.InProgressTransferMapper
 import mega.privacy.android.data.mapper.transfer.PausedTransferEventMapper
 import mega.privacy.android.data.mapper.transfer.TransferAppDataStringMapper
 import mega.privacy.android.data.mapper.transfer.TransferDataMapper
@@ -38,9 +39,11 @@ import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.transfer.ActiveTransfer
 import mega.privacy.android.domain.entity.transfer.ActiveTransferTotals
 import mega.privacy.android.domain.entity.transfer.CompletedTransfer
+import mega.privacy.android.domain.entity.transfer.InProgressTransfer
 import mega.privacy.android.domain.entity.transfer.Transfer
 import mega.privacy.android.domain.entity.transfer.TransferAppData
 import mega.privacy.android.domain.entity.transfer.TransferEvent
+import mega.privacy.android.domain.entity.transfer.TransferStage
 import mega.privacy.android.domain.entity.transfer.TransferType
 import mega.privacy.android.domain.exception.MegaException
 import nz.mega.sdk.MegaError
@@ -60,11 +63,11 @@ import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.argThat
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
-import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.io.File
@@ -93,6 +96,7 @@ class DefaultTransfersRepositoryTest {
     private val megaNodeMapper = mock<MegaNodeMapper>()
     private val sdCardGateway = mock<SDCardGateway>()
     private val deviceGateway = mock<DeviceGateway>()
+    private val inProgressTransferMapper = mock<InProgressTransferMapper>()
 
     private val testScope = CoroutineScope(UnconfinedTestDispatcher())
 
@@ -124,6 +128,7 @@ class DefaultTransfersRepositoryTest {
             megaNodeMapper = megaNodeMapper,
             sdCardGateway = sdCardGateway,
             deviceGateway = deviceGateway,
+            inProgressTransferMapper = inProgressTransferMapper,
         )
     }
 
@@ -144,6 +149,7 @@ class DefaultTransfersRepositoryTest {
             megaNodeMapper,
             sdCardGateway,
             deviceGateway,
+            inProgressTransferMapper,
         )
     }
 
@@ -259,7 +265,7 @@ class DefaultTransfersRepositoryTest {
                 (it.arguments.last() as OptionalMegaTransferListenerInterface).onTransferFinish(
                     api = mock(),
                     transfer = mock(),
-                    error = mock { on { errorCode }.thenReturn(MegaError.API_OK) },
+                    e = mock { on { errorCode }.thenReturn(MegaError.API_OK) },
                 )
             }
             if (isUpload) {
@@ -285,7 +291,7 @@ class DefaultTransfersRepositoryTest {
                 (it.arguments.last() as OptionalMegaTransferListenerInterface).onTransferFinish(
                     api = mock(),
                     transfer = mock(),
-                    error = mock { on { errorCode }.thenReturn(MegaError.API_OK) },
+                    e = mock { on { errorCode }.thenReturn(MegaError.API_OK) },
                 )
             }
             if (isUpload) {
@@ -319,7 +325,38 @@ class DefaultTransfersRepositoryTest {
                 whenever(megaNodeMapper(any())).thenReturn(mock())
             }
             val expected = mock<TransferEvent.TransferUpdateEvent>()
-            whenever(transferEventMapper.invoke(any())).thenReturn(expected)
+            whenever(transferEventMapper.invoke(argThat { this is GlobalTransfer.OnTransferUpdate }))
+                .thenReturn(expected)
+            startFlow().test {
+                assertThat(awaitItem()).isEqualTo(expected)
+            }
+        }
+
+        @ParameterizedTest
+        @MethodSource("provideUploadAndDownloadParameters")
+        fun `test that onFolderTransferUpdate is returned when the ongoing upload receives an onFolderTransferUpdate`(
+            mockStart: () -> Unit, startFlow: () -> Flow<TransferEvent>, isUpload: Boolean,
+        ) = runTest {
+            whenever(mockStart()).thenAnswer {
+                (it.arguments.last() as OptionalMegaTransferListenerInterface).onFolderTransferUpdate(
+                    api = mock(),
+                    transfer = mock(),
+                    stage = 0,
+                    folderCount = 0,
+                    createdFolderCount = 0,
+                    fileCount = 0,
+                    currentFolder = "",
+                    currentFileLeafName = ""
+                )
+            }
+            if (isUpload) {
+                whenever(megaApiGateway.getMegaNodeByHandle(any())).thenReturn(mock())
+            } else {
+                whenever(megaNodeMapper(any())).thenReturn(mock())
+            }
+            val expected = mock<TransferEvent.TransferUpdateEvent>()
+            whenever(transferEventMapper.invoke(argThat { this is GlobalTransfer.OnFolderTransferUpdate }))
+                .thenReturn(expected)
             startFlow().test {
                 assertThat(awaitItem()).isEqualTo(expected)
             }
@@ -334,7 +371,7 @@ class DefaultTransfersRepositoryTest {
                 (it.arguments.last() as OptionalMegaTransferListenerInterface).onTransferTemporaryError(
                     api = mock(),
                     transfer = mock(),
-                    error = mock { on { errorCode }.thenReturn(MegaError.API_OK + 1) },
+                    e = mock { on { errorCode }.thenReturn(MegaError.API_OK + 1) },
                 )
             }
             if (isUpload) {
@@ -685,7 +722,24 @@ class DefaultTransfersRepositoryTest {
             whenever(completedTransferMapper(transfer, error, path)).thenReturn(expected)
             underTest.addCompletedTransfer(transfer, error, path)
             verify(megaLocalRoomGateway).addCompletedTransfer(expected)
-            verify(appEventGateway).broadcastCompletedTransfer(expected)
+            verify(appEventGateway).broadcastCompletedTransfer()
+        }
+
+    @Test
+    fun `test that addCompletedTransfers call local storage gateway addCompletedTransfers and app event gateway broadcastCompletedTransfer with the mapped transfers`() =
+        runTest {
+            val transfer = mock<Transfer>()
+            val error = mock<MegaException>()
+            val expected = listOf(mock<CompletedTransfer>())
+            val path = "path"
+            val event = mock<TransferEvent.TransferFinishEvent> {
+                on { it.transfer } doReturn transfer
+                on { it.error } doReturn error
+            }
+            whenever(completedTransferMapper(transfer, error, path)).thenReturn(expected.first())
+            underTest.addCompletedTransfers(mapOf(event to path))
+            verify(megaLocalRoomGateway).addCompletedTransfers(expected)
+            verify(appEventGateway).broadcastCompletedTransfer()
         }
 
     @Test
@@ -736,22 +790,28 @@ class DefaultTransfersRepositoryTest {
                 parentHandle = 2L,
                 appData = null,
             )
-            whenever(megaLocalRoomGateway.getAllCompletedTransfers())
+            whenever(megaLocalRoomGateway.getCompletedTransfers())
                 .thenReturn(flowOf(listOf(existingTransfer1)))
             underTest.addCompletedTransfersIfNotExist(listOf(transfer1, transfer2))
-            verify(megaLocalRoomGateway).addCompletedTransfer(transfer2.copy(id = null))
-            verify(megaLocalRoomGateway, times(0)).addCompletedTransfer(transfer1.copy(id = null))
+            verify(megaLocalRoomGateway).addCompletedTransfers(listOf(transfer2.copy(id = null)))
         }
 
     @Test
     fun `test that monitorCompletedTransfer returns the result of app event gateway monitorCompletedTransfer`() =
         runTest {
-            val expected = mock<CompletedTransfer>()
-            whenever(appEventGateway.monitorCompletedTransfer).thenReturn(flowOf(expected))
+            whenever(appEventGateway.monitorCompletedTransfer).thenReturn(flowOf(Unit))
             underTest.monitorCompletedTransfer().test {
-                assertThat(awaitItem()).isEqualTo(expected)
+                assertThat(awaitItem()).isEqualTo(Unit)
                 awaitComplete()
             }
+        }
+
+    @Test
+    fun `test that insertOrUpdateActiveTransfer gateway is called when insertOrUpdateActiveTransfer is called`() =
+        runTest {
+            val activeTransfer = mock<ActiveTransfer>()
+            underTest.insertOrUpdateActiveTransfer(activeTransfer)
+            verify(megaLocalRoomGateway).insertOrUpdateActiveTransfer(activeTransfer)
         }
 
     @Test
@@ -918,16 +978,32 @@ class DefaultTransfersRepositoryTest {
     @Test
     fun `test that monitorTransferEvents emits transfer events`() = runTest {
         val start = GlobalTransfer.OnTransferStart(mock())
+        val update = GlobalTransfer.OnTransferUpdate(mock())
+        val folderUpdate = GlobalTransfer.OnFolderTransferUpdate(mock(), 1, 1, 1, 1, "", "")
         val finish = GlobalTransfer.OnTransferFinish(mock(), mock())
         val startEvent = TransferEvent.TransferStartEvent(mock())
+        val updateEvent = TransferEvent.TransferUpdateEvent(mock())
+        val folderUpdateEvent = TransferEvent.FolderTransferUpdateEvent(
+            mock(),
+            TransferStage.STAGE_NONE,
+            1,
+            1,
+            1,
+            "",
+            ""
+        )
         val finishEvent = TransferEvent.TransferFinishEvent(mock(), mock())
-        val globalTransferEventsFlow = flowOf(start, finish)
+        val globalTransferEventsFlow = flowOf(start, update, folderUpdate, finish)
         whenever(transferEventMapper(start)).thenReturn(startEvent)
+        whenever(transferEventMapper(update)).thenReturn(updateEvent)
+        whenever(transferEventMapper(folderUpdate)).thenReturn(folderUpdateEvent)
         whenever(transferEventMapper(finish)).thenReturn(finishEvent)
         whenever(megaApiGateway.globalRequestEvents).thenReturn(emptyFlow())
         whenever(megaApiGateway.globalTransfer).thenReturn(globalTransferEventsFlow)
         underTest.monitorTransferEvents().test {
             assertThat(awaitItem()).isEqualTo(startEvent)
+            assertThat(awaitItem()).isEqualTo(updateEvent)
+            assertThat(awaitItem()).isEqualTo(folderUpdateEvent)
             assertThat(awaitItem()).isEqualTo(finishEvent)
             cancelAndIgnoreRemainingEvents()
         }
@@ -1093,6 +1169,14 @@ class DefaultTransfersRepositoryTest {
                 verify(megaLocalRoomGateway).insertOrUpdateActiveTransfer(activeTransfer)
             }
 
+        @Test
+        fun `test that insertOrUpdateActiveTransfers gateway is called when insertOrUpdateActiveTransfers is called`() =
+            runTest {
+                val activeTransfers = mock<List<ActiveTransfer>>()
+                underTest.insertOrUpdateActiveTransfers(activeTransfers)
+                verify(megaLocalRoomGateway).insertOrUpdateActiveTransfers(activeTransfers)
+            }
+
         @ParameterizedTest
         @EnumSource(TransferType::class)
         fun `test that deleteAllActiveTransfersByType gateway is called when deleteAllActiveTransfersByType is called`(
@@ -1208,7 +1292,7 @@ class DefaultTransfersRepositoryTest {
         private fun stubActiveTransfer(
             transfer: Transfer,
             transferType: TransferType,
-            transferredBytes:Long = 900L
+            transferredBytes: Long = 900L,
         ) {
             val total = 1024L
             val tag = 1
@@ -1329,4 +1413,135 @@ class DefaultTransfersRepositoryTest {
             )
         }
     }
+
+    @Test
+    fun `test that monitorInProgressTransfers emits empty map when no in progress transfers has been added`() =
+        runTest {
+            setUp()
+            underTest.monitorInProgressTransfers().test {
+                assertThat(awaitItem()).isEqualTo(emptyMap<Int, InProgressTransfer>())
+            }
+        }
+
+    @Test
+    fun `test that monitorInProgressTransfers emits a map with a transfer after call updateInProgressTransfer`() =
+        runTest {
+            val tag = 1
+            val transfer = mock<Transfer> {
+                on { this.tag } doReturn tag
+            }
+            val expected = mock<InProgressTransfer.Upload> {
+                on { this.tag } doReturn tag
+            }
+
+            setUp()
+            whenever(inProgressTransferMapper(transfer)).thenReturn(expected)
+
+            underTest.monitorInProgressTransfers().test {
+                assertThat(awaitItem()).isEqualTo(emptyMap<Int, InProgressTransfer>())
+                underTest.updateInProgressTransfer(transfer)
+                assertThat(awaitItem()).isEqualTo(mapOf(Pair(tag, expected)))
+            }
+        }
+
+    @Test
+    fun `test that monitorInProgressTransfers correctly after different calls to updateInProgressTransfer and addCompletedTransfer`() =
+        runTest {
+            val tag1 = 1
+            val tag2 = 2
+            val tag3 = 3
+            val tag4 = 4
+            val transfer1 = mock<Transfer> {
+                on { this.tag } doReturn tag1
+            }
+            val transfer2 = mock<Transfer> {
+                on { this.tag } doReturn tag2
+            }
+            val transfer3 = mock<Transfer> {
+                on { this.tag } doReturn tag3
+            }
+            val transfer4 = mock<Transfer> {
+                on { this.tag } doReturn tag4
+            }
+            val inProgressTransfer1 = mock<InProgressTransfer.Download> {
+                on { this.tag } doReturn tag1
+            }
+            val inProgressTransfer2 = mock<InProgressTransfer.Upload> {
+                on { this.tag } doReturn tag2
+            }
+            val inProgressTransfer3 = mock<InProgressTransfer.Download> {
+                on { this.tag } doReturn tag3
+            }
+
+            setUp()
+            whenever(inProgressTransferMapper(transfer1)).thenReturn(inProgressTransfer1)
+            whenever(inProgressTransferMapper(transfer2)).thenReturn(inProgressTransfer2)
+            whenever(inProgressTransferMapper(transfer3)).thenReturn(inProgressTransfer3)
+
+            underTest.monitorInProgressTransfers().test {
+                assertThat(awaitItem()).isEqualTo(emptyMap<Int, InProgressTransfer>())
+                underTest.updateInProgressTransfer(transfer1)
+                assertThat(awaitItem()).isEqualTo(mapOf(Pair(tag1, inProgressTransfer1)))
+                underTest.updateInProgressTransfer(transfer2)
+                assertThat(awaitItem()).isEqualTo(
+                    mapOf(
+                        Pair(tag1, inProgressTransfer1),
+                        Pair(tag2, inProgressTransfer2)
+                    )
+                )
+                underTest.addCompletedTransfer(transfer1, null, "")
+                assertThat(awaitItem()).isEqualTo(mapOf(Pair(tag2, inProgressTransfer2)))
+                underTest.updateInProgressTransfer(transfer3)
+                assertThat(awaitItem()).isEqualTo(
+                    mapOf(
+                        Pair(tag2, inProgressTransfer2),
+                        Pair(tag3, inProgressTransfer3)
+                    )
+                )
+                underTest.addCompletedTransfer(transfer4, null, "")
+            }
+        }
+
+    @Test
+    fun `test that in progress transfers flow is updated correctly when updateInProgressTransfers and removeInProgressTransfers are called`() =
+        runTest {
+            val tag = 5
+            val transfer = mock<Transfer> {
+                on { it.tag } doReturn tag
+            }
+            val inProgressTransfer = mock<InProgressTransfer.Download> {
+                on { it.tag } doReturn tag
+            }
+            whenever(inProgressTransferMapper(transfer)).thenReturn(inProgressTransfer)
+            setUp()
+            underTest.monitorInProgressTransfers().test {
+                assertThat(awaitItem()).isEmpty()
+                underTest.updateInProgressTransfers(listOf(transfer))
+
+                assertThat(awaitItem()).containsExactly(tag, inProgressTransfer)
+                underTest.removeInProgressTransfers(setOf(tag))
+
+                assertThat(awaitItem()).isEmpty()
+            }
+        }
+
+    @Test
+    fun `test that cancelTransfers is invoked for each direction when cancelTransfers is invoked`() =
+        runTest {
+            val megaError = mock<MegaError> {
+                on { errorCode }.thenReturn(MegaError.API_OK)
+            }
+            whenever(megaApiGateway.cancelTransfers(any(), any())).thenAnswer {
+                ((it.arguments[1]) as OptionalMegaRequestListenerInterface).onRequestFinish(
+                    mock(),
+                    mock(),
+                    megaError,
+                )
+            }
+
+            underTest.cancelTransfers()
+
+            verify(megaApiGateway).cancelTransfers(eq(MegaTransfer.TYPE_UPLOAD), any())
+            verify(megaApiGateway).cancelTransfers(eq(MegaTransfer.TYPE_DOWNLOAD), any())
+        }
 }

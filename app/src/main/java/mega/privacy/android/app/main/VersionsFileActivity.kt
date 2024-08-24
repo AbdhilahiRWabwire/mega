@@ -11,6 +11,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.ActionBar
 import androidx.appcompat.app.AlertDialog
@@ -42,6 +43,7 @@ import mega.privacy.android.app.presentation.transfers.starttransfer.StartDownlo
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.createStartTransferView
 import mega.privacy.android.app.presentation.versions.VersionsFileViewModel
 import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.app.utils.Constants.VERSIONS_ADAPTER
 import mega.privacy.android.app.utils.FileUtil
 import mega.privacy.android.app.utils.MegaApiUtils
 import mega.privacy.android.app.utils.Util
@@ -49,6 +51,7 @@ import mega.privacy.android.app.utils.wrapper.MegaNodeUtilWrapper
 import mega.privacy.android.data.facade.INTENT_EXTRA_NODE_HANDLE
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.navigation.MegaNavigator
 import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaContactRequest
 import nz.mega.sdk.MegaError
@@ -112,9 +115,16 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface,
     @Inject
     lateinit var megaNodeUtilWrapper: MegaNodeUtilWrapper
 
+    /**
+     * [MegaNavigator] injection
+     */
+    @Inject
+    lateinit var megaNavigator: MegaNavigator
+
     @SuppressWarnings("deprecation")
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate")
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         binding = ActivityVersionsFileBinding.inflate(layoutInflater)
 
@@ -599,101 +609,31 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface,
                 }
 
                 mimetype.isVideoMimeType || mimetype.isAudio -> {
-                    val mediaIntent: Intent
-                    val internalIntent: Boolean
-                    var opusFile = false
-                    if (mimetype.isVideoNotSupported || mimetype.isAudioNotSupported) {
-                        mediaIntent = Intent(Intent.ACTION_VIEW)
-                        internalIntent = false
-                        val s = vNode.name.split("\\.").toTypedArray()
-                        if (s.size > 1 && s[s.size - 1] == "opus") {
-                            opusFile = true
-                        }
-                    } else {
-                        mediaIntent = Util.getMediaIntent(this, vNode.name)
-                        internalIntent = true
-                    }
-                    mediaIntent.putExtra(
-                        Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE,
-                        Constants.VERSIONS_ADAPTER
-                    )
-                    putThumbnailLocation(
-                        mediaIntent,
-                        binding.recyclerViewVersionsFile,
-                        position,
-                        Constants.VIEWER_FROM_FILE_BROWSER,
-                        adapter
-                    )
-                    mediaIntent.putExtra(Constants.INTENT_EXTRA_KEY_FILE_NAME, vNode.name)
-                    val localPath = FileUtil.getLocalFile(vNode)
-                    if (localPath != null) {
-                        val mediaFile = File(localPath)
-                        if (localPath.contains(Environment.getExternalStorageDirectory().path)) {
-                            val mediaFileUri = FileProvider.getUriForFile(
-                                this,
-                                Constants.AUTHORITY_STRING_FILE_PROVIDER,
-                                mediaFile
-                            )
-                            if (mediaFileUri == null) {
-                                showSnackbar(
-                                    Constants.SNACKBAR_TYPE,
-                                    getString(R.string.general_text_error),
-                                    -1
+                    lifecycleScope.launch {
+                        runCatching {
+                            val contentUri = viewModel.getNodeContentUri(vNode.handle)
+                            val localPath = FileUtil.getLocalFile(vNode)
+                            if (localPath != null) {
+                                val file = File(localPath)
+                                megaNavigator.openMediaPlayerActivityByLocalFile(
+                                    context = this@VersionsFileActivity,
+                                    localFile = file,
+                                    handle = vNode.handle,
+                                    parentId = vNode.parentHandle,
+                                    viewType = VERSIONS_ADAPTER
                                 )
                             } else {
-                                mediaIntent.setDataAndType(
-                                    mediaFileUri,
-                                    MimeTypeList.typeForName(vNode.name).type
+                                megaNavigator.openMediaPlayerActivity(
+                                    context = this@VersionsFileActivity,
+                                    contentUri = contentUri,
+                                    name = vNode.name,
+                                    handle = vNode.handle,
+                                    parentId = vNode.parentHandle,
+                                    viewType = VERSIONS_ADAPTER
                                 )
                             }
-                        } else {
-                            val mediaFileUri = Uri.fromFile(mediaFile)
-                            if (mediaFileUri == null) {
-                                showSnackbar(
-                                    Constants.SNACKBAR_TYPE,
-                                    getString(R.string.general_text_error),
-                                    -1
-                                )
-                            } else {
-                                mediaIntent.setDataAndType(
-                                    mediaFileUri,
-                                    MimeTypeList.typeForName(vNode.name).type
-                                )
-                            }
-                        }
-                        mediaIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    } else {
-                        megaNodeUtilWrapper.setupStreamingServer(megaApi)
-                        val url = megaApi.httpServerGetLocalLink(vNode)
-                        if (url != null) {
-                            val parsedUri = Uri.parse(url)
-                            if (parsedUri != null) {
-                                mediaIntent.setDataAndType(parsedUri, mimetype.type)
-                            } else {
-                                showSnackbar(
-                                    Constants.SNACKBAR_TYPE,
-                                    getString(R.string.general_text_error),
-                                    -1
-                                )
-                            }
-                        } else {
-                            showSnackbar(
-                                Constants.SNACKBAR_TYPE,
-                                getString(R.string.general_text_error),
-                                -1
-                            )
-                        }
-                    }
-                    mediaIntent.putExtra(Constants.INTENT_EXTRA_KEY_HANDLE, vNode.handle)
-                    if (opusFile) {
-                        mediaIntent.setDataAndType(mediaIntent.data, "audio/*")
-                    }
-                    if (internalIntent) {
-                        startActivity(mediaIntent)
-                    } else {
-                        if (MegaApiUtils.isIntentAvailable(this, mediaIntent)) {
-                            startActivity(mediaIntent)
-                        } else {
+                        }.onFailure { exception ->
+                            Timber.e(exception)
                             showSnackbar(
                                 Constants.SNACKBAR_TYPE,
                                 getString(R.string.intent_not_available),
@@ -702,7 +642,6 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface,
                             downloadNodes(listOf(vNode))
                         }
                     }
-                    overridePendingTransition(0, 0)
                 }
 
                 mimetype.isURL -> {
@@ -778,7 +717,11 @@ class VersionsFileActivity : PasscodeActivity(), MegaRequestListenerInterface,
                 }
 
                 mimetype.isOpenableTextFile(vNode.size) -> {
-                    megaNodeUtilWrapper.manageTextFileIntent(this, vNode, Constants.VERSIONS_ADAPTER)
+                    megaNodeUtilWrapper.manageTextFileIntent(
+                        this,
+                        vNode,
+                        Constants.VERSIONS_ADAPTER
+                    )
                 }
 
                 else -> {

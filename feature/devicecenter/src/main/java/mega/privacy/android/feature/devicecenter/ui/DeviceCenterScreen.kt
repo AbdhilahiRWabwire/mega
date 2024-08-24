@@ -2,7 +2,6 @@ package mega.privacy.android.feature.devicecenter.ui
 
 import mega.privacy.android.icon.pack.R as iconPackR
 import mega.privacy.android.shared.resources.R as sharedR
-import mega.privacy.android.shared.sync.R as sharedSyncR
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -62,6 +61,7 @@ import mega.privacy.android.shared.original.core.ui.controls.snackbars.MegaSnack
 import mega.privacy.android.shared.original.core.ui.model.MenuAction
 import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import mega.privacy.android.shared.sync.ui.SyncEmptyState
 import mega.privacy.mobile.analytics.event.SyncFeatureUpgradeDialogCancelButtonPressedEvent
 import mega.privacy.mobile.analytics.event.SyncFeatureUpgradeDialogDisplayedEvent
@@ -90,7 +90,6 @@ internal const val TEST_TAG_DEVICE_CENTER_SCREEN_UPGRADE_DIALOG =
  * @param onDeviceMenuClicked Lambda that performs a specific action when a Device's Menu Icon is clicked
  * @param onBackupFolderClicked Lambda that performs a specific action when a Backup Folder is clicked
  * @param onNonBackupFolderClicked Lambda that performs a specific action when a Non Backup Folder is clicked
- * @param onCameraUploadsClicked Lambda that performs a specific action when the User clicks the "Camera uploads" Bottom Dialog Option
  * @param onInfoOptionClicked Lambda that performs a specific action when the User clicks the "Info" Bottom Dialog Option
  * @param onAddNewSyncOptionClicked Lambda that performs a specific action when the User clicks the "Add new sync" Bottom Dialog Option
  * @param onRenameDeviceOptionClicked Lambda that performs a specific action when the User clicks the "Rename" Bottom Dialog Option
@@ -110,7 +109,6 @@ internal fun DeviceCenterScreen(
     onDeviceMenuClicked: (DeviceUINode) -> Unit,
     onBackupFolderClicked: (BackupDeviceFolderUINode) -> Unit,
     onNonBackupFolderClicked: (NonBackupDeviceFolderUINode) -> Unit,
-    onCameraUploadsClicked: () -> Unit,
     onInfoOptionClicked: (DeviceCenterUINode) -> Unit,
     onAddNewSyncOptionClicked: (DeviceUINode) -> Unit,
     onRenameDeviceOptionClicked: (DeviceUINode) -> Unit,
@@ -150,7 +148,7 @@ internal fun DeviceCenterScreen(
         event = uiState.renameDeviceSuccess,
         onConsumed = onRenameDeviceSuccessfulSnackbarShown,
         action = {
-            snackbarHostState.showSnackbar(
+            snackbarHostState.showAutoDurationSnackbar(
                 context.resources.getString(
                     R.string.device_center_snackbar_message_rename_device_successful
                 )
@@ -173,7 +171,6 @@ internal fun DeviceCenterScreen(
             DeviceBottomSheetBody(
                 device = uiState.menuClickedDevice ?: return@BottomSheet,
                 isCameraUploadsEnabled = uiState.isCameraUploadsEnabled,
-                onCameraUploadsClicked = onCameraUploadsClicked,
                 onRenameDeviceClicked = onRenameDeviceOptionClicked,
                 onInfoClicked = onInfoOptionClicked,
                 onAddNewSyncClicked = {
@@ -187,7 +184,6 @@ internal fun DeviceCenterScreen(
                     coroutineScope.launch { modalSheetState.hide() }
                 },
                 isFreeAccount = uiState.isFreeAccount,
-                isSyncFeatureFlagEnabled = uiState.isSyncFeatureFlagEnabled,
             )
         },
         content = {
@@ -342,9 +338,6 @@ private fun DeviceCenterAppBar(
                         if (uiState.isCameraUploadsEnabled) {
                             list.add(DeviceMenuAction.Info)
                         }
-                        if (!uiState.isSyncFeatureFlagEnabled) {
-                            list.add(DeviceMenuAction.CameraUploads)
-                        }
                     }
 
                     else -> list.add(DeviceMenuAction.Info)
@@ -363,7 +356,7 @@ private fun DeviceCenterAppBar(
 @Composable
 private fun DeviceCenterNoNetworkState() {
     SyncEmptyState(
-        iconId = sharedSyncR.drawable.ic_no_cloud,
+        iconId = iconPackR.drawable.ic_no_cloud,
         iconSize = 144.dp,
         iconDescription = "No network connectivity state",
         textId = R.string.device_center_no_network_state,
@@ -377,7 +370,7 @@ private fun DeviceCenterNoNetworkState() {
 @Composable
 private fun DeviceCenterNothingSetupState() {
     SyncEmptyState(
-        iconId = R.drawable.ic_folder_sync_empty,
+        iconId = iconPackR.drawable.ic_folder_sync,
         iconSize = 128.dp,
         iconDescription = "No setup state",
         textId = R.string.device_center_nothing_setup_state,
@@ -499,7 +492,6 @@ private fun DeviceCenterNoNetworkStatePreview() {
             onNonBackupFolderClicked = {},
             onInfoOptionClicked = {},
             onAddNewSyncOptionClicked = {},
-            onCameraUploadsClicked = {},
             onRenameDeviceOptionClicked = {},
             onRenameDeviceCancelled = {},
             onRenameDeviceSuccessful = {},
@@ -533,7 +525,6 @@ private fun DeviceCenterNoItemsFoundPreview() {
             onNonBackupFolderClicked = {},
             onInfoOptionClicked = {},
             onAddNewSyncOptionClicked = {},
-            onCameraUploadsClicked = {},
             onRenameDeviceOptionClicked = {},
             onRenameDeviceCancelled = {},
             onRenameDeviceSuccessful = {},
@@ -564,7 +555,6 @@ private fun DeviceCenterInInitialLoadingPreview() {
             onNonBackupFolderClicked = {},
             onInfoOptionClicked = {},
             onAddNewSyncOptionClicked = {},
-            onCameraUploadsClicked = {},
             onRenameDeviceOptionClicked = {},
             onRenameDeviceCancelled = {},
             onRenameDeviceSuccessful = {},
@@ -605,7 +595,6 @@ private fun DeviceCenterInDeviceViewPreview() {
             onNonBackupFolderClicked = {},
             onInfoOptionClicked = {},
             onAddNewSyncOptionClicked = {},
-            onCameraUploadsClicked = {},
             onRenameDeviceOptionClicked = {},
             onRenameDeviceCancelled = {},
             onRenameDeviceSuccessful = {},
@@ -643,7 +632,6 @@ private fun DeviceCenterInFolderViewEmptyStatePreview() {
             onNonBackupFolderClicked = {},
             onInfoOptionClicked = {},
             onAddNewSyncOptionClicked = {},
-            onCameraUploadsClicked = {},
             onRenameDeviceOptionClicked = {},
             onRenameDeviceCancelled = {},
             onRenameDeviceSuccessful = {},
@@ -680,7 +668,6 @@ private fun DeviceCenterInFolderViewPreview() {
             onNonBackupFolderClicked = {},
             onInfoOptionClicked = {},
             onAddNewSyncOptionClicked = {},
-            onCameraUploadsClicked = {},
             onRenameDeviceOptionClicked = {},
             onRenameDeviceCancelled = {},
             onRenameDeviceSuccessful = {},

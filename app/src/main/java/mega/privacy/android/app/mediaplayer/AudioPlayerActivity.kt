@@ -13,6 +13,7 @@ import android.os.IBinder
 import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,7 +22,6 @@ import androidx.annotation.ColorRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
-import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
@@ -34,7 +34,9 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
+import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.dragger.DragToExitSupport
 import mega.privacy.android.app.databinding.ActivityAudioPlayerBinding
@@ -72,6 +74,7 @@ import mega.privacy.android.app.utils.Constants.LINKS_ADAPTER
 import mega.privacy.android.app.utils.Constants.MEDIA_PLAYER_TOOLBAR_SHOW_HIDE_DURATION_MS
 import mega.privacy.android.app.utils.Constants.OFFLINE_ADAPTER
 import mega.privacy.android.app.utils.Constants.OUTGOING_SHARES_ADAPTER
+import mega.privacy.android.app.utils.Constants.SNACKBAR_TYPE
 import mega.privacy.android.app.utils.Constants.URL_FILE_LINK
 import mega.privacy.android.app.utils.Constants.ZIP_ADAPTER
 import mega.privacy.android.app.utils.FileUtil
@@ -89,6 +92,8 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.exception.BlockedMegaException
 import mega.privacy.android.domain.exception.QuotaExceededMegaException
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.mobile.analytics.event.AudioPlayerHideNodeMenuItemEvent
+import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import nz.mega.sdk.MegaError
 import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaShare
@@ -112,6 +117,14 @@ class AudioPlayerActivity : MediaPlayerActivity() {
     private var takenDownDialog: AlertDialog? = null
 
     private var tempNodeId: NodeId? = null
+
+    private val nameCollisionActivityContract = registerForActivityResult(
+        NameCollisionActivityContract()
+    ) { result ->
+        result?.let {
+            showSnackbar(SNACKBAR_TYPE, it, INVALID_HANDLE)
+        }
+    }
 
     /**
      * Inject [GetFeatureFlagValueUseCase] to the Fragment
@@ -195,6 +208,7 @@ class AudioPlayerActivity : MediaPlayerActivity() {
      */
     @androidx.annotation.OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         // Setup the Back Press dispatcher to receive Back Press events
@@ -261,7 +275,7 @@ class AudioPlayerActivity : MediaPlayerActivity() {
     private fun setupObserver() {
         with(viewModel) {
             getCollision().observe(this@AudioPlayerActivity) { collision ->
-                nameCollisionActivityContract?.launch(arrayListOf(collision))
+                nameCollisionActivityContract.launch(arrayListOf(collision))
             }
 
             onSnackbarMessage().observe(this@AudioPlayerActivity) { message ->
@@ -455,6 +469,7 @@ class AudioPlayerActivity : MediaPlayerActivity() {
                 }
 
                 R.id.hide -> {
+                    Analytics.tracker.trackEvent(AudioPlayerHideNodeMenuItemEvent)
                     handleHideNodeClick(playingHandle = playingHandle)
                 }
 
@@ -544,8 +559,7 @@ class AudioPlayerActivity : MediaPlayerActivity() {
         navController.addOnDestinationChangedListener { _, dest, args ->
             setupToolbarColors()
             when (dest.id) {
-                R.id.audio_main_player,
-                R.id.audio_playlist,
+                R.id.audio_main_player
                 -> {
                     if (dest.id == R.id.audio_main_player) {
                         supportActionBar?.title = ""
@@ -716,8 +730,6 @@ class AudioPlayerActivity : MediaPlayerActivity() {
         @ColorInt val statusBarColor: Int
         val toolbarElevation: Float
 
-        WindowCompat.setDecorFitsSystemWindows(window, true)
-
         binding.rootLayout.setBackgroundColor(
             getColor(
                 R.color.white_dark_grey
@@ -854,9 +866,7 @@ class AudioPlayerActivity : MediaPlayerActivity() {
 
 
                     when (currentFragmentId) {
-                        R.id.audio_playlist,
-                        R.id.audio_queue,
-                        -> {
+                        R.id.audio_queue -> {
                             menu.toggleAllMenuItemsVisibility(false)
                             searchMenuItem?.isVisible = true
                             // Display the select option

@@ -12,13 +12,16 @@ import android.view.KeyEvent
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowInsets
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
@@ -186,7 +189,6 @@ class MeetingActivity : PasscodeActivity() {
     private fun initializePictureInPictureParams() {
         if (isSystemPipEnabledAndAvailable()) {
             pipBuilderParams = PictureInPictureParams.Builder()
-            pipBuilderParams.setAspectRatio(Rational(PIP_WIDTH_RATIO, PIP_HEIGHT_RATIO))
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 pipBuilderParams.setSeamlessResizeEnabled(false)
             }
@@ -209,10 +211,10 @@ class MeetingActivity : PasscodeActivity() {
         isInPictureInPictureMode: Boolean,
         newConfig: Configuration,
     ) {
-        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         if (meetingViewModel.state.value.isPictureInPictureFeatureFlagEnabled) {
             meetingViewModel.updateIsInPipMode(isInPipMode = isInPictureInPictureMode)
         }
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
     }
 
     /**
@@ -224,11 +226,19 @@ class MeetingActivity : PasscodeActivity() {
         if (currentFragment is InMeetingFragment) {
             enterPipModeIfPossible()
         }
+        super.onUserLeaveHint()
     }
 
     private fun enterPipModeIfPossible(): Boolean {
         if (isSystemPipEnabledAndAvailable() && meetingViewModel.state.value.isPictureInPictureFeatureFlagEnabled) {
             return try {
+                val rationale =
+                    if (resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
+                        Rational(PIP_WIDTH_RATIO, PIP_HEIGHT_RATIO)
+                    } else {
+                        Rational(PIP_HEIGHT_RATIO, PIP_WIDTH_RATIO)
+                    }
+                pipBuilderParams.setAspectRatio(rationale)
                 enterPictureInPictureMode(pipBuilderParams.build())
                 true
             } catch (e: Exception) {
@@ -237,17 +247,6 @@ class MeetingActivity : PasscodeActivity() {
             }
         }
         return false
-    }
-
-    private fun isInPipMode(): Boolean {
-        return isSystemPipEnabledAndAvailable() && isInPictureInPictureMode
-    }
-
-
-    private fun View.setMarginTop(marginTop: Int) {
-        val menuLayoutParams = this.layoutParams as ViewGroup.MarginLayoutParams
-        menuLayoutParams.setMargins(0, marginTop, 0, 0)
-        this.layoutParams = menuLayoutParams
     }
 
     override fun onNewIntent(newIntent: Intent) {
@@ -259,7 +258,13 @@ class MeetingActivity : PasscodeActivity() {
         initNavigation()
     }
 
+    override fun attachBaseContext(newBase: Context?) {
+        delegate.localNightMode = AppCompatDelegate.MODE_NIGHT_YES
+        super.attachBaseContext(newBase)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         initializePictureInPictureParams()
 
@@ -400,13 +405,14 @@ class MeetingActivity : PasscodeActivity() {
     }
 
     override fun onDestroy() {
+        Timber.d("onDestroy")
         navController?.removeOnDestinationChangedListener(destinationChangedListener)
-
         super.onDestroy()
     }
 
     private fun initIntent() {
         intent?.let {
+            Timber.d("Intent action: $it")
             val chatId = it.getLongExtra(MEETING_CHAT_ID, MEGACHAT_INVALID_HANDLE).let { chatId ->
                 meetingViewModel.updateChatRoomId(chatId)
                 chatId
@@ -484,24 +490,22 @@ class MeetingActivity : PasscodeActivity() {
         }
     }
 
-    @Suppress("DEPRECATION")
     private fun setStatusBarTranslucent() {
-        val decorView: View = window.decorView
+        ViewCompat.setOnApplyWindowInsetsListener(binding.toolbar) { v, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                topMargin = insets.top
+            }
 
-        decorView.setOnApplyWindowInsetsListener { v: View, insets: WindowInsets? ->
-            val defaultInsets = v.onApplyWindowInsets(insets)
+            binding.navHostFragment.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                topMargin = insets.top
+                leftMargin = insets.left
+                rightMargin = insets.right
+                bottomMargin = insets.bottom
+            }
 
-            binding.toolbar.setMarginTop(defaultInsets.systemWindowInsetTop)
-
-            defaultInsets.replaceSystemWindowInsets(
-                defaultInsets.systemWindowInsetLeft,
-                0,
-                defaultInsets.systemWindowInsetRight,
-                defaultInsets.systemWindowInsetBottom
-            )
+            WindowInsetsCompat.CONSUMED
         }
-
-        ViewCompat.requestApplyInsets(decorView)
     }
 
     /**

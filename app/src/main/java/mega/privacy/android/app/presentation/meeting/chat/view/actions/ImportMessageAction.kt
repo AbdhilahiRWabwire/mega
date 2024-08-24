@@ -17,21 +17,22 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.app.namecollision.NameCollisionActivity
-import mega.privacy.android.app.namecollision.data.NameCollision
+import mega.privacy.android.app.namecollision.data.NameCollisionUiEntity
 import mega.privacy.android.app.presentation.meeting.chat.model.messages.actions.MessageActionGroup
 import mega.privacy.android.app.presentation.meeting.chat.view.message.attachment.NodeAttachmentMessageViewModel
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openFileExplorerActivity
 import mega.privacy.android.app.presentation.meeting.chat.view.navigation.openNameCollisionActivity
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.shared.original.core.ui.controls.layouts.LocalSnackBarHostState
 import mega.privacy.android.domain.entity.chat.messages.NodeAttachmentMessage
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
+import mega.privacy.android.shared.original.core.ui.controls.layouts.LocalSnackBarHostState
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import mega.privacy.mobile.analytics.event.ChatConversationAddToCloudDriveActionMenuEvent
 import mega.privacy.mobile.analytics.event.ChatConversationAddToCloudDriveActionMenuItemEvent
 
 internal class ImportMessageAction(
     private val launchFolderPicker: (Context, ActivityResultLauncher<Intent>) -> Unit = ::openFileExplorerActivity,
-    private val launchNameCollisionActivity: (Context, List<NameCollision>, ActivityResultLauncher<Intent>) -> Unit = ::openNameCollisionActivity,
+    private val launchNameCollisionActivity: (Context, List<NameCollisionUiEntity>, ActivityResultLauncher<Intent>) -> Unit = ::openNameCollisionActivity,
 ) : MessageAction(
     text = R.string.general_import,
     icon = R.drawable.ic_cloud_upload_medium_regular_outline,
@@ -91,7 +92,7 @@ internal class ImportMessageAction(
                         } else {
                             null
                         }?.let {
-                            snackbarHostState?.showSnackbar(it)
+                            snackbarHostState?.showAutoDurationSnackbar(it)
                         }
                         if (conflictNodes.isNotEmpty()) {
                             launchNameCollisionActivity(
@@ -100,7 +101,7 @@ internal class ImportMessageAction(
                                     messages.first { (it as NodeAttachmentMessage).fileNode.id.longValue == collision.nodeHandle }
                                         .let { message ->
                                             with(collision) {
-                                                NameCollision.Import(
+                                                NameCollisionUiEntity.Import(
                                                     collisionHandle = collisionHandle,
                                                     nodeHandle = nodeHandle,
                                                     chatId = message.chatId,
@@ -120,14 +121,14 @@ internal class ImportMessageAction(
                         }
                     }
                 }.onFailure {
-                    snackbarHostState?.showSnackbar(error)
+                    snackbarHostState?.showAutoDurationSnackbar(error)
                     onHandled()
                 }
             }
         }
         collisionsResult?.let {
             LaunchedEffect(Unit) {
-                collisionsResult?.let { snackbarHostState?.showSnackbar(it) }
+                collisionsResult?.let { snackbarHostState?.showAutoDurationSnackbar(it) }
                 onHandled()
             }
         }

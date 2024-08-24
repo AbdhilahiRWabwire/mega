@@ -1,6 +1,7 @@
 package mega.privacy.android.app.camera
 
 import android.Manifest
+import android.content.Intent
 import android.net.Uri
 import android.view.OrientationEventListener
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -10,6 +11,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -89,7 +91,10 @@ internal fun CameraCaptureScreen(
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.PickVisualMedia()
         ) {
-            it?.let(onFinish)
+            it?.let {
+                context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                onFinish(it)
+            }
         }
 
     LaunchedEffect(isRecording) {
@@ -142,6 +147,7 @@ internal fun CameraCaptureScreen(
 
     // force dark mode
     MegaScaffold(
+        modifier = Modifier.systemBarsPadding(),
         topBar = {
             MegaAppBar(
                 appBarType = AppBarType.BACK_NAVIGATION,

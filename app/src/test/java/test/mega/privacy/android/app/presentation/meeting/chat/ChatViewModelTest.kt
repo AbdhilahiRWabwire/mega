@@ -39,15 +39,14 @@ import mega.privacy.android.app.presentation.transfers.starttransfer.model.Trans
 import mega.privacy.android.app.utils.CacheFolderManager
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
-import mega.privacy.android.shared.original.core.ui.controls.chat.VoiceClipRecordEvent
-import mega.privacy.android.shared.original.core.ui.controls.chat.messages.reaction.model.UIReaction
-import mega.privacy.android.shared.original.core.ui.controls.chat.messages.reaction.model.UIReactionUser
 import mega.privacy.android.domain.entity.ChatRequest
 import mega.privacy.android.domain.entity.ChatRoomPermission
 import mega.privacy.android.domain.entity.EventType
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.StorageStateEvent
-import mega.privacy.android.domain.entity.chat.ChatCall
+import mega.privacy.android.domain.entity.call.ChatCall
+import mega.privacy.android.domain.entity.call.ChatCallStatus
+import mega.privacy.android.domain.entity.call.ChatCallTermCodeType
 import mega.privacy.android.domain.entity.chat.ChatConnectionState
 import mega.privacy.android.domain.entity.chat.ChatConnectionStatus
 import mega.privacy.android.domain.entity.chat.ChatMessage
@@ -61,8 +60,6 @@ import mega.privacy.android.domain.entity.chat.messages.ForwardResult
 import mega.privacy.android.domain.entity.chat.messages.TypedMessage
 import mega.privacy.android.domain.entity.chat.messages.normal.NormalMessage
 import mega.privacy.android.domain.entity.contacts.UserChatStatus
-import mega.privacy.android.domain.entity.meeting.ChatCallStatus
-import mega.privacy.android.domain.entity.meeting.ChatCallTermCodeType
 import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
@@ -77,6 +74,11 @@ import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.GetNodeByIdUseCase
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
 import mega.privacy.android.domain.usecase.cache.GetCacheFileUseCase
+import mega.privacy.android.domain.usecase.call.AnswerChatCallUseCase
+import mega.privacy.android.domain.usecase.call.HangChatCallUseCase
+import mega.privacy.android.domain.usecase.call.IsChatStatusConnectedForCallUseCase
+import mega.privacy.android.domain.usecase.call.StartCallUseCase
+import mega.privacy.android.domain.usecase.call.StartChatCallNoRingingUseCase
 import mega.privacy.android.domain.usecase.chat.ArchiveChatUseCase
 import mega.privacy.android.domain.usecase.chat.BroadcastChatArchivedUseCase
 import mega.privacy.android.domain.usecase.chat.ClearChatHistoryUseCase
@@ -130,22 +132,20 @@ import mega.privacy.android.domain.usecase.contact.RequestUserLastGreenUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.file.CreateNewImageUriUseCase
 import mega.privacy.android.domain.usecase.file.DeleteFileUseCase
-import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.BroadcastUpgradeDialogClosedUseCase
-import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
+import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChatUseCase
 import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
-import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.IsChatStatusConnectedForCallUseCase
 import mega.privacy.android.domain.usecase.meeting.LoadMessagesUseCase
 import mega.privacy.android.domain.usecase.meeting.SendStatisticsMeetingsUseCase
 import mega.privacy.android.domain.usecase.meeting.SetUsersCallLimitRemindersUseCase
-import mega.privacy.android.domain.usecase.meeting.StartCallUseCase
-import mega.privacy.android.domain.usecase.meeting.StartChatCallNoRingingUseCase
 import mega.privacy.android.domain.usecase.meeting.StartMeetingInWaitingRoomChatUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorUpdatePushNotificationSettingsUseCase
 import mega.privacy.android.domain.usecase.transfers.paused.AreTransfersPausedUseCase
-import mega.privacy.android.domain.usecase.transfers.paused.PauseAllTransfersUseCase
+import mega.privacy.android.domain.usecase.transfers.paused.PauseTransfersQueueUseCase
+import mega.privacy.android.shared.original.core.ui.controls.chat.VoiceClipRecordEvent
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.reaction.model.UIReaction
+import mega.privacy.android.shared.original.core.ui.controls.chat.messages.reaction.model.UIReactionUser
 import mega.privacy.mobile.analytics.event.ChatConversationUnmuteMenuToolbarEvent
 import nz.mega.sdk.MegaChatError
 import org.junit.jupiter.api.AfterEach
@@ -235,7 +235,7 @@ internal class ChatViewModelTest {
         mock<MonitorUserLastGreenUpdatesUseCase> {
             on { invoke(any()) } doReturn emptyFlow()
         }
-    private val getScheduledMeetingByChat = mock<GetScheduledMeetingByChat>()
+    private val getScheduledMeetingByChatUseCase = mock<GetScheduledMeetingByChatUseCase>()
     private val monitorHasAnyContactUseCase = mock<MonitorHasAnyContactUseCase> {
         onBlocking { invoke() } doReturn emptyFlow()
     }
@@ -312,7 +312,7 @@ internal class ChatViewModelTest {
     private val broadcastChatArchivedUseCase = mock<BroadcastChatArchivedUseCase>()
     private val broadcastUpgradeDialogClosedUseCase = mock<BroadcastUpgradeDialogClosedUseCase>()
     private val areTransfersPausedUseCase = mock<AreTransfersPausedUseCase>()
-    private val pauseAllTransfersUseCase = mock<PauseAllTransfersUseCase>()
+    private val pauseTransfersQueueUseCase = mock<PauseTransfersQueueUseCase>()
 
     @BeforeEach
     fun resetMocks() {
@@ -324,7 +324,7 @@ internal class ChatViewModelTest {
             requestUserLastGreenUseCase,
             getMyUserHandleUseCase,
             getParticipantFirstNameUseCase,
-            getScheduledMeetingByChat,
+            getScheduledMeetingByChatUseCase,
             passcodeManagement,
             getCustomSubtitleListUseCase,
             inviteToChatUseCase,
@@ -379,7 +379,7 @@ internal class ChatViewModelTest {
             getUsersCallLimitRemindersUseCase,
             broadcastUpgradeDialogClosedUseCase,
             areTransfersPausedUseCase,
-            pauseAllTransfersUseCase
+            pauseTransfersQueueUseCase
         )
         whenever(getUsersCallLimitRemindersUseCase()).thenReturn(emptyFlow())
         wheneverBlocking { isAnonymousModeUseCase() } doReturn false
@@ -438,7 +438,7 @@ internal class ChatViewModelTest {
             monitorUserLastGreenUpdatesUseCase = monitorUserLastGreenUpdatesUseCase,
             getParticipantFirstNameUseCase = getParticipantFirstNameUseCase,
             getMyUserHandleUseCase = getMyUserHandleUseCase,
-            getScheduledMeetingByChatUseCase = getScheduledMeetingByChat,
+            getScheduledMeetingByChatUseCase = getScheduledMeetingByChatUseCase,
             monitorHasAnyContactUseCase = monitorHasAnyContactUseCase,
             passcodeManagement = passcodeManagement,
             getCustomSubtitleListUseCase = getCustomSubtitleListUseCase,
@@ -501,7 +501,7 @@ internal class ChatViewModelTest {
             getUsersCallLimitRemindersUseCase = getUsersCallLimitRemindersUseCase,
             broadcastUpgradeDialogClosedUseCase = broadcastUpgradeDialogClosedUseCase,
             areTransfersPausedUseCase = areTransfersPausedUseCase,
-            pauseAllTransfersUseCase = pauseAllTransfersUseCase,
+            pauseTransfersQueueUseCase = pauseTransfersQueueUseCase,
             actionFactories = setOf(),
         )
     }
@@ -1270,7 +1270,11 @@ internal class ChatViewModelTest {
     fun `test that ui state is updated when get scheduled meeting by chatId succeeds`() = runTest {
         val invalidHandle = -1L
         val expectedScheduledMeeting = ChatScheduledMeeting(parentSchedId = invalidHandle)
-        whenever(getScheduledMeetingByChat(chatId)).thenReturn(listOf(expectedScheduledMeeting))
+        whenever(getScheduledMeetingByChatUseCase(chatId)).thenReturn(
+            listOf(
+                expectedScheduledMeeting
+            )
+        )
         initTestClass()
         underTest.state.test {
             assertThat(awaitItem().scheduledMeeting).isEqualTo(expectedScheduledMeeting)
@@ -1280,7 +1284,7 @@ internal class ChatViewModelTest {
     @Test
     fun `test that scheduled meeting in ui state is null when get scheduled meeting by chatId fails`() =
         runTest {
-            whenever(getScheduledMeetingByChat(any())).thenAnswer {
+            whenever(getScheduledMeetingByChatUseCase(any())).thenAnswer {
                 throw Exception("get scheduled meeting by chat failed")
             }
 
@@ -1844,7 +1848,11 @@ internal class ChatViewModelTest {
             on { ownPrivilege } doReturn ChatRoomPermission.Moderator
             on { isWaitingRoom } doReturn false
         }
-        whenever(getScheduledMeetingByChat(chatId)).thenReturn(listOf(expectedScheduledMeeting))
+        whenever(getScheduledMeetingByChatUseCase(chatId)).thenReturn(
+            listOf(
+                expectedScheduledMeeting
+            )
+        )
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
         initTestClass()
         underTest.state.test {
@@ -1877,7 +1885,11 @@ internal class ChatViewModelTest {
             on { ownPrivilege } doReturn ChatRoomPermission.Moderator
             on { isWaitingRoom } doReturn false
         }
-        whenever(getScheduledMeetingByChat(chatId)).thenReturn(listOf(expectedScheduledMeeting))
+        whenever(getScheduledMeetingByChatUseCase(chatId)).thenReturn(
+            listOf(
+                expectedScheduledMeeting
+            )
+        )
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
         initTestClass()
         underTest.state.test {
@@ -1919,7 +1931,11 @@ internal class ChatViewModelTest {
             on { ownPrivilege } doReturn ChatRoomPermission.Moderator
             on { isWaitingRoom } doReturn true
         }
-        whenever(getScheduledMeetingByChat(chatId)).thenReturn(listOf(expectedScheduledMeeting))
+        whenever(getScheduledMeetingByChatUseCase(chatId)).thenReturn(
+            listOf(
+                expectedScheduledMeeting
+            )
+        )
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
         initTestClass()
         underTest.state.test {
@@ -1952,7 +1968,11 @@ internal class ChatViewModelTest {
             on { ownPrivilege } doReturn ChatRoomPermission.Moderator
             on { isWaitingRoom } doReturn true
         }
-        whenever(getScheduledMeetingByChat(chatId)).thenReturn(listOf(expectedScheduledMeeting))
+        whenever(getScheduledMeetingByChatUseCase(chatId)).thenReturn(
+            listOf(
+                expectedScheduledMeeting
+            )
+        )
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
         initTestClass()
         underTest.state.test {
@@ -1994,7 +2014,11 @@ internal class ChatViewModelTest {
             on { ownPrivilege } doReturn ChatRoomPermission.Standard
             on { isWaitingRoom } doReturn true
         }
-        whenever(getScheduledMeetingByChat(chatId)).thenReturn(listOf(expectedScheduledMeeting))
+        whenever(getScheduledMeetingByChatUseCase(chatId)).thenReturn(
+            listOf(
+                expectedScheduledMeeting
+            )
+        )
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
         initTestClass()
         underTest.state.test {
@@ -2019,7 +2043,11 @@ internal class ChatViewModelTest {
             on { ownPrivilege } doReturn ChatRoomPermission.Standard
             on { isWaitingRoom } doReturn true
         }
-        whenever(getScheduledMeetingByChat(chatId)).thenReturn(listOf(expectedScheduledMeeting))
+        whenever(getScheduledMeetingByChatUseCase(chatId)).thenReturn(
+            listOf(
+                expectedScheduledMeeting
+            )
+        )
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
         initTestClass()
         underTest.state.test {
@@ -2044,7 +2072,11 @@ internal class ChatViewModelTest {
             on { ownPrivilege } doReturn ChatRoomPermission.Moderator
             on { isWaitingRoom } doReturn true
         }
-        whenever(getScheduledMeetingByChat(chatId)).thenReturn(listOf(expectedScheduledMeeting))
+        whenever(getScheduledMeetingByChatUseCase(chatId)).thenReturn(
+            listOf(
+                expectedScheduledMeeting
+            )
+        )
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
         initTestClass()
         underTest.onStartOrJoinMeeting(true)
@@ -2062,7 +2094,11 @@ internal class ChatViewModelTest {
             on { ownPrivilege } doReturn ChatRoomPermission.Standard
             on { isWaitingRoom } doReturn false
         }
-        whenever(getScheduledMeetingByChat(chatId)).thenReturn(listOf(expectedScheduledMeeting))
+        whenever(getScheduledMeetingByChatUseCase(chatId)).thenReturn(
+            listOf(
+                expectedScheduledMeeting
+            )
+        )
         whenever(getChatRoomUseCase(chatId)).thenReturn(chatRoom)
         initTestClass()
         underTest.onStartOrJoinMeeting(true)
@@ -3054,7 +3090,7 @@ internal class ChatViewModelTest {
     fun `test that resume transfers invokes correct use case`() = runTest {
         underTest.resumeTransfers()
 
-        verify(pauseAllTransfersUseCase).invoke(false)
+        verify(pauseTransfersQueueUseCase).invoke(false)
     }
 
 

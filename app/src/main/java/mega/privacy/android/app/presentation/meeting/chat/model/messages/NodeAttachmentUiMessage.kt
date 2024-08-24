@@ -15,8 +15,6 @@ import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
-import mega.privacy.android.app.mediaplayer.AudioPlayerActivity
-import mega.privacy.android.app.mediaplayer.LegacyVideoPlayerActivity
 import mega.privacy.android.app.presentation.imagepreview.ImagePreviewActivity
 import mega.privacy.android.app.presentation.imagepreview.fetcher.ChatImageNodeFetcher
 import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewFetcherSource
@@ -29,17 +27,15 @@ import mega.privacy.android.app.presentation.node.FileNodeContent
 import mega.privacy.android.app.presentation.pdfviewer.PdfViewerActivity
 import mega.privacy.android.app.textEditor.TextEditorActivity
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.app.utils.MegaNodeUtil
-import mega.privacy.android.domain.entity.AudioFileTypeInfo
+import mega.privacy.android.app.utils.MegaNodeUtil.MegaNavigatorEntryPoint
 import mega.privacy.android.domain.entity.PdfFileTypeInfo
-import mega.privacy.android.domain.entity.VideoFileTypeInfo
 import mega.privacy.android.domain.entity.ZipFileTypeInfo
 import mega.privacy.android.domain.entity.chat.messages.NodeAttachmentMessage
-import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.NodeContentUri
 import mega.privacy.android.domain.entity.node.chat.ChatFile
 import mega.privacy.android.shared.original.core.ui.controls.chat.messages.reaction.model.UIReaction
 import mega.privacy.android.shared.original.core.ui.controls.layouts.LocalSnackBarHostState
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import timber.log.Timber
 import java.io.File
 
@@ -71,7 +67,7 @@ data class NodeAttachmentUiMessage(
         val onClick: () -> Unit = {
             coroutineScope.launch {
                 if (!message.exists) {
-                    snackbarHostState?.showSnackbar(context.getString(R.string.error_file_not_available))
+                    snackbarHostState?.showAutoDurationSnackbar(context.getString(R.string.error_file_not_available))
                     return@launch
                 }
                 runCatching {
@@ -91,7 +87,7 @@ data class NodeAttachmentUiMessage(
                             context,
                             message,
                             content.uri,
-                            viewModel
+                            coroutineScope
                         )
 
                         is FileNodeContent.Other -> openOtherFiles(
@@ -143,44 +139,22 @@ data class NodeAttachmentUiMessage(
         context: Context,
         message: NodeAttachmentMessage,
         uri: NodeContentUri,
-        viewModel: NodeAttachmentMessageViewModel,
+        coroutineScope: CoroutineScope,
     ) {
-        val fileNode = message.fileNode
-        val intent = buildVideoOrAudioIntent(fileNode, context, message)
-        val mimeType =
-            if (fileNode.type.extension == "opus") "audio/*" else fileNode.type.mimeType
-        viewModel.applyNodeContentUri(
-            intent = intent,
-            content = uri,
-            mimeType = mimeType,
-            isSupported = fileNode.type.isSupported
-        )
-        safeLaunchActivity(context, intent)
-    }
-
-    private fun buildVideoOrAudioIntent(
-        fileNode: FileNode,
-        context: Context,
-        message: NodeAttachmentMessage,
-    ): Intent = when {
-        fileNode.type.isSupported && fileNode.type is VideoFileTypeInfo -> Intent(
-            context,
-            LegacyVideoPlayerActivity::class.java
-        )
-
-        fileNode.type.isSupported && fileNode.type is AudioFileTypeInfo -> Intent(
-            context,
-            AudioPlayerActivity::class.java
-        )
-
-        else -> Intent(Intent.ACTION_VIEW)
-    }.apply {
-        putExtra(Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE, Constants.FROM_CHAT)
-        putExtra(Constants.INTENT_EXTRA_KEY_IS_PLAYLIST, false)
-        putExtra(Constants.INTENT_EXTRA_KEY_MSG_ID, message.msgId)
-        putExtra(Constants.INTENT_EXTRA_KEY_CHAT_ID, message.chatId)
-        putExtra(Constants.INTENT_EXTRA_KEY_FILE_NAME, fileNode.name)
-        putExtra("HANDLE", fileNode.id.longValue)
+        coroutineScope.launch {
+            runCatching {
+                val fileNode = message.fileNode
+                EntryPointAccessors.fromApplication(context, MegaNavigatorEntryPoint::class.java)
+                    .megaNavigator().openMediaPlayerActivityFromChat(
+                        context = context,
+                        contentUri = uri,
+                        fileNode = fileNode,
+                        message = message,
+                    )
+            }.onFailure {
+                Timber.e(it, "No activity found to open file")
+            }
+        }
     }
 
     private fun openPdfActivity(
@@ -270,7 +244,7 @@ data class NodeAttachmentUiMessage(
                     context.startActivity(intent)
                 }.onFailure {
                     // no activity found to open file, just show download snackbar
-                    snackbarHostState?.showSnackbar(context.getString(R.string.general_already_downloaded))
+                    snackbarHostState?.showAutoDurationSnackbar(context.getString(R.string.general_already_downloaded))
                 }
             }
         } else {
@@ -288,31 +262,15 @@ data class NodeAttachmentUiMessage(
         Timber.d("The file is zip, open in-app.")
         EntryPointAccessors.fromApplication(
             context,
-            MegaNodeUtil.MegaNavigatorEntryPoint::class.java
+            MegaNavigatorEntryPoint::class.java
         ).megaNavigator().openZipBrowserActivity(
             context = context,
             zipFilePath = localFile.absolutePath,
             nodeHandle = fileNode.id.longValue
         ) {
             coroutineScope.launch {
-                snackbarHostState?.showSnackbar(context.getString(R.string.message_zip_format_error))
+                snackbarHostState?.showAutoDurationSnackbar(context.getString(R.string.message_zip_format_error))
             }
-        }
-    }
-
-    /**
-     * Safe launch activity
-     *
-     * Only need to call this function in cases of starting activity by ACTION, for example:
-     * ACTION_VIEW, ACTION_EDIT etc
-     * Some devices may not have an activity to handle the intent with the specified mime type
-     * We do not need to call this for internal intents handled by our own app
-     */
-    private fun safeLaunchActivity(context: Context, intent: Intent) {
-        runCatching {
-            context.startActivity(intent)
-        }.onFailure {
-            Timber.e(it, "No activity found to open file")
         }
     }
 

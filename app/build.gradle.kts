@@ -172,7 +172,6 @@ dependencies {
     testImplementation(project(":core-ui-test"))
 
     // Jetbrains
-    implementation(lib.anko.commons)
     implementation(lib.coroutines.android)
     implementation(lib.coroutines.core)
     implementation(lib.kotlin.ktx)
@@ -238,12 +237,15 @@ dependencies {
     implementation(google.services.location)
     implementation(google.services.maps)
     implementation(google.maps.utils)
+    implementation(google.maps.compose)
     implementation(google.code.scanner)
     implementation(google.install.referrer)
 
-    // Play Core
-    implementation(google.play.core)
-    implementation(google.play.core.ktx)
+    //Play
+    implementation(google.play.review)
+    implementation(google.play.review.ktx)
+    implementation(google.play.update)
+    implementation(google.play.update.ktx)
 
     // protobuf-java for tombstone debug
     implementation(google.protobuff)
@@ -275,10 +277,7 @@ dependencies {
     implementation(lib.bannerviewpager)
     implementation(lib.parallaxscroll)
     implementation(lib.vdurmont.emoji)
-    implementation(lib.code.scanner)
-    implementation(lib.stickyheader)
     implementation(lib.shimmerlayout)
-    implementation(lib.collapsingtoolbar)
     implementation(lib.namedregexp)
     implementation(lib.blurry)
     implementation(lib.documentscanner)

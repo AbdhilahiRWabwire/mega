@@ -30,18 +30,19 @@ import mega.privacy.android.data.mapper.meeting.MegaChatScheduledMeetingRulesMap
 import mega.privacy.android.data.model.ScheduledMeetingUpdate
 import mega.privacy.android.data.model.meeting.ChatCallUpdate
 import mega.privacy.android.domain.entity.ChatRequest
-import mega.privacy.android.domain.entity.chat.ChatCall
+import mega.privacy.android.domain.entity.call.ChatCall
+import mega.privacy.android.domain.entity.call.ChatCallStatus
+import mega.privacy.android.domain.entity.call.ChatSessionUpdatesResult
 import mega.privacy.android.domain.entity.chat.ChatScheduledFlags
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeetingOccurr
 import mega.privacy.android.domain.entity.chat.ChatScheduledRules
 import mega.privacy.android.domain.entity.chat.ChatVideoUpdate
 import mega.privacy.android.domain.entity.featureflag.Flag
-import mega.privacy.android.domain.entity.meeting.ChatCallStatus
-import mega.privacy.android.domain.entity.meeting.ChatSessionUpdatesResult
 import mega.privacy.android.domain.entity.meeting.ResultOccurrenceUpdate
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.repository.CallRepository
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -502,6 +503,13 @@ internal class CallRepositoryImpl @Inject constructor(
     override fun getChatLocalVideoUpdates(chatId: Long): Flow<ChatVideoUpdate> =
         megaChatApiGateway.getChatLocalVideoUpdates(chatId).flowOn(dispatcher)
 
+    override fun getChatRemoteVideoUpdates(
+        chatId: Long,
+        clientId: Long,
+        hiRes: Boolean,
+    ): Flow<ChatVideoUpdate> = megaChatApiGateway.getChatRemoteVideoUpdates(chatId, clientId, hiRes)
+        .flowOn(dispatcher)
+
     override suspend fun openVideoDevice(): ChatRequest = withContext(dispatcher) {
         suspendCancellableCoroutine { continuation ->
             val listener = continuation.getChatRequestListener(
@@ -571,6 +579,7 @@ internal class CallRepositoryImpl @Inject constructor(
     override suspend fun enableAudio(
         chatId: Long,
     ): ChatRequest = withContext(dispatcher) {
+        Timber.d("enable Audio")
         suspendCancellableCoroutine { continuation ->
             val listener = continuation.getChatRequestListener(
                 methodName = "enableAudio",
@@ -589,6 +598,7 @@ internal class CallRepositoryImpl @Inject constructor(
     override suspend fun disableAudio(
         chatId: Long,
     ): ChatRequest = withContext(dispatcher) {
+        Timber.d("disable Audio")
         suspendCancellableCoroutine { continuation ->
             val listener = continuation.getChatRequestListener(
                 methodName = "disableAudio",
@@ -809,6 +819,12 @@ internal class CallRepositoryImpl @Inject constructor(
     override suspend fun broadcastCallEnded(chatId: Long) =
         appEventGateway.broadcastCallEnded(chatId)
 
+    override fun monitorCallScreenOpened(): Flow<Boolean> =
+        appEventGateway.monitorCallScreenOpened()
+
+    override suspend fun broadcastCallScreenOpened(isOpened: Boolean) =
+        appEventGateway.broadcastCallScreenOpened(isOpened)
+
     override suspend fun mutePeers(
         chatId: Long,
         clientId: Long,
@@ -854,15 +870,30 @@ internal class CallRepositoryImpl @Inject constructor(
                 ?.let(flagMapper::invoke)
         }
 
-    override suspend fun setIgnoredCall(chatId: Long): ChatRequest = withContext(dispatcher) {
+    override suspend fun setIgnoredCall(chatId: Long): Boolean =
+        withContext(dispatcher) {
+            megaChatApiGateway.setIgnoredCall(
+                chatId
+            )
+        }
+
+    override suspend fun createMeeting(
+        title: String,
+        speakRequest: Boolean,
+        waitingRoom: Boolean,
+        openInvite: Boolean,
+    ): ChatRequest = withContext(dispatcher) {
         suspendCancellableCoroutine { continuation ->
             val callback = continuation.getChatRequestListener(
-                methodName = "setIgnoredCall",
+                methodName = "createMeeting",
                 chatRequestMapper::invoke
             )
 
-            megaChatApiGateway.setIgnoredCall(
-                chatId,
+            megaChatApiGateway.createMeeting(
+                title,
+                speakRequest,
+                waitingRoom,
+                openInvite,
                 callback
             )
 

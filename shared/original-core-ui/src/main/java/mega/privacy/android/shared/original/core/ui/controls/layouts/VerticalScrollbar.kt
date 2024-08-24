@@ -113,26 +113,34 @@ private fun VerticalScrollbar(
 
     var thumbPressed by remember { mutableStateOf(false) }
     // scrollableItemsAmount is item count minus visible items, approximately the first visible item when fully scrolled
-    val scrollableItemsAmount by remember {
+    val scrollableItemsAmount by remember(
+        itemCount,
+        lastVisibleItemIndex.value,
+        firstVisibleItemIndex.value
+    ) {
         derivedStateOf {
             val visibleItems = lastVisibleItemIndex.value - firstVisibleItemIndex.value
             itemCount - visibleItems - 1
         }
     }
 
-    val thumbOffset by remember {
+    val thumbOffset by remember(itemCount) {
         derivedStateOf {
-            val scrollProportion = if (reverseLayout) {
-                1 - firstVisibleItemIndex.value.toFloat() / scrollableItemsAmount
-            } else {
-                firstVisibleItemIndex.value.toFloat() / scrollableItemsAmount
+            val isScrollToEnd =
+                lastVisibleItemIndex.value == itemCount - 1 || scrollableItemsAmount == 0
+            val scrollProportion = when {
+                isScrollToEnd -> if (reverseLayout) 0f else 1f
+                reverseLayout -> 1 - firstVisibleItemIndex.value.toFloat() / scrollableItemsAmount
+                else -> firstVisibleItemIndex.value.toFloat() / scrollableItemsAmount
             }
             scrollableHeight * scrollProportion
         }
     }
 
-    val thumbVisible by remember {
-        derivedStateOf { state.isScrollInProgress || thumbPressed }
+    val thumbVisible by remember(itemCount) {
+        derivedStateOf {
+            itemCount > 0 && state.isScrollInProgress || thumbPressed
+        }
     }
 
     val tooltipString by remember(thumbVisible) {
@@ -155,16 +163,24 @@ private fun VerticalScrollbar(
                         thumbPressed = false
                     }
                 ) { change, _ ->
-                    if (thumbPressed && scrollableHeightPixels > 0) {
+                    if (thumbPressed && scrollableHeightPixels > 0 && itemCount > 0) {
                         change.consume()
+
+                        val dragPositionY = change.position.y
+                        val adjustedY = dragPositionY - thumbHeightPixels / 2
+
                         val dragProportion = if (reverseLayout) {
-                            1 - (change.position.y - thumbHeightPixels / 2) / scrollableHeightPixels
+                            1 - (adjustedY / scrollableHeightPixels)
                         } else {
-                            (change.position.y - thumbHeightPixels / 2) / scrollableHeightPixels
+                            adjustedY / scrollableHeightPixels
                         }
-                        val targetIndex = (dragProportion * scrollableItemsAmount)
+
+                        val clampedProportion = dragProportion.coerceIn(0f, 1f)
+
+                        val targetIndex = (clampedProportion * scrollableItemsAmount)
                             .toInt()
                             .coerceIn(0, itemCount - 1)
+
                         coroutineScope.launch {
                             scrollToItem(targetIndex)
                         }

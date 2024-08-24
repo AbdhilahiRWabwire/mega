@@ -116,12 +116,9 @@ import javax.crypto.spec.SecretKeySpec;
 
 import mega.privacy.android.app.BaseActivity;
 import mega.privacy.android.app.MegaApplication;
-import mega.privacy.android.app.MimeTypeList;
 import mega.privacy.android.app.R;
 import mega.privacy.android.app.di.DbHandlerModuleKt;
 import mega.privacy.android.app.interfaces.SnackbarShower;
-import mega.privacy.android.app.mediaplayer.AudioPlayerActivity;
-import mega.privacy.android.app.mediaplayer.LegacyVideoPlayerActivity;
 import mega.privacy.android.app.presentation.extensions.StorageStateExtensionsKt;
 import mega.privacy.android.data.database.DatabaseHandler;
 import mega.privacy.android.data.model.MegaPreferences;
@@ -1308,21 +1305,6 @@ public class Util {
             activity.startActivityForResult(cameraIntent, option);
         } catch (Exception e) {
             Timber.d("Can not handle action MediaStore.ACTION_IMAGE_CAPTURE");
-        }
-    }
-
-    /**
-     * Get an Intent to play audio or video node.
-     *
-     * @param context  Android context
-     * @param nodeName the node name (not needed when New Video Player is implemented)
-     * @return the Intent with corresponding target activity class
-     */
-    public static Intent getMediaIntent(Context context, String nodeName) {
-        if (MimeTypeList.typeForName(nodeName).isAudio()) {
-            return new Intent(context, AudioPlayerActivity.class);
-        } else {
-            return new Intent(context, LegacyVideoPlayerActivity.class);
         }
     }
 

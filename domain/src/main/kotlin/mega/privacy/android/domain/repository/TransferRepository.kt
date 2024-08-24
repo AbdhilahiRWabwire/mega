@@ -8,6 +8,7 @@ import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.transfer.ActiveTransfer
 import mega.privacy.android.domain.entity.transfer.ActiveTransferTotals
 import mega.privacy.android.domain.entity.transfer.CompletedTransfer
+import mega.privacy.android.domain.entity.transfer.InProgressTransfer
 import mega.privacy.android.domain.entity.transfer.Transfer
 import mega.privacy.android.domain.entity.transfer.TransferAppData
 import mega.privacy.android.domain.entity.transfer.TransferData
@@ -192,14 +193,14 @@ interface TransferRepository {
      *
      * @return a flow of completed transfer
      */
-    fun monitorCompletedTransfer(): Flow<CompletedTransfer>
+    fun monitorCompletedTransfer(): Flow<Unit>
 
     /**
-     * Get the list of completed transfers
+     * Monitors list of completed transfers
      *
      * @param size the limit size of the list. If null, the limit does not apply
      */
-    fun getAllCompletedTransfers(size: Int? = null): Flow<List<CompletedTransfer>>
+    fun monitorCompletedTransfers(size: Int? = null): Flow<List<CompletedTransfer>>
 
     /**
      * Add a completed transfer to local storage
@@ -210,6 +211,15 @@ interface TransferRepository {
         transfer: Transfer,
         megaException: MegaException?,
         transferPath: String? = null,
+    )
+
+    /**
+     * Add a list of completed transfer to local storage
+     *
+     * @param finishEventsAndPaths
+     */
+    suspend fun addCompletedTransfers(
+        finishEventsAndPaths: Map<TransferEvent.TransferFinishEvent, String?>,
     )
 
     /**
@@ -351,6 +361,11 @@ interface TransferRepository {
      * Insert a new active transfer or replace it if there's already an active transfer with the same tag
      */
     suspend fun insertOrUpdateActiveTransfer(activeTransfer: ActiveTransfer)
+
+    /**
+     * Insert (or replace  if there's already an active transfer with the same tag) a list of active transfers
+     */
+    suspend fun insertOrUpdateActiveTransfers(activeTransfers: List<ActiveTransfer>)
 
     /**
      * Set or update the transferred bytes counter of this transfer
@@ -512,4 +527,30 @@ interface TransferRepository {
      * @return a flow that emits true if UploadsWorker is enqueued. false otherwise
      */
     fun isUploadsWorkerEnqueuedFlow(): Flow<Boolean>
+
+
+    /**
+     * Updates or adds a new transfer to the in progress transfers list.
+     */
+    suspend fun updateInProgressTransfer(transfer: Transfer)
+
+    /**
+     * Updates or adds a list of transfers to the in progress transfers list.
+     */
+    suspend fun updateInProgressTransfers(transfers: List<Transfer>)
+
+    /**
+     * Monitor in progress transfers flow.
+     */
+    fun monitorInProgressTransfers(): Flow<Map<Int, InProgressTransfer>>
+
+    /**
+     * Remove in progress transfer by tag.
+     */
+    suspend fun removeInProgressTransfer(tag: Int)
+
+    /**
+     * Remove a list of in progress transfers by tag.
+     */
+    suspend fun removeInProgressTransfers(tags: Set<Int>)
 }

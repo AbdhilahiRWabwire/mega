@@ -24,8 +24,10 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -110,6 +112,7 @@ import mega.privacy.android.shared.original.core.ui.model.SpanIndicator
 import mega.privacy.android.shared.original.core.ui.preview.CombinedTextAndThemePreviews
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import timber.log.Timber
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -158,7 +161,7 @@ internal fun InviteContactRoute(
                         it.argument
                     )
                 } else context.getString(it.id)
-                snackBarHostState.showSnackbar(message)
+                snackBarHostState.showAutoDurationSnackbar(message)
             }
         }
     }
@@ -195,7 +198,7 @@ internal fun InviteContactRoute(
                             }
                         }
                     }
-                    snackBarHostState.showSnackbar(message)
+                    snackBarHostState.showAutoDurationSnackbar(message)
                 }
             }
 
@@ -214,7 +217,9 @@ internal fun InviteContactRoute(
 
     Box(modifier = modifier.semantics { testTagsAsResourceId = true }) {
         InviteContactScreen(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .systemBarsPadding()
+                .fillMaxSize(),
             uiState = uiState,
             isDarkMode = isDarkMode,
             onBackPressed = onBackPressed,
@@ -291,7 +296,7 @@ internal fun InviteContactRoute(
         }
 
         SnackbarHost(
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier.navigationBarsPadding().align(Alignment.BottomCenter),
             hostState = snackBarHostState
         )
     }

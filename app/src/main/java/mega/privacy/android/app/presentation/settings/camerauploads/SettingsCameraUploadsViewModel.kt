@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.presentation.settings.camerauploads.mapper.UploadOptionUiItemMapper
 import mega.privacy.android.app.presentation.settings.camerauploads.mapper.VideoQualityUiItemMapper
 import mega.privacy.android.app.presentation.settings.camerauploads.model.SettingsCameraUploadsUiState
@@ -50,9 +49,8 @@ import mega.privacy.android.domain.usecase.camerauploads.IsChargingRequiredForVi
 import mega.privacy.android.domain.usecase.camerauploads.IsChargingRequiredToUploadContentUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsFolderPathExistingUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsMediaUploadsEnabledUseCase
-import mega.privacy.android.domain.usecase.camerauploads.IsPrimaryFolderNodeValidUseCase
+import mega.privacy.android.domain.usecase.camerauploads.IsNewFolderNodeValidUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsPrimaryFolderPathUnrelatedToSecondaryFolderUseCase
-import mega.privacy.android.domain.usecase.camerauploads.IsSecondaryFolderNodeValidUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsSecondaryFolderPathUnrelatedToPrimaryFolderUseCase
 import mega.privacy.android.domain.usecase.camerauploads.IsSecondaryFolderPathValidUseCase
 import mega.privacy.android.domain.usecase.camerauploads.ListenToNewMediaUseCase
@@ -75,7 +73,6 @@ import mega.privacy.android.domain.usecase.camerauploads.SetupDefaultSecondaryFo
 import mega.privacy.android.domain.usecase.camerauploads.SetupMediaUploadsSettingUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetupPrimaryFolderUseCase
 import mega.privacy.android.domain.usecase.camerauploads.SetupSecondaryFolderUseCase
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.workers.StartCameraUploadUseCase
 import mega.privacy.android.domain.usecase.workers.StopCameraUploadsUseCase
@@ -96,7 +93,6 @@ import javax.inject.Inject
  * Uploads Folder
  * @property deleteCameraUploadsTemporaryRootDirectoryUseCase Deletes the temporary Camera Uploads Cache Folder
  * @property disableMediaUploadsSettingsUseCase Disables Media Uploads
- * @property getFeatureFlagValueUseCase Retrieves the local Feature Flag configurations
  * @property getPrimaryFolderNodeUseCase Gets the Camera Uploads Primary Folder Node
  * @property getPrimaryFolderPathUseCase Gets the Camera Uploads Primary Folder Path
  * @property getSecondaryFolderNodeUseCase Gets the Media Uploads Secondary Folder Node
@@ -115,11 +111,11 @@ import javax.inject.Inject
  * @property isConnectedToInternetUseCase Checks if the User is connected to the Internet or not
  * @property isFolderPathExistingUseCase Checks if the specific Local Folder exists or not
  * @property isMediaUploadsEnabledUseCase Checks if Media Uploads (the Secondary Folder) is enabled or not
- * @property isPrimaryFolderNodeValidUseCase Checks if the Camera Uploads Folder Node is valid or not
+ * @property isNewFolderNodeValidUseCase Checks whether the new Cloud Drive Folder Node selected by
+ * Camera Uploads is valid or not
  * @property isPrimaryFolderPathUnrelatedToSecondaryFolderUseCase Checks if the specific Camera
  * Uploads Primary Folder Path is not the same Folder or a parent Folder or a sub Folder from the
  * current Local Secondary Folder
- * @property isSecondaryFolderNodeValidUseCase Checks if the Media Uploads Folder Node is valid or not
  * @property isSecondaryFolderPathUnrelatedToPrimaryFolderUseCase Checks if the specific Camera
  * Uploads Secondary Folder Path is not the same Folder or a parent Folder or a sub Folder from the
  * current Local Primary Folder
@@ -165,7 +161,6 @@ internal class SettingsCameraUploadsViewModel @Inject constructor(
     private val clearCameraUploadsRecordUseCase: ClearCameraUploadsRecordUseCase,
     private val deleteCameraUploadsTemporaryRootDirectoryUseCase: DeleteCameraUploadsTemporaryRootDirectoryUseCase,
     private val disableMediaUploadsSettingsUseCase: DisableMediaUploadsSettingsUseCase,
-    private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val getPrimaryFolderNodeUseCase: GetPrimaryFolderNodeUseCase,
     private val getPrimaryFolderPathUseCase: GetPrimaryFolderPathUseCase,
     private val getSecondaryFolderNodeUseCase: GetSecondaryFolderNodeUseCase,
@@ -180,9 +175,8 @@ internal class SettingsCameraUploadsViewModel @Inject constructor(
     private val isConnectedToInternetUseCase: IsConnectedToInternetUseCase,
     private val isFolderPathExistingUseCase: IsFolderPathExistingUseCase,
     private val isMediaUploadsEnabledUseCase: IsMediaUploadsEnabledUseCase,
-    private val isPrimaryFolderNodeValidUseCase: IsPrimaryFolderNodeValidUseCase,
+    private val isNewFolderNodeValidUseCase: IsNewFolderNodeValidUseCase,
     private val isPrimaryFolderPathUnrelatedToSecondaryFolderUseCase: IsPrimaryFolderPathUnrelatedToSecondaryFolderUseCase,
-    private val isSecondaryFolderNodeValidUseCase: IsSecondaryFolderNodeValidUseCase,
     private val isSecondaryFolderPathUnrelatedToPrimaryFolderUseCase: IsSecondaryFolderPathUnrelatedToPrimaryFolderUseCase,
     private val isSecondaryFolderPathValidUseCase: IsSecondaryFolderPathValidUseCase,
     private val listenToNewMediaUseCase: ListenToNewMediaUseCase,
@@ -253,9 +247,6 @@ internal class SettingsCameraUploadsViewModel @Inject constructor(
 
                 _uiState.update {
                     it.copy(
-                        canChangeChargingWhenUploadingContentState = getFeatureFlagValueUseCase(
-                            AppFeatures.SettingsCameraUploadsUploadWhileCharging
-                        ),
                         isCameraUploadsEnabled = isCameraUploadsEnabled.await(),
                         isMediaUploadsEnabled = isMediaUploadsEnabled.await(),
                         maximumNonChargingVideoCompressionSize = maximumNonChargingVideoCompressionSize.await(),
@@ -413,7 +404,7 @@ internal class SettingsCameraUploadsViewModel @Inject constructor(
                     if (enabled) {
                         // Check if the Media Permissions have been granted before continuing the
                         // process of enabling Camera Uploads
-                        _uiState.update { it.copy(requestPermissions = triggered) }
+                        _uiState.update { it.copy(requestMediaPermissions = triggered) }
                     } else {
                         // Disable Camera Uploads
                         setCameraUploadsEnabled(false)
@@ -516,13 +507,23 @@ internal class SettingsCameraUploadsViewModel @Inject constructor(
     }
 
     /**
-     * Updates the value of [SettingsCameraUploadsUiState.requestPermissions]
+     * Updates the value of [SettingsCameraUploadsUiState.requestLocationPermission]
      *
-     * @param newState The new State Event. If triggered, this will perform a Camera Uploads
-     * permissions request
+     * @param newState The new State Event. If triggered, this will perform a request to grant the
+     * Location Permission
      */
-    fun onRequestPermissionsStateChanged(newState: StateEvent) {
-        _uiState.update { it.copy(requestPermissions = newState) }
+    fun onRequestLocationPermissionStateChanged(newState: StateEvent) {
+        _uiState.update { it.copy(requestLocationPermission = newState) }
+    }
+
+    /**
+     * Updates the value of [SettingsCameraUploadsUiState.requestMediaPermissions]
+     *
+     * @param newState The new State Event. If triggered, this will perform a request to grant
+     * Media Permissions
+     */
+    fun onRequestMediaPermissionsStateChanged(newState: StateEvent) {
+        _uiState.update { it.copy(requestMediaPermissions = newState) }
     }
 
     /**
@@ -626,24 +627,43 @@ internal class SettingsCameraUploadsViewModel @Inject constructor(
     }
 
     /**
+     * When the User has granted the Location Permission, enable the "Include location tags" Option
+     */
+    fun onLocationPermissionGranted() {
+        includeLocationTags(true)
+    }
+
+    /**
      * Configures whether Location Tags should be added / removed when uploading Photos. Doing this
      * stops the ongoing Camera Uploads process
+     *
+     * @param isEnabled true if the feature should be enabled
+     */
+    private fun includeLocationTags(isEnabled: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                setLocationTagsEnabledUseCase(isEnabled)
+                stopCameraUploadsUseCase(CameraUploadsRestartMode.Stop)
+                _uiState.update { it.copy(shouldIncludeLocationTags = isEnabled) }
+            }.onFailure {
+                Timber.e("An exception occurred when changing the Include Location Tags state to $isEnabled")
+                showGenericErrorSnackbar()
+            }
+        }
+    }
+
+    /**
+     * Performs certain actions when the "Include location tags" State changes
      *
      * @param newState The new Include Location Tags state
      */
     fun onIncludeLocationTagsStateChanged(newState: Boolean) {
-        viewModelScope.launch {
-            runCatching {
-                setLocationTagsEnabledUseCase(newState)
-                stopCameraUploadsUseCase(CameraUploadsRestartMode.Stop)
-                _uiState.update { it.copy(shouldIncludeLocationTags = newState) }
-            }.onFailure { exception ->
-                Timber.e(
-                    "An error occurred when changing the Include Location Tags state",
-                    exception
-                )
-                showGenericErrorSnackbar()
-            }
+        if (newState) {
+            // Check if the Location Permission has been granted before continuing the process of
+            // enabling the Option
+            _uiState.update { it.copy(requestLocationPermission = triggered) }
+        } else {
+            includeLocationTags(false)
         }
     }
 
@@ -786,7 +806,7 @@ internal class SettingsCameraUploadsViewModel @Inject constructor(
     fun onPrimaryFolderNodeSelected(newPrimaryFolderNodeId: NodeId) {
         viewModelScope.launch {
             runCatching {
-                if (isPrimaryFolderNodeValidUseCase(newPrimaryFolderNodeId.longValue)) {
+                if (isNewFolderNodeValidUseCase(newPrimaryFolderNodeId.longValue)) {
                     setupPrimaryFolderUseCase(newPrimaryFolderNodeId.longValue)
                     stopCameraUploadsUseCase(CameraUploadsRestartMode.Stop)
                 } else {
@@ -851,7 +871,7 @@ internal class SettingsCameraUploadsViewModel @Inject constructor(
     fun onSecondaryFolderNodeSelected(newSecondaryFolderNodeId: NodeId) {
         viewModelScope.launch {
             runCatching {
-                if (isSecondaryFolderNodeValidUseCase(newSecondaryFolderNodeId.longValue)) {
+                if (isNewFolderNodeValidUseCase(newSecondaryFolderNodeId.longValue)) {
                     setupSecondaryFolderUseCase(newSecondaryFolderNodeId.longValue)
                     stopCameraUploadsUseCase(CameraUploadsRestartMode.Stop)
                 } else {

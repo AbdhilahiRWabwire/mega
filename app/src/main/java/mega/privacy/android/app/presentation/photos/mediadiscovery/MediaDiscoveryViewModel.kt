@@ -21,13 +21,10 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MimeTypeList.Companion.typeForName
-import mega.privacy.android.app.domain.usecase.AuthorizeNode
 import mega.privacy.android.app.domain.usecase.GetNodeByHandle
 import mega.privacy.android.app.domain.usecase.GetNodeListByIds
 import mega.privacy.android.app.domain.usecase.GetPublicNodeListByIds
 import mega.privacy.android.app.featuretoggle.AppFeatures
-import mega.privacy.android.app.namecollision.data.NameCollisionType
-import mega.privacy.android.app.namecollision.usecase.CheckNameCollisionUseCase
 import mega.privacy.android.app.presentation.copynode.mapper.CopyRequestMessageMapper
 import mega.privacy.android.app.presentation.copynode.toCopyRequestResult
 import mega.privacy.android.app.presentation.photos.mediadiscovery.MediaDiscoveryFragment.Companion.INTENT_KEY_CURRENT_FOLDER_ID
@@ -49,6 +46,7 @@ import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_NEED_STOP_HTTP_
 import mega.privacy.android.app.utils.FileUtil
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.NodeId
+import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.photos.Photo
 import mega.privacy.android.domain.entity.preference.ViewType
@@ -70,18 +68,21 @@ import mega.privacy.android.domain.usecase.folderlink.GetPublicChildNodeFromIdUs
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunningUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
-import mega.privacy.android.domain.usecase.node.CopyNodesUseCase
+import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionWithActionUseCase
+import mega.privacy.android.domain.usecase.node.GetNodeContentUriByHandleUseCase
 import mega.privacy.android.domain.usecase.node.IsNodeInRubbishBinUseCase
 import mega.privacy.android.domain.usecase.photos.GetPhotosByFolderIdUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorSubFolderMediaDiscoverySettingsUseCase
 import mega.privacy.android.domain.usecase.viewtype.SetViewType
 import nz.mega.sdk.MegaNode
-import org.jetbrains.anko.collections.forEachWithIndex
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
 
+/**
+ * ViewModel for MediaDiscoveryFragment
+ */
 @HiltViewModel
 class MediaDiscoveryViewModel @Inject constructor(
     private val getNodeListByIds: GetNodeListByIds,
@@ -98,9 +99,7 @@ class MediaDiscoveryViewModel @Inject constructor(
     private val getFileUrlByNodeHandleUseCase: GetFileUrlByNodeHandleUseCase,
     private val getLocalFolderLinkFromMegaApiUseCase: GetLocalFolderLinkFromMegaApiUseCase,
     private val monitorConnectivityUseCase: MonitorConnectivityUseCase,
-    private val checkNameCollisionUseCase: CheckNameCollisionUseCase,
-    private val authorizeNode: AuthorizeNode,
-    private val copyNodesUseCase: CopyNodesUseCase,
+    private val checkNodesNameCollisionWithActionUseCase: CheckNodesNameCollisionWithActionUseCase,
     private val copyRequestMessageMapper: CopyRequestMessageMapper,
     private val hasCredentialsUseCase: HasCredentialsUseCase,
     private val getPublicNodeListByIds: GetPublicNodeListByIds,
@@ -114,6 +113,7 @@ class MediaDiscoveryViewModel @Inject constructor(
     private val monitorShowHiddenItemsUseCase: MonitorShowHiddenItemsUseCase,
     private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
+    private val getNodeContentUriByHandleUseCase: GetNodeContentUriByHandleUseCase,
     @DefaultDispatcher val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
@@ -317,7 +317,7 @@ class MediaDiscoveryViewModel @Inject constructor(
         val currentZoomLevel = _state.value.currentZoomLevel
         val uiPhotoList = mutableListOf<UIPhoto>()
 
-        sortedPhotos.forEachWithIndex { index, photo ->
+        sortedPhotos.forEachIndexed { index, photo ->
             val shouldShowDate = if (index == 0)
                 true
             else
@@ -607,43 +607,28 @@ class MediaDiscoveryViewModel @Inject constructor(
     /**
      * Checks the list of nodes to copy in order to know which names already exist
      *
-     * @param nodes         List of node handles to copy.
+     * @param nodeHandles         List of node handles to copy.
      * @param toHandle      Handle of destination node
      */
-    fun checkNameCollision(nodes: List<MegaNode>, toHandle: Long) = viewModelScope.launch {
+    fun checkNameCollision(nodeHandles: List<Long>, toHandle: Long) = viewModelScope.launch {
         runCatching {
-            checkNameCollisionUseCase.checkNodeListAsync(
-                nodes = nodes,
-                parentHandle = toHandle,
-                type = NameCollisionType.COPY
+            checkNodesNameCollisionWithActionUseCase(
+                nodes = nodeHandles.associateWith { toHandle },
+                type = NodeNameCollisionType.COPY
             )
         }.onSuccess { result ->
-            val collisions = result.first
-            if (collisions.isNotEmpty()) {
-                _state.update {
-                    it.copy(collisions = collisions)
-                }
-            }
-            val nodesWithoutCollisions = result.second.associate {
-                it.handle to toHandle
-            }
-            if (nodesWithoutCollisions.isNotEmpty()) {
-                runCatching {
-                    copyNodesUseCase(nodesWithoutCollisions)
-                }.onSuccess { copyResult ->
-                    _state.update {
-                        it.copy(
-                            copyResultText = copyRequestMessageMapper(copyResult.toCopyRequestResult())
-                        )
+            _state.update { state ->
+                state.copy(
+                    collisions = result.collisionResult.conflictNodes.values.toList(),
+                    copyResultText = result.moveRequestResult?.let {
+                        copyRequestMessageMapper(it.toCopyRequestResult())
                     }
-                }.onFailure { throwable ->
-                    _state.update {
-                        it.copy(copyThrowable = throwable)
-                    }
-                }
+                )
             }
         }.onFailure { throwable ->
-            Timber.e(throwable)
+            _state.update {
+                it.copy(copyThrowable = throwable)
+            }
         }
     }
 
@@ -661,11 +646,9 @@ class MediaDiscoveryViewModel @Inject constructor(
      */
     fun resetLaunchCollisionActivity() {
         _state.update {
-            it.copy(collisions = null)
+            it.copy(collisions = emptyList())
         }
     }
-
-    suspend fun authorizeNodeById(id: Long): MegaNode? = authorizeNode(id)
 
     /**
      * Check if login is required
@@ -743,4 +726,7 @@ class MediaDiscoveryViewModel @Inject constructor(
             it.copy(isHiddenNodesOnboarded = true)
         }
     }
+
+    internal suspend fun getNodeContentUri(nodeHandle: Long) =
+        getNodeContentUriByHandleUseCase(nodeHandle)
 }

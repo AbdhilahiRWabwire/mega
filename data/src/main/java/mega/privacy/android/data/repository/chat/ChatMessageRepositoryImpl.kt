@@ -35,6 +35,7 @@ import mega.privacy.android.domain.entity.chat.messages.reactions.Reaction
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.repository.chat.ChatMessageRepository
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -168,6 +169,7 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
         vararg updatePendingMessageRequests: UpdatePendingMessageRequest,
     ) {
         return withContext(ioDispatcher) {
+            Timber.d("Chat pending message updated to ${updatePendingMessageRequests.map { "${it.pendingMessageId} -> ${it.state}" }}")
             chatStorageGateway.updatePendingMessage(updatePendingMessageRequest = updatePendingMessageRequests)
         }
     }
@@ -193,13 +195,13 @@ internal class ChatMessageRepositoryImpl @Inject constructor(
             }
         }
 
-    override suspend fun attachNode(chatId: Long, nodeHandle: Long): Long? =
+    override suspend fun attachNode(chatId: Long, nodeId: NodeId): Long? =
         withContext(ioDispatcher) {
             suspendCancellableCoroutine { continuation ->
                 val listener = continuation.getChatRequestListener("attachNode") {
                     it.megaChatMessage.tempId
                 }
-                megaChatApiGateway.attachNode(chatId, nodeHandle, listener)
+                megaChatApiGateway.attachNode(chatId, nodeId.longValue, listener)
                 continuation.invokeOnCancellation {
                     megaChatApiGateway.removeRequestListener(listener)
                 }

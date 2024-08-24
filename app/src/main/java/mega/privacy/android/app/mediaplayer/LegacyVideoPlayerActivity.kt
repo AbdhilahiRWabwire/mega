@@ -15,6 +15,7 @@ import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import android.database.ContentObserver
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.provider.Settings
@@ -23,6 +24,7 @@ import android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
 import android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
 import android.view.Menu
 import android.view.MenuItem
+import android.view.ViewGroup
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResult
@@ -39,6 +41,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -56,6 +59,7 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.OfflineFileInfoActivity
+import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.dragger.DragToExitSupport
 import mega.privacy.android.app.databinding.ActivityVideoPlayerBinding
@@ -110,6 +114,7 @@ import mega.privacy.android.app.utils.Constants.OUTGOING_SHARES_ADAPTER
 import mega.privacy.android.app.utils.Constants.RECENTS_ADAPTER
 import mega.privacy.android.app.utils.Constants.RUBBISH_BIN_ADAPTER
 import mega.privacy.android.app.utils.Constants.SEARCH_ADAPTER
+import mega.privacy.android.app.utils.Constants.SNACKBAR_TYPE
 import mega.privacy.android.app.utils.Constants.URL_FILE_LINK
 import mega.privacy.android.app.utils.Constants.VERSIONS_ADAPTER
 import mega.privacy.android.app.utils.Constants.ZIP_ADAPTER
@@ -130,6 +135,7 @@ import mega.privacy.android.domain.exception.BlockedMegaException
 import mega.privacy.android.domain.exception.QuotaExceededMegaException
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.mobile.analytics.event.VideoPlayerGetLinkMenuToolbarEvent
+import mega.privacy.mobile.analytics.event.VideoPlayerHideNodeMenuItemEvent
 import mega.privacy.mobile.analytics.event.VideoPlayerInfoMenuItemEvent
 import mega.privacy.mobile.analytics.event.VideoPlayerIsActivatedEvent
 import mega.privacy.mobile.analytics.event.VideoPlayerRemoveLinkMenuToolbarEvent
@@ -141,7 +147,6 @@ import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import nz.mega.sdk.MegaError
 import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaShare
-import org.jetbrains.anko.configuration
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -180,6 +185,17 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
     private var playbackPositionDialog: Dialog? = null
 
     private var tempNodeId: NodeId? = null
+
+    @ColorInt
+    private var statusBarColor: Int = Color.TRANSPARENT
+
+    private val nameCollisionActivityContract = registerForActivityResult(
+        NameCollisionActivityContract()
+    ) { result ->
+        result?.let {
+            showSnackbar(SNACKBAR_TYPE, it, INVALID_HANDLE)
+        }
+    }
 
     private val headsetPlugReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -257,7 +273,7 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
             nodeAttacher.restoreState(savedInstanceState)
         }
 
-        currentOrientation = configuration.orientation
+        currentOrientation = resources.configuration.orientation
         observeRotationSettingsChange()
 
         binding = ActivityVideoPlayerBinding.inflate(layoutInflater)
@@ -283,6 +299,7 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
 
         createPlayer()
         setupToolbar()
+        setupToolbarColors()
         setupNavDestListener()
         setupObserver()
         initMediaData()
@@ -440,7 +457,7 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
     private fun setupObserver() {
         with(viewModel) {
             getCollision().observe(this@LegacyVideoPlayerActivity) { collision ->
-                nameCollisionActivityContract?.launch(arrayListOf(collision))
+                nameCollisionActivityContract.launch(arrayListOf(collision))
             }
 
             onSnackbarMessage().observe(this@LegacyVideoPlayerActivity) { message ->
@@ -663,6 +680,7 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
                 }
 
                 R.id.hide -> {
+                    Analytics.tracker.trackEvent(VideoPlayerHideNodeMenuItemEvent)
                     handleHideNodeClick(playingHandle = playingHandle)
                 }
 
@@ -951,9 +969,7 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
                     }
                 }
 
-                R.id.video_playlist,
-                R.id.video_queue,
-                -> {
+                R.id.video_queue -> {
                     // Pause the video when the playlist page is opened, and allow the video to
                     // revert to playing after back to the video player page.
                     mediaPlayerGateway.setPlayWhenReady(false)
@@ -1080,13 +1096,6 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
                 LINKS_ADAPTER
             )
             when (currentFragmentId) {
-                R.id.video_playlist -> {
-                    menu.toggleAllMenuItemsVisibility(false)
-                    searchMenuItem?.isVisible = true
-                    // Display the select option
-                    menu.findItem(R.id.select).isVisible = true
-                }
-
                 R.id.video_main_player -> {
                     when {
                         adapterType == OFFLINE_ADAPTER -> {
@@ -1345,7 +1354,7 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
      */
     internal fun updateToolbarTitleBasedOnOrientation(metadata: Metadata) {
         setToolbarTitle(
-            if (configuration.orientation == ORIENTATION_LANDSCAPE) {
+            if (resources.configuration.orientation == ORIENTATION_LANDSCAPE) {
                 metadata.title ?: metadata.nodeName
             } else {
                 ""
@@ -1389,10 +1398,15 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
     }
 
     override fun showSystemUI() {
-        WindowInsetsControllerCompat(
-            window,
-            binding.root
-        ).show(WindowInsetsCompat.Type.systemBars())
+        with(WindowInsetsControllerCompat(window, window.decorView)) {
+            isAppearanceLightNavigationBars = false
+            isAppearanceLightStatusBars = false
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                window.statusBarColor = statusBarColor
+                window.navigationBarColor = getColor(android.R.color.transparent)
+            }
+            show(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     /**
@@ -1415,10 +1429,8 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
     override fun setupToolbarColors(showElevation: Boolean) {
         val isDarkMode = isDarkMode(this)
         val isMainPlayer = navController.currentDestination?.id == R.id.video_main_player
-        val isPlaylist = navController.currentDestination?.id == R.id.video_playlist ||
-                navController.currentDestination?.id == R.id.video_queue
+        val isPlaylist = navController.currentDestination?.id == R.id.video_queue
         @ColorRes val toolbarBackgroundColor: Int
-        @ColorInt val statusBarColor: Int
         val toolbarElevation: Float
 
         val elevationStatusBarColor =
@@ -1478,7 +1490,9 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
             }
         }
 
-        window.statusBarColor = statusBarColor
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            window.statusBarColor = statusBarColor
+        }
         binding.toolbar.setBackgroundColor(ContextCompat.getColor(this, toolbarBackgroundColor))
         binding.toolbar.elevation = toolbarElevation
     }
@@ -1493,16 +1507,17 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
             isAppearanceLightNavigationBars = false
             isAppearanceLightStatusBars = false
         }
-        window.navigationBarColor = getColor(android.R.color.transparent)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            window.navigationBarColor = getColor(android.R.color.transparent)
+        }
     }
 
     private fun updatePaddingForSystemUI() {
         binding.rootLayout.post {
-            ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { _, windowInsets ->
+            ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { v, windowInsets ->
                 val isVideoPlayerMainView =
                     navController.currentDestination?.id == R.id.video_main_player
-                val isVideoPlaylist = navController.currentDestination?.id == R.id.video_playlist ||
-                        navController.currentDestination?.id == R.id.video_queue
+                val isVideoPlaylist = navController.currentDestination?.id == R.id.video_queue
                 if (isVideoPlayerMainView || isVideoPlaylist) {
                     windowInsets.getInsets(WindowInsetsCompat.Type.systemBars()).let { insets ->
                         val horizontalInsets: Pair<Int, Int> =
@@ -1535,12 +1550,12 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
                             }
                         }
 
-                        binding.rootLayout.updatePadding(
-                            left = if (isVideoPlaylist) horizontalInsets.first else 0,
-                            top = 0,
-                            right = if (isVideoPlaylist) horizontalInsets.second else 0,
-                            bottom = if (isVideoPlaylist) insets.bottom else 0
-                        )
+                        v.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                            leftMargin = if (isVideoPlaylist) horizontalInsets.first else 0
+                            topMargin = if (isVideoPlaylist) insets.top else 0
+                            rightMargin = if (isVideoPlaylist) horizontalInsets.second else 0
+                            bottomMargin = if (isVideoPlaylist) insets.bottom else 0
+                        }
                     }
                 }
                 WindowInsetsCompat.CONSUMED

@@ -73,11 +73,14 @@ internal class VideoSectionRepositoryImpl @Inject constructor(
                 sortOrderIntMapper(order),
                 megaCancelToken,
             ).map { megaNode ->
+                val isOutShared =
+                    megaApiGateway.getMegaNodeByHandle(megaNode.parentHandle)?.isOutShare == true
                 typedVideoNodeMapper(
                     fileNode = megaNode.convertToFileNode(
                         offlineItems?.get(megaNode.handle.toString())
                     ),
                     duration = megaNode.duration,
+                    isOutShared = isOutShared
                 )
             }
         }
@@ -178,7 +181,6 @@ internal class VideoSectionRepositoryImpl @Inject constructor(
                     type = MegaSet.SET_TYPE_PLAYLIST,
                     listener = listener
                 )
-                continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
             }
         }
 
@@ -197,7 +199,6 @@ internal class VideoSectionRepositoryImpl @Inject constructor(
                         listener = listener,
                     )
                 }
-                continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
             }
         }
 
@@ -221,11 +222,6 @@ internal class VideoSectionRepositoryImpl @Inject constructor(
                             listener = listener,
                         )
                     }
-                    continuation.invokeOnCancellation {
-                        megaApiGateway.removeRequestListener(
-                            listener
-                        )
-                    }
                 }
             }
         }
@@ -246,7 +242,6 @@ internal class VideoSectionRepositoryImpl @Inject constructor(
                         listener = listener
                     )
                 }
-                continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
             }
         }
 
@@ -266,7 +261,6 @@ internal class VideoSectionRepositoryImpl @Inject constructor(
                         listener = listener
                     )
                 }
-                continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
             }
         }
 
@@ -284,7 +278,6 @@ internal class VideoSectionRepositoryImpl @Inject constructor(
                     name = newTitle,
                     listener = listener
                 )
-                continuation.invokeOnCancellation { megaApiGateway.removeRequestListener(listener) }
             }
         }
 

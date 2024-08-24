@@ -5,13 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -31,7 +27,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
@@ -41,25 +36,18 @@ import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import dagger.hilt.android.AndroidEntryPoint
 import de.palm.composestateevents.EventEffect
 import kotlinx.coroutines.launch
-import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.WebViewActivity
 import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.session.SessionContainer
-import mega.privacy.android.app.components.transferWidget.TransfersWidgetView
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.globalmanagement.TransfersManagement
 import mega.privacy.android.app.main.ManagerActivity
-import mega.privacy.android.app.mediaplayer.AudioPlayerActivity
-import mega.privacy.android.app.mediaplayer.LegacyVideoPlayerActivity
 import mega.privacy.android.app.modalbottomsheet.SortByBottomSheetDialogFragment
-import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.presentation.clouddrive.FileBrowserViewModel
 import mega.privacy.android.app.presentation.extensions.isDarkMode
-import mega.privacy.android.app.presentation.filelink.view.animationScale
-import mega.privacy.android.app.presentation.filelink.view.animationSpecs
 import mega.privacy.android.app.presentation.imagepreview.ImagePreviewActivity
 import mega.privacy.android.app.presentation.imagepreview.fetcher.BackupsImageNodeFetcher
 import mega.privacy.android.app.presentation.imagepreview.fetcher.CloudDriveImageNodeFetcher
@@ -76,7 +64,6 @@ import mega.privacy.android.app.presentation.node.NodeActionsViewModel
 import mega.privacy.android.app.presentation.pdfviewer.PdfViewerActivity
 import mega.privacy.android.app.presentation.qrcode.findActivity
 import mega.privacy.android.app.presentation.search.mapper.NodeSourceTypeToViewTypeMapper
-import mega.privacy.android.app.presentation.search.model.SearchFilter
 import mega.privacy.android.app.presentation.search.navigation.contactArraySeparator
 import mega.privacy.android.app.presentation.search.navigation.searchForeignNodeDialog
 import mega.privacy.android.app.presentation.search.navigation.searchOverQuotaDialog
@@ -90,30 +77,25 @@ import mega.privacy.android.app.presentation.transfers.view.IN_PROGRESS_TAB_INDE
 import mega.privacy.android.app.textEditor.TextEditorActivity
 import mega.privacy.android.app.textEditor.TextEditorViewModel
 import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.app.utils.Constants.INVALID_VALUE
 import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
-import mega.privacy.android.domain.entity.AudioFileTypeInfo
 import mega.privacy.android.domain.entity.ThemeMode
-import mega.privacy.android.domain.entity.VideoFileTypeInfo
 import mega.privacy.android.domain.entity.ZipFileTypeInfo
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.NodeContentUri
-import mega.privacy.android.domain.entity.node.NodeNameCollisionResult
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
+import mega.privacy.android.domain.entity.node.NodeNameCollisionsResult
 import mega.privacy.android.domain.entity.node.NodeSourceType
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedFolderNode
-import mega.privacy.android.domain.entity.search.SearchCategory
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.feature.sync.data.mapper.ListToStringWithDelimitersMapper
 import mega.privacy.android.navigation.MegaNavigator
 import mega.privacy.android.shared.original.core.ui.controls.layouts.MegaScaffold
+import mega.privacy.android.shared.original.core.ui.controls.widgets.TransfersWidgetViewAnimated
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
-import mega.privacy.mobile.analytics.event.SearchAudioFilterPressedEvent
-import mega.privacy.mobile.analytics.event.SearchDocsFilterPressedEvent
-import mega.privacy.mobile.analytics.event.SearchImageFilterPressedEvent
-import mega.privacy.mobile.analytics.event.SearchResetFilterPressedEvent
-import mega.privacy.mobile.analytics.event.SearchVideosFilterPressedEvent
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -165,14 +147,15 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
     @Inject
     lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
 
-    private val nameCollisionActivityContract =
-        registerForActivityResult(NameCollisionActivityContract()) { result: String? ->
-            if (result != null) {
-                lifecycleScope.launch {
-                    snackbarHostState.showSnackbar(result)
-                }
+    private val nameCollisionActivityLauncher = registerForActivityResult(
+        NameCollisionActivityContract()
+    ) { result ->
+        if (result != null) {
+            lifecycleScope.launch {
+                snackbarHostState.showAutoDurationSnackbar(result)
             }
         }
+    }
 
     /**
      * Move request message mapper
@@ -229,8 +212,8 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
      */
     @OptIn(ExperimentalMaterialNavigationApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
         //Should be done in onCreate to avoid the issue that the activity is attempting to register while current state is RESUMED. LifecycleOwners must call register before they are STARTED.
         val bottomSheetActionHandler =
             NodeActionHandler(this, nodeActionsViewModel)
@@ -263,20 +246,13 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
                             .semantics { testTagsAsResourceId = true },
                         scaffoldState = scaffoldState,
                         floatingActionButton = {
-                            AnimatedVisibility(
-                                visible = transferState.widgetVisible,
-                                enter = scaleIn(animationSpecs, initialScale = animationScale) +
-                                        fadeIn(animationSpecs),
-                                exit = scaleOut(animationSpecs, targetScale = animationScale) +
-                                        fadeOut(animationSpecs),
-                                modifier = Modifier.navigationBarsPadding(),
-                            ) {
-                                TransfersWidgetView(
-                                    transfersData = transferState.transfersInfo,
+                            if (!transferState.hideTransfersWidget) {
+                                TransfersWidgetViewAnimated(
+                                    transfersInfo = transferState.transfersInfo,
                                     onClick = ::transfersWidgetClicked,
-                                    modifier = Modifier.testTag(
-                                        SEARCH_SCREEN_TRANSFERS_WIDGET_TEST_TAG
-                                    )
+                                    modifier = Modifier
+                                        .navigationBarsPadding()
+                                        .testTag(SEARCH_SCREEN_TRANSFERS_WIDGET_TEST_TAG)
                                 )
                             }
                         },
@@ -309,7 +285,6 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
                                 nodeActionsViewModel = nodeActionsViewModel,
                                 navigateToLink = ::navigateToLink,
                                 showSortOrderBottomSheet = ::showSortOrderBottomSheet,
-                                trackAnalytics = ::trackAnalytics,
                                 nodeActionHandler = bottomSheetActionHandler,
                                 navHostController = navHostController,
                                 bottomSheetNavigator = bottomSheetNavigator,
@@ -349,7 +324,7 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
                 }
 
                 EventEffect(
-                    event = nodeActionState.nodeNameCollisionResult,
+                    event = nodeActionState.nodeNameCollisionsResult,
                     onConsumed = nodeActionsViewModel::markHandleNodeNameCollisionResult,
                     action = {
                         handleNodesNameCollisionResult(it)
@@ -396,7 +371,7 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
                 ) { info ->
                     info?.let {
                         info.getInfo(this@SearchActivity).let { text ->
-                            scaffoldState.snackbarHostState.showSnackbar(text)
+                            scaffoldState.snackbarHostState.showAutoDurationSnackbar(text)
                         }
                     } ?: findActivity()?.finish()
                 }
@@ -512,7 +487,7 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
             startActivity(this)
         }.onFailure { error ->
             Timber.e(error)
-            snackbarHostState.showSnackbar(getString(R.string.intent_not_available))
+            snackbarHostState.showAutoDurationSnackbar(getString(R.string.intent_not_available))
         }
     }
 
@@ -527,7 +502,7 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
             nodeHandle = fileNode.id.longValue
         ) {
             lifecycleScope.launch {
-                snackbarHostState.showSnackbar(getString(R.string.message_zip_format_error))
+                snackbarHostState.showAutoDurationSnackbar(getString(R.string.message_zip_format_error))
             }
         }
     }
@@ -625,42 +600,19 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
         content: NodeContentUri,
         viewType: Int?,
     ) {
-        val intent = when {
-            fileNode.type.isSupported && fileNode.type is VideoFileTypeInfo ->
-                Intent(this, LegacyVideoPlayerActivity::class.java).apply {
-                    putExtra(
-                        Constants.INTENT_EXTRA_KEY_ORDER_GET_CHILDREN,
-                        viewModel.state.value.sortOrder
-                    )
-                }
-
-            fileNode.type.isSupported && fileNode.type is AudioFileTypeInfo -> Intent(
-                this,
-                AudioPlayerActivity::class.java
-            ).apply {
-                putExtra(
-                    Constants.INTENT_EXTRA_KEY_ORDER_GET_CHILDREN,
-                    viewModel.state.value.sortOrder
+        lifecycleScope.launch {
+            runCatching {
+                megaNavigator.openMediaPlayerActivityByFileNode(
+                    context = this@SearchActivity,
+                    fileNode = fileNode,
+                    contentUri = content,
+                    viewType = viewType ?: INVALID_VALUE,
+                    sortOrder = viewModel.state.value.sortOrder
                 )
+            }.onFailure {
+                Timber.e(it)
             }
-
-            else -> Intent(Intent.ACTION_VIEW)
-        }.apply {
-            putExtra(Constants.INTENT_EXTRA_KEY_PLACEHOLDER, 0)
-            putExtra(Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE, viewType)
-            putExtra(Constants.INTENT_EXTRA_KEY_FILE_NAME, fileNode.name)
-            putExtra(Constants.INTENT_EXTRA_KEY_HANDLE, fileNode.id.longValue)
-            putExtra(Constants.INTENT_EXTRA_KEY_PARENT_NODE_HANDLE, fileNode.parentId.longValue)
-            putExtra(Constants.INTENT_EXTRA_KEY_IS_FOLDER_LINK, false)
-            val mimeType =
-                if (fileNode.type.extension == "opus") "audio/*" else fileNode.type.mimeType
-            nodeActionsViewModel.applyNodeContentUri(
-                intent = this,
-                content = content,
-                mimeType = mimeType,
-            )
         }
-        safeLaunchActivity(intent)
     }
 
     private fun openUrlFile(
@@ -702,37 +654,10 @@ class SearchActivity : AppCompatActivity(), MegaSnackbarShower {
         )
     }
 
-    private fun trackAnalytics(selectedFilter: SearchFilter?) {
-        val event = if (viewModel.state.value.selectedFilter?.filter == selectedFilter?.filter) {
-            SearchResetFilterPressedEvent
-        } else {
-            when (selectedFilter?.filter) {
-                SearchCategory.IMAGES -> SearchImageFilterPressedEvent
-                SearchCategory.ALL_DOCUMENTS -> SearchDocsFilterPressedEvent
-                SearchCategory.AUDIO -> SearchAudioFilterPressedEvent
-                SearchCategory.VIDEO -> SearchVideosFilterPressedEvent
-                else -> SearchResetFilterPressedEvent
-            }
-        }
-        Analytics.tracker.trackEvent(event)
-    }
-
-    private fun handleNodesNameCollisionResult(result: NodeNameCollisionResult) {
+    private fun handleNodesNameCollisionResult(result: NodeNameCollisionsResult) {
         if (result.conflictNodes.isNotEmpty()) {
-            nameCollisionActivityContract
-                .launch(
-                    ArrayList(
-                        result.conflictNodes.values.map {
-                            when (result.type) {
-                                NodeNameCollisionType.RESTORE,
-                                NodeNameCollisionType.MOVE,
-                                -> NameCollision.Movement.getMovementCollision(it)
-
-                                NodeNameCollisionType.COPY -> NameCollision.Copy.getCopyCollision(it)
-                            }
-                        },
-                    )
-                )
+            nameCollisionActivityLauncher
+                .launch(result.conflictNodes.values.toCollection(ArrayList()))
         }
         if (result.noConflictNodes.isNotEmpty()) {
             when (result.type) {

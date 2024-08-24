@@ -6,35 +6,38 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.viewModels
 import androidx.compose.material.SnackbarHostState
+import androidx.compose.material.SnackbarResult
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import de.palm.composestateevents.EventEffect
+import kotlinx.coroutines.launch
 import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.BaseActivity
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.WebViewActivity
 import mega.privacy.android.app.activities.contract.DeleteVersionsHistoryActivityContract
+import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.activities.contract.SelectFolderToCopyActivityContract
 import mega.privacy.android.app.activities.contract.SelectFolderToMoveActivityContract
 import mega.privacy.android.app.activities.contract.SelectUsersToShareActivityContract
-import mega.privacy.android.app.components.attacher.MegaAttacher
 import mega.privacy.android.app.interfaces.ActionBackupListener
 import mega.privacy.android.app.main.FileContactListActivity
+import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.main.controllers.NodeController
 import mega.privacy.android.app.modalbottomsheet.FileContactsListBottomSheetDialogFragment
 import mega.privacy.android.app.modalbottomsheet.FileContactsListBottomSheetDialogListener
 import mega.privacy.android.app.modalbottomsheet.ModalBottomSheetUtil.isBottomSheetDialogShown
-import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.presentation.contact.authenticitycredendials.AuthenticityCredentialsActivity
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.fileinfo.model.FileInfoMenuAction
@@ -45,11 +48,14 @@ import mega.privacy.android.app.presentation.fileinfo.view.FileInfoScreen
 import mega.privacy.android.app.presentation.security.PasscodeCheck
 import mega.privacy.android.app.presentation.tags.TagsActivity
 import mega.privacy.android.app.presentation.tags.TagsActivity.Companion.NODE_ID
+import mega.privacy.android.app.presentation.transfers.attach.NodeAttachmentView
+import mega.privacy.android.app.presentation.transfers.attach.NodeAttachmentViewModel
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.StartTransferComponent
 import mega.privacy.android.app.sync.fileBackups.FileBackupManager
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.utils.AlertsAndWarnings
 import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.app.utils.Constants.SNACKBAR_TYPE
 import mega.privacy.android.app.utils.ContactUtil
 import mega.privacy.android.app.utils.LinksUtil
 import mega.privacy.android.app.utils.LocationInfo
@@ -67,9 +73,11 @@ import mega.privacy.android.domain.entity.node.MoveRequestResult
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import mega.privacy.mobile.analytics.event.NodeInfoDescriptionAddedMessageDisplayedEvent
 import mega.privacy.mobile.analytics.event.NodeInfoDescriptionUpdatedMessageDisplayedEvent
 import mega.privacy.mobile.analytics.event.NodeInfoScreenEvent
+import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import nz.mega.sdk.MegaShare
 import timber.log.Timber
 import javax.inject.Inject
@@ -94,10 +102,10 @@ class FileInfoActivity : BaseActivity() {
     private lateinit var moveLauncher: ActivityResultLauncher<LongArray>
 
     private val viewModel: FileInfoViewModel by viewModels()
+    private val nodeAttachmentViewModel: NodeAttachmentViewModel by viewModels()
     private var adapterType = 0
     private var fileBackupManager: FileBackupManager? = null
     private val nodeController: NodeController by lazy { NodeController(this) }
-    private val nodeAttacher by lazy { MegaAttacher(this) }
 
     private var bottomSheetDialogFragment: FileContactsListBottomSheetDialogFragment? = null
 
@@ -113,20 +121,25 @@ class FileInfoActivity : BaseActivity() {
         }
     }
 
+    private val nameCollisionActivityLauncher = registerForActivityResult(
+        NameCollisionActivityContract()
+    ) { result ->
+        result?.let {
+            showSnackbar(SNACKBAR_TYPE, it, INVALID_HANDLE)
+        }
+    }
+
     /**
      * on create the activity
      */
     @OptIn(ExperimentalComposeUiApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
         viewModel.setNode(readExtrasAndGetHandle() ?: run {
             finish()
             return
         })
-        savedInstanceState?.apply {
-            nodeAttacher.restoreState(this)
-        }
         configureActivityResultLaunchers()
         initFileBackupManager()
         onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
@@ -136,6 +149,7 @@ class FileInfoActivity : BaseActivity() {
                 .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val snackBarHostState = remember { SnackbarHostState() }
+            val coroutineScope = rememberCoroutineScope()
             OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                 EventEffect(
                     event = uiState.oneOffViewEvent,
@@ -168,7 +182,8 @@ class FileInfoActivity : BaseActivity() {
                     onUpgradeAccountClick = this::navigateToUpgradeAccountScreen,
                     modifier = Modifier.semantics {
                         testTagsAsResourceId = true
-                    }
+                    },
+                    getAddress = viewModel::getAddress,
                 )
                 uiState.requiredExtraAction?.let { action ->
                     ExtraActionDialog(
@@ -183,6 +198,27 @@ class FileInfoActivity : BaseActivity() {
                     { viewModel.consumeDownloadEvent() },
                     snackBarHostState = snackBarHostState,
                 )
+                NodeAttachmentView(
+                    nodeAttachmentViewModel
+                ) { message, chatId ->
+                    coroutineScope.launch {
+                        val result = snackBarHostState.showAutoDurationSnackbar(
+                            message = message.ifBlank { getString(R.string.sent_as_message) },
+                            actionLabel = getString(R.string.action_see)
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            startActivity(
+                                Intent(this@FileInfoActivity, ManagerActivity::class.java).apply {
+                                    action = Constants.ACTION_CHAT_NOTIFICATION_MESSAGE
+                                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                    putExtra(Constants.CHAT_ID, chatId)
+                                    putExtra(Constants.EXTRA_MOVE_TO_CHAT_SECTION, true)
+                                },
+                            )
+                            finish()
+                        }
+                    }
+                }
                 updateContactShareBottomSheet(uiState)
             }
         }
@@ -215,26 +251,6 @@ class FileInfoActivity : BaseActivity() {
         val intent = Intent(this, AuthenticityCredentialsActivity::class.java)
         intent.putExtra(Constants.EMAIL, email)
         startActivity(intent)
-    }
-
-    /**
-     * Listen an propagate results to node saver.
-     */
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (nodeAttacher.handleActivityResult(requestCode, resultCode, data, this)) {
-            return
-        }
-    }
-
-
-    /**
-     * Called to retrieve per-instance state from an activity before being killed so that the state can be restored
-     */
-    public override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        nodeAttacher.saveState(outState)
     }
 
     private fun readExtrasAndGetHandle() = intent.extras?.let { extras ->
@@ -344,7 +360,10 @@ class FileInfoActivity : BaseActivity() {
             FileInfoMenuAction.RemoveLink -> viewModel.initiateRemoveLink()
             FileInfoMenuAction.ShareFolder -> showShareFolderDialog()
             FileInfoMenuAction.Leave -> showConfirmLeaveDialog()
-            FileInfoMenuAction.SendToChat -> navigateToSendToChat()
+            FileInfoMenuAction.SendToChat -> nodeAttachmentViewModel.startAttachNodes(
+                listOf(NodeId(viewModel.node.handle))
+            )
+
             FileInfoMenuAction.DisputeTakedown -> navigateToDisputeTakeDown()
             FileInfoMenuAction.SelectionModeAction.ChangePermission -> {
                 viewModel.initiateChangePermission(null)
@@ -395,11 +414,6 @@ class FileInfoActivity : BaseActivity() {
 
     private fun navigateToCopy() = copyLauncher.launch(longArrayOf(viewModel.nodeId.longValue))
     private fun navigateToMove() = moveLauncher.launch(longArrayOf(viewModel.nodeId.longValue))
-
-    private fun navigateToSendToChat() {
-        Timber.d("Send chat option")
-        nodeAttacher.attachNode(viewModel.node)
-    }
 
     private fun navigateToDisputeTakeDown() =
         startActivity(
@@ -469,24 +483,22 @@ class FileInfoActivity : BaseActivity() {
             FileInfoOneOffViewEvent.PublicLinkCopiedToClipboard -> {
                 if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
                     //Android 13 and up shows a system notification, so no need to show the toast
-                    snackBarHostState.showSnackbar(getString(R.string.file_properties_get_link))
+                    snackBarHostState.showAutoDurationSnackbar(getString(R.string.file_properties_get_link))
                 }
             }
 
             is FileInfoOneOffViewEvent.GeneralError -> {
-                snackBarHostState.showSnackbar(getString(R.string.general_error))
+                snackBarHostState.showAutoDurationSnackbar(getString(R.string.general_error))
             }
 
             is FileInfoOneOffViewEvent.CollisionDetected -> {
-                val list = ArrayList<NameCollision>()
-                list.add(event.collision)
-                nameCollisionActivityContract?.launch(list)
+                nameCollisionActivityLauncher.launch(arrayListOf(event.collision))
             }
 
             is FileInfoOneOffViewEvent.Finished -> {
                 if (event.exception == null) {
                     event.successMessage(this)?.let {
-                        snackBarHostState.showSnackbar(it)
+                        snackBarHostState.showAutoDurationSnackbar(it)
                     }
                     sendBroadcast(
                         Intent(Constants.BROADCAST_ACTION_INTENT_FILTER_UPDATE_FULL_SCREEN).setPackage(
@@ -497,14 +509,14 @@ class FileInfoActivity : BaseActivity() {
                     Timber.e(event.exception)
                     if (!manageCopyMoveException(event.exception)) {
                         event.failMessage(this)?.let {
-                            snackBarHostState.showSnackbar(it)
+                            snackBarHostState.showAutoDurationSnackbar(it)
                         }
                     }
                 }
             }
 
             is FileInfoOneOffViewEvent.Message -> {
-                snackBarHostState.showSnackbar(getString(event.message))
+                snackBarHostState.showAutoDurationSnackbar(getString(event.message))
                 if (event is FileInfoOneOffViewEvent.Message.NodeDescriptionAdded) {
                     Analytics.tracker.trackEvent(NodeInfoDescriptionAddedMessageDisplayedEvent)
                 }

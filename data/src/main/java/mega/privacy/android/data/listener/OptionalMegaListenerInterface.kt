@@ -110,6 +110,19 @@ class OptionalMegaListenerInterface(
         return false
     }
 
+    override fun onFolderTransferUpdate(
+        api: MegaApiJava,
+        transfer: MegaTransfer,
+        stage: Int,
+        folderCount: Long,
+        createdFolderCount: Long,
+        fileCount: Long,
+        currentFolder: String?,
+        currentFileLeafName: String?,
+    ) {
+
+    }
+
     override fun onSyncDeleted(api: MegaApiJava, sync: MegaSync) {
         onSyncDeleted?.invoke(sync)
     }

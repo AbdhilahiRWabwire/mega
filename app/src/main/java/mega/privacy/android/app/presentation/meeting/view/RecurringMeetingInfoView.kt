@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -75,6 +76,7 @@ import mega.privacy.android.shared.original.core.ui.theme.white
 import mega.privacy.android.shared.original.core.ui.theme.white_alpha_012
 import mega.privacy.android.shared.original.core.ui.theme.white_alpha_054
 import mega.privacy.android.shared.original.core.ui.theme.white_alpha_087
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 
 /**
  * Recurring meeting info View
@@ -108,11 +110,7 @@ fun RecurringMeetingInfoView(
     val scaffoldState = rememberScaffoldState()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    val modalSheetState = rememberModalBottomSheetState(
-        initialValue = ModalBottomSheetValue.Hidden,
-        confirmValueChange = { it != ModalBottomSheetValue.HalfExpanded },
-        skipHalfExpanded = true,
-    )
+    val modalSheetState = rememberModalBottomSheetState(ModalBottomSheetValue.Hidden)
 
     BackHandler(enabled = modalSheetState.isVisible) {
         coroutineScope.launch { modalSheetState.hide() }
@@ -125,6 +123,7 @@ fun RecurringMeetingInfoView(
     )
 
     Scaffold(
+        modifier = modifier.systemBarsPadding(),
         scaffoldState = scaffoldState,
         snackbarHost = {
             SnackbarHost(hostState = it) { data ->
@@ -142,7 +141,7 @@ fun RecurringMeetingInfoView(
     ) { paddingValues ->
         LazyColumn(
             state = listState,
-            modifier = modifier
+            modifier = Modifier
                 .padding(paddingValues)
                 .testTag("Occurrence_list_view")
         ) {
@@ -167,7 +166,7 @@ fun RecurringMeetingInfoView(
             event = managementState.snackbarMessageContent,
             onConsumed = onResetSnackbarMessage
         ) {
-            scaffoldState.snackbarHostState.showSnackbar(it)
+            scaffoldState.snackbarHostState.showAutoDurationSnackbar(it)
         }
     }
 

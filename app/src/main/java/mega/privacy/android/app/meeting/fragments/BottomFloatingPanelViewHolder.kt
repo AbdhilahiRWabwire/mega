@@ -82,7 +82,6 @@ class BottomFloatingPanelViewHolder(
 
     init {
         initButtonsState()
-        setupBottomSheet()
         listenButtons()
         setupRecyclerView()
         updatePanel()
@@ -192,6 +191,7 @@ class BottomFloatingPanelViewHolder(
      * @param shouldExpand determine if should expand panel when update
      */
     fun updatePanel(shouldExpand: Boolean = true) {
+        setupBottomSheet()
         if (shouldExpand) {
             collapse()
         }
@@ -228,15 +228,18 @@ class BottomFloatingPanelViewHolder(
      * Init the state for the Mic, Cam and End button on button bar
      */
     private fun initButtonsState() {
+        Timber.d("button state init")
         disableEnableButtons(
             inMeetingViewModel.isCallEstablished()
         )
+        savedMicState = meetingViewModel.micLiveData.value ?: false
+        savedCamState = meetingViewModel.cameraLiveData.value ?: false
         // compose implementation
         meetingActionButtons.apply {
             isMicOn = savedMicState
             Timber.d("Mic Enabled $isMicOn")
-            isCameraOn = savedCamState
-            Timber.d("Camera Enabled $isMicOn")
+            isCameraOn = true
+            Timber.d("Camera Enabled $isCameraOn")
         }
         updateSpeakerIcon(savedSpeakerState)
     }
@@ -489,6 +492,7 @@ class BottomFloatingPanelViewHolder(
      * @param micOn True, if the audio is on. False, if the audio is off
      */
     fun updateMicIcon(micOn: Boolean) {
+        Timber.d("Update mic icon. Cam is $micOn")
         savedMicState = micOn
         meetingActionButtons.isMicOn = micOn
     }
@@ -499,6 +503,7 @@ class BottomFloatingPanelViewHolder(
      * @param camOn True, if the video is on. False, if the video is off
      */
     fun updateCamIcon(camOn: Boolean) {
+        Timber.d("Update cam icon. Cam is $camOn")
         savedCamState = camOn
         meetingActionButtons.isCameraOn = camOn
     }
@@ -607,11 +612,5 @@ class BottomFloatingPanelViewHolder(
 
         private const val INDICATOR_COLOR_START = 0x4F
         private const val INDICATOR_COLOR_END = 0xBD
-
-        private const val FAB_LABEL_COLOR_DARK_MODE = 0xE2
-        private const val FAB_LABEL_COLOR_START_LIGHT_MODE = 0xFF
-        private const val FAB_LABEL_COLOR_END_LIGHT_MODE = 0x21
-        private const val FAB_TINT_COLOR_START = 0.0F
-        private const val FAB_TINT_COLOR_END = 1.0F
     }
 }

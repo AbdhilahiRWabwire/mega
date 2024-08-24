@@ -2,17 +2,17 @@
 accompanist = "0.32.0"
 accompanist-pager = "0.30.1"
 accompanist-systemui = "0.23.1"
-app-update = "2.1.0"
 autovalue = "1.10.4"
 firebase = "33.1.1"
 firebase-app-distribution = "16.0.0-beta13"
-flexbox = "2.0.1"
+flexbox = "3.0.0"
 gson = "2.10.1"
 hilt = "2.51"
 material = "1.12.0"
 maps-utils = "0.5"
-play-core = "1.10.3"
-play-core-ktx = "1.8.1"
+maps-compose = "6.1.0"
+play-review = "2.0.1"
+play-update = "2.1.0"
 protobuff = "3.22.3"
 services-location = "21.3.0"
 services-maps = "18.2.0"
@@ -30,8 +30,6 @@ accompanist-permissions = { module = "com.google.accompanist:accompanist-permiss
 accompanist-navigationmaterial = { module = "com.google.accompanist:accompanist-navigation-material", version.ref = "accompanist" }
 accompanist-navigationanimation = { module = "com.google.accompanist:accompanist-navigation-animation", version.ref = "accompanist" }
 accompanist-systemui = { module = "com.google.accompanist:accompanist-systemuicontroller", version.ref = "accompanist-systemui" }
-app-update = { module = "com.google.android.play:app-update", version.ref = "app-update" }
-app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "app-update" }
 autovalue = { module = "com.google.auto.value:auto-value", version.ref = "autovalue" }
 autovalue-annotations = { module = "com.google.auto.value:auto-value-annotations", version.ref = "autovalue" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase" }
@@ -41,16 +39,19 @@ firebase-crashlytics-ndk = { group = "com.google.firebase", name = "firebase-cra
 firebase-crashlytics-ktx = { group = "com.google.firebase", name = "firebase-crashlytics-ktx" }
 firebase-messaging-ktx = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
 firebase-perf-ktx = { group = "com.google.firebase", name = "firebase-perf-ktx" }
-flexbox = { module = "com.google.android:flexbox", version.ref = "flexbox" }
+flexbox = { module = "com.google.android.flexbox:flexbox", version.ref = "flexbox" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 hilt-core = { module = "com.google.dagger:hilt-core", version.ref = "hilt" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-android-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }
 hilt-android-test = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
 maps-utils = { module = "com.google.maps.android:android-maps-utils", version.ref = "maps-utils" }
+maps-compose = { module = "com.google.maps.android:maps-compose", version.ref = "maps-compose" }
 material = { module = "com.google.android.material:material", version.ref = "material" }
-play-core = { module = "com.google.android.play:core", version.ref = "play-core" }
-play-core-ktx = { module = "com.google.android.play:core-ktx", version.ref = "play-core-ktx" }
+play-review = { module = "com.google.android.play:review", version.ref = "play-review" }
+play-review-ktx = { module = "com.google.android.play:review-ktx", version.ref = "play-review" }
+play-update = { module = "com.google.android.play:app-update", version.ref = "play-update" }
+play-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "play-update" }
 protobuff = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuff" }
 services-location = { module = "com.google.android.gms:play-services-location", version.ref = "services-location" }
 services-maps = { module = "com.google.android.gms:play-services-maps", version.ref = "services-maps" }

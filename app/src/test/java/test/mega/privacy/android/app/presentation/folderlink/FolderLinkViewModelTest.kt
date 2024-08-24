@@ -20,9 +20,10 @@ import mega.privacy.android.domain.entity.folderlink.FetchFolderNodesResult
 import mega.privacy.android.domain.entity.folderlink.FolderLoginStatus
 import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.MoveRequestResult
+import mega.privacy.android.domain.entity.node.NodeContentUri
 import mega.privacy.android.domain.entity.node.NodeId
-import mega.privacy.android.domain.entity.node.NodeNameCollisionResult
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
+import mega.privacy.android.domain.entity.node.NodeNameCollisionsResult
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
@@ -52,6 +53,7 @@ import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUse
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodesUseCase
+import mega.privacy.android.domain.usecase.node.GetFolderLinkNodeContentUriUseCase
 import mega.privacy.android.domain.usecase.node.publiclink.MapNodeToPublicLinkUseCase
 import mega.privacy.android.domain.usecase.viewtype.MonitorViewType
 import mega.privacy.android.domain.usecase.viewtype.SetViewType
@@ -61,6 +63,7 @@ import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mockito
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
 import org.mockito.kotlin.verify
@@ -100,8 +103,10 @@ class FolderLinkViewModelTest {
     private val httpServerIsRunning: MegaApiHttpServerIsRunningUseCase = mock()
     private val getLocalFolderLinkFromMegaApiUseCase: GetLocalFolderLinkFromMegaApiUseCase = mock()
     private val getFileUriUseCase: GetFileUriUseCase = mock()
-    private val mapNodeToPublicLinkUseCase = mock<MapNodeToPublicLinkUseCase>()
-    private val checkNodesNameCollisionUseCase = mock<CheckNodesNameCollisionUseCase>()
+    private val mapNodeToPublicLinkUseCase: MapNodeToPublicLinkUseCase = mock()
+    private val checkNodesNameCollisionUseCase: CheckNodesNameCollisionUseCase = mock()
+    private val getFolderLinkNodeContentUriUseCase: GetFolderLinkNodeContentUriUseCase = mock()
+
 
     @BeforeEach
     fun setup() {
@@ -139,7 +144,8 @@ class FolderLinkViewModelTest {
             getLocalFolderLinkFromMegaApiUseCase,
             getFileUriUseCase,
             mapNodeToPublicLinkUseCase,
-            checkNodesNameCollisionUseCase
+            checkNodesNameCollisionUseCase,
+            getFolderLinkNodeContentUriUseCase
         )
     }
 
@@ -172,7 +178,8 @@ class FolderLinkViewModelTest {
             getLocalFolderLinkFromMegaApiUseCase,
             getFileUriUseCase,
             mapNodeToPublicLinkUseCase,
-            checkNodesNameCollisionUseCase
+            checkNodesNameCollisionUseCase,
+            getFolderLinkNodeContentUriUseCase
         )
     }
 
@@ -669,7 +676,7 @@ class FolderLinkViewModelTest {
     fun `test that non-conflict nodes are copied when checkNameCollision is invoked`() = runTest {
         val nodeMap = mapOf(Pair(1234L, 2345L), Pair(234L, 2345L))
         whenever(checkNodesNameCollisionUseCase(nodeMap, NodeNameCollisionType.COPY)).thenReturn(
-            NodeNameCollisionResult(
+            NodeNameCollisionsResult(
                 noConflictNodes = nodeMap,
                 conflictNodes = emptyMap(),
                 type = NodeNameCollisionType.COPY
@@ -700,4 +707,12 @@ class FolderLinkViewModelTest {
                     .containsExactly(link1, link2)
             }
         }
+
+    @Test
+    fun `test that getNodeContentUri returns as expected`() = runTest {
+        val expectedNodeContentUri = mock<NodeContentUri.RemoteContentUri>()
+
+        whenever(getFolderLinkNodeContentUriUseCase(anyOrNull())).thenReturn(expectedNodeContentUri)
+        assertThat(underTest.getNodeContentUri(mock())).isEqualTo(expectedNodeContentUri)
+    }
 }

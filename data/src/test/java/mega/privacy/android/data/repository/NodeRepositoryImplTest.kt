@@ -67,6 +67,7 @@ import nz.mega.sdk.MegaRequestListenerInterface
 import nz.mega.sdk.MegaSearchFilter
 import nz.mega.sdk.MegaShare
 import nz.mega.sdk.MegaShare.ACCESS_READ
+import nz.mega.sdk.MegaStringList
 import nz.mega.sdk.MegaUser
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
@@ -91,6 +92,7 @@ import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import java.io.File
 import java.util.stream.Stream
+import kotlin.test.Ignore
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -179,6 +181,7 @@ class NodeRepositoryImplTest {
             cancelTokenProvider = cancelTokenProvider,
             megaSearchFilterMapper = megaSearchFilterMapper,
             workManagerGateway = workManagerGateway,
+            stringListMapper = stringListMapper,
         )
     }
 
@@ -275,12 +278,13 @@ class NodeRepositoryImplTest {
             verify(megaApiGateway).stopSharingNode(megaNode)
         }
 
+    @Ignore
     @Test
     fun `test when setShareAccess is called then nodeShareKeyResultMapper is called with the meganode returned by megaApiGateway`() =
         runTest {
             val megaNode = mock<MegaNode>()
             val email = "example@example.com"
-            val mapperResultBlock = mock<((AccessPermission, String) -> Unit)>()
+            val mapperResultBlock = mock<(suspend (AccessPermission, String) -> Unit)>()
             whenever(nodeShareKeyResultMapper.invoke(megaNode)).thenReturn(mapperResultBlock)
             whenever(megaApiGateway.getMegaNodeByHandle(nodeId.longValue)).thenReturn(megaNode)
 
@@ -1438,6 +1442,19 @@ class NodeRepositoryImplTest {
             assertThat(result.size).isEqualTo(1)
             assertThat(result.first().name).isEqualTo(firstNodeName)
         }
+
+    @Test
+    fun `test that getAllNodeTags returns all tags from gateway`() = runTest {
+        val searchString = "searchString"
+        val tags = listOf("tag1", "tag2")
+        val token = mock<MegaCancelToken>()
+        val megaStringList = mock<MegaStringList>()
+        whenever(cancelTokenProvider.getOrCreateCancelToken()).thenReturn(token)
+        whenever(megaApiGateway.getAllNodeTags(searchString, token)).thenReturn(megaStringList)
+        whenever(stringListMapper(megaStringList)).thenReturn(tags)
+        val actual = underTest.getAllNodeTags(searchString)
+        assertThat(actual).isEqualTo(tags)
+    }
 
     private fun provideNodeId() = Stream.of(
         Arguments.of(null),

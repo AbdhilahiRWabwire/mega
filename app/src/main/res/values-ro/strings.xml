@@ -129,7 +129,7 @@
     <!-- Login button -->
     <string name="login_text">Conectați-vă</string>
     <!-- email label -->
-    <string name="email_text">E-mail</string>
+    <string name="email_text">Adresa de e-mail</string>
     <!-- password label -->
     <string name="password_text">Parolă</string>
     <!-- Hint of the confirmation dialog to get link with password -->
@@ -147,7 +147,7 @@
     <!-- when the user tries to log in to MEGA without a network connection -->
     <string name="error_server_connection_problem">Nicio conexiune la rețea</string>
     <!-- when the user tries to log in to MEGA without a valid session -->
-    <string name="error_server_expired_session">Ai fost deconectat de pe acest dispozitiv dintr-o altă locație</string>
+    <string name="error_server_expired_session">Ați fost deconectat de pe acest dispozitiv dintr-o altă locație</string>
     <!-- the first step when logging in is calculate the private and public encryption keys -->
     <string name="login_generating_key">Se generează cheile de criptare</string>
     <!-- Message displayed while the app is connecting to a MEGA server -->
@@ -167,7 +167,7 @@
     <!-- First Name of the user -->
     <string name="first_name_text">Prenume</string>
     <!-- Last name of the user -->
-    <string name="lastname_text">Nume</string>
+    <string name="lastname_text">Nume de familie</string>
     <!-- text placed on the checkbox of acceptation of the Terms of Service -->
     <string name="tos">Sunt de acord cu [A]Termenii de utilizare a serviciului[/A] MEGA</string>
     <!-- Text placed on the checkbox to make sure user agree that understand the danger of losing password -->
@@ -301,7 +301,7 @@
     <!-- create a link of a file and send it using an app from the device -->
     <string name="context_get_link">Partajează linkul</string>
     <!-- Delete a link label -->
-    <string name="context_delete_link">Șterge linkul</string>
+    <string name="context_delete_link">Ștergeți linkul</string>
     <!-- Title alert before leaving a share. -->
     <string name="alert_leave_share">Părăsește partajarea</string>
     <!-- Item menu option upon right click on one or multiple files. -->
@@ -335,7 +335,7 @@
     <!-- while copying a file or folder -->
     <string name="context_copying">Se copiază</string>
     <!-- menu item -->
-    <string name="context_move_to_trash">Mută în Coșul de gunoi</string>
+    <string name="context_move_to_trash">Mutați în Coșul de gunoi</string>
     <!-- menu item -->
     <string name="context_delete_from_mega">Elimină de pe MEGA</string>
     <!-- Input field description in the create folder dialog. -->
@@ -363,9 +363,9 @@
     <!-- Menu option to manage a shared folder. -->
     <string name="manage_share">Gestionează partajarea</string>
     <!-- menu item -->
-    <string name="context_delete">Șterge</string>
+    <string name="context_delete">Ștergeți</string>
     <!-- success message when removing a contact request -->
-    <string name="context_contact_invitation_deleted">Cerere ștearsă</string>
+    <string name="context_contact_invitation_deleted">Cerere a fost ștearsă</string>
     <!-- success message when reinvite a contact -->
     <string name="context_contact_invitation_resent">Cerere retrimisă</string>
     <!-- success message when sending a contact request -->
@@ -473,7 +473,7 @@
     <!-- when did the last session happen -->
     <string name="my_account_last_session">Ultima sesiune</string>
     <!-- message displayed while the app is changing the password -->
-    <string name="my_account_changing_password">Se modifică parola</string>
+    <string name="my_account_changing_password">Se schimbă parola</string>
     <!-- when changing the password -->
     <string name="my_account_change_password_newPassword1">Parolă nouă</string>
     <!-- when changing the password -->
@@ -525,7 +525,7 @@
     <!-- Settings preference title for offline files -->
     <string name="settings_advanced_features_offline">Șterge fișierele offline</string>
     <!-- Settings preference title for delete account -->
-    <string name="settings_delete_account">Șterge contul</string>
+    <string name="settings_delete_account">Ștergeți contul</string>
     <!-- Size of files in offline or cache folders -->
     <string name="settings_advanced_features_size">În prezent folosind %s</string>
     <!-- Calculating Size of files in offline or cache folders -->
@@ -627,7 +627,7 @@
         <item quantity="other">%1$d de încercări eșuate pentru codul de acces</item>
     </plurals>
     <!-- Error message when not typing the Passcode code correctly -->
-    <string name="pin_lock_alert">Vei fi deconectat(ă) și fișierele tale offline vor fi șterse după 10 încercări eșuate.</string>
+    <string name="pin_lock_alert">Veți fi deconectat și fișierele dvs. offline vor fi șterse după 10 încercări eșuate</string>
     <!-- Error message when not typing the Passcode correctly (two times) -->
     <string name="pin_lock_not_match">Codurile de acces nu coincid. Încearcă din nou.</string>
     <!-- Title of the screen to unlock screen with Passcode -->
@@ -641,7 +641,7 @@
     <!-- Caption of a title, in the context of “About MEGA” or “About us” -->
     <string name="settings_about">Despre</string>
     <!-- Preference screen item action button -->
-    <string name="settings_about_privacy_policy">Politica de confidențialitate</string>
+    <string name="settings_about_privacy_policy">Politica privind confidențialitatea și datele</string>
     <!--  -->
     <string name="settings_about_terms_of_service">Termenii de utilizare a serviciului</string>
     <!-- App means “Application” -->
@@ -731,7 +731,7 @@
     <!-- Hint of the text where the user can write his password -->
     <string name="edit_text_insert_pass">parola se introduce aici</string>
     <!-- Text shown in the last alert dialog to confirm delete user account -->
-    <string name="delete_account_text_last_step">Acesta este ultimul pas pentru a vă șterge contul. Veți pierde definitiv toate datele stocate în cloud. Vă rugăm să introduceți parola mai jos.</string>
+    <string name="delete_account_text_last_step">Acesta este ultimul pas pentru a vă șterge contul. Veți pierde definitiv toate datele stocate în cloud. Introduceți parola mai jos.</string>
     <!-- Title of the alert dialog to inform the user that have to check the email -->
     <string name="email_verification_title">Verificarea adresei de e-mail</string>
     <!-- Text of the alert dialog to inform the user that have to check the email -->
@@ -781,13 +781,13 @@
     <!-- Text shown in the last alert dialog to change the email associated to an account -->
     <string name="change_mail_text_last_step">Acesta este ultimul pas pentru a vă schimba adresa dvs. de e-mail. Introduceți parola mai jos.</string>
     <!-- Title of the alert dialog to change the email associated to an account -->
-    <string name="change_mail_title_last_step">Modifică e-mailul</string>
+    <string name="change_mail_title_last_step">Schimbați adresa de e-mail</string>
     <!-- Option of the sliding panel to capture a new picture to upload to Cloud Drive or to set as user avatar -->
-    <string name="take_photo_avatar_panel">Capturează</string>
+    <string name="take_photo_avatar_panel">Capturați</string>
     <!-- Option of the sliding panel to change the avatar by choosing an existing picture -->
-    <string name="choose_photo_avatar_panel">Alege poza</string>
+    <string name="choose_photo_avatar_panel">Alegeți poza</string>
     <!-- Option of the sliding panel to delete the existing avatar -->
-    <string name="delete_avatar_panel">Șterge poza</string>
+    <string name="delete_avatar_panel">Ștergeți poza</string>
     <!-- Alert when the user introduces his MK to reset pass incorrectly -->
     <string name="incorrect_MK">Cheia pe care ați furnizat-o nu se potrivește cu acest cont. Asigurați-vă că folosiți cheia de recuperare corectă și încercați din nou.</string>
     <!-- Title of the alert when the user introduces his MK to reset pass incorrectly -->
@@ -797,7 +797,7 @@
     <!-- Text of the alert dialog to inform the user that have to check the email to validate his new email -->
     <string name="email_verification_text_change_mail">Noua dvs. adresă de e-mail trebuie validată. Verificați căsuța de e-mail a noii adrese de e-mail pentru a continua.</string>
     <!-- Confirmation before deleting the avatar of the user’s profile -->
-    <string name="confirmation_delete_avatar">Îți ștergi poza de profil?</string>
+    <string name="confirmation_delete_avatar">Ștergeți fotografia de profil?</string>
     <!-- Title of the Dialog to edit the profile attributes of the user’s account -->
     <string name="title_edit_profile_info">Editează</string>
     <!-- Alert Dialog to get link with password -->
@@ -1001,7 +1001,7 @@
     <!-- Text appended to a edited message. -->
     <string name="edited_message_text">(editat)</string>
     <!-- Option in menu to change title of a chat group. -->
-    <string name="change_title_option">Schimbă titlul</string>
+    <string name="change_title_option">Schimbați titlul</string>
     <!-- confirmation message before leaving a group chat -->
     <string name="confirmation_leave_group_chat">Dacă părăsești chatul de grup, nu vei mai avea acces să citești sau să scrii mesaje.</string>
     <!-- title confirmation message before leaving a group chat -->
@@ -1095,7 +1095,7 @@
     <!-- Label for the option of setting to change the colour theme -->
     <string name="set_color_theme_label">Temă cromatică</string>
     <!-- Answer for confirmation dialog. -->
-    <string name="general_dismiss">Înlătură</string>
+    <string name="general_dismiss">Închideți</string>
     <!-- Content of a normal message that cannot be recognized -->
     <string name="error_message_unrecognizable">Mesaj nerecunoscut</string>
     <!-- Title of the settings section to configure the autoaway of chat presence -->
@@ -1288,7 +1288,7 @@
     <!-- Message when an error ocurred when changing an user avatar -->
     <string name="error_changing_user_avatar">Eroare la schimbarea pozei de profil</string>
     <!-- Message when an user avatar has been deleted successfully -->
-    <string name="success_deleting_user_avatar">Poza de profil ștearsă</string>
+    <string name="success_deleting_user_avatar">Poza de profil a fost ștearsă</string>
     <!-- Message when an error ocurred when deleting an user avatar -->
     <string name="error_deleting_user_avatar">Eroare la ștergerea pozei de profil</string>
     <!-- Message when an error ocurred when changing an user attribute -->
@@ -1310,11 +1310,11 @@
     <!--  -->
     <string name="attachment_upload_panel_contact">Contact</string>
     <!-- Button and title of dialog shown when the user wants to delete permanently their account. -->
-    <string name="delete_account">Anulează contul</string>
+    <string name="delete_account">Ștergeți contul</string>
     <!-- Text shown in the alert dialog to confirm the deletion of an account -->
-    <string name="delete_account_text">Dacă ștergi contul, nu vei putea accesa datele contului, contactele sau conversațiile MEGA.\nNu vei putea anula această acțiune.</string>
+    <string name="delete_account_text">Dacă ștergeți contul, nu veți putea accesa datele contului, contactele MEGA sau conversațiile.\nNu veți putea anula această acțiune.</string>
     <!-- menu item -->
-    <string name="delete_button">Șterge</string>
+    <string name="delete_button">Ștergeți</string>
     <!--  -->
     <string name="file_properties_info_info_file">Informații</string>
     <!-- Refers to the size of a file. -->
@@ -1336,7 +1336,7 @@
     <!-- Confirmation before deleting one attachment -->
     <string name="confirmation_delete_one_attachment">Elimini atașamentul?</string>
     <!-- Menu option -->
-    <string name="general_view_with_revoke">Vezi fișierele (%1$d șterse)</string>
+    <string name="general_view_with_revoke">Afișați fișierele (%1$d șters)</string>
     <!-- Message sound option when no sound has been selected for chat notifications -->
     <string name="settings_chat_silent_sound_not">Silențios</string>
     <!-- part of the string in incoming shared folder notification -->
@@ -1358,15 +1358,15 @@
     <!-- Item menu option upon clicking on one or multiple files. -->
     <string name="context_removing_contact_folder">Eliminarea contactului de la folderul partajat</string>
     <!-- confirmation message before removing a file -->
-    <string name="confirmation_move_to_rubbish">Muți în Coșul de gunoi?</string>
+    <string name="confirmation_move_to_rubbish">Mutați în Coșul de gunoi?</string>
     <!-- confirmation message before removing CU folder -->
     <string name="confirmation_move_cu_folder_to_rubbish">Doriți să mutați acest folder în Coșul de gunoi? Un nou folder va fi creat automat pentru încărcările camere.</string>
     <!-- Confirmation message before removing MU folder -->
     <string name="confirmation_move_mu_folder_to_rubbish">Doriți să mutați acest folder în Coșul de gunoi? Un nou folder va fi creat automat pentru încărcările media.</string>
     <!-- confirmation message before removing a file -->
-    <string name="confirmation_move_to_rubbish_plural">Muți în Coșul de gunoi?</string>
+    <string name="confirmation_move_to_rubbish_plural">Mutați în Coșul de gunoi?</string>
     <!-- confirmation message before removing a file -->
-    <string name="confirmation_delete_from_mega">Ștergi de pe MEGA?</string>
+    <string name="confirmation_delete_from_mega">Ștergeți de pe MEGA?</string>
     <!-- Title of the section to enable notifications in the Contact Properties screen -->
     <string name="title_properties_contact_notifications_for_chat">Notificări de chat</string>
     <!-- title of the section for achievements -->
@@ -1502,7 +1502,7 @@
     <!-- Option in menu of section  My QR code to reset the QR code -->
     <string name="action_reset_qr">Resetează codul QR</string>
     <!-- Option in menu of section  My QR code to delete the QR code -->
-    <string name="action_delete_qr">Șterge codul QR</string>
+    <string name="action_delete_qr">Ștergeți codul QR</string>
     <!-- Option shown in QR code bottom sheet dialog to save QR code in Cloud Drive -->
     <string name="save_cloud_drive">În Unitatea cloud</string>
     <!-- Option shown in QR code bottom sheet dialog to save QR code in File System -->
@@ -1518,7 +1518,7 @@
     <!-- Text shown when it has not been reseted the QR code successfully -->
     <string name="qrcode_reset_not_successfully">Codul QR nu este resetat din cauza unei erori. Vă rugăm să încercați din nou.</string>
     <!-- Text shown when it has not been delete the QR code successfully -->
-    <string name="qrcode_delete_not_successfully">Codul QR nu a fost șters din cauza unei erori. Vă rugăm să încercați din nou.</string>
+    <string name="qrcode_delete_not_successfully">Codul QR nu a fost șters din cauza unei erori. Încercați din nou.</string>
     <!-- Title of dialog shown when a contact request has been sent with QR code -->
     <string name="invite_sent">Invitația a fost trimisă</string>
     <!-- Text of dialog shown when a contact request has been sent. -->
@@ -1655,9 +1655,9 @@
     <string name="general_revert">Restabilește</string>
     <!-- Title of the dialog to confirm that a version os going to be deleted, version items -->
     <plurals name="title_dialog_delete_version">
-        <item quantity="one">Ștergi versiunea?</item>
-        <item quantity="few">Ștergi versiunile?</item>
-        <item quantity="other">Ștergi versiunile?</item>
+        <item quantity="one">Ștergeți versiunea?</item>
+        <item quantity="few">Ștergeți versiunile?</item>
+        <item quantity="other">Ștergeți versiunile?</item>
     </plurals>
     <!-- Content of the dialog to confirm that a version is going to be deleted -->
     <string name="content_dialog_delete_version">Această versiune va fi eliminată definitiv.</string>
@@ -1735,15 +1735,15 @@
     <!-- Dialog option that permits user do not show it again -->
     <string name="general_do_not_show">Nu afișa din nou</string>
     <!-- Button of the dialog ‘Do you remember your password?’ that permits user test his password -->
-    <string name="remember_pwd_dialog_button_test">Testează parola</string>
+    <string name="remember_pwd_dialog_button_test">Testați parola</string>
     <!-- Message shown to the user when is testing her password and it is correct -->
     <string name="test_pwd_accepted">Parolă acceptată</string>
     <!-- Message shown to the user when is testing her password and it is wrong -->
-    <string name="test_pwd_wrong">Parolă greșită.\nFă backup cheii de recuperare cât mai curând posibil.</string>
+    <string name="test_pwd_wrong">Parola este greșită.\nFaceți un backup al cheii de recuperare cât mai curând posibil.</string>
     <!-- Option that permits user copy to clipboard -->
-    <string name="option_copy_to_clipboard">Copiază în clipboard</string>
+    <string name="option_copy_to_clipboard">Copiați în clipboard</string>
     <!-- Option that permits user logout -->
-    <string name="proceed_to_logout">Continuă pentru a te deconecta</string>
+    <string name="proceed_to_logout">Continuați să vă deconectați</string>
     <!-- Title of the preference Recovery key on Settings section -->
     <string name="recovery_key_bottom_sheet">Cheie de recuperare</string>
     <!-- Option that permits user save on File System -->
@@ -1825,7 +1825,7 @@
     <!-- Text that explain how to do with Two-Factor Authentication QR -->
     <string name="explain_qr_seed_2fa_1">Scanează sau copiază sămânța în aplicația de autentificare.</string>
     <!-- Text that explain how to do with Two-Factor Authentication seed -->
-    <string name="explain_qr_seed_2fa_2">Asigură-te că faci backupul acestei sămânțe într-un loc sigur în cazul în care îți pierzi aparatul.</string>
+    <string name="explain_qr_seed_2fa_2">Asigurați-vă că faceți backupul acestei semințe într-un loc sigur în cazul în care vă pierdeți dispozitivul.</string>
     <!-- Text that explain how to confirm Two-Factor Authentication -->
     <string name="explain_confirm_2fa">Vă rugăm să introduceți codul din 6 cifre generat de aplicația dvs. de autentificare.</string>
     <!-- Text button -->
@@ -1841,17 +1841,17 @@
     <!-- Error shown when a user tries to enable Two-Factor Authentication and introduce an invalid code -->
     <string name="pin_error_2fa">Cod nevalid</string>
     <!-- Title of screen Lost authenticator decive -->
-    <string name="lost_your_authenticator_device">Ți-ai pierdut dispozitivul pentru autentificare?</string>
+    <string name="lost_your_authenticator_device">Ați pierdut dispozitivul de autentificare?</string>
     <!-- Title of screen Login verification with Two-Factor Authentication -->
     <string name="login_verification">Verificarea autentificării</string>
     <!-- Subtitle of screen verify Two-Factor Authentication for changing password -->
-    <string name="verify_2fa_subtitle_change_password">Modifică parola</string>
+    <string name="verify_2fa_subtitle_change_password">Schimbați parola</string>
     <!-- Subtitle of screen verify Two-Factor Authentication for changing email -->
-    <string name="verify_2fa_subtitle_change_email">Modifică e-mailul</string>
+    <string name="verify_2fa_subtitle_change_email">Schimbați adresa de e-mail</string>
     <!-- Subtitle of screen verify Two-Factor Authentication for cancelling account -->
-    <string name="verify_2fa_subtitle_delete_account">Șterge contul</string>
+    <string name="verify_2fa_subtitle_delete_account">Ștergeți contul</string>
     <!-- Subtitle of screen verify Two-Factor Authentication for disabling Two-Factor Authentication -->
-    <string name="verify_2fa_subtitle_diable_2fa">Dezactivează</string>
+    <string name="verify_2fa_subtitle_diable_2fa">Dezactivați</string>
     <!-- When the user tries to disable Two-Factor Authentication and some error ocurr in the process -->
     <string name="error_disable_2fa">A apărut o eroare la încercarea de a dezactiva autentificarea cu doi factori. Vă rugăm să încercați din nou.</string>
     <!-- When the user tries to enable Two-Factor Authentication and some error ocurr in the process -->
@@ -1969,7 +1969,7 @@
     <!-- Title of the section File management on Settings section -->
     <string name="settings_file_management_category">Managementul fișierelor</string>
     <!-- Option in Settings to delete all the versions of the account -->
-    <string name="settings_file_management_delete_versions">Șterge toate versiunile mai vechi ale fișierelor mele</string>
+    <string name="settings_file_management_delete_versions">Ștergeți toate versiunile mai vechi ale fișierelor mele</string>
     <!-- subtitle of the option in Settings to delete all the versions of the account -->
     <string name="settings_file_management_subtitle_delete_versions">Toate fișierele actuale vor rămâne. Doar versiunile istorice ale fișierelor vor fi șterse.</string>
     <!-- Text of the dialog to delete all the file versions of the account -->
@@ -2099,7 +2099,7 @@
     <!-- Text shown when a moderator of a chat delete a chat link. Please keep the placeholder because is to show the moderator’s name in runtime. -->
     <string name="message_deleted_chat_link">[A]%1$s[/A][B] a eliminat linkul chatului.[/B]</string>
     <!-- Title of the option to delete a chat link -->
-    <string name="action_delete_link">Șterge linkul chatului</string>
+    <string name="action_delete_link">Ștergeți linkul chatului</string>
     <!-- Title of the alert when a chat link is invalid -->
     <string name="title_alert_chat_link_error">Link al chatului</string>
     <!-- Text of the dialog to confirm after closing all other sessions -->
@@ -2131,7 +2131,7 @@
     <!-- General label for files -->
     <string name="general_files">Fișiere</string>
     <!-- Item menu option upon right click on one or multiple files -->
-    <string name="general_save_to_device">Salvează pe dispozitiv</string>
+    <string name="general_save_to_device">Salvați pe dispozitiv</string>
     <!-- Title of cloud explorer to upload a file -->
     <string name="title_upload_explorer">Încarcă pe MEGA</string>
     <!-- Label choose destination -->
@@ -2155,7 +2155,7 @@
     <!-- Title of the historic notification when an user deletes you as contact -->
     <string name="title_contact_notification_deleted">Contact șters</string>
     <!-- Subtitle of the historic notification when an user deletes you as contact -->
-    <string name="subtitle_contact_notification_deleted">[A]%s [/A][B]te-a șters ca contact.[/B]</string>
+    <string name="subtitle_contact_notification_deleted">[A]%s [/A][B]v-a șters ca contact.[/B]</string>
     <!-- Title of the historic notification when an user blocks you as contact -->
     <string name="title_contact_notification_blocked">Contact blocat</string>
     <!-- Subtitle of the historic notification when an user blocks you as contact -->
@@ -2425,7 +2425,7 @@
     <!-- Label indicating some content has been sent as message -->
     <string name="sent_as_message">Trimite ca mesaj.</string>
     <!-- Action delete all file versions -->
-    <string name="delete_versions">Șterge versiunile anterioare</string>
+    <string name="delete_versions">Ștergeți versiunile anterioare</string>
     <!-- Title of the dialog shown when it wants to delete the version history of a file -->
     <string name="title_delete_version_history">Ștergi versiunile anterioare?</string>
     <!-- Text of the dialog shown when it wants to delete the version history of a file -->
@@ -2529,7 +2529,7 @@
     <!-- In some cases, a user may try to get the link for a chat room, but if such is not set by an operator - it would say ‘not link available’ and not auto create it. -->
     <string name="no_chat_link_available">Niciun link de chat disponibil.</string>
     <!-- Alert shown when it has been deleted successfully a chat link -->
-    <string name="chat_link_deleted">Link-ul de chat șters</string>
+    <string name="chat_link_deleted">Link-ul de chat a fost șters</string>
     <!-- Message shown when it restored successfully a file version -->
     <string name="version_restored">Versiunea a fost restaurată</string>
     <!-- Text to inform that to make a recording you have to keep pressed the record button more than one second -->
@@ -2627,11 +2627,11 @@
     <!-- A dialog message which is shown to sub-users of expired business accounts. -->
     <string name="expired_user_business_text_2">Contactează administratorul contului business pentru a rezolva problema și a-ți activa contul.</string>
     <!-- Warning message to alert user about logout in My Account section if has offline files. -->
-    <string name="logout_warning_offline">Când te deconectezi, fișierele din secțiunea Offline vor fi șterse de pe dispozitiv.</string>
+    <string name="logout_warning_offline">Când vă deconectați, fișierele din secțiunea Offline vor fi șterse de pe dispozitiv.</string>
     <!-- Warning message to alert user about logout in My Account section if has transfers in progress. -->
     <string name="logout_warning_transfers">Când te deconectezi, transferurile în curs vor fi anulate.</string>
     <!-- Warning message to alert user about logout in My Account section if has offline files and transfers in progress. -->
-    <string name="logout_warning_offline_and_transfers">Când te deconectezi, fișierele din secțiunea Offline vor fi șterse de pe dispozitiv și transferurile în curs vor fi anulate.</string>
+    <string name="logout_warning_offline_and_transfers">Când vă deconectați, fișierele din secțiunea Offline vor fi șterse de pe dispozitiv și transferurile în curs vor fi anulate.</string>
     <!-- Label to indicate that a name has not been possible to obtain for some reason -->
     <string name="unknown_name_label">Nume necunoscut</string>
     <!-- Error when renaming a chat title and it is too long -->
@@ -2821,11 +2821,11 @@
     <!-- System message that is shown to all chat participants upon disabling the Retention history -->
     <string name="retention_history_disabled">[A]%1$s[/A][B] a dezactivat ștergerea mesajelor.[/B]</string>
     <!-- Subtitle of the section to clear the chat content in the Manage chat history screen -->
-    <string name="subtitle_properties_chat_clear">Șterge toate mesajele și fișierele partajate în această conversație. Această acțiune este ireversibilă.</string>
+    <string name="subtitle_properties_chat_clear">Ștergeți toate mesajele și fișierele partajate în această conversație. Această acțiune este ireversibilă.</string>
     <!-- Title of the history retention option -->
     <string name="title_properties_history_retention">Ștergerea istoricului</string>
     <!-- Subtitle of the history retention option when history retention is disabled -->
-    <string name="subtitle_properties_history_retention">Șterge automat mesajele mai vechi de o anumită perioadă de timp.</string>
+    <string name="subtitle_properties_history_retention">Ștergeți automat mesajele mai vechi de o anumită perioadă de timp.</string>
     <!-- Label for the dialog box option to configure history retention. This option will indicate that history retention option is disabled -->
     <string name="history_retention_option_disabled">Dezactivat</string>
     <!-- Label for the dialog box option to configure history retention. This option will indicate that automatically deleted messages older than one day -->
@@ -2839,7 +2839,7 @@
     <!-- Title of the Manage chat history screen -->
     <string name="title_properties_manage_chat">Gestionează istoricul chatului</string>
     <!-- Subtitle of the dialogue to select a retention time -->
-    <string name="subtitle_properties_manage_chat">Șterge automat mesajele mai vechi de:</string>
+    <string name="subtitle_properties_manage_chat">Ștergeți automat mesajele mai vechi de:</string>
     <!-- Text of the confirmation dialog to clear the chat history from Manage chat history section -->
     <string name="confirmation_clear_chat_history">Sigur vreți să ștergeți istoricul complet al mesajelor din această conversație?</string>
     <!-- Text on the label indicating that the oldest messages of a year will be automatically deleted. -->
@@ -2909,7 +2909,7 @@
     <!-- Confirmation shown informing a key link it’s copied to the clipboard -->
     <string name="key_copied_clipboard">Cheie copiată în clipboard</string>
     <!-- Confirmation shown informing a password link it’s copied to the clipboard -->
-    <string name="password_copied_clipboard">Parolă copiată în clipboard</string>
+    <string name="password_copied_clipboard">Parolă a fost copiată în clipboard</string>
     <!-- Message displayed to inform that a link and its decryption key have been sent separately to a chat -->
     <string name="link_and_key_sent">Link și cheie trimise</string>
     <!-- Message displayed to inform that a link and its password have been sent separately to a chat -->
@@ -3049,7 +3049,7 @@
     <!-- Text to show as production api server option -->
     <string name="production_api_server">Producție</string>
     <!-- Title to show in a dialog to change api server -->
-    <string name="title_change_server">Schimbă serverul</string>
+    <string name="title_change_server">Schimbați serverul</string>
     <!-- Show line numbers action -->
     <string name="action_show_line_numbers">Afișează numerele liniilor</string>
     <!-- Hide line numbers action -->
@@ -3135,7 +3135,7 @@
     <!-- Text of the option Backup Recovery Key in My account section -->
     <string name="backup_recovery_key_subtitle">Îți mai aduci aminte parola?\nMEGA nu îți poate reseta parola dacă o uiți.</string>
     <!-- Action to change name -->
-    <string name="change_name_action">Schimbați numele</string>
+    <string name="change_name_action">Schimbați nume</string>
     <!-- Action to add photo -->
     <string name="add_photo_action">Schimbați imaginea profilului</string>
     <!-- Action to add phone number -->
@@ -3277,7 +3277,7 @@
     <!-- the bonus title of join without account on left meeting page-->
     <string name="left_meeting_bonus_title">Obține 20&#160;GB gratuit</string>
     <!-- the bonus content of join without account on left meeting page-->
-    <string name="left_meeting_bonus_content">Înscrie-te acum și bucură-te gratuit de funcțiile avansate de colaborare.</string>
+    <string name="left_meeting_bonus_content">Înscrieți-vă acum și bucurați-vă gratuit de funcții avansate de colaborare.</string>
     <!-- Content of ongoing call for MaterialAlertDialog-->
     <string name="ongoing_call_content">Un alt apel în desfășurare. Vă rugăm să încheiați apelul curent înainte de a efectua altul.</string>
     <!-- The hint text when changing meeting name-->
@@ -3289,7 +3289,7 @@
     <!-- Menu item to change from thumbnail view to main view in meeting-->
     <string name="main_view">Vizualizare principală</string>
     <!-- Warning in Offline section alerting all the Offline files will be deleted after logout. -->
-    <string name="offline_warning">Deconectarea îți șterge conținutul offline.</string>
+    <string name="offline_warning">Deconectarea șterge conținutul dvs. offline.</string>
     <!-- Settings category which contains all preferences related to user interface. -->
     <string name="user_interface_setting">Interfața utilizatorului</string>
     <!-- Setting which allows to choose the start screen. -->
@@ -3407,7 +3407,7 @@
     <!-- Message for dialog that subscription is from android platform and shows before delete account -->
     <string name="message_android_platform_subscription">Aveți un abonament MEGA activ cu %1$s. Trebuie să o anulați separat prin %2$s, deoarece MEGA nu este în măsură să o anuleze pentru dvs. Vizitați Centrul nostru de ajutor pentru mai multe informații.</string>
     <!-- Message for dialog that subscription is from other platform and shows before delete account  -->
-    <string name="message_other_platform_subscription">Ai un abonament MEGA activ. Acesta va fi anulat automat după ștergerea contului. Vizitează centrul nostru de asistență pentru mai multe informații.</string>
+    <string name="message_other_platform_subscription">Aveți un abonament MEGA activ. Acesta va fi anulat automat după ștergerea contului. Pentru mai multe informații, accesați Centrul nostru de ajutor.</string>
     <!-- Message for dialog that subscription is from iTunes platform and shows before delete account  -->
     <string name="message_itunes_platform_subscription">Aveți un abonament MEGA activ cu Apple. Trebuie să îl anulați separat de contul dvs. Apple, deoarece MEGA nu îl poate anula pentru dvs. Vizitați Centrul nostru de ajutor pentru mai multe informații.</string>
     <!-- Text for button of subscription dialog that shows before delete account -->
@@ -3487,9 +3487,9 @@
         <item quantity="other">%1$s și alți %2$d au părăsit apelul</item>
     </plurals>
     <!-- Bottom menu option to delete permanently an item from Rubbish Bin -->
-    <string name="rubbish_bin_bottom_menu_option_delete">Șterge definitiv</string>
+    <string name="rubbish_bin_bottom_menu_option_delete">Ștergeți definitiv</string>
     <!-- Button in the delete confirmation dialog to delete permanently items from Rubbish Bin -->
-    <string name="rubbish_bin_delete_confirmation_dialog_button_delete">Șterge</string>
+    <string name="rubbish_bin_delete_confirmation_dialog_button_delete">Ștergeți</string>
     <!-- Label to indicate the date when the current subscription renews. The placeholder is to include the date, and the other formatting placeholders are to display the text in different colors. -->
     <string name="account_info_renews_on">[A]Se reînnoiește [/A] [B]%s[/B]</string>
     <!-- Label to indicate the date when the current Pro plan or subscription expires. The placeholder is to include the date, and the other formatting placeholders are to display the text in different colors. -->
@@ -3539,35 +3539,35 @@
     <!-- Informs about what is expected after choose the option move and replace for a name collision if file versioning is disabled. -->
     <string name="warning_move_and_replace">Înlocuiește fișierul în folderul de destinație cu fișierul pe care îl muți.</string>
     <!-- Move and replace action button for a name collision. -->
-    <string name="move_and_replace">Mută și înlocuiește</string>
+    <string name="move_and_replace">Mutați și înlocuiți</string>
     <!-- Don’t move action button for a name collision. -->
     <string name="do_not_move">Nu muta</string>
     <!-- Informs about what is expected after choose the option move and rename for a name collision. -->
     <string name="warning_move_and_rename">Fișierul pe care îl muți va fi redenumit sub numele:</string>
     <!-- Move and rename action button for a name collision. -->
-    <string name="move_and_rename">Mută și redenumește</string>
+    <string name="move_and_rename">Mutați și redenumiți</string>
     <!-- Informs about what is expected after choose the option copy and replace for a name collision if file versioning is disabled. -->
     <string name="warning_copy_and_replace">Înlocuiește fișierul în folderul de destinație cu fișierul pe care îl copiezi.</string>
     <!-- Copy and replace action button for a name collision. -->
-    <string name="copy_and_replace">Copiază și înlocuiește</string>
+    <string name="copy_and_replace">Copiați și înlocuiți</string>
     <!-- Don’t copy action button for a name collision. -->
     <string name="do_not_copy">Nu copia</string>
     <!-- Informs about what is expected after choose the option copy and rename for a name collision. -->
     <string name="warning_copy_and_rename">Fișierul pe care îl copiezi va fi redenumit sub numele:</string>
     <!-- Copy and rename action button for a name collision. -->
-    <string name="copy_and_rename">Copiază și redenumește</string>
+    <string name="copy_and_rename">Copiați și redenumiți</string>
     <!-- Informs about what is expected after choose the option copy and merge for a name collision. -->
     <string name="warning_copy_and_merge">Îmbină folderul la destinație cu folderul pe care îl copiezi.</string>
     <!-- Copy and merge action button for a name collision. -->
-    <string name="copy_and_merge">Copiază și îmbină</string>
+    <string name="copy_and_merge">Copiați și fuzionați</string>
     <!-- Informs about what is expected after choose the option move and merge for a name collision. -->
     <string name="warning_move_and_merge">Îmbină folderul la destinație cu folderul pe care îl copiezi.</string>
     <!-- Move and merge action button for a name collision. -->
-    <string name="move_and_merge">Mută și îmbină</string>
+    <string name="move_and_merge">Mutați și fuzionați</string>
     <!-- Informs about what is expected after choose the option upload and merge for a name collision. -->
     <string name="warning_upload_and_merge">Îmbină folderul la destinație cu folderul pe care îl încarci.</string>
     <!-- Upload and merge action button for a name collision. -->
-    <string name="upload_and_merge">Încarcă și îmbină</string>
+    <string name="upload_and_merge">Încărcați și fuzionați</string>
     <!-- Informs about what is expected after choose the option "Don’t copy/move/upload" for file name collisions. -->
     <string name="skip_file">Niciun fișier nu va fi modificat. Vei păstra fișierul de mai jos:</string>
     <!-- Informs about what is expected after choose the option "Don’t copy/move/upload" for folder name collisions. -->
@@ -3859,14 +3859,14 @@
     <!-- Message after selected albums are deleted. -->
     <plurals name="photos_album_deleted_message">
         <item quantity="one">„%s” a fost ștearsă</item>
-        <item quantity="few">%d albume au fost șterse</item>
-        <item quantity="other">%d albume șterse</item>
+        <item quantity="few">%d&#160;albume au fost șterse</item>
+        <item quantity="other">%d&#160;albume au fost șterse</item>
     </plurals>
     <!-- Delete albums confirmation title. -->
     <plurals name="photos_album_delete_confirmation_title">
-        <item quantity="one">Ștergi albumul?</item>
-        <item quantity="few">Ștergi albumele?</item>
-        <item quantity="other">Ștergi albumele?</item>
+        <item quantity="one">Ștergeți albumul?</item>
+        <item quantity="few">Ștergeți albumele?</item>
+        <item quantity="other">Ștergeți albumele?</item>
     </plurals>
     <!-- Delete albums confirmation description. -->
     <plurals name="photos_album_delete_confirmation_description">
@@ -4526,9 +4526,9 @@
     </plurals>
     <!-- Result message after copy action will be shown as a snackbar, this plurals template will be used when copy request failed -->
     <plurals name="general_copy_snackbar_fail">
-        <item quantity="one">Nu a putut copia %1$d element</item>
-        <item quantity="few">Nu s-a putut copia %1$d elemente</item>
-        <item quantity="other">Nu s-a putut copia %1$d de elemente</item>
+        <item quantity="one">Imposibil de copiat %1$d&#160;element</item>
+        <item quantity="few">Imposibil de copiat %1$d&#160;elemente</item>
+        <item quantity="other">Imposibil de copiat %1$d de elemente</item>
     </plurals>
     <!-- Result message after copy action will be shown as a snackbar, this plurals template will be used when some copy request are successful and some failed, this is the success part Space after "," is required because it will be concatenated with `general_copy_snackbar_concat_fail` ** eg: Copied 1 item, couldn't copy 1 item || Copied 2 items, couldn't copy 1 item || Copied 2 items, couldn't copy 3 items -->
     <plurals name="general_copy_snackbar_concat_success">
@@ -4633,7 +4633,7 @@
     <!-- Title of option to send calendar invite in Schedule meeting screen -->
     <string name="meetings_schedule_meeting_send_calendar_invite_label">Trimite invitația pentru calendar</string>
     <!-- Title of option to add description in Schedule meeting screen -->
-    <string name="meetings_schedule_meeting_add_description_label">Adaugă o descriere</string>
+    <string name="meetings_schedule_meeting_add_description_label">Adăugați o descriere</string>
     <!-- Error message shown when a meeting name is empty in Schedule meeting screen -->
     <string name="meetings_schedule_meeting_empty_meeting_name_error">Este necesar numele întâlnirii</string>
     <!-- Error message shown when a meeting name is longer than 30 characters in Schedule meeting screen -->
@@ -4759,7 +4759,7 @@
     <!-- Text prompt for a checkbox to remember the Timeline filter preferences  -->
     <string name="photos_timeline_filter_remember_preferences">Amintiți-vă preferințele</string>
     <!-- Title of the "Device center" feature in the Home Side Menu and the Device Center feature itself. -->
-    <string name="home_side_menu_device_center_title">Centrul dispozitivului</string>
+    <string name="home_side_menu_device_center_title">Centrul de dispozitive</string>
     <!-- Every day option in dialog to set a recurrence in Schedule meeting screen -->
     <string name="meetings_schedule_meeting_recurrence_dialog_every_day_option">În fiecare zi</string>
     <!-- Every week option in dialog to set a recurrence in Schedule meeting screen -->
@@ -5409,13 +5409,13 @@
     <!-- Free plan limitation text for scheduled meetings calls longer than 60 minutes in edit occurrence dialog. -->
     <string name="meetings_edit_occurrence_free_plan_60_minute_limit_warning">[A]Abonamentul dvs. gratuit are o limită de 60 de minute pentru întâlniri. Utilizatorii Pro au apeluri nelimitate și până la 1000 de participanți.[/A] [B]Upgradați acum.[/B]</string>
     <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user selects monthly subscription. The placeholders %1$s and %2$s will be replaced with localised price and currency sign (based on Google localisation), for example $4.99. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string. -->
-    <string name="account_upgrade_account_subscription_details_body_monthly_with_price">Veți fi taxat %1$s imediat și abonamentul dvs. se va reînnoi automat după 1 lună pentru %2$s pe lună. Contul dvs. Google&#160;Play va fi taxat pentru reînnoire în termen de 24 de ore de la sfârșitul fiecărei perioade de facturare. Pentru a vă anula abonamentul, trebuie să dezactivați reînnoirea automată a abonamentului MEGA&#160;Pro cu cel puțin 24 de ore înainte de sfârșitul perioadei de facturare prin Abonamente în [A]Google&#160;Play[/A].\nPrin actualizarea contului dvs., sunteți de acord cu MEGA [B]Termenii de utilizare a serviciului[/B] și [C]Politica de confidențialitate[/C].</string>
+    <string name="account_upgrade_account_subscription_details_body_monthly_with_price">Veți fi taxat %1$s imediat și abonamentul dvs. se va reînnoi automat după 1 lună pentru %2$s pe lună. Contul dvs. Google&#160;Play va fi taxat pentru reînnoire în termen de 24 de ore de la sfârșitul fiecărei perioade de facturare. Pentru a vă anula abonamentul, trebuie să dezactivați reînnoirea automată a abonamentului MEGA&#160;Pro cu cel puțin 24 de ore înainte de sfârșitul perioadei de facturare prin Abonamente în [A]Google&#160;Play[/A].\nPrin actualizarea contului dvs., sunteți de acord cu MEGA [B]Termenii de utilizare a serviciului[/B] și [C]Politica privind confidențialitatea și datele[/C].</string>
     <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user selects yearly subscription. The placeholders %1$s and %2$s will be replaced with localised price and currency sign (based on Google localisation), for example $4.99. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string. -->
-    <string name="account_upgrade_account_subscription_details_body_yearly_with_price">Veți fi taxat %1$s imediat iar abonamentul dvs. se va reînnoi automat după 12&#160;luni la %2$s pe an. Contul dvs. Google&#160;Play va fi taxat pentru reînnoire în termen de 24 de ore de la sfârșitul fiecărei perioade de facturare. Pentru a vă anula abonamentul, trebuie să dezactivați reînnoirea automată a abonamentului MEGA&#160;Pro cu cel puțin 24 de ore înainte de sfârșitul perioadei de facturare prin Abonamente în [A]Google&#160;Play[/A].\nPrin actualizarea contului dvs., sunteți de acord cu MEGA [B]Termenii de utilizare a serviciului[/B] și [C]Politica de confidențialitate[/C].</string>
+    <string name="account_upgrade_account_subscription_details_body_yearly_with_price">Veți fi taxat %1$s imediat și abonamentul dvs. se va reînnoi automat după 12&#160;luni pentru %2$s pe an. Contul dvs. Google&#160;Play va fi taxat pentru reînnoire în termen de 24 de ore de la sfârșitul fiecărei perioade de facturare. Pentru a vă anula abonamentul, trebuie să dezactivați reînnoirea automată a abonamentului MEGA&#160;Pro cu cel puțin 24 de ore înainte de sfârșitul perioadei de facturare prin Abonamente în [A]Google&#160;Play[/A].\nPrin actualizarea contului dvs., sunteți de acord cu MEGA [B]Termenii de utilizare a serviciului[/B] și [C]Politica privind confidențialitatea și datele[/C].</string>
     <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user is in monthly tab and no subscription plan was selected. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string. -->
-    <string name="account_upgrade_account_subscription_details_body_monthly_without_price">Veți fi taxat imediat, iar abonamentul dvs. se va reînnoi automat după 1&#160;lună. Contul dvs. Google&#160;Play va fi taxat pentru reînnoire în termen de 24 de ore de la sfârșitul fiecărei perioade de facturare. Pentru a vă anula abonamentul, trebuie să dezactivați reînnoirea automată a abonamentului MEGA&#160;Pro cu cel puțin 24 de ore înainte de sfârșitul perioadei de facturare prin Abonamente în [A]Google&#160;Play[/A].\nPrin actualizarea contului dvs., sunteți de acord cu MEGA [B]Termenii de utilizare a serviciului[/B] și [C]Politica de confidențialitate[/C].</string>
+    <string name="account_upgrade_account_subscription_details_body_monthly_without_price">Veți fi taxat imediat, iar abonamentul dvs. se va reînnoi automat după 1&#160;lună. Contul dvs. Google&#160;Play va fi taxat pentru reînnoire în termen de 24 de ore de la sfârșitul fiecărei perioade de facturare. Pentru a vă anula abonamentul, trebuie să dezactivați reînnoirea automată a abonamentului MEGA&#160;Pro cu cel puțin 24 de ore înainte de sfârșitul perioadei de facturare prin Abonamente în [A]Google&#160;Play[/A].\nPrin actualizarea contului dvs., sunteți de acord cu MEGA [B]Termenii de utilizare a serviciului[/B] și [C]Politica privind confidențialitatea și datele[/C].</string>
     <!-- Body for the subscription details section, which is shown to the user to provide details about subscription. This string is shown if user is in yearly tab and no subscription plan was selected. Please keep these placeholders [A], [/A], [B], [/B], [C], [/C]. They will be used to format the string -->
-    <string name="account_upgrade_account_subscription_details_body_yearly_without_price">Veți fi taxat imediat, iar abonamentul dvs. se va reînnoi automat după 12&#160;luni. Contul dvs. Google&#160;Play va fi taxat pentru reînnoire în termen de 24 de ore de la sfârșitul fiecărei perioade de facturare. Pentru a vă anula abonamentul, trebuie să dezactivați reînnoirea automată a abonamentului MEGA&#160;Pro cu cel puțin 24 de ore înainte de sfârșitul perioadei de facturare prin Abonamente în [A]Google&#160;Play[/A].\nPrin actualizarea contului dvs., sunteți de acord cu MEGA [B]Termenii de utilizare a serviciului[/B] și [C]Politica de confidențialitate[/C].</string>
+    <string name="account_upgrade_account_subscription_details_body_yearly_without_price">Veți fi taxat imediat, iar abonamentul dvs. se va reînnoi automat după 12&#160;luni. Contul dvs. Google&#160;Play va fi taxat pentru reînnoire în termen de 24 de ore de la sfârșitul fiecărei perioade de facturare. Pentru a vă anula abonamentul, trebuie să dezactivați reînnoirea automată a abonamentului MEGA&#160;Pro cu cel puțin 24 de ore înainte de sfârșitul perioadei de facturare prin Abonamente în [A]Google&#160;Play[/A].\nPrin actualizarea contului dvs., sunteți de acord cu MEGA [B]Termenii de utilizare a serviciului[/B] și [C]Politica privind confidențialitatea și datele[/C].</string>
     <!-- The title of the Dialog shown to a suspended Business Account User, regardless if the User is a Sub-User or Administrator -->
     <string name="account_business_account_deactivated_dialog_title">Contul Business a fost dezactivat</string>
     <!-- The body of the Dialog shown to a suspended Business Account Sub-User -->
@@ -5575,5 +5575,5 @@
     <!-- Image or Video map location title-->
     <string name="file_properties_info_map_location">Locație</string>
     <!-- Image or Video no map location info-->
-    <string name="file_properties_info_map_location_no_location_info">No location information</string>
+    <string name="file_properties_info_map_location_no_location_info">Nicio informație despre locație</string>
 </resources>

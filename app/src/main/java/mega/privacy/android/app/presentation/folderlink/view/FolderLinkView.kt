@@ -6,11 +6,6 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -55,18 +50,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import de.palm.composestateevents.EventEffect
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
-import mega.privacy.android.app.components.transferWidget.TransfersWidgetView
 import mega.privacy.android.app.main.dialog.storagestatus.StorageStatusDialogView
 import mega.privacy.android.app.presentation.advertisements.model.AdsUIState
 import mega.privacy.android.app.presentation.advertisements.view.AdsBannerView
 import mega.privacy.android.app.presentation.data.NodeUIItem
-import mega.privacy.android.app.presentation.filelink.view.animationScale
-import mega.privacy.android.app.presentation.filelink.view.animationSpecs
 import mega.privacy.android.app.presentation.folderlink.model.FolderLinkState
 import mega.privacy.android.app.presentation.folderlink.view.Constants.APPBAR_MORE_OPTION_TAG
 import mega.privacy.android.app.presentation.folderlink.view.Constants.IMPORT_BUTTON_TAG
@@ -78,9 +69,12 @@ import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
 import mega.privacy.android.shared.original.core.ui.controls.buttons.TextMegaButton
 import mega.privacy.android.shared.original.core.ui.controls.layouts.MegaScaffold
+import mega.privacy.android.shared.original.core.ui.controls.widgets.TransfersWidgetViewAnimated
+import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_020_grey_700
 import mega.privacy.android.shared.original.core.ui.theme.extensions.teal_300_teal_200
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 
 internal object Constants {
 
@@ -158,7 +152,6 @@ internal fun FolderLinkView(
     val coroutineScope = rememberCoroutineScope()
     val modalSheetState = rememberModalBottomSheetState(
         initialValue = ModalBottomSheetValue.Hidden,
-        confirmValueChange = { it != ModalBottomSheetValue.HalfExpanded },
         skipHalfExpanded = true,
     )
 
@@ -196,65 +189,87 @@ internal fun FolderLinkView(
     )
 
     EventEffect(event = state.snackbarMessageContent, onConsumed = onResetSnackbarMessage) {
-        scaffoldState.snackbarHostState.showSnackbar(it)
+        scaffoldState.snackbarHostState.showAutoDurationSnackbar(it)
     }
 
     LaunchedEffect(modalSheetState.isVisible) {
         if (!modalSheetState.isVisible)
             onResetMoreOptionNode()
     }
-
-    MegaScaffold(
-        scaffoldState = scaffoldState,
-        topBar = {
-            if (state.selectedNodeCount > 0) {
-                FolderLinkSelectedTopAppBar(
-                    title = state.selectedNodeCount.toString(),
-                    elevation = !firstItemVisible,
-                    onBackPressed = onBackPressed,
-                    onSelectAllClicked = onSelectAllActionClicked,
-                    onClearAllClicked = onClearAllActionClicked,
-                    onSaveToDeviceClicked = { onSaveToDeviceClicked(null) }
+    FolderLinkBottomSheetView(
+        modalSheetState = modalSheetState,
+        coroutineScope = coroutineScope,
+        nodeUIItem = state.moreOptionNode,
+        showImport = state.hasDbCredentials,
+        onImportClicked = onImportClicked,
+        onSaveToDeviceClicked = onSaveToDeviceClicked,
+    ) {
+        MegaScaffold(
+            scaffoldState = scaffoldState,
+            topBar = {
+                if (state.selectedNodeCount > 0) {
+                    FolderLinkSelectedTopAppBar(
+                        title = state.selectedNodeCount.toString(),
+                        elevation = !firstItemVisible,
+                        onBackPressed = onBackPressed,
+                        onSelectAllClicked = onSelectAllActionClicked,
+                        onClearAllClicked = onClearAllActionClicked,
+                        onSaveToDeviceClicked = { onSaveToDeviceClicked(null) }
+                    )
+                } else {
+                    FolderLinkTopAppBar(
+                        title = title,
+                        elevation = !firstItemVisible,
+                        onBackPressed = onBackPressed,
+                        onShareClicked = onShareClicked,
+                        onMoreClicked = { onMoreOptionClick(null) }
+                    )
+                }
+            },
+            floatingActionButton = {
+                if (!transferState.hideTransfersWidget) {
+                    TransfersWidgetViewAnimated(
+                        transfersInfo = transferState.transfersInfo,
+                        onClick = onTransferWidgetClick,
+                    )
+                }
+            },
+            bottomBar = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    ImportDownloadView(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .background(MaterialTheme.colors.grey_020_grey_700),
+                        hasDbCredentials = state.hasDbCredentials,
+                        onImportClicked = onImportClicked,
+                        onSaveToDeviceClicked = { onSaveToDeviceClicked(null) }
+                    )
+                    if (adsUiState.showAdsView) {
+                        AdsBannerView(
+                            uiState = adsUiState,
+                            onAdClicked = onAdClicked,
+                            onAdsWebpageLoaded = {},
+                            onAdDismissed = onAdDismissed
+                        )
+                    }
+                }
+            },
+        ) { paddingValues ->
+            if (state.nodesList.isEmpty()) {
+                EmptyFolderLinkView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(paddingValues)
+                        .padding(horizontal = 8.dp),
+                    emptyViewString = emptyViewString,
+                    state.isNodesFetched
                 )
             } else {
-                FolderLinkTopAppBar(
-                    title = title,
-                    elevation = !firstItemVisible,
-                    onBackPressed = onBackPressed,
-                    onShareClicked = onShareClicked,
-                    onMoreClicked = { onMoreOptionClick(null) }
-                )
-            }
-        },
-        floatingActionButton = {
-            AnimatedVisibility(
-                visible = transferState.widgetVisible,
-                enter = scaleIn(animationSpecs, initialScale = animationScale) +
-                        fadeIn(animationSpecs),
-                exit = scaleOut(animationSpecs, targetScale = animationScale) +
-                        fadeOut(animationSpecs),
-            ) {
-                TransfersWidgetView(
-                    transfersData = transferState.transfersInfo,
-                    onClick = onTransferWidgetClick,
-                )
-            }
-        }
-    ) {
-        if (state.nodesList.isEmpty()) {
-            EmptyFolderLinkView(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight()
-                    .padding(horizontal = 8.dp),
-                emptyViewString = emptyViewString,
-                state.isNodesFetched
-            )
-        } else {
-            Column {
                 NodesView(
                     modifier = Modifier
-                        .weight(1f)
+                        .padding(paddingValues)
                         .padding(horizontal = 2.dp),
                     nodeUIItems = state.nodesList,
                     onMenuClick = { onMoreOptionClick(it) },
@@ -275,43 +290,16 @@ internal fun FolderLinkView(
                     fileTypeIconMapper = fileTypeIconMapper,
                     inSelectionMode = state.selectedNodeCount > 0
                 )
-                ImportDownloadView(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .background(MaterialTheme.colors.grey_020_grey_700),
-                    hasDbCredentials = state.hasDbCredentials,
-                    onImportClicked = onImportClicked,
-                    onSaveToDeviceClicked = { onSaveToDeviceClicked(null) }
-                )
-
-                if (adsUiState.showAdsView) {
-                    AdsBannerView(
-                        uiState = adsUiState,
-                        onAdClicked = onAdClicked,
-                        onAdsWebpageLoaded = {},
-                        onAdDismissed = onAdDismissed
-                    )
-                }
             }
-        }
 
-        FolderLinkBottomSheetView(
-            modalSheetState = modalSheetState,
-            coroutineScope = coroutineScope,
-            nodeUIItem = state.moreOptionNode,
-            showImport = state.hasDbCredentials,
-            onImportClicked = onImportClicked,
-            onSaveToDeviceClicked = onSaveToDeviceClicked,
-        )
-
-        if (state.storageStatusDialogState != null) {
-            StorageStatusDialogView(
-                state = state.storageStatusDialogState,
-                dismissClickListener = onStorageStatusDialogDismiss,
-                actionButtonClickListener = onStorageDialogActionButtonClick,
-                achievementButtonClickListener = onStorageDialogAchievementButtonClick,
-            )
+            if (state.storageStatusDialogState != null) {
+                StorageStatusDialogView(
+                    state = state.storageStatusDialogState,
+                    dismissClickListener = onStorageStatusDialogDismiss,
+                    actionButtonClickListener = onStorageDialogActionButtonClick,
+                    achievementButtonClickListener = onStorageDialogAchievementButtonClick,
+                )
+            }
         }
     }
 }
@@ -473,10 +461,9 @@ internal fun EmptyFolderLinkView(
     }
 }
 
-@Preview
-@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, name = "DarkSimpleAppBarPreview")
+@CombinedThemePreviews
 @Composable
-private fun PreviewFolderLinkTopAppBar() {
+private fun FolderLinkTopAppBarPreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         FolderLinkTopAppBar(
             title = "Folder Name",
@@ -488,26 +475,38 @@ private fun PreviewFolderLinkTopAppBar() {
     }
 }
 
-@Preview
-@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, name = "DarkSimpleAppBarPreview")
+@CombinedThemePreviews
 @Composable
-private fun PreviewEmptyFolderLinkView() {
+private fun EmptyFolderLinkViewPreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
-        EmptyFolderLinkView(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .padding(horizontal = 8.dp),
-            emptyViewString = stringResource(id = R.string.file_browser_empty_folder),
-            isNodesFetched = true
-        )
+        MegaScaffold(
+            bottomBar = {
+                ImportDownloadView(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .background(MaterialTheme.colors.grey_020_grey_700),
+                    hasDbCredentials = true,
+                    onImportClicked = { },
+                    onSaveToDeviceClicked = { }
+                )
+            }
+        ) {
+            EmptyFolderLinkView(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .padding(horizontal = 8.dp),
+                emptyViewString = stringResource(id = R.string.file_browser_empty_folder),
+                isNodesFetched = true
+            )
+        }
     }
 }
 
-@Preview
-@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, name = "DarkSimpleAppBarPreview")
+@CombinedThemePreviews
 @Composable
-private fun PreviewFolderLinkSelectedTopAppBar() {
+private fun FolderLinkSelectedTopAppBarPreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         FolderLinkSelectedTopAppBar(
             title = "Folder Name",
@@ -520,10 +519,9 @@ private fun PreviewFolderLinkSelectedTopAppBar() {
     }
 }
 
-@Preview
-@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, name = "DarkSimpleAppBarPreview")
+@CombinedThemePreviews
 @Composable
-private fun PreviewImportDownloadView() {
+private fun ImportDownloadViewPreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         ImportDownloadView(
             modifier = Modifier

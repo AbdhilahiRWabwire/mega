@@ -3,6 +3,7 @@ package mega.privacy.android.app.presentation.videosection.model
 import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.account.AccountDetail
 import mega.privacy.android.domain.entity.node.TypedVideoNode
+import mega.privacy.android.legacy.core.ui.model.SearchWidgetState
 
 /**
  * The state is for the videos section
@@ -11,8 +12,6 @@ import mega.privacy.android.domain.entity.node.TypedVideoNode
  * @property sortOrder the sort order of video items
  * @property isPendingRefresh
  * @property progressBarShowing the progress bar showing state
- * @property searchMode the search mode state
- * @property actionMode the action mode state
  * @property scrollToTop the scroll to top state
  * @property selectedVideoHandles the selected video handles
  * @property selectedVideoPlaylistHandles the selected video playlist handles
@@ -27,12 +26,6 @@ import mega.privacy.android.domain.entity.node.TypedVideoNode
  * @property numberOfRemovedItems the number of removed items
  * @property isPlaylistProgressBarShown true if the playlist progress bar is being shown
  * @property isInputTitleValid true if the input title is valid
- * @property shouldCreateVideoPlaylist true if there is a need to create a video playlist
- * @property shouldRenameVideoPlaylist true if there is a need to rename a video playlist
- * @property shouldDeleteVideoPlaylist true if there is a need to delete video playlists
- * @property shouldDeleteSingleVideoPlaylist true if there is a need to delete a single video playlist from detail
- * @property shouldDeleteVideosFromPlaylist true if there is a need to delete videos from a playlist
- * @property shouldShowMoreVideoPlaylistOptions true if there is a need to show more options of a video playlist
  * @property createVideoPlaylistPlaceholderTitle the create video playlist placeholder title
  * @property createDialogErrorMessage the create dialog error message
  * @property deletedVideoPlaylistTitles the deleted video playlist titles
@@ -43,14 +36,17 @@ import mega.privacy.android.domain.entity.node.TypedVideoNode
  * @property isHiddenNodesOnboarded if is hidden nodes onboarded
  * @property clickedItem the clicked item
  * @property clickedPlaylistDetailItem the clicked playlist detail item
+ * @property searchState the search state
+ * @property query the search query
+ * @property isHideMenuActionVisible the hide menu action whether is visible
+ * @property isUnhideMenuActionVisible the unhide menu action whether is visible
+ * @property isRemoveLinkMenuActionVisible the remove link menu action whether is visible
  */
 data class VideoSectionState(
     val allVideos: List<VideoUIEntity> = emptyList(),
     val sortOrder: SortOrder = SortOrder.ORDER_NONE,
     val isPendingRefresh: Boolean = false,
     val progressBarShowing: Boolean = true,
-    val searchMode: Boolean = false,
-    val actionMode: Boolean = false,
     val scrollToTop: Boolean = false,
     val selectedVideoHandles: List<Long> = emptyList(),
     val selectedVideoPlaylistHandles: List<Long> = emptyList(),
@@ -65,14 +61,8 @@ data class VideoSectionState(
     val numberOfRemovedItems: Int = 0,
     val isPlaylistProgressBarShown: Boolean = true,
     val isInputTitleValid: Boolean = true,
-    val shouldCreateVideoPlaylist: Boolean = false,
-    val shouldShowMoreVideoPlaylistOptions: Boolean = false,
-    val shouldDeleteSingleVideoPlaylist: Boolean = false,
     val createVideoPlaylistPlaceholderTitle: String = "",
     val createDialogErrorMessage: Int? = null,
-    val shouldRenameVideoPlaylist: Boolean = false,
-    val shouldDeleteVideoPlaylist: Boolean = false,
-    val shouldDeleteVideosFromPlaylist: Boolean = false,
     val deletedVideoPlaylistTitles: List<String> = emptyList(),
     val areVideoPlaylistsRemovedSuccessfully: Boolean = false,
     val currentDestinationRoute: String? = null,
@@ -81,4 +71,9 @@ data class VideoSectionState(
     val isHiddenNodesOnboarded: Boolean = false,
     val clickedItem: TypedVideoNode? = null,
     val clickedPlaylistDetailItem: TypedVideoNode? = null,
+    val searchState: SearchWidgetState = SearchWidgetState.COLLAPSED,
+    val query: String? = null,
+    val isHideMenuActionVisible: Boolean = false,
+    val isUnhideMenuActionVisible: Boolean = false,
+    val isRemoveLinkMenuActionVisible: Boolean = false,
 )

@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import kotlinx.collections.immutable.persistentListOf
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,12 +22,13 @@ class TagsScreenTest {
         // Test the TagsScreen
         composeTestRule.setContent {
             TagsScreen(
-                addNodeTag = {},
                 consumeInfoMessage = {},
-                validateTagName = { _ -> true },
+                validateTagName = { _ -> },
+                addOrRemoveTag = { _ -> },
                 onBackPressed = {},
+                consumeMaxTagsError = {},
                 uiState = TagsUiState(),
-                removeTag = { _ -> }
+                consumeTagsUpdated = {},
             )
         }
 
@@ -45,12 +47,13 @@ class TagsScreenTest {
     fun `test that tags are displayed when tags available in UI state`() {
         composeTestRule.setContent {
             TagsScreen(
-                addNodeTag = {},
                 consumeInfoMessage = {},
-                validateTagName = { _ -> true },
+                validateTagName = { _ -> },
+                addOrRemoveTag = { _ -> },
                 onBackPressed = {},
-                uiState = TagsUiState(tags = listOf("tag1", "tag2")),
-                removeTag = { _ -> }
+                consumeMaxTagsError = {},
+                uiState = TagsUiState(tags = persistentListOf("tag1", "tag2")),
+                consumeTagsUpdated = {}
             )
         }
 

@@ -5,11 +5,15 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.material.SnackbarHostState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.os.bundleOf
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -22,11 +26,12 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.BaseActivity
 import mega.privacy.android.app.R
+import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.activities.contract.SelectFolderToCopyActivityContract
 import mega.privacy.android.app.activities.contract.SelectFolderToImportActivityContract
 import mega.privacy.android.app.activities.contract.SelectFolderToMoveActivityContract
-import mega.privacy.android.app.components.attacher.MegaAttacher
 import mega.privacy.android.app.modalbottomsheet.nodelabel.NodeLabelBottomSheetDialogFragment
+import mega.privacy.android.app.namecollision.data.NameCollisionUiEntity
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.fileinfo.FileInfoActivity
 import mega.privacy.android.app.presentation.hidenode.HiddenNodesOnboardingActivity
@@ -42,7 +47,10 @@ import mega.privacy.android.app.presentation.imagepreview.slideshow.SlideshowAct
 import mega.privacy.android.app.presentation.imagepreview.view.ImagePreviewScreen
 import mega.privacy.android.app.presentation.passcode.model.PasscodeCryptObjectFactory
 import mega.privacy.android.app.presentation.security.check.PasscodeContainer
+import mega.privacy.android.app.presentation.transfers.attach.NodeAttachmentView
+import mega.privacy.android.app.presentation.transfers.attach.NodeAttachmentViewModel
 import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.app.utils.Constants.SNACKBAR_TYPE
 import mega.privacy.android.app.utils.LinksUtil
 import mega.privacy.android.app.utils.MegaNodeDialogUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
@@ -50,6 +58,7 @@ import mega.privacy.android.app.utils.MegaNodeUtil.onNodeTapped
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.account.AccountDetail
 import mega.privacy.android.domain.entity.node.ImageNode
+import mega.privacy.android.domain.entity.node.NameCollision
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
@@ -57,9 +66,13 @@ import mega.privacy.mobile.analytics.event.PhotoPreviewSaveToDeviceMenuToolbarEv
 import mega.privacy.mobile.analytics.event.PhotoPreviewScreenEvent
 import mega.privacy.mobile.analytics.event.PlaySlideshowMenuToolbarEvent
 import nz.mega.sdk.MegaApiJava
+import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import nz.mega.sdk.MegaNode
 import javax.inject.Inject
 
+/**
+ * Activity to view an image node
+ */
 @AndroidEntryPoint
 class ImagePreviewActivity : BaseActivity() {
     @Inject
@@ -92,24 +105,35 @@ class ImagePreviewActivity : BaseActivity() {
             ::handleHiddenNodesOnboardingResult,
         )
 
+    private val nameCollisionActivityLauncher = registerForActivityResult(
+        NameCollisionActivityContract()
+    ) { result ->
+        result?.let {
+            showSnackbar(SNACKBAR_TYPE, it, INVALID_HANDLE)
+        }
+    }
+
     private val viewModel: ImagePreviewViewModel by viewModels()
-    private val nodeAttacher: MegaAttacher by lazy { MegaAttacher(this) }
+    private val nodeAttachmentViewModel: NodeAttachmentViewModel by viewModels()
 
     private var tempNodeId: NodeId? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         Analytics.tracker.trackEvent(PhotoPreviewScreenEvent)
-        if (savedInstanceState != null) {
-            nodeAttacher.restoreState(savedInstanceState)
-        }
         setContent {
             val themeMode by getThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.System)
+            val snackbarHostState: SnackbarHostState = remember {
+                SnackbarHostState()
+            }
+            val coroutineScope = rememberCoroutineScope()
             OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                 PasscodeContainer(
                     passcodeCryptObjectFactory = passcodeCryptObjectFactory,
                     content = {
                         ImagePreviewScreen(
+                            snackbarHostState = snackbarHostState,
                             onClickBack = ::finish,
                             onClickVideoPlay = ::playVideo,
                             onClickSlideshow = ::playSlideshow,
@@ -121,7 +145,9 @@ class ImagePreviewActivity : BaseActivity() {
                             onClickImport = ::importNode,
                             onSwitchAvailableOffline = ::setAvailableOffline,
                             onClickGetLink = ::getNodeLink,
-                            onClickSendTo = ::sendNodeToChat,
+                            onClickSendTo = {
+                                nodeAttachmentViewModel.startAttachNodes(listOf(it.id))
+                            },
                             onClickShare = ::shareNode,
                             onClickRename = ::renameNode,
                             onClickHide = ::hideNode,
@@ -132,6 +158,11 @@ class ImagePreviewActivity : BaseActivity() {
                             onClickRestore = ::restoreNode,
                             onClickRemove = ::removeNode,
                             onClickMoveToRubbishBin = ::moveNodeToRubbishBin,
+                        )
+
+                        NodeAttachmentView(
+                            viewModel = nodeAttachmentViewModel,
+                            snackbarHostState = snackbarHostState,
                         )
                     }
                 )
@@ -149,6 +180,13 @@ class ImagePreviewActivity : BaseActivity() {
 
     private fun handleState(state: ImagePreviewState) {
         manageCopyMoveException(state.copyMoveException)
+        manageNameCollision(state.nameCollision)
+    }
+
+    private fun manageNameCollision(nameCollision: NameCollision?) {
+        nameCollision ?: return
+        nameCollisionActivityLauncher.launch(arrayListOf(nameCollision))
+        viewModel.onNameCollisionConsumed()
     }
 
     private fun handleMoveFolderResult(result: Pair<LongArray, Long>?) {
@@ -221,9 +259,9 @@ class ImagePreviewActivity : BaseActivity() {
         )
     }
 
-    private fun saveNodeToDevice(imageNode: ImageNode) {
+    private fun saveNodeToDevice() {
         Analytics.tracker.trackEvent(PhotoPreviewSaveToDeviceMenuToolbarEvent)
-        viewModel.executeTransfer(transferMessage = getString(R.string.resume_paused_transfers_text))
+        viewModel.executeTransfer()
     }
 
     private fun importNode(imageNode: ImageNode) {
@@ -235,10 +273,6 @@ class ImagePreviewActivity : BaseActivity() {
             setOffline = checked,
             imageNode = imageNode
         )
-    }
-
-    private fun sendNodeToChat(imageNode: ImageNode) {
-        nodeAttacher.attachNode(MegaNode.unserialize(imageNode.serializedData))
     }
 
     private fun getNodeLink(imageNode: ImageNode) {
@@ -335,30 +369,13 @@ class ImagePreviewActivity : BaseActivity() {
         }
     }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        nodeAttacher.saveState(outState)
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
-        when {
-            nodeAttacher.handleActivityResult(requestCode, resultCode, intent, this) ->
-                return
-
-            else -> super.onActivityResult(requestCode, resultCode, intent)
-        }
-    }
-
     /**
      * Upon a node is open with, if it cannot be previewed in-app,
      * then download it first, this download will be marked as "download by open with".
      *
      */
     private fun saveNodeByOpenWith() {
-        viewModel.executeTransfer(
-            transferMessage = getString(R.string.resume_paused_transfers_text),
-            downloadForPreview = true,
-        )
+        viewModel.executeTransfer(downloadForPreview = true)
     }
 
     private fun handleHiddenNodesOnboardingResult(result: ActivityResult) {

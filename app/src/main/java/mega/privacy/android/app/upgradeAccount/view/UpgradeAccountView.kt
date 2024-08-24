@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,7 +72,6 @@ import mega.privacy.android.app.upgradeAccount.view.components.MonthlyYearlyTabs
 import mega.privacy.android.app.upgradeAccount.view.components.ProPlanInfoCard
 import mega.privacy.android.app.upgradeAccount.view.components.SaveUpToLabel
 import mega.privacy.android.app.upgradeAccount.view.components.SubscriptionDetails
-import mega.privacy.android.app.utils.Constants.INVALID_VALUE
 import mega.privacy.android.app.utils.Constants.PRICING_PAGE_URL
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.Currency
@@ -95,6 +95,7 @@ import mega.privacy.android.shared.original.core.ui.theme.extensions.teal_300_te
 import mega.privacy.android.shared.original.core.ui.theme.extensions.yellow_100_yellow_700_alpha_015
 import mega.privacy.android.shared.original.core.ui.theme.subtitle1
 import mega.privacy.android.shared.original.core.ui.theme.values.TextColor
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 
 /**
  * Screen is shown when user taps on Upgrade button
@@ -111,7 +112,7 @@ fun UpgradeAccountView(
     onChoosingPlanType: (chosenPlan: AccountType) -> Unit,
     hideBillingWarning: () -> Unit,
     showBillingWarning: () -> Unit,
-    onDialogConfirmButtonClicked: (Int) -> Unit,
+    onDialogConfirmButtonClicked: (AccountType) -> Unit,
     onDialogDismissButtonClicked: () -> Unit,
     showUpgradeWarningBanner: Boolean,
     modifier: Modifier = Modifier,
@@ -130,6 +131,7 @@ fun UpgradeAccountView(
     var isUpgradeWarningBannerVisible by rememberSaveable { mutableStateOf(showUpgradeWarningBanner) }
 
     Scaffold(
+        modifier = Modifier.systemBarsPadding(),
         scaffoldState = scaffoldState,
         topBar = {
             MegaAppBar(
@@ -259,7 +261,7 @@ fun UpgradeAccountView(
                             if (isPaymentMethodAvailable) {
                                 if (disableCardClick) {
                                     coroutineScope.launch {
-                                        scaffoldState.snackbarHostState.showSnackbar(
+                                        scaffoldState.snackbarHostState.showAutoDurationSnackbar(
                                             message = context.getString(R.string.account_upgrade_account_snackbar_recurring_plan_already_exist)
                                         )
                                     }
@@ -288,7 +290,6 @@ fun UpgradeAccountView(
 
                 FeaturesOfPlans(
                     showNoAdsFeature = state.showNoAdsFeature,
-                    showAndroidSyncString = state.showAndroidSyncString,
                 )
                 if (state.localisedSubscriptionsList.isNotEmpty()) {
                     SubscriptionDetails(
@@ -303,7 +304,7 @@ fun UpgradeAccountView(
     }
     if (state.showBuyNewSubscriptionDialog) {
         BuyNewSubscriptionDialog(
-            upgradeTypeInt = state.currentPayment.upgradeType,
+            upgradeType = state.currentPayment.upgradeType,
             paymentMethod = state.currentPayment.currentPayment ?: return,
             onDialogPositiveButtonClicked = onDialogConfirmButtonClicked,
             onDialogDismissButtonClicked = { onDialogDismissButtonClicked() }
@@ -519,7 +520,6 @@ fun EmptySubscriptionPlansInfoCards(brush: Brush) {
 @Composable
 private fun FeaturesOfPlans(
     showNoAdsFeature: Boolean,
-    showAndroidSyncString: Boolean,
 ) {
     val modifier = Modifier.padding(
         start = 10.dp,
@@ -560,14 +560,12 @@ private fun FeaturesOfPlans(
                 style = MaterialTheme.typography.body2.copy(textIndent = textIndent),
                 modifier = modifier
             )
-            if (showAndroidSyncString) {
-                MegaText(
-                    text = stringResource(id = sharedR.string.account_upgrade_account_description_feature_sync),
-                    textColor = TextColor.Primary,
-                    style = MaterialTheme.typography.body2.copy(textIndent = textIndent),
-                    modifier = modifier
-                )
-            }
+            MegaText(
+                text = stringResource(id = sharedR.string.account_upgrade_account_description_feature_sync),
+                textColor = TextColor.Primary,
+                style = MaterialTheme.typography.body2.copy(textIndent = textIndent),
+                modifier = modifier
+            )
             MegaText(
                 text = stringResource(id = R.string.account_upgrade_account_description_feature_rewind),
                 textColor = TextColor.Primary,
@@ -686,7 +684,7 @@ private class UpgradeAccountPreviewProvider :
                 showBillingWarning = false,
                 showBuyNewSubscriptionDialog = false,
                 currentPayment = UpgradePayment(
-                    upgradeType = INVALID_VALUE,
+                    upgradeType = AccountType.UNKNOWN,
                     currentPayment = null,
                 ),
             )

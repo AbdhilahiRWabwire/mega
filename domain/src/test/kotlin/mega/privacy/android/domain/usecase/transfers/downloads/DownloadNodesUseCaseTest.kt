@@ -45,6 +45,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.internal.verification.Times
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.anyVararg
 import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
@@ -292,7 +293,7 @@ class DownloadNodesUseCaseTest {
             verify(
                 handleTransferEventUseCase,
                 Times(nodeIds.size * flow.count())
-            ).invoke(any())
+            ).invoke(anyVararg())
         }
 
     @Test
@@ -498,11 +499,9 @@ class DownloadNodesUseCaseTest {
         ).thenAnswer {
             flowOf(
                 if (node is FolderNode) {
-                    TransferEvent.TransferUpdateEvent(mock {
-                        on { isFolderTransfer }.thenReturn(true)
-                        on { stage }.thenReturn(TransferStage.STAGE_TRANSFERRING_FILES)
+                    TransferEvent.FolderTransferUpdateEvent(mock {
                         on { nodeHandle }.thenReturn(handle)
-                    })
+                    }, TransferStage.STAGE_TRANSFERRING_FILES, 1, 1, 0, null, null)
                 } else {
                     TransferEvent.TransferStartEvent(mock {
                         on { isFolderTransfer }.thenReturn(false)
@@ -522,11 +521,9 @@ class DownloadNodesUseCaseTest {
         ).thenAnswer {
             flowOf(
                 if (node is FolderNode) {
-                    TransferEvent.TransferUpdateEvent(mock {
-                        on { isFolderTransfer }.thenReturn(true)
-                        on { stage }.thenReturn(TransferStage.STAGE_TRANSFERRING_FILES)
+                    TransferEvent.FolderTransferUpdateEvent(mock {
                         on { nodeHandle }.thenReturn(handle)
-                    })
+                    }, TransferStage.STAGE_TRANSFERRING_FILES, 1, 1, 0, null, null)
                 } else {
                     TransferEvent.TransferUpdateEvent(mock {
                         on { isFolderTransfer }.thenReturn(false)

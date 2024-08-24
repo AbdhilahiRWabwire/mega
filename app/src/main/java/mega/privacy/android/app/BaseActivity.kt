@@ -3,7 +3,6 @@ package mega.privacy.android.app
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.DialogInterface
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
@@ -23,7 +22,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -31,6 +29,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.BaseTransientBottomBar.LENGTH_LONG
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.snackbar.Snackbar.SnackbarLayout
 import dagger.hilt.android.AndroidEntryPoint
@@ -39,7 +38,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import mega.privacy.android.analytics.Analytics
-import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.activities.settingsActivities.FileManagementPreferencesActivity
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.saver.AutoPlayInfo
@@ -51,11 +49,9 @@ import mega.privacy.android.app.interfaces.ActivityLauncher
 import mega.privacy.android.app.interfaces.PermissionRequester
 import mega.privacy.android.app.interfaces.SnackbarShower
 import mega.privacy.android.app.listeners.ChatLogoutListener
-import mega.privacy.android.app.logging.LegacyLoggingSettings
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.meeting.activity.MeetingActivity
 import mega.privacy.android.app.myAccount.MyAccountActivity
-import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.presentation.advertisements.AdsViewModel
 import mega.privacy.android.app.presentation.base.BaseViewModel
 import mega.privacy.android.app.presentation.billing.BillingViewModel
@@ -103,7 +99,6 @@ import mega.privacy.android.app.utils.permission.PermissionUtils.toAppInfo
 import mega.privacy.android.data.database.DatabaseHandler
 import mega.privacy.android.data.qualifier.MegaApi
 import mega.privacy.android.data.qualifier.MegaApiFolder
-import mega.privacy.android.domain.entity.LogsType
 import mega.privacy.android.domain.entity.PurchaseType
 import mega.privacy.android.domain.entity.account.AccountBlockedDetail
 import mega.privacy.android.domain.entity.account.AccountBlockedType
@@ -116,12 +111,13 @@ import mega.privacy.android.domain.entity.transfer.TransfersFinishedState
 import mega.privacy.android.domain.exception.node.ForeignNodeException
 import mega.privacy.android.domain.usecase.GetAccountDetailsUseCase
 import mega.privacy.android.domain.usecase.MonitorChatSignalPresenceUseCase
+import mega.privacy.android.domain.usecase.ResetSdkLoggerUseCase
 import mega.privacy.android.domain.usecase.login.GetAccountCredentialsUseCase
 import mega.privacy.android.domain.usecase.login.SaveAccountCredentialsUseCase
 import mega.privacy.android.domain.usecase.psa.FetchPsaUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorCookieSettingsSavedUseCase
 import mega.privacy.android.domain.usecase.transfers.overquota.MonitorTransferOverQuotaUseCase
-import mega.privacy.android.domain.usecase.transfers.paused.PauseAllTransfersUseCase
+import mega.privacy.android.domain.usecase.transfers.paused.PauseTransfersQueueUseCase
 import mega.privacy.mobile.analytics.event.TransferOverQuotaDialogEvent
 import mega.privacy.mobile.analytics.event.TransferOverQuotaUpgradeAccountButtonEvent
 import nz.mega.sdk.MegaAccountDetails
@@ -132,6 +128,7 @@ import nz.mega.sdk.MegaChatApiAndroid
 import nz.mega.sdk.MegaChatApiJava.MEGACHAT_INVALID_HANDLE
 import timber.log.Timber
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Base activity which includes common behaviors for several activities.
@@ -144,7 +141,6 @@ import javax.inject.Inject
  * @property transfersManagement            [TransfersManagement]
  * @property loggingSettings                [LegacyLoggingSettings]
  * @property composite                      [CompositeDisposable]
- * @property nameCollisionActivityContract  [NameCollisionActivityContract]
  * @property app                            [MegaApplication]
  * @property outMetrics                     [DisplayMetrics]
  * @property isResumeTransfersWarningShown  True if the warning should be shown, false otherwise.
@@ -153,7 +149,7 @@ import javax.inject.Inject
  * @property billingViewModel
  * @property monitorTransferOverQuotaUseCase
  * @property fetchPsaUseCase
- * @property pauseAllTransfersUseCase
+ * @property pauseTransfersQueueUseCase
  */
 @AndroidEntryPoint
 abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionRequester,
@@ -180,7 +176,7 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
     lateinit var transfersManagement: TransfersManagement
 
     @Inject
-    lateinit var loggingSettings: LegacyLoggingSettings
+    lateinit var resetSdkLoggerUseCase: ResetSdkLoggerUseCase
 
     @JvmField
     var composite = CompositeDisposable()
@@ -211,10 +207,8 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
     lateinit var monitorChatSignalPresenceUseCase: MonitorChatSignalPresenceUseCase
 
     @Inject
-    lateinit var pauseAllTransfersUseCase: PauseAllTransfersUseCase
+    lateinit var pauseTransfersQueueUseCase: PauseTransfersQueueUseCase
 
-    @JvmField
-    var nameCollisionActivityContract: ActivityResultLauncher<ArrayList<NameCollision>>? = null
     protected val billingViewModel by viewModels<BillingViewModel>()
     protected val adsViewModel: AdsViewModel by viewModels()
     private val viewModel by viewModels<BaseViewModel>()
@@ -357,7 +351,7 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
             showResumeTransfersWarning(this@BaseActivity) {
                 lifecycleScope.launch {
                     runCatching {
-                        pauseAllTransfersUseCase(false)
+                        pauseTransfersQueueUseCase(false)
                     }.onFailure {
                         Timber.e(it)
                     }
@@ -375,13 +369,6 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        nameCollisionActivityContract =
-            registerForActivityResult(NameCollisionActivityContract()) { result: String? ->
-                if (result != null) {
-                    showSnackbar(SNACKBAR_TYPE, result, MEGACHAT_INVALID_HANDLE)
-                }
-            }
-
         onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
 
         collectFlow(billingViewModel.billingUpdateEvent) {
@@ -480,7 +467,7 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
             if (isResumeTransfersWarningShown) {
                 showResumeTransfersWarning(this@BaseActivity) {
                     lifecycleScope.launch {
-                        pauseAllTransfersUseCase(false)
+                        pauseTransfersQueueUseCase(false)
                     }
                 }
             }
@@ -624,10 +611,11 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
      */
     private fun openDownloadedFile() {
         autoPlayNode(
-            this@BaseActivity,
-            autoPlayInfo ?: return,
-            this@BaseActivity,
-            this@BaseActivity
+            context = this@BaseActivity,
+            autoPlayInfo = autoPlayInfo ?: return,
+            activityLauncher = this@BaseActivity,
+            snackbarShower = this@BaseActivity,
+            coroutineScope = lifecycleScope
         )
 
         autoPlayInfo = null
@@ -886,6 +874,10 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
         }
 
         snackbar?.apply {
+            // Match snackbar time with compose MegaSnackbar
+            if (duration == LENGTH_LONG) {
+                duration = 4.seconds.inWholeMilliseconds.toInt()
+            }
             val snackbarLayout = this.view as SnackbarLayout
             if (forceDarkMode) {
                 setTextColor(resources.getColor(R.color.grey_alpha_087, theme))
@@ -1046,7 +1038,7 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
                 ChatLogoutListener(
                     this,
                     getString(R.string.dialog_account_suspended_ToS_copyright_message),
-                    loggingSettings
+                    resetSdkLoggerUseCase
                 )
             )
 
@@ -1054,7 +1046,7 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
                 ChatLogoutListener(
                     this,
                     getString(R.string.dialog_account_suspended_ToS_non_copyright_message),
-                    loggingSettings
+                    resetSdkLoggerUseCase
                 )
             )
 
@@ -1062,7 +1054,7 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
                 ChatLogoutListener(
                     this,
                     getString(R.string.error_business_disabled),
-                    loggingSettings
+                    resetSdkLoggerUseCase
                 )
             )
 
@@ -1070,7 +1062,7 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
                 ChatLogoutListener(
                     this,
                     getString(R.string.error_business_removed),
-                    loggingSettings
+                    resetSdkLoggerUseCase
                 )
             )
 
@@ -1109,47 +1101,15 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
     }
 
     /**
-     * Shows a dialog to confirm enable the SDK logs.
-     */
-    protected open fun showConfirmationEnableLogsSDK() {
-        showConfirmationEnableLogs(LogsType.SDK_LOGS)
-    }
-
-    /**
-     * Shows a dialog to confirm enable the Karere logs.
-     */
-    protected open fun showConfirmationEnableLogsKarere() {
-        showConfirmationEnableLogs(LogsType.MEGA_CHAT_LOGS)
-    }
-
-    /**
-     * Shows a dialog to confirm enable the SDK or Karere logs.
-     *
-     * @param logsType SDK_LOGS to confirm enable the SDK logs,
-     * KARERE_LOGS to confirm enable the Karere logs.
-     */
-    protected fun showConfirmationEnableLogs(logsType: LogsType?) {
-        MaterialAlertDialogBuilder(this)
-            .setMessage(R.string.enable_log_text_dialog)
-            .setPositiveButton(R.string.general_enable) { _: DialogInterface?, _: Int ->
-                when (logsType) {
-                    LogsType.SDK_LOGS -> loggingSettings.setStatusLoggerSDK(this, true)
-                    LogsType.MEGA_CHAT_LOGS -> loggingSettings.setStatusLoggerKarere(this, true)
-                    else -> {}
-                }
-            }
-            .setNegativeButton(R.string.general_cancel, null)
-            .show()
-            .setCanceledOnTouchOutside(false)
-    }
-
-    /**
      * Shows a warning indicating transfer over quota occurred.
      */
     fun showGeneralTransferOverQuotaWarning() = lifecycleScope.launch {
         if (isActivityInBackground || transfersManagement.isOnTransfersSection || transferGeneralOverQuotaWarning != null) return@launch
         val builder =
-            MaterialAlertDialogBuilder(this@BaseActivity, R.style.ThemeOverlay_Mega_MaterialAlertDialog)
+            MaterialAlertDialogBuilder(
+                this@BaseActivity,
+                R.style.ThemeOverlay_Mega_MaterialAlertDialog
+            )
         val binding = TransferOverquotaLayoutBinding.inflate(layoutInflater)
         builder.setView(binding.root)
             .setOnDismissListener {
@@ -1293,7 +1253,7 @@ abstract class BaseActivity : AppCompatActivity(), ActivityLauncher, PermissionR
 
             if (state == MegaChatApi.INIT_ERROR) {
                 // The megaChatApi cannot be recovered, then logout
-                megaChatApi.logout(ChatLogoutListener(this, loggingSettings))
+                megaChatApi.logout(ChatLogoutListener(this, resetSdkLoggerUseCase))
                 return true
             }
         }

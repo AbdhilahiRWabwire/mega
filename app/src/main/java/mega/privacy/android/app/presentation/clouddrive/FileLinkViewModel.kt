@@ -14,9 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import mega.privacy.android.app.MimeTypeList
 import mega.privacy.android.app.R
-import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.presentation.fileinfo.model.getNodeIcon
 import mega.privacy.android.app.presentation.filelink.model.FileLinkState
 import mega.privacy.android.app.presentation.mapper.UrlDownloadException
@@ -40,6 +38,7 @@ import mega.privacy.android.domain.usecase.filelink.GetPublicNodeUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerIsRunningUseCase
 import mega.privacy.android.domain.usecase.mediaplayer.MegaApiHttpServerStartUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
+import mega.privacy.android.domain.usecase.node.GetFileLinkNodeContentUriUseCase
 import mega.privacy.android.domain.usecase.node.publiclink.CheckPublicNodesNameCollisionUseCase
 import mega.privacy.android.domain.usecase.node.publiclink.CopyPublicNodeUseCase
 import mega.privacy.android.domain.usecase.node.publiclink.MapNodeToPublicLinkUseCase
@@ -62,6 +61,7 @@ class FileLinkViewModel @Inject constructor(
     private val getFileUrlByPublicLinkUseCase: GetFileUrlByPublicLinkUseCase,
     private val mapNodeToPublicLinkUseCase: MapNodeToPublicLinkUseCase,
     private val fileTypeIconMapper: FileTypeIconMapper,
+    private val getFileLinkNodeContentUriUseCase: GetFileLinkNodeContentUriUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(FileLinkState())
@@ -217,9 +217,8 @@ class FileLinkViewModel @Inject constructor(
             if (result.noConflictNodes.isNotEmpty()) {
                 copy(targetHandle)
             } else if (result.conflictNodes.isNotEmpty()) {
-                val collision = NameCollision.Copy.getCopyCollision(result.conflictNodes[0])
                 _state.update {
-                    it.copy(collision = collision, jobInProgressState = null)
+                    it.copy(collision = result.conflictNodes.first(), jobInProgressState = null)
                 }
             }
         }.onFailure { throwable ->
@@ -311,45 +310,6 @@ class FileLinkViewModel @Inject constructor(
      */
     fun updateImageIntent(intent: Intent) {
         _state.update { it.copy(openFile = triggered(intent)) }
-    }
-
-    /**
-     * Update intent values for audio/video
-     */
-    fun updateAudioVideoIntent(intent: Intent, nameType: MimeTypeList) {
-        viewModelScope.launch {
-            runCatching {
-                with(state.value) {
-                    intent.apply {
-                        putExtra(
-                            Constants.INTENT_EXTRA_KEY_ADAPTER_TYPE,
-                            Constants.FILE_LINK_ADAPTER
-                        )
-                        putExtra(Constants.INTENT_EXTRA_KEY_IS_PLAYLIST, false)
-                        putExtra(Constants.URL_FILE_LINK, url)
-                        putExtra(Constants.INTENT_EXTRA_KEY_HANDLE, handle)
-                        putExtra(Constants.INTENT_EXTRA_KEY_FILE_NAME, title)
-                        putExtra(Constants.EXTRA_SERIALIZE_STRING, serializedData)
-                    }
-
-                    startHttpServer(intent)
-                    val path = getFileUrlByPublicLinkUseCase(url) ?: throw UrlDownloadException()
-                    intent.setDataAndType(Uri.parse(path), nameType.type)
-
-                    if (nameType.isVideoNotSupported || nameType.isAudioNotSupported) {
-                        val s = title.split("\\.".toRegex())
-                        if (s.size > 1 && s[s.size - 1] == "opus") {
-                            intent.setDataAndType(intent.data, "audio/*")
-                        }
-                    }
-                    intent
-                }
-            }.onSuccess { intent ->
-                intent.let { _state.update { it.copy(openFile = triggered(intent)) } }
-            }.onFailure {
-                Timber.e("itemClick:ERROR:httpServerGetLocalLink")
-            }
-        }
     }
 
     /**
@@ -451,4 +411,6 @@ class FileLinkViewModel @Inject constructor(
      * Reset and notify that foreignNodeError event is consumed
      */
     fun resetForeignNodeError() = _state.update { it.copy(foreignNodeError = consumed) }
+
+    internal suspend fun getNodeContentUri() = getFileLinkNodeContentUriUseCase(_state.value.url)
 }

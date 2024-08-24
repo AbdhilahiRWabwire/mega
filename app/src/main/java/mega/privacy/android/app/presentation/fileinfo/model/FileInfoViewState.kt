@@ -11,6 +11,7 @@ import mega.privacy.android.domain.entity.node.FileNode
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.shares.AccessPermission
+import mega.privacy.android.shared.original.core.ui.utils.textcomparator.AlphanumericComparator
 import nz.mega.sdk.MegaShare
 
 /**
@@ -52,6 +53,14 @@ import nz.mega.sdk.MegaShare
  * @param actions a list of [FileInfoMenuAction] representing available actions for this node
  * @param requiredExtraAction an initiated action that needs to be confirmed by the user or more data needs to be specified (typically by an alert dialog)
  * @param isRemindersForContactVerificationEnabled checks if reminders for contact verification is enabled
+ * @param tagsEnabled checks if tags are enabled
+ * @param isProAccount checks if the user is a PRO account
+ * @param isBusinessAccountActive checks if the Business account user is currently active
+ * @param tags list of tags for the node
+ * @param mapLocationEnabled checks if GIS location is enabled
+ * @param longitude the longitude of the node
+ * @param latitude the latitude of the node
+ * @param isPhoto true if the node is a photo (Image or Video)
  */
 internal data class FileInfoViewState(
     val title: String = "",
@@ -94,7 +103,12 @@ internal data class FileInfoViewState(
     val isRemindersForContactVerificationEnabled: Boolean = false,
     val tagsEnabled: Boolean = false,
     val isProAccount: Boolean = false,
+    val isBusinessAccountActive: Boolean? = null,
     val tags: List<String> = emptyList(),
+    val mapLocationEnabled: Boolean = false,
+    val longitude: Double = 0.0,
+    val latitude: Double = 0.0,
+    val isPhoto: Boolean = false,
 ) {
 
     /**
@@ -118,7 +132,7 @@ internal data class FileInfoViewState(
         modificationTime = (typedNode as? TypedFileNode)?.modificationTime,
         descriptionText = typedNode.description.orEmpty(),
         hasPreview = (typedNode as? TypedFileNode)?.hasPreview == true,
-        tags = typedNode.tags.orEmpty(),
+        tags = typedNode.tags.orEmpty().sortedWith(AlphanumericComparator()),
     )
 
 
@@ -128,6 +142,11 @@ internal data class FileInfoViewState(
     fun isDescriptionEnabled() = !isNodeInRubbish && !isNodeInBackups &&
             (accessPermission == AccessPermission.FULL ||
                     accessPermission == AccessPermission.OWNER)
+
+    /**
+     * Check Conditions to enable gis field
+     */
+    fun canEnableMapLocation() = mapLocationEnabled && accessPermission == AccessPermission.OWNER
 
     /**
      * Check Conditions to enable tags field

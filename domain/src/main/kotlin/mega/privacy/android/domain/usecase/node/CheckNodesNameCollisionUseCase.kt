@@ -5,7 +5,7 @@ import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.Node
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeNameCollision
-import mega.privacy.android.domain.entity.node.NodeNameCollisionResult
+import mega.privacy.android.domain.entity.node.NodeNameCollisionsResult
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.entity.node.UnTypedNode
 import mega.privacy.android.domain.exception.node.NodeDoesNotExistsException
@@ -32,7 +32,7 @@ class CheckNodesNameCollisionUseCase @Inject constructor(
     suspend operator fun invoke(
         nodes: Map<Long, Long>,
         type: NodeNameCollisionType,
-    ): NodeNameCollisionResult {
+    ): NodeNameCollisionsResult {
         val noConflictNodes = hashMapOf<Long, Long>()
         val conflictNodes = hashMapOf<Long, NodeNameCollision>()
         nodes.forEach { entry ->
@@ -52,7 +52,8 @@ class CheckNodesNameCollisionUseCase @Inject constructor(
                     conflictNodes[nodeHandle] = createNodeNameCollision(
                         currentNode = currentNode,
                         parent = parent,
-                        conflictNode = conflictNode
+                        conflictNode = conflictNode,
+                        type = type
                     )
                 } ?: run {
                     noConflictNodes[nodeHandle] = parentNodeHandle
@@ -60,13 +61,14 @@ class CheckNodesNameCollisionUseCase @Inject constructor(
             }
         }
 
-        return NodeNameCollisionResult(noConflictNodes, conflictNodes, type)
+        return NodeNameCollisionsResult(noConflictNodes, conflictNodes, type)
     }
 
     private fun createNodeNameCollision(
         currentNode: UnTypedNode,
         parent: Node,
         conflictNode: UnTypedNode,
+        type: NodeNameCollisionType
     ) = NodeNameCollision.Default(
         collisionHandle = conflictNode.id.longValue,
         nodeHandle = currentNode.id.longValue,
@@ -76,7 +78,8 @@ class CheckNodesNameCollisionUseCase @Inject constructor(
         childFolderCount = (parent as? FolderNode)?.childFolderCount ?: 0,
         childFileCount = (parent as? FolderNode)?.childFileCount ?: 0,
         lastModified = if (currentNode is FileNode) currentNode.modificationTime else currentNode.creationTime,
-        isFile = currentNode is FileNode
+        isFile = currentNode is FileNode,
+        type = type
     )
 
     private suspend fun getParentOrRootNode(parentHandle: Long) =

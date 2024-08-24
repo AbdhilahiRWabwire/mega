@@ -51,7 +51,6 @@ import mega.privacy.android.app.utils.Constants.ACTION_REFRESH
 import mega.privacy.android.app.utils.Constants.CANCEL_ACCOUNT_LINK_REGEXS
 import mega.privacy.android.app.utils.Constants.CHANGE_MAIL_2FA
 import mega.privacy.android.app.utils.Constants.EMAIL_ADDRESS
-import mega.privacy.android.app.utils.Constants.FREE
 import mega.privacy.android.app.utils.Constants.INVALID_VALUE
 import mega.privacy.android.app.utils.Constants.LOGIN_FRAGMENT
 import mega.privacy.android.app.utils.Constants.REQUEST_CAMERA
@@ -66,7 +65,7 @@ import mega.privacy.android.app.utils.permission.PermissionUtils.hasPermissions
 import mega.privacy.android.app.utils.permission.PermissionUtils.requestPermission
 import mega.privacy.android.data.qualifier.MegaApi
 import mega.privacy.android.domain.entity.AccountType
-import mega.privacy.android.domain.entity.account.business.BusinessAccountStatus
+import mega.privacy.android.domain.entity.SubscriptionStatus
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.entity.verification.VerifiedPhoneNumber
@@ -95,6 +94,7 @@ import mega.privacy.android.domain.usecase.account.ConfirmChangeEmailUseCase
 import mega.privacy.android.domain.usecase.account.GetUserDataUseCase
 import mega.privacy.android.domain.usecase.account.IsMultiFactorAuthEnabledUseCase
 import mega.privacy.android.domain.usecase.account.KillOtherSessionsUseCase
+import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
 import mega.privacy.android.domain.usecase.account.QueryCancelLinkUseCase
 import mega.privacy.android.domain.usecase.account.QueryChangeEmailLinkUseCase
 import mega.privacy.android.domain.usecase.account.UpdateCurrentUserName
@@ -151,6 +151,8 @@ import javax.inject.Inject
  * @property getCurrentUserEmail
  * @property monitorVerificationStatus
  * @property snackBarHandler Handler used to display a Snackbar
+ * @property getBusinessStatusUseCase
+ * @property monitorAccountDetailUseCase
  */
 @HiltViewModel
 @SuppressLint("StaticFieldLeak")
@@ -194,6 +196,7 @@ class MyAccountViewModel @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     private val snackBarHandler: SnackBarHandler,
     private val getBusinessStatusUseCase: GetBusinessStatusUseCase,
+    private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
 ) : ViewModel() {
 
     companion object {
@@ -274,6 +277,17 @@ class MyAccountViewModel @Inject constructor(
                                 }
                             }
                         }.onFailure { Timber.w(it) }
+                    }
+                }
+        }
+        viewModelScope.launch {
+            monitorAccountDetailUseCase()
+                .catch { Timber.w("Exception monitoring account details: $it") }
+                .collectLatest { accountDetail ->
+                    _state.update {
+                        it.copy(
+                            subscriptionDetails = accountDetail.levelDetail,
+                        )
                     }
                 }
         }
@@ -484,14 +498,20 @@ class MyAccountViewModel @Inject constructor(
      *
      * @return
      */
-    fun getAccountType(): Int = myAccountInfo.accountType
+    fun getAccountType(): AccountType = when (myAccountInfo.accountType) {
+        Constants.PRO_LITE -> AccountType.PRO_LITE
+        Constants.PRO_I -> AccountType.PRO_I
+        Constants.PRO_II -> AccountType.PRO_II
+        Constants.PRO_III -> AccountType.PRO_III
+        else -> AccountType.UNKNOWN
+    }
 
     /**
      * Is free account
      *
      * @return
      */
-    fun isFreeAccount(): Boolean = getAccountType() == FREE
+    fun isFreeAccount(): Boolean = getAccountType().isPaid.not()
 
     /**
      * Get used storage
@@ -1308,15 +1328,18 @@ class MyAccountViewModel @Inject constructor(
 
                 val businessProFlexiStatus = getBusinessStatusUseCase()
 
+                val subscriptionDetails = state.value.subscriptionDetails
                 _state.update { state ->
                     state.copy(
                         isBusinessAccount = accountDetails.isBusinessAccount &&
                                 accountDetails.accountTypeIdentifier == AccountType.BUSINESS,
                         isProFlexiAccount = accountDetails.isBusinessAccount && accountDetails.accountTypeIdentifier == AccountType.PRO_FLEXI,
                         businessProFlexiStatus = businessProFlexiStatus,
-                        isStandardProAccount = accountDetails.accountTypeIdentifier?.let {
-                            isStandardProAccountCheck(it)
-                        } ?: false
+                        isStandardProAccount = if (subscriptionDetails?.subscriptionStatus == SubscriptionStatus.VALID) {
+                            accountDetails.accountTypeIdentifier?.let {
+                                isStandardProAccountCheck(it)
+                            } ?: false
+                        } else false
                     )
                 }
             }.onFailure {
@@ -1364,18 +1387,11 @@ class MyAccountViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Get account status for Business or Pro Flexi accounts
-     */
-    fun getBusinessProFlexiStatus(): BusinessAccountStatus? =
-        state.value.businessProFlexiStatus
-
     private fun isStandardProAccountCheck(accountType: AccountType): Boolean = when (accountType) {
         AccountType.PRO_I -> true
         AccountType.PRO_II -> true
         AccountType.PRO_III -> true
         AccountType.PRO_LITE -> true
-        AccountType.PRO_FLEXI -> true
         else -> false
     }
 

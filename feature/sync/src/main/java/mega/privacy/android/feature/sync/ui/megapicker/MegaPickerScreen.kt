@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.domain.entity.node.Node
@@ -34,8 +35,10 @@ import mega.privacy.android.shared.original.core.ui.controls.appbar.MegaAppBar
 import mega.privacy.android.shared.original.core.ui.controls.buttons.RaisedDefaultMegaButton
 import mega.privacy.android.shared.original.core.ui.controls.snackbars.MegaSnackbar
 import mega.privacy.android.shared.original.core.ui.model.MenuAction
+import mega.privacy.android.shared.original.core.ui.preview.BooleanProvider
 import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import nz.mega.sdk.MegaApiJava
 
 @Composable
@@ -47,6 +50,7 @@ internal fun MegaPickerScreen(
     fileTypeIconMapper: FileTypeIconMapper,
     errorMessageId: Int?,
     errorMessageShown: () -> Unit,
+    isSelectEnabled: Boolean,
     onCreateNewFolderDialogSuccess: (String) -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -88,11 +92,12 @@ internal fun MegaPickerScreen(
             )
         }, content = { paddingValues ->
             MegaPickerScreenContent(
-                nodes,
-                folderClicked,
-                currentFolderSelected,
-                fileTypeIconMapper,
-                Modifier.padding(paddingValues)
+                nodes = nodes,
+                folderClicked = folderClicked,
+                currentFolderSelected = currentFolderSelected,
+                fileTypeIconMapper = fileTypeIconMapper,
+                modifier = Modifier.padding(paddingValues),
+                isSelectEnabled = isSelectEnabled,
             )
         },
         snackbarHost = {
@@ -117,7 +122,7 @@ internal fun MegaPickerScreen(
 
     LaunchedEffect(errorMessageId) {
         if (errorMessageId != null) {
-            snackbarHostState.showSnackbar(
+            snackbarHostState.showAutoDurationSnackbar(
                 message = context.resources.getString(errorMessageId),
             )
             errorMessageShown()
@@ -131,6 +136,7 @@ private fun MegaPickerScreenContent(
     folderClicked: (TypedNode) -> Unit,
     currentFolderSelected: () -> Unit,
     fileTypeIconMapper: FileTypeIconMapper,
+    isSelectEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
@@ -141,9 +147,9 @@ private fun MegaPickerScreenContent(
             onSortOrderClick = {},
             onChangeViewTypeClick = {},
             nodesList = nodes,
-            sortOrder = "Name",
-            showSortOrder = true,
-            showChangeViewType = true,
+            sortOrder = "",
+            showSortOrder = false,
+            showChangeViewType = false,
             listState = LazyListState(),
             onFolderClick = {
                 folderClicked(it)
@@ -162,6 +168,7 @@ private fun MegaPickerScreenContent(
                 onClick = {
                     currentFolderSelected()
                 },
+                enabled = isSelectEnabled,
             )
         }
     }
@@ -170,7 +177,9 @@ private fun MegaPickerScreenContent(
 
 @CombinedThemePreviews
 @Composable
-private fun PreviewSyncNewFolderScreen() {
+private fun SyncNewFolderScreenPreview(
+    @PreviewParameter(BooleanProvider::class) isSelectEnabled: Boolean,
+) {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         MegaPickerScreen(
             null,
@@ -179,7 +188,8 @@ private fun PreviewSyncNewFolderScreen() {
             {},
             FileTypeIconMapper(),
             errorMessageId = null,
-            errorMessageShown = {}
+            errorMessageShown = {},
+            isSelectEnabled = isSelectEnabled,
         )
     }
 }

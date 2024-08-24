@@ -18,7 +18,6 @@ import org.mockito.kotlin.argThat
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.reset
-import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -106,12 +105,43 @@ internal class CorrectActiveTransfersUseCaseTest {
                 .thenReturn(alreadyInDataBase)
             whenever(getInProgressTransfersUseCase()).thenReturn(mockedTransfers)
             underTest(TransferType.GENERAL_UPLOAD)
-            verify(transferRepository, times(notInDataBase.size))
-                .insertOrUpdateActiveTransfer(any())
-            notInDataBase.forEach {
-                verify(transferRepository).insertOrUpdateActiveTransfer(
-                    argThat { tag == it.tag }
-                )
+            verify(transferRepository).insertOrUpdateActiveTransfers(argThat { it ->
+                it.map { it.tag } == notInDataBase.map { it.tag }
+            })
+        }
+
+    @Test
+    fun `test that active transfers not finished and not in progress are removed as in progress transfers`() =
+        runTest {
+            stubActiveTransfers(false)
+            stubTransfers()
+            whenever(transferRepository.getCurrentActiveTransfersByType(any()))
+                .thenReturn(mockedActiveTransfers)
+            val inProgress = subSetTransfers()
+            whenever(getInProgressTransfersUseCase()).thenReturn(inProgress)
+            val expected = mockedActiveTransfers.filter { transfer ->
+                !inProgress.map { it.tag }.contains(transfer.tag)
             }
+            Truth.assertThat(expected).isNotEmpty()
+            underTest(TransferType.GENERAL_UPLOAD)
+
+            verify(transferRepository).removeInProgressTransfers(expected.map { it.tag }.toSet())
+        }
+
+    @Test
+    fun `test that in progress transfers not in active transfers are updated in in progress transfers`() =
+        runTest {
+            stubActiveTransfers(false)
+            stubTransfers()
+            val alreadyInDataBase = subSetActiveTransfers()
+            val notInDataBase = mockedActiveTransfers - alreadyInDataBase.toSet()
+            whenever(transferRepository.getCurrentActiveTransfersByType(any()))
+                .thenReturn(alreadyInDataBase)
+            whenever(getInProgressTransfersUseCase()).thenReturn(mockedTransfers)
+            underTest(TransferType.GENERAL_UPLOAD)
+
+            verify(transferRepository).updateInProgressTransfers(
+                argThat { this.map { it.tag } == notInDataBase.map { it.tag } }
+            )
         }
 }

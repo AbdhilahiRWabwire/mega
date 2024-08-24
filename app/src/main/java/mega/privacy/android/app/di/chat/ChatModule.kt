@@ -13,21 +13,16 @@ import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.domain.repository.CallRepository
 import mega.privacy.android.domain.repository.ChatRepository
 import mega.privacy.android.domain.repository.FileSystemRepository
-import mega.privacy.android.domain.usecase.CreateChatLink
 import mega.privacy.android.domain.usecase.DefaultGetChatParticipants
 import mega.privacy.android.domain.usecase.GetChatParticipants
 import mega.privacy.android.domain.usecase.InviteToChat
 import mega.privacy.android.domain.usecase.MonitorChatListItemUpdates
-import mega.privacy.android.domain.usecase.QueryChatLink
-import mega.privacy.android.domain.usecase.RemoveChatLink
 import mega.privacy.android.domain.usecase.RemoveFromChat
 import mega.privacy.android.domain.usecase.SetMyChatFilesFolder
-import mega.privacy.android.domain.usecase.SetOpenInvite
 import mega.privacy.android.domain.usecase.SetPublicChatToPrivate
 import mega.privacy.android.domain.usecase.SignalChatPresenceActivity
 import mega.privacy.android.domain.usecase.meeting.FetchNumberOfScheduledMeetingOccurrencesByChat
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeeting
-import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
 
 /**
  * Chats module.
@@ -48,13 +43,6 @@ abstract class ChatModule {
     companion object {
 
         /**
-         * Provides the Use Case [GetScheduledMeetingByChat]
-         */
-        @Provides
-        fun provideGetScheduledMeetingByChat(callRepository: CallRepository): GetScheduledMeetingByChat =
-            GetScheduledMeetingByChat(callRepository::getScheduledMeetingsByChat)
-
-        /**
          * Provides the Use Case [GetScheduledMeeting]
          */
         @Provides
@@ -69,13 +57,6 @@ abstract class ChatModule {
             FetchNumberOfScheduledMeetingOccurrencesByChat(callRepository::fetchScheduledMeetingOccurrencesByChat)
 
         /**
-         * Provides the Use Case [SetOpenInvite]
-         */
-        @Provides
-        fun provideSetOpenInvite(chatRepository: ChatRepository): SetOpenInvite =
-            SetOpenInvite(chatRepository::setOpenInvite)
-
-        /**
          * Provides the Use Case [InviteToChat]
          */
         @Provides
@@ -88,27 +69,6 @@ abstract class ChatModule {
         @Provides
         fun provideSetPublicChatToPrivate(chatRepository: ChatRepository): SetPublicChatToPrivate =
             SetPublicChatToPrivate(chatRepository::setPublicChatToPrivate)
-
-        /**
-         * Provides the Use Case [CreateChatLink]
-         */
-        @Provides
-        fun provideCreateChatLink(chatRepository: ChatRepository): CreateChatLink =
-            CreateChatLink(chatRepository::createChatLink)
-
-        /**
-         * Provides the Use Case [RemoveChatLink]
-         */
-        @Provides
-        fun provideRemoveChatLink(chatRepository: ChatRepository): RemoveChatLink =
-            RemoveChatLink(chatRepository::removeChatLink)
-
-        /**
-         * Provides the Use Case [QueryChatLink]
-         */
-        @Provides
-        fun provideQueryChatLink(chatRepository: ChatRepository): QueryChatLink =
-            QueryChatLink(chatRepository::queryChatLink)
 
         /**
          * Provides the Use Case [MonitorChatListItemUpdates]

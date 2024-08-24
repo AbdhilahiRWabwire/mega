@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -68,7 +69,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import mega.privacy.android.app.R
-import mega.privacy.android.app.namecollision.data.NameCollision
 import mega.privacy.android.app.presentation.avatar.model.AvatarContent
 import mega.privacy.android.app.presentation.avatar.model.TextAvatarContent
 import mega.privacy.android.app.presentation.avatar.view.Avatar
@@ -82,6 +82,7 @@ import mega.privacy.android.app.presentation.qrcode.mycode.view.QRCode
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.StartTransferComponent
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.domain.entity.contacts.InviteContactRequest
+import mega.privacy.android.domain.entity.node.NameCollision
 import mega.privacy.android.domain.entity.qrcode.QRCodeQueryResults
 import mega.privacy.android.domain.entity.qrcode.ScannedContactLinkResult
 import mega.privacy.android.legacy.core.ui.controls.dialogs.LoadingDialog
@@ -90,10 +91,11 @@ import mega.privacy.android.shared.original.core.ui.controls.buttons.RaisedDefau
 import mega.privacy.android.shared.original.core.ui.controls.dialogs.ConfirmationDialog
 import mega.privacy.android.shared.original.core.ui.controls.snackbars.MegaSnackbar
 import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_alpha_038_white_alpha_038
 import mega.privacy.android.shared.original.core.ui.theme.extensions.grey_alpha_087_white_alpha_087
 import mega.privacy.android.shared.original.core.ui.theme.extensions.teal_300_teal_200
-import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
@@ -141,12 +143,7 @@ internal fun QRCodeView(
     var showScannedContactLinkResult by remember { mutableStateOf<ScannedContactLinkResult?>(null) }
     var showInviteContactResult by remember { mutableStateOf<InviteContactRequest?>(null) }
     var qrCodeComposableBounds by remember { mutableStateOf<Rect?>(null) }
-
-    val modalSheetState = rememberModalBottomSheetState(
-        initialValue = ModalBottomSheetValue.Hidden,
-        confirmValueChange = { it != ModalBottomSheetValue.HalfExpanded },
-        skipHalfExpanded = true,
-    )
+    val modalSheetState = rememberModalBottomSheetState(ModalBottomSheetValue.Hidden)
 
     BackHandler(enabled = modalSheetState.isVisible) {
         coroutineScope.launch { modalSheetState.hide() }
@@ -156,7 +153,7 @@ internal fun QRCodeView(
         event = viewState.resultMessage,
         onConsumed = onResultMessageConsumed
     ) {
-        snackBarHostState.showSnackbar(context.resources.getString(it.first, *it.second))
+        snackBarHostState.showAutoDurationSnackbar(context.resources.getString(it.first, *it.second))
     }
 
     EventEffect(
@@ -204,6 +201,7 @@ internal fun QRCodeView(
     )
 
     Scaffold(
+        modifier = Modifier.systemBarsPadding().fillMaxSize(),
         scaffoldState = scaffoldState,
         snackbarHost = {
             SnackbarHost(hostState = snackBarHostState) { data ->
@@ -444,7 +442,7 @@ private fun ShowSnackBar(
     }
     snackBarText?.let {
         coroutineScope.launch {
-            snackbarHostState.showSnackbar(snackBarText)
+            snackbarHostState.showAutoDurationSnackbar(snackBarText)
         }
     }
 }
@@ -548,8 +546,8 @@ private fun handleSave(
                 bitmap?.let {
                     saveBitmap(bitmap, qrFilePath)
                     onSaveQRCode()
-                } ?: snackBarHostState.showSnackbar(activity.getString(R.string.general_text_error))
-            }.onFailure { snackBarHostState.showSnackbar(activity.getString(R.string.general_text_error)) }
+                } ?: snackBarHostState.showAutoDurationSnackbar(activity.getString(R.string.general_text_error))
+            }.onFailure { snackBarHostState.showAutoDurationSnackbar(activity.getString(R.string.general_text_error)) }
         }
     }
 }
@@ -570,8 +568,8 @@ private fun handleShare(
                     val file = saveBitmap(bitmap, qrFilePath)
                     val uri = getFileUri(activity, file)
                     shareImage(activity, uri)
-                } ?: snackBarHostState.showSnackbar(activity.getString(R.string.error_share_qr))
-            }.onFailure { snackBarHostState.showSnackbar(activity.getString(R.string.error_share_qr)) }
+                } ?: snackBarHostState.showAutoDurationSnackbar(activity.getString(R.string.error_share_qr))
+            }.onFailure { snackBarHostState.showAutoDurationSnackbar(activity.getString(R.string.error_share_qr)) }
         }
     }
 }

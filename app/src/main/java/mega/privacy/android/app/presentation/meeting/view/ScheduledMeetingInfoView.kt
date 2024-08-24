@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -95,6 +96,7 @@ import mega.privacy.android.shared.original.core.ui.theme.white
 import mega.privacy.android.shared.original.core.ui.theme.white_alpha_012
 import mega.privacy.android.shared.original.core.ui.theme.white_alpha_038
 import mega.privacy.android.shared.original.core.ui.theme.white_alpha_054
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -133,6 +135,7 @@ fun ScheduledMeetingInfoView(
                 && managementState.waitingRoomReminder == WaitingRoomReminders.Enabled
 
     Scaffold(
+        modifier = Modifier.systemBarsPadding(),
         scaffoldState = scaffoldState,
         snackbarHost = {
             SnackbarHost(hostState = it) { data ->
@@ -246,7 +249,7 @@ fun ScheduledMeetingInfoView(
         EventEffect(
             event = state.snackbarMsg, onConsumed = onResetStateSnackbarMessage
         ) {
-            scaffoldState.snackbarHostState.showSnackbar(it)
+            scaffoldState.snackbarHostState.showAutoDurationSnackbar(it)
         }
     }
 

@@ -36,10 +36,13 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.PasscodeActivity
+import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.components.attacher.MegaAttacher
 import mega.privacy.android.app.databinding.ActivityTextFileEditorBinding
+import mega.privacy.android.app.extensions.enableEdgeToEdgeAndConsumeInsets
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.interfaces.ActionNodeCallback
 import mega.privacy.android.app.interfaces.Scrollable
@@ -73,6 +76,7 @@ import mega.privacy.android.app.utils.Constants.REQUEST_CODE_SELECT_FOLDER_TO_MO
 import mega.privacy.android.app.utils.Constants.REQUEST_CODE_SELECT_IMPORT_FOLDER
 import mega.privacy.android.app.utils.Constants.RUBBISH_BIN_ADAPTER
 import mega.privacy.android.app.utils.Constants.SCROLLING_UP_DIRECTION
+import mega.privacy.android.app.utils.Constants.SNACKBAR_TYPE
 import mega.privacy.android.app.utils.Constants.URL_FILE_LINK
 import mega.privacy.android.app.utils.Constants.VERSIONS_ADAPTER
 import mega.privacy.android.app.utils.Constants.ZIP_ADAPTER
@@ -90,14 +94,17 @@ import mega.privacy.android.app.utils.ViewUtils.hideKeyboard
 import mega.privacy.android.app.utils.permission.PermissionUtils.checkNotificationsPermission
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.mobile.analytics.event.TextEditorHideNodeMenuItemEvent
 import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import nz.mega.sdk.MegaChatApi
 import nz.mega.sdk.MegaShare
-import org.jetbrains.anko.configuration
 import timber.log.Timber
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
+/**
+ * Activity to view and edit text files
+ */
 @AndroidEntryPoint
 class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
 
@@ -112,36 +119,30 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
         private const val STATE_HIDDEN = 1
     }
 
+    /**
+     * Use case to get feature flag
+     */
+    @Inject
+    lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
     private val viewModel by viewModels<TextEditorViewModel>()
-
     private lateinit var binding: ActivityTextFileEditorBinding
-
     private var menu: Menu? = null
-
     private var discardChangesDialog: AlertDialog? = null
     private var renameDialog: AlertDialog? = null
     private var errorReadingContentDialog: AlertDialog? = null
-
     private var currentUIState = STATE_SHOWN
     private var animator: ViewPropertyAnimator? = null
     private var countDownTimer: CountDownTimer? = null
     private var isHiddenNodesEnabled: Boolean = false
     private var tempNodeId: NodeId? = null
-
-    @Inject
-    lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
-
+    private var originalContentTextSize: Float = 0f
+    private var originalNameTextSize: Float = 0f
     private val elevation by lazy { resources.getDimension(R.dimen.toolbar_elevation) }
     private val toolbarElevationColor by lazy { getColorForElevation(this, elevation) }
-    private val transparentColor by lazy {
-        ContextCompat.getColor(
-            this,
-            android.R.color.transparent
-        )
-    }
-
     private val nodeAttacher by lazy { MegaAttacher(this) }
-
+    private val transparentColor by lazy {
+        ContextCompat.getColor(this, android.R.color.transparent)
+    }
     private val onBackPressedCallback = object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
             if (!viewModel.isViewMode() && viewModel.isFileEdited()) {
@@ -166,11 +167,16 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
             }
         }
     }
-
-    private var originalContentTextSize: Float = 0f
-    private var originalNameTextSize: Float = 0f
+    private val nameCollisionActivityContract = registerForActivityResult(
+        NameCollisionActivityContract()
+    ) { result ->
+        result?.let {
+            showSnackbar(SNACKBAR_TYPE, it, INVALID_HANDLE)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdgeAndConsumeInsets()
         super.onCreate(savedInstanceState)
         binding = ActivityTextFileEditorBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -259,8 +265,9 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
      * Get original text size for setting text size based on system font scale
      */
     private fun getOriginalTextSize() {
-        originalContentTextSize = binding.contentText.textSize / configuration.fontScale
-        originalNameTextSize = binding.nameText.textSize / configuration.fontScale
+        val fontScale = resources.configuration.fontScale
+        originalContentTextSize = binding.contentText.textSize / fontScale
+        originalNameTextSize = binding.nameText.textSize / fontScale
     }
 
     override fun onDestroy() {
@@ -300,6 +307,7 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
 
             R.id.action_rename -> renameNode()
             R.id.action_hide -> {
+                Analytics.tracker.trackEvent(TextEditorHideNodeMenuItemEvent)
                 handleHideNodeClick(handle = viewModel.getNode()?.handle ?: 0)
             }
 
@@ -355,7 +363,7 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
                     ?: return
 
                 viewModel.getNode()?.let {
-                    viewModel.importNode(it, toHandle)
+                    viewModel.importNode(toHandle)
                 }
             }
 
@@ -677,7 +685,7 @@ class TextEditorActivity : PasscodeActivity(), SnackbarShower, Scrollable {
             showSnackbar(getString(message))
         }
         viewModel.getCollision().observe(this) { collision ->
-            nameCollisionActivityContract?.launch(arrayListOf(collision))
+            nameCollisionActivityContract.launch(arrayListOf(collision))
         }
         viewModel.onExceptionThrown().observe(this, ::manageException)
         viewModel.onFatalError().observe(this) {

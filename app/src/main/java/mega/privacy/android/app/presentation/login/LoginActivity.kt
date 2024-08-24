@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -108,6 +109,7 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate")
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
         chatRequestHandler.setIsLoggingRunning(true)
@@ -361,14 +363,6 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
                 viewModel.stopCameraUploads()
             }.setNegativeButton(getString(R.string.general_no), null)
             .show()
-    }
-
-    public override fun showConfirmationEnableLogsKarere() {
-        super.showConfirmationEnableLogsKarere()
-    }
-
-    public override fun showConfirmationEnableLogsSDK() {
-        super.showConfirmationEnableLogsSDK()
     }
 
     /**

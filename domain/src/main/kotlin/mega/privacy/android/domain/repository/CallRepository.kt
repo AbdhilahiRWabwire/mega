@@ -3,15 +3,15 @@ package mega.privacy.android.domain.repository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import mega.privacy.android.domain.entity.ChatRequest
-import mega.privacy.android.domain.entity.chat.ChatCall
+import mega.privacy.android.domain.entity.call.ChatCall
+import mega.privacy.android.domain.entity.call.ChatCallStatus
+import mega.privacy.android.domain.entity.call.ChatSessionUpdatesResult
 import mega.privacy.android.domain.entity.chat.ChatScheduledFlags
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeeting
 import mega.privacy.android.domain.entity.chat.ChatScheduledMeetingOccurr
 import mega.privacy.android.domain.entity.chat.ChatScheduledRules
 import mega.privacy.android.domain.entity.chat.ChatVideoUpdate
 import mega.privacy.android.domain.entity.featureflag.Flag
-import mega.privacy.android.domain.entity.meeting.ChatCallStatus
-import mega.privacy.android.domain.entity.meeting.ChatSessionUpdatesResult
 import mega.privacy.android.domain.entity.meeting.ResultOccurrenceUpdate
 
 /**
@@ -342,6 +342,21 @@ interface CallRepository {
     fun getChatLocalVideoUpdates(chatId: Long): Flow<ChatVideoUpdate>
 
     /**
+     * Register a listener to receive video from remote device for an specific chat room.
+     * This listener will be deregistered automatically.
+     *
+     * @param chatId    Chat Room Id
+     * @param clientId  Client Id
+     * @param hiRes    True if high resolution video is requested, false otherwise
+     * @return          Flow of [ChatVideoUpdate]
+     */
+    fun getChatRemoteVideoUpdates(
+        chatId: Long,
+        clientId: Long,
+        hiRes: Boolean,
+    ): Flow<ChatVideoUpdate>
+
+    /**
      * Open video device
      *
      * @return      True if the device is opened, false otherwise.
@@ -524,6 +539,20 @@ interface CallRepository {
     suspend fun broadcastCallEnded(chatId: Long)
 
     /**
+     * Monitor that a specific call has ended.
+     *
+     * @return Flow of Boolean. ID of the call.
+     */
+    fun monitorCallScreenOpened(): Flow<Boolean>
+
+    /**
+     * Broadcast that a specific call has ended.
+     *
+     * @param isOpened  True, the call is opened. False, if the call is not opened.
+     */
+    suspend fun broadcastCallScreenOpened(isOpened: Boolean)
+
+    /**
      * Mute peers
      *
      * @param chatId            The chat id.
@@ -560,5 +589,21 @@ interface CallRepository {
      */
     suspend fun setIgnoredCall(
         chatId: Long,
+    ): Boolean
+
+    /**
+     * Create meeting
+     *
+     * @param title         Meeting title
+     * @param speakRequest  Speak request enable
+     * @param waitingRoom   Waiting room enable
+     * @param openInvite    Open invite enable
+     * @return                 [ChatRequest]
+     */
+    suspend fun createMeeting(
+        title: String,
+        speakRequest: Boolean,
+        waitingRoom: Boolean,
+        openInvite: Boolean,
     ): ChatRequest
 }

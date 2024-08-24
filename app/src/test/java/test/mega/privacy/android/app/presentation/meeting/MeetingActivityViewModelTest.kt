@@ -5,28 +5,39 @@ import androidx.lifecycle.SavedStateHandle
 import io.reactivex.rxjava3.android.plugins.RxAndroidPlugins
 import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.meeting.activity.MeetingActivity
 import mega.privacy.android.app.meeting.activity.MeetingActivityRepository
 import mega.privacy.android.app.meeting.activity.MeetingActivityViewModel
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
+import mega.privacy.android.app.objects.PasscodeManagement
 import mega.privacy.android.app.presentation.mapper.GetPluralStringFromStringResMapper
 import mega.privacy.android.app.presentation.mapper.GetStringFromStringResMapper
 import mega.privacy.android.app.presentation.meeting.mapper.ChatParticipantMapper
-import mega.privacy.android.app.usecase.call.GetCallUseCase
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.data.gateway.DeviceGateway
 import mega.privacy.android.domain.usecase.CheckChatLinkUseCase
-import mega.privacy.android.domain.usecase.CreateChatLink
 import mega.privacy.android.domain.usecase.GetChatParticipants
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.MonitorUserUpdates
-import mega.privacy.android.domain.usecase.QueryChatLink
+import mega.privacy.android.domain.usecase.QueryChatLinkUseCase
 import mega.privacy.android.domain.usecase.RemoveFromChat
-import mega.privacy.android.domain.usecase.SetOpenInvite
+import mega.privacy.android.domain.usecase.SetOpenInviteWithChatIdUseCase
 import mega.privacy.android.domain.usecase.account.GetCurrentSubscriptionPlanUseCase
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
+import mega.privacy.android.domain.usecase.call.AllowUsersJoinCallUseCase
+import mega.privacy.android.domain.usecase.call.AnswerChatCallUseCase
+import mega.privacy.android.domain.usecase.call.BroadcastCallEndedUseCase
+import mega.privacy.android.domain.usecase.call.CreateMeetingUseCase
+import mega.privacy.android.domain.usecase.call.GetCallIdsOfOthersCallsUseCase
+import mega.privacy.android.domain.usecase.call.GetChatCallUseCase
+import mega.privacy.android.domain.usecase.call.HangChatCallUseCase
+import mega.privacy.android.domain.usecase.call.MonitorCallEndedUseCase
+import mega.privacy.android.domain.usecase.call.RingIndividualInACallUseCase
+import mega.privacy.android.domain.usecase.call.StartCallUseCase
+import mega.privacy.android.domain.usecase.chat.CreateChatLinkUseCase
 import mega.privacy.android.domain.usecase.chat.IsEphemeralPlusPlusUseCase
 import mega.privacy.android.domain.usecase.chat.MonitorChatRoomUpdatesUseCase
 import mega.privacy.android.domain.usecase.chat.StartConversationUseCase
@@ -37,21 +48,15 @@ import mega.privacy.android.domain.usecase.contact.InviteContactWithHandleUseCas
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.login.LogoutUseCase
 import mega.privacy.android.domain.usecase.login.MonitorFinishActivityUseCase
-import mega.privacy.android.domain.usecase.meeting.AllowUsersJoinCallUseCase
-import mega.privacy.android.domain.usecase.meeting.AnswerChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.BroadcastCallEndedUseCase
+import mega.privacy.android.domain.usecase.meeting.BroadcastCallScreenOpenedUseCase
 import mega.privacy.android.domain.usecase.meeting.EnableOrDisableAudioUseCase
 import mega.privacy.android.domain.usecase.meeting.EnableOrDisableVideoUseCase
-import mega.privacy.android.domain.usecase.meeting.GetChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChat
-import mega.privacy.android.domain.usecase.meeting.HangChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.MonitorCallEndedUseCase
+import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChatUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorScheduledMeetingUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MuteAllPeersUseCase
 import mega.privacy.android.domain.usecase.meeting.MutePeersUseCase
-import mega.privacy.android.domain.usecase.meeting.RingIndividualInACallUseCase
 import mega.privacy.android.domain.usecase.meeting.StartVideoDeviceUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
@@ -61,8 +66,10 @@ import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import test.mega.privacy.android.app.presentation.myaccount.InstantTaskExecutorExtension
+import kotlin.test.Test
 
 @ExperimentalCoroutinesApi
 @ExtendWith(value = [CoroutineMainDispatcherExtension::class, InstantTaskExecutorExtension::class])
@@ -74,7 +81,7 @@ class MeetingActivityViewModelTest {
     private val scheduler = Schedulers.trampoline()
     private val meetingActivityRepository: MeetingActivityRepository = mock()
     private val answerChatCallUseCase: AnswerChatCallUseCase = mock()
-    private val getCallUseCase: GetCallUseCase = mock()
+    private val getCallIdsOfOthersCallsUseCase: GetCallIdsOfOthersCallsUseCase = mock()
     private val getChatCallUseCase: GetChatCallUseCase = mock()
     private val rtcAudioManagerGateway: RTCAudioManagerGateway = mock()
     private val chatManagement: ChatManagement = mock()
@@ -88,11 +95,11 @@ class MeetingActivityViewModelTest {
     private val monitorChatSessionUpdatesUseCase: MonitorChatSessionUpdatesUseCase = mock()
     private val getChatRoomUseCase: GetChatRoomUseCase = mock()
     private val monitorChatRoomUpdatesUseCase: MonitorChatRoomUpdatesUseCase = mock()
-    private val queryChatLink: QueryChatLink = mock()
-    private val setOpenInvite: SetOpenInvite = mock()
+    private val queryChatLinkUseCase: QueryChatLinkUseCase = mock()
+    private val setOpenInviteWithChatIdUseCase: SetOpenInviteWithChatIdUseCase = mock()
     private val chatParticipantMapper: ChatParticipantMapper = mock()
     private val isEphemeralPlusPlusUseCase: IsEphemeralPlusPlusUseCase = mock()
-    private val createChatLink: CreateChatLink = mock()
+    private val createChatLinkUseCase: CreateChatLinkUseCase = mock()
     private val inviteContactWithHandleUseCase: InviteContactWithHandleUseCase = mock()
     private val updateChatPermissionsUseCase: UpdateChatPermissionsUseCase = mock()
     private val removeFromChaUseCase: RemoveFromChat = mock()
@@ -101,7 +108,8 @@ class MeetingActivityViewModelTest {
     private val monitorStorageStateEventUseCase: MonitorStorageStateEventUseCase = mock()
     private val hangChatCallUseCase: HangChatCallUseCase = mock()
     private val broadcastCallEndedUseCase: BroadcastCallEndedUseCase = mock()
-    private val getScheduledMeetingByChat: GetScheduledMeetingByChat = mock()
+    private val broadcastCallScreenOpenedUseCase: BroadcastCallScreenOpenedUseCase = mock()
+    private val getScheduledMeetingByChatUseCase: GetScheduledMeetingByChatUseCase = mock()
     private val getMyFullNameUseCase: GetMyFullNameUseCase = mock()
     private val monitorUserUpdates: MonitorUserUpdates = mock()
     private val monitorScheduledMeetingUpdatesUseCase: MonitorScheduledMeetingUpdatesUseCase =
@@ -121,6 +129,9 @@ class MeetingActivityViewModelTest {
     private val monitorCallEndedUseCase: MonitorCallEndedUseCase = mock()
     private val enableOrDisableVideoUseCase: EnableOrDisableVideoUseCase = mock()
     private val enableOrDisableAudioUseCase: EnableOrDisableAudioUseCase = mock()
+    private val createMeetingUseCase: CreateMeetingUseCase = mock()
+    private val startCallUseCase: StartCallUseCase = mock()
+    private val passcodeManagement: PasscodeManagement = mock()
 
     private val context: Context = mock()
 
@@ -136,7 +147,7 @@ class MeetingActivityViewModelTest {
         reset(
             meetingActivityRepository,
             answerChatCallUseCase,
-            getCallUseCase,
+            getCallIdsOfOthersCallsUseCase,
             getChatCallUseCase,
             rtcAudioManagerGateway,
             chatManagement,
@@ -151,11 +162,11 @@ class MeetingActivityViewModelTest {
             monitorChatSessionUpdatesUseCase,
             getChatRoomUseCase,
             monitorChatRoomUpdatesUseCase,
-            queryChatLink,
-            setOpenInvite,
+            queryChatLinkUseCase,
+            setOpenInviteWithChatIdUseCase,
             chatParticipantMapper,
             isEphemeralPlusPlusUseCase,
-            createChatLink,
+            createChatLinkUseCase,
             inviteContactWithHandleUseCase,
             updateChatPermissionsUseCase,
             removeFromChaUseCase,
@@ -164,7 +175,8 @@ class MeetingActivityViewModelTest {
             monitorStorageStateEventUseCase,
             hangChatCallUseCase,
             broadcastCallEndedUseCase,
-            getScheduledMeetingByChat,
+            broadcastCallScreenOpenedUseCase,
+            getScheduledMeetingByChatUseCase,
             getMyFullNameUseCase,
             monitorUserUpdates,
             monitorScheduledMeetingUpdatesUseCase,
@@ -179,6 +191,9 @@ class MeetingActivityViewModelTest {
             getFeatureFlagValueUseCase,
             getMyUserHandleUseCase,
             startVideoDeviceUseCase,
+            createMeetingUseCase,
+            startCallUseCase,
+            passcodeManagement,
             monitorCallEndedUseCase,
             enableOrDisableAudioUseCase,
             enableOrDisableVideoUseCase,
@@ -191,7 +206,7 @@ class MeetingActivityViewModelTest {
         underTest = MeetingActivityViewModel(
             meetingActivityRepository = meetingActivityRepository,
             answerChatCallUseCase = answerChatCallUseCase,
-            getCallUseCase = getCallUseCase,
+            getCallIdsOfOthersCallsUseCase = getCallIdsOfOthersCallsUseCase,
             getChatCallUseCase = getChatCallUseCase,
             rtcAudioManagerGateway = rtcAudioManagerGateway,
             chatManagement = chatManagement,
@@ -206,11 +221,11 @@ class MeetingActivityViewModelTest {
             monitorChatSessionUpdatesUseCase = monitorChatSessionUpdatesUseCase,
             getChatRoomUseCase = getChatRoomUseCase,
             monitorChatRoomUpdatesUseCase = monitorChatRoomUpdatesUseCase,
-            queryChatLink = queryChatLink,
-            setOpenInvite = setOpenInvite,
+            queryChatLinkUseCase = queryChatLinkUseCase,
+            setOpenInviteWithChatIdUseCase = setOpenInviteWithChatIdUseCase,
             chatParticipantMapper = chatParticipantMapper,
             isEphemeralPlusPlusUseCase = isEphemeralPlusPlusUseCase,
-            createChatLink = createChatLink,
+            createChatLinkUseCase = createChatLinkUseCase,
             inviteContactWithHandleUseCase = inviteContactWithHandleUseCase,
             updateChatPermissionsUseCase = updateChatPermissionsUseCase,
             removeFromChaUseCase = removeFromChaUseCase,
@@ -219,7 +234,8 @@ class MeetingActivityViewModelTest {
             monitorStorageStateEventUseCase = monitorStorageStateEventUseCase,
             hangChatCallUseCase = hangChatCallUseCase,
             broadcastCallEndedUseCase = broadcastCallEndedUseCase,
-            getScheduledMeetingByChat = getScheduledMeetingByChat,
+            broadcastCallScreenOpenedUseCase = broadcastCallScreenOpenedUseCase,
+            getScheduledMeetingByChatUseCase = getScheduledMeetingByChatUseCase,
             getMyFullNameUseCase = getMyFullNameUseCase,
             monitorUserUpdates = monitorUserUpdates,
             monitorScheduledMeetingUpdatesUseCase = monitorScheduledMeetingUpdatesUseCase,
@@ -237,7 +253,10 @@ class MeetingActivityViewModelTest {
             enableOrDisableAudioUseCase = enableOrDisableAudioUseCase,
             enableOrDisableVideoUseCase = enableOrDisableVideoUseCase,
             startVideoDeviceUseCase = startVideoDeviceUseCase,
-            monitorCallEndedUseCase = monitorCallEndedUseCase
+            monitorCallEndedUseCase = monitorCallEndedUseCase,
+            createMeetingUseCase = createMeetingUseCase,
+            startCallUseCase = startCallUseCase,
+            passcodeManagement = passcodeManagement,
         )
     }
 

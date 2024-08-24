@@ -19,7 +19,6 @@ import mega.privacy.android.app.BaseActivity
 import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.twemoji.EmojiTextView
-import mega.privacy.android.app.constants.EventConstants.EVENT_CALL_ANSWERED_IN_ANOTHER_CLIENT
 import mega.privacy.android.app.databinding.MeetingRingingFragmentBinding
 import mega.privacy.android.app.meeting.activity.MeetingActivity
 import mega.privacy.android.app.meeting.activity.MeetingActivity.Companion.MEETING_ACTION_RINGING_VIDEO_OFF
@@ -35,7 +34,7 @@ import mega.privacy.android.app.utils.Constants.AVATAR_SIZE
 import mega.privacy.android.app.utils.RunOnUIThreadUtils
 import mega.privacy.android.app.utils.permission.PermissionUtils
 import mega.privacy.android.app.utils.permission.permissionsBuilder
-import mega.privacy.android.domain.entity.meeting.ChatCallStatus
+import mega.privacy.android.domain.entity.call.ChatCallStatus
 import nz.mega.sdk.MegaChatApiJava.MEGACHAT_INVALID_HANDLE
 import timber.log.Timber
 
@@ -154,9 +153,9 @@ class RingingMeetingFragment : MeetingBaseFragment() {
         var bitmap: Bitmap?
 
         // Set caller's name and avatar
-        inMeetingViewModel.getChat()?.let {
+        inMeetingViewModel.state.value.chat?.let {
             if (inMeetingViewModel.isOneToOneCall()) {
-                val callerId = it.getPeerHandle(0)
+                val callerId = it.peerHandlesList[0]
 
                 bitmap = getImageAvatarCall(callerId)
                 if (bitmap == null) {
@@ -165,7 +164,7 @@ class RingingMeetingFragment : MeetingBaseFragment() {
             } else {
                 bitmap = getDefaultAvatar(
                     getSpecificAvatarColor(AVATAR_GROUP_CHAT_COLOR),
-                    getTitleChat(it),
+                    it.title,
                     AVATAR_SIZE,
                     true,
                     true
@@ -174,13 +173,6 @@ class RingingMeetingFragment : MeetingBaseFragment() {
 
             binding.avatar.setImageBitmap(bitmap)
         }
-
-        LiveEventBus.get(EVENT_CALL_ANSWERED_IN_ANOTHER_CLIENT, Long::class.java)
-            .observe(this) {
-                if (chatId == it) {
-                    requireActivity().finish()
-                }
-            }
 
         sharedModel.cameraPermissionCheck.observe(viewLifecycleOwner) { allowed ->
             if (allowed) {
@@ -226,6 +218,13 @@ class RingingMeetingFragment : MeetingBaseFragment() {
             .distinctUntilChanged()) {
             if (it.isNotBlank()) {
                 toolbarTitle.text = it
+            }
+        }
+
+        viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.callAnsweredInAnotherClient }
+            .distinctUntilChanged()) {
+            if (it) {
+                requireActivity().finish()
             }
         }
 

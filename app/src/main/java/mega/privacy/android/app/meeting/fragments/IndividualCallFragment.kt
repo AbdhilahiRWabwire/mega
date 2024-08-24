@@ -24,11 +24,9 @@ import mega.privacy.android.app.presentation.meeting.model.MeetingState
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.Util.getCurrentOrientation
-import mega.privacy.android.domain.entity.meeting.ChatCallStatus
-import mega.privacy.android.domain.entity.meeting.ChatSessionStatus
+import mega.privacy.android.domain.entity.call.ChatCallStatus
+import mega.privacy.android.domain.entity.call.ChatSessionStatus
 import nz.mega.sdk.MegaChatApiJava.MEGACHAT_INVALID_HANDLE
-import nz.mega.sdk.MegaChatCall
-import nz.mega.sdk.MegaChatCall.CALL_STATUS_IN_PROGRESS
 import timber.log.Timber
 
 @AndroidEntryPoint
@@ -65,6 +63,7 @@ class IndividualCallFragment : MeetingBaseFragment() {
             clientId = it.getLong(Constants.CLIENT_ID, MEGACHAT_INVALID_HANDLE)
             isFloatingWindow = it.getBoolean(Constants.IS_FLOATING_WINDOW, false)
         }
+        Timber.d("Chat ID: $chatId, Peer ID: $peerId, Client ID: $clientId")
 
         if (chatId == MEGACHAT_INVALID_HANDLE) {
             Timber.e("Error. Chat doesn't exist")
@@ -75,14 +74,7 @@ class IndividualCallFragment : MeetingBaseFragment() {
 
         inMeetingViewModel = inMeetingFragment.inMeetingViewModel
 
-        inMeetingViewModel.setChatId(chatId)
-
-        if (inMeetingViewModel.getCall() == null || peerId == MEGACHAT_INVALID_HANDLE) {
-            Timber.e("Error. Call doesn't exist")
-            return
-        }
-
-        if (!inMeetingViewModel.isMe(peerId) && clientId == MEGACHAT_INVALID_HANDLE) {
+        if (peerId == MEGACHAT_INVALID_HANDLE || !inMeetingViewModel.isMe(peerId) && clientId == MEGACHAT_INVALID_HANDLE) {
             Timber.e("Error. Client id invalid")
             return
         }
@@ -150,6 +142,7 @@ class IndividualCallFragment : MeetingBaseFragment() {
                     videoListener?.setAlpha(videoAlphaFloating)
                 }
             }
+
             showLocalFloatingViewMicroMutedIcon(!inMeetingViewModel.state.value.hasLocalAudio)
         } else {
             videoListener?.setAlpha(videoAlpha)
@@ -159,6 +152,11 @@ class IndividualCallFragment : MeetingBaseFragment() {
     }
 
     private fun collectFlows() {
+        viewLifecycleOwner.collectFlow(sharedModel.state.map { it.chatId }
+            .distinctUntilChanged()) {
+            inMeetingViewModel.setChatId(it)
+        }
+
         viewLifecycleOwner.collectFlow(sharedModel.state) { state: MeetingState ->
             raisedHandIcon?.isVisible =
                 state.isRaiseToSpeakFeatureFlagEnabled && state.isMyHandRaisedToSpeak
@@ -175,7 +173,7 @@ class IndividualCallFragment : MeetingBaseFragment() {
         viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.sessionOnHoldChanges }
             .distinctUntilChanged()) { session ->
             session?.apply {
-                if (inMeetingViewModel.state.value.isOneToOneCall && isAdded) {
+                if (inMeetingViewModel.isOneToOneCall() && isAdded) {
                     Timber.d("Check changes in session on hold")
                     checkChangesInOnHold(isOnHold)
                 }
@@ -212,6 +210,11 @@ class IndividualCallFragment : MeetingBaseFragment() {
                 Timber.d("Check changes in call on hold")
                 checkChangesInOnHold(isOnHold)
             }
+        }
+
+        viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.hasLocalAudio }
+            .distinctUntilChanged()) {
+            showLocalFloatingViewMicroMutedIcon(!it)
         }
 
         viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.changesInHiResInSession }
@@ -276,6 +279,7 @@ class IndividualCallFragment : MeetingBaseFragment() {
         Timber.d("Check the current UI status")
         inMeetingViewModel.getCall()?.let {
             if (inMeetingViewModel.isMe(peerId)) {
+                Timber.d("call status ${it.status}")
                 if (it.status == ChatCallStatus.InProgress && it.hasLocalVideo) {
                     Timber.d("Check if local video should be on")
                     checkVideoOn(peerId, clientId)
@@ -352,7 +356,7 @@ class IndividualCallFragment : MeetingBaseFragment() {
      *
      * @param show Indicates if the call has local audio or not
      */
-    fun showLocalFloatingViewMicroMutedIcon(show: Boolean) {
+    private fun showLocalFloatingViewMicroMutedIcon(show: Boolean) {
         microOffImageView?.isVisible = show
     }
 
@@ -382,7 +386,7 @@ class IndividualCallFragment : MeetingBaseFragment() {
      * Method to control the Call on hold icon visibility
      */
     private fun showCallOnHoldIcon() {
-        val isOneToOneCall = inMeetingViewModel.state.value.isOneToOneCall
+        val isOneToOneCall = inMeetingViewModel.isOneToOneCall()
         val isCallOnHold = inMeetingViewModel.state.value.isCallOnHold == true
         val isSessionOnHold = inMeetingViewModel.state.value.isSessionOnHold == true
 

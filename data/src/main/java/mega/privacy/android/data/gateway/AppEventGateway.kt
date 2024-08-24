@@ -7,7 +7,6 @@ import mega.privacy.android.domain.entity.account.AccountBlockedDetail
 import mega.privacy.android.domain.entity.backup.BackupInfoType
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsSettingsAction
 import mega.privacy.android.domain.entity.settings.cookie.CookieType
-import mega.privacy.android.domain.entity.transfer.CompletedTransfer
 import mega.privacy.android.domain.entity.transfer.TransfersFinishedState
 
 internal interface AppEventGateway {
@@ -15,7 +14,7 @@ internal interface AppEventGateway {
     /**
      * Monitor completed transfer
      */
-    val monitorCompletedTransfer: Flow<CompletedTransfer>
+    val monitorCompletedTransfer: Flow<Unit>
 
     /**
      * Monitor cookie settings saved.
@@ -153,11 +152,10 @@ internal interface AppEventGateway {
     fun monitorPushNotificationSettings(): Flow<Boolean>
 
     /**
-     * Broadcast completed transfer
+     * Broadcast an event when there is a new completed transfer
      *
-     * @param transfer the completed transfer to be broadcast
      */
-    suspend fun broadcastCompletedTransfer(transfer: CompletedTransfer)
+    suspend fun broadcastCompletedTransfer()
 
     /**
      * Monitor account update.
@@ -349,6 +347,20 @@ internal interface AppEventGateway {
      * @param chatId    ID of the chat to which the call corresponded.
      */
     suspend fun broadcastCallEnded(chatId: Long)
+
+    /**
+     * Monitor that a specific call has opened.
+     *
+     * @return Flow of Boolean. True, if it's opened. False if not.
+     */
+    fun monitorCallScreenOpened(): Flow<Boolean>
+
+    /**
+     * Broadcast that a specific call has opened.
+     *
+     * @param isOpened    True, if it's opened. False if not.
+     */
+    suspend fun broadcastCallScreenOpened(isOpened: Boolean)
 
     /**
      * Monitor that a specific call has ended.
