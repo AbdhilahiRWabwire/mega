@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.videosection.view.videoselected
 
+import mega.privacy.android.icon.pack.R as iconPackR
 import mega.privacy.android.shared.resources.R as sharedR
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
@@ -45,7 +46,7 @@ import mega.privacy.android.core.ui.mapper.FileTypeIconMapper
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.TypedNode
 import mega.privacy.android.domain.entity.preference.ViewType
-import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
+import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyViewWithImage
 import mega.privacy.android.shared.original.core.ui.controls.progressindicator.MegaCircularProgressIndicator
 import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
@@ -142,10 +143,10 @@ internal fun VideoSelectedView(
                 },
             )
 
-            uiState.nodesList.isEmpty() -> LegacyMegaEmptyView(
+            uiState.nodesList.isEmpty() -> LegacyMegaEmptyViewWithImage(
                 modifier = Modifier.testTag(VIDEO_SELECTED_EMPTY_VIEW_TEST_TAG),
                 text = stringResource(id = R.string.homepage_empty_hint_video),
-                imagePainter = painterResource(id = R.drawable.ic_homepage_empty_video)
+                imagePainter = painterResource(id = iconPackR.drawable.ic_video_section_empty_video)
             )
 
             else -> {

@@ -55,7 +55,7 @@ class FastLoginUseCase @Inject constructor(
                 .collectLatest { loginStatus ->
                     if (loginStatus == LoginStatus.LoginSucceed) {
                         saveAccountCredentialsUseCase()
-                        runCatching { loginMutex.unlock() }
+                        unlockLoginMutex()
                     }
 
                     trySend(loginStatus)
@@ -65,13 +65,15 @@ class FastLoginUseCase @Inject constructor(
                 chatLogoutUseCase(disableChatApiUseCase)
                 resetChatSettingsUseCase()
             }
-
-            runCatching { loginMutex.unlock() }
+            unlockLoginMutex()
             throw it
         }
 
         awaitClose {
-            runCatching { loginMutex.unlock() }
+            unlockLoginMutex()
         }
     }
+
+    private fun unlockLoginMutex() = runCatching { loginMutex.unlock() }
+
 }

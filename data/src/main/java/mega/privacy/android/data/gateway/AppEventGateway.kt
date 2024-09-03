@@ -5,9 +5,9 @@ import mega.privacy.android.domain.entity.CameraUploadsFolderDestinationUpdate
 import mega.privacy.android.domain.entity.MyAccountUpdate
 import mega.privacy.android.domain.entity.account.AccountBlockedDetail
 import mega.privacy.android.domain.entity.backup.BackupInfoType
+import mega.privacy.android.domain.entity.call.AudioDevice
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsSettingsAction
 import mega.privacy.android.domain.entity.settings.cookie.CookieType
-import mega.privacy.android.domain.entity.transfer.TransfersFinishedState
 
 internal interface AppEventGateway {
 
@@ -172,20 +172,6 @@ internal interface AppEventGateway {
     suspend fun broadcastMyAccountUpdate(data: MyAccountUpdate)
 
     /**
-     * Monitor transfers finished.
-     *
-     * @return Flow of [TransfersFinishedState]
-     */
-    fun monitorTransfersFinished(): Flow<TransfersFinishedState>
-
-    /**
-     * Broadcast transfers finished.
-     *
-     * @param transfersFinishedState [TransfersFinishedState]
-     */
-    suspend fun broadcastTransfersFinished(transfersFinishedState: TransfersFinishedState)
-
-    /**
      * Monitor chat archived.
      *
      * @return Flow [String]
@@ -238,18 +224,6 @@ internal interface AppEventGateway {
      * @param chatId [Long] ID of the chat to leave.
      */
     suspend fun broadcastLeaveChat(chatId: Long)
-
-    /**
-     * Monitors when transfers management have to stop.
-     *
-     * @return Flow [Boolean]
-     */
-    fun monitorStopTransfersWork(): Flow<Boolean>
-
-    /**
-     * Broadcasts if transfers management have to stop.
-     */
-    suspend fun broadcastStopTransfersWork()
 
     /**
      * Broadcast refresh session
@@ -361,6 +335,20 @@ internal interface AppEventGateway {
      * @param isOpened    True, if it's opened. False if not.
      */
     suspend fun broadcastCallScreenOpened(isOpened: Boolean)
+
+    /**
+     * Monitor that audio output has changed..
+     *
+     * @return Flow of AudioDevice.
+     */
+    fun monitorAudioOutput(): Flow<AudioDevice>
+
+    /**
+     * Broadcast that audio output has changed.
+     *
+     * @param audioDevice   [AudioDevice]
+     */
+    suspend fun broadcastAudioOutput(audioDevice: AudioDevice)
 
     /**
      * Monitor that a specific call has ended.

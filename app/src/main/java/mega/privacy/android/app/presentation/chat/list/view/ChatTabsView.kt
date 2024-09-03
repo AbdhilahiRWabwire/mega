@@ -2,7 +2,6 @@ package mega.privacy.android.app.presentation.chat.list.view
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
@@ -81,7 +80,7 @@ fun ChatTabsView(
     onResetManagementStateSnackbarMessage: () -> Unit = {},
     onCancelScheduledMeeting: () -> Unit = {},
     onDismissDialog: () -> Unit = {},
-    onStartChatClick: () -> Unit = {},
+    onStartChatClick: (isFabClicked: Boolean) -> Unit = {},
     onShowNextTooltip: (MeetingTooltipItem) -> Unit = {},
     onDismissForceAppUpdateDialog: () -> Unit = {},
 ) {
@@ -93,7 +92,7 @@ fun ChatTabsView(
         initialPage = initialPage,
         initialPageOffsetFraction = 0f
     ) {
-        ChatTab.values().size
+        ChatTab.entries.size
     }
     var scrollToTop by remember { mutableStateOf(false) }
     var showFabButton by remember { mutableStateOf(true) }
@@ -126,7 +125,9 @@ fun ChatTabsView(
                     FabButton(true, onStartChatClick)
                 }
             } else {
-                FabButton(showFabButton, onStartChatClick)
+                if ((state.hasAnyContact.not() && state.chats.isEmpty()) || state.chats.isNotEmpty()) {
+                    FabButton(showFabButton, onStartChatClick)
+                }
             }
         }
     ) { paddingValues ->
@@ -140,7 +141,7 @@ fun ChatTabsView(
                 backgroundColor = MaterialTheme.colors.surface,
                 contentColor = MaterialTheme.colors.red_600_red_300
             ) {
-                ChatTab.values().forEachIndexed { index, item ->
+                ChatTab.entries.forEachIndexed { index, item ->
                     Tab(
                         text = {
                             TabText(
@@ -188,8 +189,9 @@ fun ChatTabsView(
                     onItemMoreClick = onItemMoreClick,
                     onItemSelected = onItemSelected,
                     onScrollInProgress = { showFabButton = !it },
-                    onEmptyButtonClick = onStartChatClick,
+                    onEmptyButtonClick = { onStartChatClick(false) },
                     onShowNextTooltip = onShowNextTooltip,
+                    hasAnyContact = state.hasAnyContact
                 )
             }
 
@@ -223,7 +225,11 @@ fun ChatTabsView(
             EventEffect(
                 event = state.snackbarMessageContent, onConsumed = onResetStateSnackbarMessage
             ) { resId ->
-                scaffoldState.snackbarHostState.showAutoDurationSnackbar(context.resources.getString(resId))
+                scaffoldState.snackbarHostState.showAutoDurationSnackbar(
+                    context.resources.getString(
+                        resId
+                    )
+                )
             }
 
             EventEffect(
@@ -267,14 +273,13 @@ private fun TabText(titleStringRes: Int, hasUnreadMessages: Boolean) {
 }
 
 @Composable
-@OptIn(ExperimentalAnimationApi::class)
-private fun FabButton(showFabButton: Boolean, onStartChatClick: () -> Unit) {
+private fun FabButton(showFabButton: Boolean, onStartChatClick: (isFabClicked: Boolean) -> Unit) {
     AnimatedVisibility(
         visible = showFabButton,
         enter = scaleIn(),
         exit = scaleOut(),
     ) {
-        FloatingActionButton(onClick = onStartChatClick) {
+        FloatingActionButton(onClick = { onStartChatClick(true) }) {
             Icon(
                 imageVector = Icons.Filled.Add,
                 contentDescription = "Create new chat",

@@ -52,7 +52,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import mega.privacy.android.app.R
 import mega.privacy.android.app.presentation.videosection.model.VideoPlaylistUIEntity
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionMenuAction
 import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
@@ -61,7 +60,7 @@ import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.core.formatter.formatFileSize
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.thumbnail.ThumbnailRequest
-import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyView
+import mega.privacy.android.legacy.core.ui.controls.LegacyMegaEmptyViewWithImage
 import mega.privacy.android.shared.original.core.ui.controls.dividers.DividerType
 import mega.privacy.android.shared.original.core.ui.controls.dividers.MegaDivider
 import mega.privacy.android.shared.original.core.ui.controls.text.LongTextBehaviour
@@ -322,7 +321,7 @@ fun VideoPlaylistDetailView(
                             else -> {
                                 val videoItem = items[it]
                                 VideoItemView(
-                                    icon = iconPackR.drawable.ic_video_medium_solid,
+                                    icon = iconPackR.drawable.ic_video_section_video_default_thumbnail,
                                     name = videoItem.name,
                                     fileSize = formatFileSize(videoItem.size, LocalContext.current),
                                     duration = videoItem.durationString,
@@ -383,11 +382,10 @@ internal fun VideoPlaylistEmptyView(
             dividerType = DividerType.Centered,
             modifier = Modifier.padding(bottom = 16.dp)
         )
-        LegacyMegaEmptyView(
-            modifier = Modifier
-                .fillMaxSize(),
+        LegacyMegaEmptyViewWithImage(
+            modifier = Modifier.fillMaxSize(),
             text = stringResource(id = sharedR.string.video_section_playlist_detail_empty_hint_videos),
-            imagePainter = painterResource(id = R.drawable.ic_homepage_empty_video)
+            imagePainter = painterResource(id = iconPackR.drawable.ic_video_section_empty_video)
         )
     }
 }
@@ -408,12 +406,13 @@ internal fun VideoPlaylistHeaderView(
         ) {
             val thumbnailModifier = Modifier
                 .width(126.dp)
-                .aspectRatio(1.6f)
+                .aspectRatio(1.77f)
                 .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colors.grey_050_grey_800)
 
             ThumbnailListView(
-                icon = R.drawable.ic_playlist_item_empty,
+                emptyPlaylistIcon = iconPackR.drawable.ic_video_playlist_default_thumbnail,
+                noThumbnailIcon = iconPackR.drawable.ic_video_playlist_no_thumbnail,
                 modifier = thumbnailModifier,
                 thumbnailList = thumbnailList
             )

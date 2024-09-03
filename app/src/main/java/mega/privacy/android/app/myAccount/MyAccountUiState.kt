@@ -1,6 +1,7 @@
 package mega.privacy.android.app.myAccount
 
 import androidx.annotation.StringRes
+import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.account.AccountLevelDetail
 import mega.privacy.android.domain.entity.account.business.BusinessAccountStatus
 
@@ -28,8 +29,9 @@ import mega.privacy.android.domain.entity.account.business.BusinessAccountStatus
  * @property showChangeEmailConfirmation true if a confirmation should be shown explaining that the
  * User's Email Address will be changed
  * @property showNewCancelSubscriptionFeature true if the new Cancel Subscription feature should be shown
- * @property isStandardProAccount true if user has Pro subscription (Pro Lite, Pro I, Pro II, Pro III or Pro Flexi)
+ * @property isProSubscription true if user has active Pro subscription and the account level of subscription is the highest
  * @property subscriptionDetails  subscription details, including the subscription type, subscription cycle and expiration date
+ * @property accountType The type of the account
  */
 data class MyAccountUiState(
     val isFileVersioningEnabled: Boolean = true,
@@ -51,6 +53,7 @@ data class MyAccountUiState(
     val showInvalidChangeEmailLinkPrompt: Boolean = false,
     val showChangeEmailConfirmation: Boolean = false,
     val showNewCancelSubscriptionFeature: Boolean = false,
-    val isStandardProAccount: Boolean = false,
-    val subscriptionDetails: AccountLevelDetail? = null
+    val isProSubscription: Boolean = false,
+    val subscriptionDetails: AccountLevelDetail? = null,
+    val accountType: AccountType = AccountType.FREE,
 )

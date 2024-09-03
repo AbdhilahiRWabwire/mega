@@ -162,13 +162,18 @@
             android:value="false" />
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"
-            android:value="barcode_ui" />
+            android:value="barcode_ui,doc_scanner" />
 
         <activity
             android:name=".presentation.login.LoginActivity"
-            android:label="@string/login_text"
+            android:exported="true"
             android:screenOrientation="portrait"
-            android:windowSoftInputMode="stateAlwaysHidden" />
+            android:windowSoftInputMode="stateAlwaysHidden" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".activities.WebViewActivity"
             android:configChanges="orientation|screenSize"
@@ -180,9 +185,6 @@
             android:windowSoftInputMode="adjustNothing">
             <intent-filter>
                 <action android:name="android.intent.action.SEARCH" />
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
             <meta-data
@@ -244,12 +246,6 @@
                 <data android:scheme="mega" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".imageviewer.ImageViewerActivity"
-            android:label=""
-            android:launchMode="singleTop"
-            android:theme="@style/Theme.Mega.FullScreen.Viewer"
-            android:windowSoftInputMode="stateHidden|adjustResize" />
         <activity
             android:name=".main.ContactFileListActivity"
             android:label="@string/contact_properties_activity"
@@ -339,10 +335,6 @@
             android:launchMode="singleInstance"
             android:windowSoftInputMode="adjustResize|stateVisible" />
         <activity
-            android:name=".zippreview.ui.ZipBrowserActivity"
-            android:configChanges="orientation|screenSize"
-            android:label="@string/zip_browser_activity" />
-        <activity
             android:name=".presentation.zipbrowser.ZipBrowserComposeActivity"
             android:configChanges="orientation|screenSize"
             android:label="@string/zip_browser_activity" />
@@ -353,11 +345,9 @@
             android:name=".presentation.contact.invite.InviteContactActivity"
             android:windowSoftInputMode="adjustNothing" />
         <activity
-            android:name=".presentation.contact.invite.InviteContactActivityV2"
-            android:windowSoftInputMode="adjustNothing" />
-        <activity
             android:name=".presentation.meeting.chat.ChatHostActivity"
             android:launchMode="singleTask"
+            android:theme="@style/Theme.Mega"
             android:windowSoftInputMode="stateHidden|adjustResize" />
         <activity android:name=".presentation.contactinfo.ContactInfoActivity" />
         <activity android:name=".presentation.fileinfo.FileInfoActivity" />
@@ -439,6 +429,10 @@
             android:label="@string/section_photo_sync"
             android:launchMode="singleTop" />
         <activity
+            android:name=".presentation.documentscanner.SaveScannedDocumentsActivity"
+            android:label="@string/scan_title_save_scan"
+            android:launchMode="singleTop" />
+        <activity
             android:name="mega.privacy.android.feature.sync.ui.settings.SettingsSyncActivity"
             android:label="@string/settings_section_sync"
             android:launchMode="singleTop" />
@@ -478,12 +472,7 @@
             android:name=".presentation.weakaccountprotection.WeakAccountProtectionAlertActivity"
             android:launchMode="singleTop" />
         <activity
-            android:name=".activities.ManageChatHistoryActivity"
-            android:configChanges="orientation|screenSize"
-            android:label="@string/title_properties_manage_chat"
-            android:launchMode="singleTop" />
-        <activity
-            android:name=".presentation.meeting.managechathistory.view.screen.ManageChatHistoryActivityV2"
+            android:name=".presentation.meeting.managechathistory.view.screen.ManageChatHistoryActivity"
             android:configChanges="orientation|screenSize"
             android:label="@string/title_properties_manage_chat"
             android:launchMode="singleTop" />
@@ -531,10 +520,6 @@
         <service
             android:name=".meeting.CallNotificationIntentService"
             android:exported="false" />
-        <service
-            android:name=".UploadService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
         <service
             android:name=".mediaplayer.service.AudioPlayerService"
             android:exported="false"
@@ -680,11 +665,6 @@
             android:label="@string/start_screen_setting"
             android:launchMode="singleTop" />
         <activity
-            android:name=".namecollision.LegacyNameCollisionActivity"
-            android:label="@string/title_duplicated_items"
-            android:launchMode="singleTop"
-            android:theme="@style/Theme.Mega.FullScreen.Viewer" />
-        <activity
             android:name=".namecollision.NameCollisionActivity"
             android:label="@string/title_duplicated_items"
             android:launchMode="singleTop"
@@ -745,6 +725,13 @@
         <activity
             android:name=".presentation.tags.TagsActivity"
             android:launchMode="singleTop" />
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-2135147798858967~2157690671"/>
+        <property
+            android:name="android.adservices.AD_SERVICES_CONFIG"
+            android:resource="@xml/gma_ad_services_config"
+            tools:replace="android:resource" />
     </application>
 
 </manifest>

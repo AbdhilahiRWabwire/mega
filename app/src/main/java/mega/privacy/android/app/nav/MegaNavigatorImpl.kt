@@ -5,19 +5,17 @@ import android.content.Context
 import android.content.Intent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import mega.privacy.android.app.activities.ManageChatHistoryActivity
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.mediaplayer.AudioPlayerActivity
 import mega.privacy.android.app.mediaplayer.LegacyVideoPlayerActivity
 import mega.privacy.android.app.mediaplayer.VideoPlayerComposeActivity
 import mega.privacy.android.app.presentation.contact.invite.InviteContactActivity
-import mega.privacy.android.app.presentation.contact.invite.InviteContactActivityV2
 import mega.privacy.android.app.presentation.contact.invite.InviteContactViewModel
 import mega.privacy.android.app.presentation.meeting.chat.ChatHostActivity
 import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_ACTION
 import mega.privacy.android.app.presentation.meeting.chat.model.EXTRA_LINK
 import mega.privacy.android.app.presentation.meeting.chat.view.message.attachment.NodeContentUriIntentMapper
-import mega.privacy.android.app.presentation.meeting.managechathistory.view.screen.ManageChatHistoryActivityV2
+import mega.privacy.android.app.presentation.meeting.managechathistory.view.screen.ManageChatHistoryActivity
 import mega.privacy.android.app.presentation.settings.camerauploads.SettingsCameraUploadsActivity
 import mega.privacy.android.app.presentation.transfers.EXTRA_TAB
 import mega.privacy.android.app.presentation.transfers.TransfersActivity
@@ -55,6 +53,9 @@ import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.usecase.GetFileTypeInfoByNameUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.file.GetFileTypeInfoUseCase
+import mega.privacy.android.feature.sync.ui.SyncFragment.Companion.OPEN_NEW_SYNC_KEY
+import mega.privacy.android.feature.sync.ui.SyncFragment.Companion.TITLE_KEY
+import mega.privacy.android.feature.sync.ui.SyncHostActivity
 import mega.privacy.android.navigation.MegaNavigator
 import java.io.File
 import javax.inject.Inject
@@ -144,13 +145,7 @@ internal class MegaNavigatorImpl @Inject constructor(
         email: String?,
     ) {
         applicationScope.launch {
-            val activity =
-                if (getFeatureFlagValueUseCase(AppFeatures.NewManageChatHistoryActivity)) {
-                    ManageChatHistoryActivityV2::class.java
-                } else {
-                    ManageChatHistoryActivity::class.java
-                }
-            val intent = Intent(context, activity).apply {
+            val intent = Intent(context, ManageChatHistoryActivity::class.java).apply {
                 putExtra(Constants.CHAT_ID, chatId)
                 email?.let { putExtra(Constants.EMAIL, it) }
             }
@@ -178,13 +173,7 @@ internal class MegaNavigatorImpl @Inject constructor(
 
     override fun openInviteContactActivity(context: Context, isFromAchievement: Boolean) {
         applicationScope.launch {
-            val activity =
-                if (getFeatureFlagValueUseCase(AppFeatures.NewInviteContactActivity)) {
-                    InviteContactActivityV2::class.java
-                } else {
-                    InviteContactActivity::class.java
-                }
-            val intent = Intent(context, activity).apply {
+            val intent = Intent(context, InviteContactActivity::class.java).apply {
                 putExtra(InviteContactViewModel.KEY_FROM, isFromAchievement)
             }
             context.startActivity(intent)
@@ -407,5 +396,12 @@ internal class MegaNavigatorImpl @Inject constructor(
             mediaQueueTitle = mediaQueueTitle,
             nodeHandles = nodeHandles
         )
+    }
+
+    override fun openSyncs(context: Context, deviceName: String?, openNewSync: Boolean) {
+        val intent = Intent(context, SyncHostActivity::class.java)
+        intent.putExtra(TITLE_KEY, deviceName)
+        intent.putExtra(OPEN_NEW_SYNC_KEY, openNewSync)
+        context.startActivity(intent)
     }
 }

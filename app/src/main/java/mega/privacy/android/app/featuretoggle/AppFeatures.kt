@@ -164,25 +164,9 @@ enum class AppFeatures(override val description: String, private val defaultValu
     ),
 
     /**
-     * Enables new manage chat history compose page
-     */
-    NewManageChatHistoryActivity(
-        "Enable new manage chat history activity",
-        true
-    ),
-
-    /**
      * Raise to speak in a call
      */
     RaiseToSpeak("Raise to speak in a call or a meeting", true),
-
-    /**
-     * Enables UploadWorker for upload files, instead of UploadService. This is a work in progress feature.
-     */
-    UploadWorker(
-        "Enables UploadWorker for download files, instead of UploadService. This is a work in progress feature.",
-        true,
-    ),
 
     /**
      * Camera uploads utilizes active transfers to monitor transfers
@@ -190,22 +174,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     ActiveTransfersInCameraUploads(
         "Camera Uploads uses Active transfers to monitor the transfer progress",
         true,
-    ),
-
-    /**
-     * Enables new confirm email fragment compose page
-     */
-    NewConfirmEmailFragment(
-        "Enable new confirm email fragment",
-        true
-    ),
-
-    /**
-     * Enables new tour fragment compose page
-     */
-    NewTourFragment(
-        "Enable new tour fragment",
-        true
     ),
 
     /**
@@ -222,14 +190,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     PictureInPicture(
         "Enable Picture in Picture in Meeting",
         false
-    ),
-
-    /**
-     * Enables new invite contact compose page
-     */
-    NewInviteContactActivity(
-        "Enable new invite contact activity",
-        true
     ),
 
     /**

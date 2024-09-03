@@ -21,7 +21,6 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.provider.ContactsContract
 import android.text.TextUtils
 import android.view.Display
 import android.view.Gravity
@@ -32,6 +31,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.Chronometer
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import android.widget.TextView
@@ -81,6 +81,11 @@ import androidx.navigation.fragment.NavHostFragment
 import androidx.viewpager2.widget.ViewPager2
 import androidx.work.WorkManager
 import com.anggrayudi.storage.file.getAbsolutePath
+import com.google.android.gms.ads.AdListener
+import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.admanager.AdManagerAdRequest
+import com.google.android.gms.ads.admanager.AdManagerAdView
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -109,13 +114,13 @@ import mega.privacy.android.app.BusinessExpiredAlertActivity
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
 import mega.privacy.android.app.ShareInfo
-import mega.privacy.android.app.UploadService
 import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.constants.IntentConstants
 import mega.privacy.android.app.contacts.ContactsActivity
 import mega.privacy.android.app.extensions.enableEdgeToEdgeAndConsumeInsets
 import mega.privacy.android.app.extensions.isPortrait
+import mega.privacy.android.app.extensions.isTablet
 import mega.privacy.android.app.featuretoggle.ABTestFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.fragments.homepage.HomepageSearchable
@@ -123,7 +128,6 @@ import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
 import mega.privacy.android.app.fragments.homepage.main.HomepageFragment
 import mega.privacy.android.app.fragments.homepage.main.HomepageFragmentDirections
 import mega.privacy.android.app.fragments.settingsFragments.cookie.CookieDialogHandler
-import mega.privacy.android.app.generalusecase.FilePrepareUseCase
 import mega.privacy.android.app.globalmanagement.ActivityLifecycleHandler
 import mega.privacy.android.app.globalmanagement.MyAccountInfo
 import mega.privacy.android.app.interfaces.ActionBackupListener
@@ -161,7 +165,6 @@ import mega.privacy.android.app.myAccount.MyAccountActivity
 import mega.privacy.android.app.presentation.advertisements.model.AdsSlotIDs.TAB_CLOUD_SLOT_ID
 import mega.privacy.android.app.presentation.advertisements.model.AdsSlotIDs.TAB_HOME_SLOT_ID
 import mega.privacy.android.app.presentation.advertisements.model.AdsSlotIDs.TAB_PHOTOS_SLOT_ID
-import mega.privacy.android.app.presentation.advertisements.view.AdsBannerView
 import mega.privacy.android.app.presentation.backups.BackupsFragment
 import mega.privacy.android.app.presentation.bottomsheet.NodeOptionsBottomSheetDialogFragment
 import mega.privacy.android.app.presentation.bottomsheet.UploadBottomSheetDialogActionListener
@@ -172,6 +175,8 @@ import mega.privacy.android.app.presentation.clouddrive.FileBrowserActionListene
 import mega.privacy.android.app.presentation.clouddrive.FileBrowserComposeFragment
 import mega.privacy.android.app.presentation.clouddrive.FileBrowserViewModel
 import mega.privacy.android.app.presentation.copynode.mapper.CopyRequestMessageMapper
+import mega.privacy.android.app.presentation.documentscanner.dialogs.DocumentScanningErrorDialog
+import mega.privacy.android.app.presentation.documentscanner.model.HandleScanDocumentResult
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.extensions.serializable
 import mega.privacy.android.app.presentation.fileinfo.FileInfoActivity
@@ -251,7 +256,6 @@ import mega.privacy.android.app.sync.fileBackups.FileBackupManager
 import mega.privacy.android.app.sync.fileBackups.FileBackupManager.BackupDialogState.BACKUP_DIALOG_SHOW_NONE
 import mega.privacy.android.app.sync.fileBackups.FileBackupManager.BackupDialogState.BACKUP_DIALOG_SHOW_WARNING
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
-import mega.privacy.android.app.usecase.UploadUseCase
 import mega.privacy.android.app.usecase.chat.GetChatChangesUseCase
 import mega.privacy.android.app.utils.AlertDialogUtil.dismissAlertDialogIfExists
 import mega.privacy.android.app.utils.AlertDialogUtil.isAlertDialogShown
@@ -305,7 +309,6 @@ import mega.privacy.android.domain.entity.node.NodeSourceType
 import mega.privacy.android.domain.entity.node.RestoreNodeResult
 import mega.privacy.android.domain.entity.psa.Psa
 import mega.privacy.android.domain.entity.transfer.CompletedTransfer
-import mega.privacy.android.domain.entity.uri.UriPath
 import mega.privacy.android.domain.exception.MegaException
 import mega.privacy.android.domain.exception.NotEnoughQuotaMegaException
 import mega.privacy.android.domain.exception.QuotaExceededMegaException
@@ -320,7 +323,6 @@ import mega.privacy.android.domain.usecase.environment.IsFirstLaunchUseCase
 import mega.privacy.android.domain.usecase.file.CheckFileNameCollisionsUseCase
 import mega.privacy.android.domain.usecase.login.MonitorEphemeralCredentialsUseCase
 import mega.privacy.android.feature.devicecenter.ui.DeviceCenterFragment
-import mega.privacy.android.feature.sync.ui.SyncFragment
 import mega.privacy.android.feature.sync.ui.navigator.SyncNavigator
 import mega.privacy.android.shared.original.core.ui.controls.sheets.BottomSheet
 import mega.privacy.android.shared.original.core.ui.controls.widgets.setTransfersWidgetContent
@@ -408,16 +410,10 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     lateinit var cookieDialogHandler: CookieDialogHandler
 
     @Inject
-    lateinit var filePrepareUseCase: FilePrepareUseCase
-
-    @Inject
     lateinit var getChatChangesUseCase: GetChatChangesUseCase
 
     @Inject
     lateinit var checkFileNameCollisionsUseCase: CheckFileNameCollisionsUseCase
-
-    @Inject
-    lateinit var uploadUseCase: UploadUseCase
 
     @Inject
     lateinit var activityLifecycleHandler: ActivityLifecycleHandler
@@ -526,10 +522,11 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     private lateinit var fragmentLayout: LinearLayout
     private lateinit var waitingRoomComposeView: ComposeView
     private lateinit var callRecordingConsentDialogComposeView: ComposeView
+    private lateinit var documentScanningErrorDialogComposeView: ComposeView
     private lateinit var freePlanLimitParticipantsDialogComposeView: ComposeView
     private lateinit var bottomNavigationView: BottomNavigationView
     private lateinit var navigationView: NavigationView
-    private lateinit var adsComposeView: ComposeView
+    private lateinit var adsContainerView: FrameLayout
 
     private var miniAudioPlayerController: MiniAudioPlayerController? = null
     private lateinit var cameraUploadViewTypes: LinearLayout
@@ -558,7 +555,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     // Fragments
     private var fileBrowserComposeFragment: FileBrowserComposeFragment? = null
     private var rubbishBinComposeFragment: RubbishBinComposeFragment? = null
-    private var syncFragment: SyncFragment? = null
     private var incomingSharesComposeFragment: IncomingSharesComposeFragment? = null
     private var outgoingSharesComposeFragment: OutgoingSharesComposeFragment? = null
     private var linksComposeFragment: LinksComposeFragment? = null
@@ -644,6 +640,8 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         }
     }
 
+    private var adView: AdManagerAdView? = null
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<String>,
@@ -651,10 +649,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         when (requestCode) {
-            Constants.REQUEST_UPLOAD_CONTACT -> {
-                uploadContactInfo(infoManager, parentNodeManager)
-            }
-
             Constants.REQUEST_CAMERA -> {
                 if (typesCameraPermission == Constants.TAKE_PICTURE_OPTION) {
                     Timber.d("TAKE_PICTURE_OPTION")
@@ -934,8 +928,8 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     private fun checkForInAppAdvertisement() {
         lifecycleScope.launch {
             runCatching {
-                val isAdsEnabled = getFeatureFlagValueUseCase(ABTestFeatures.ads)
-                if (isAdsEnabled) {
+                val isAdseFlagEnabled = getFeatureFlagValueUseCase(ABTestFeatures.adse)
+                if (isAdseFlagEnabled) {
                     if (this@ManagerActivity.isPortrait()) {
                         setupAdsView()
                     } else {
@@ -945,7 +939,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                     adsViewModel.getDefaultStartScreen()
                 }
             }.onFailure {
-                Timber.e("Failed to fetch feature flags or ab_ads test flag with error: ${it.message}")
+                Timber.e("Failed to fetch ab_adse flag with error: ${it.message}")
             }
         }
     }
@@ -991,9 +985,11 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         waitingRoomComposeView = findViewById(R.id.waiting_room_dialog_compose_view)
         callRecordingConsentDialogComposeView =
             findViewById(R.id.call_recording_consent_dialog_compose_view)
+        documentScanningErrorDialogComposeView =
+            findViewById(R.id.document_scanning_error_dialog_compose_view)
         freePlanLimitParticipantsDialogComposeView =
             findViewById(R.id.free_plan_limit_dialog_compose_view)
-        adsComposeView = findViewById(R.id.ads_web_compose_view)
+        adsContainerView = findViewById(R.id.ads_web_compose_view)
         fragmentLayout = findViewById(R.id.fragment_layout)
         bottomNavigationView =
             findViewById(R.id.bottom_navigation_view)
@@ -1070,6 +1066,24 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                 val isDark = themeMode.isDarkMode()
                 OriginalTempTheme(isDark = isDark) {
                     CallRecordingConsentDialog()
+                }
+            }
+        }
+
+        documentScanningErrorDialogComposeView.apply {
+            isVisible = true
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                val themeMode by getThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.System)
+                val isDark = themeMode.isDarkMode()
+                val state by viewModel.state.collectAsStateWithLifecycle()
+
+                OriginalTempTheme(isDark = isDark) {
+                    DocumentScanningErrorDialog(
+                        documentScanningErrorTypeUiItem = state.documentScanningErrorTypeUiItem,
+                        onErrorAcknowledged = { viewModel.onDocumentScanningErrorConsumed() },
+                        onErrorDismissed = { viewModel.onDocumentScanningErrorConsumed() },
+                    )
                 }
             }
         }
@@ -1927,6 +1941,21 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                 viewModel.markHandledMessage()
             }
 
+            managerState.handleScanDocumentResult?.let { handleScanDocumentResult ->
+                when (handleScanDocumentResult) {
+                    HandleScanDocumentResult.UseLegacyImplementation -> {
+                        uploadBottomSheetDialogActionHandler.scanDocumentUsingLegacyScanner()
+                    }
+
+                    is HandleScanDocumentResult.UseNewImplementation -> {
+                        uploadBottomSheetDialogActionHandler.scanDocumentUsingNewScanner(
+                            documentScanner = handleScanDocumentResult.documentScanner,
+                        )
+                    }
+                }
+                viewModel.onHandleScanDocumentResultConsumed()
+            }
+
             managerState.chatLinkContent?.let {
                 handleCheckLinkResult(it)
                 viewModel.markHandleCheckLinkResult()
@@ -2210,7 +2239,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         askPermissions = false
         showStorageAlertWithDelay = true
         //If mobile device, only portrait mode is allowed
-        if (!Util.isTablet(this)) {
+        if (isTablet().not()) {
             Timber.d("Mobile only portrait mode")
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
@@ -2262,7 +2291,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     fun destroyPermissionsFragment() {
         initialPermissionsAlreadyAsked = true
         //In mobile, allow all orientation after permission screen
-        if (!Util.isTablet(this)) {
+        if (isTablet().not()) {
             Timber.d("Mobile, all orientation")
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_USER
         }
@@ -2287,7 +2316,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
      */
     fun handleShowingAds(slotId: String) {
         if (this.isPortrait() && adsViewModel.canConsumeAdSlot(slotId)) {
-            adsViewModel.fetchNewAd(slotId)
+            showAdsView()
         } else {
             hideAdsView()
         }
@@ -2305,6 +2334,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         checkForInAppUpdateInstallStatus()
         cookieDialogHandler.onResume()
         updateTransfersWidgetVisibility()
+        adView?.resume()
     }
 
     private fun checkForInAppUpdateInstallStatus() {
@@ -2706,6 +2736,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     override fun onPause() {
         Timber.d("onPause")
         transfersManagement.isOnTransfersSection = false
+        adView?.pause()
         super.onPause()
     }
 
@@ -2717,6 +2748,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         reconnectDialog?.cancel()
         dismissAlertDialogIfExists(processFileDialog)
         cookieDialogHandler.onDestroy()
+        adView?.destroy()
         super.onDestroy()
     }
 
@@ -2935,7 +2967,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         if (drawerItem == null) {
             return@launch
         }
-        if (listOf(DrawerItem.SYNC, DrawerItem.DEVICE_CENTER).contains(drawerItem)) {
+        if (drawerItem == DrawerItem.DEVICE_CENTER) {
             supportActionBar?.hide()
         } else {
             supportActionBar?.show()
@@ -2978,8 +3010,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                     }
                 }
             }
-
-            DrawerItem.SYNC -> viewModel.setIsFirstNavigationLevel(false)
 
             DrawerItem.RUBBISH_BIN -> {
                 supportActionBar?.subtitle = null
@@ -3654,8 +3684,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
      * [INVALID_HANDLE] by default
      * The value is set to -1 by default if no other Backups Node Handle is passed
      * @param errorMessage The [StringRes] of the error message to display
-     * @param title Custom title
-     * @param openNewSync Only for [DrawerItem.SYNC]: True to directly open New Sync screen, False otherwise.
      */
     @SuppressLint("NewApi")
     @JvmOverloads
@@ -3665,8 +3693,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         cloudDriveNodeHandle: Long = INVALID_HANDLE,
         backupsHandle: Long = INVALID_HANDLE,
         @StringRes errorMessage: Int? = null,
-        title: String? = null,
-        openNewSync: Boolean = false,
     ) {
         Timber.d("Selected DrawerItem: ${item?.name}. Current drawerItem is ${drawerItem?.name}")
         if (!this::drawerLayout.isInitialized) {
@@ -3781,17 +3807,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                     newFragmentInstance = DeviceCenterFragment.newInstance(),
                     fragmentTag = FragmentTag.DEVICE_CENTER.tag,
                 )
-            }
-
-            DrawerItem.SYNC -> {
-                syncFragment = SyncFragment.newInstance(title = title, openNewSync = openNewSync)
-
-                setBottomNavigationMenuItemChecked(NO_BNV)
-                supportInvalidateOptionsMenu()
-                syncFragment?.let { replaceFragment(it, FragmentTag.SYNC.tag) }
-                showFabButton()
-                updateTransfersWidgetPosition(false)
-                hideAdsView()
             }
 
             DrawerItem.HOMEPAGE -> {
@@ -4042,7 +4057,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         )
         val padding =
-            if (adsComposeView.isVisible) resources.getDimensionPixelSize(R.dimen.ads_web_view_and_bottom_navigation_view_height)
+            if (adsContainerView.isVisible) resources.getDimensionPixelSize(R.dimen.ads_web_view_and_bottom_navigation_view_height)
             else resources.getDimensionPixelSize(R.dimen.bottom_navigation_view_height)
         params.setMargins(
             0, 0, 0,
@@ -4542,7 +4557,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             android.R.id.home -> {
                 if (isFirstNavigationLevel) {
                     when (drawerItem) {
-                        DrawerItem.SYNC, DrawerItem.RUBBISH_BIN, DrawerItem.TRANSFERS -> {
+                        DrawerItem.RUBBISH_BIN, DrawerItem.TRANSFERS -> {
                             goBackToBottomNavigationItem(bottomNavigationCurrentItem)
                         }
 
@@ -4557,7 +4572,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                 } else {
                     if (drawerItem == DrawerItem.CLOUD_DRIVE) {
                         handleCloudDriveBackNavigation(performBackNavigation = true)
-                    } else if (drawerItem == DrawerItem.SYNC || drawerItem == DrawerItem.DEVICE_CENTER) {
+                    } else if (drawerItem == DrawerItem.DEVICE_CENTER) {
                         onBackPressedDispatcher.onBackPressed()
                     } else if (drawerItem == DrawerItem.RUBBISH_BIN) {
                         rubbishBinComposeFragment = getRubbishBinComposeFragment()
@@ -4797,8 +4812,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         }
         if (drawerItem === DrawerItem.CLOUD_DRIVE) {
             handleCloudDriveBackNavigation(performBackNavigation = true)
-        } else if (drawerItem == DrawerItem.SYNC) {
-            selectDrawerItem(item = DrawerItem.DEVICE_CENTER)
         } else if (drawerItem == DrawerItem.DEVICE_CENTER) {
             handleDeviceCenterBackNavigation()
         } else if (drawerItem == DrawerItem.RUBBISH_BIN) {
@@ -5362,7 +5375,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     }
 
     override fun scanDocument() {
-        uploadBottomSheetDialogActionHandler.scanDocument()
+        viewModel.handleScanDocument()
     }
 
     override fun showNewFolderDialog(typedText: String?) {
@@ -5864,27 +5877,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             return
         }
         when {
-            requestCode == Constants.REQUEST_CODE_GET_FILES && resultCode == Activity.RESULT_OK -> {
-                if (intent == null) {
-                    Timber.w("Intent NULL")
-                    return
-                }
-                Timber.d("Intent action: %s", intent.action)
-                Timber.d("Intent type: %s", intent.type)
-                intent.action = Intent.ACTION_OPEN_DOCUMENT
-                processFileDialog = showProcessFileDialog(this, intent)
-                filePrepareUseCase.prepareFiles(intent)
-                    .subscribeOn(Schedulers.io())
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(
-                        { shareInfo: List<ShareInfo> ->
-                            onIntentProcessed(shareInfo)
-                        },
-                        { throwable: Throwable -> Timber.e(throwable) }
-                    )
-                    .addTo(composite)
-            }
-
             requestCode == Constants.REQUEST_CODE_GET_FOLDER -> {
                 UploadUtil.getFolder(this, resultCode, intent, currentParentHandle)
             }
@@ -6158,7 +6150,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             }.onSuccess { collisions ->
                 collisions.firstOrNull()?.let {
                     nameCollisionActivityLauncher.launch(arrayListOf(it))
-                } ?: uploadFile(file, parentHandle)
+                } ?: viewModel.uploadFile(file, parentHandle)
             }.onFailure { throwable: Throwable? ->
                 Timber.e(throwable)
                 showSnackbar(
@@ -6166,24 +6158,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                     getString(R.string.general_error),
                     MEGACHAT_INVALID_HANDLE
                 )
-            }
-        }
-    }
-
-    @SuppressLint("CheckResult")
-    private fun uploadFile(file: File, parentHandle: Long) {
-        applicationScope.launch {
-            if (getFeatureFlagValueUseCase(AppFeatures.UploadWorker)) {
-                viewModel.uploadFile(file, parentHandle)
-            } else {
-                PermissionUtils.checkNotificationsPermission(this@ManagerActivity)
-                uploadUseCase.upload(this@ManagerActivity, file, parentHandle)
-                    .subscribeOn(Schedulers.io())
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(
-                        { Timber.d("Upload started") },
-                        { t: Throwable? -> Timber.e(t) })
-                    .addTo(composite)
             }
         }
     }
@@ -6302,7 +6276,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         when (newStorageState) {
             StorageState.Green -> {
                 Timber.d("STORAGE STATE GREEN")
-                notifyUploadServiceStorageStateChange(newStorageState, storageState)
                 if (myAccountInfo.accountType == MegaAccountDetails.ACCOUNT_TYPE_FREE) {
                     Timber.d("ACCOUNT TYPE FREE")
                     if (Util.showMessageRandom()) {
@@ -6315,7 +6288,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
 
             StorageState.Orange -> {
                 Timber.w("STORAGE STATE ORANGE")
-                notifyUploadServiceStorageStateChange(newStorageState, storageState)
                 if (newStorageState.ordinal > storageState.ordinal) {
                     showStorageAlmostFullDialog()
                 }
@@ -6333,20 +6305,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             else -> return
         }
         storageState = newStorageState
-    }
-
-    private fun notifyUploadServiceStorageStateChange(
-        newStorageState: StorageState,
-        oldStorageState: StorageState,
-    ) {
-        if (newStorageState != oldStorageState) {
-            val uploadServiceIntent = Intent(this, UploadService::class.java)
-            uploadServiceIntent.action = Constants.ACTION_STORAGE_STATE_CHANGED
-            runCatching { ContextCompat.startForegroundService(this, uploadServiceIntent) }
-                .onFailure {
-                    Timber.e(it, "Exception starting UploadService")
-                }
-        }
     }
 
     /**
@@ -6407,12 +6365,24 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         }
     }
 
+    fun handleFileUris(uris: List<Uri>) {
+        lifecycleScope.launch {
+            runCatching {
+                processFileDialog = showProcessFileDialog(this@ManagerActivity, intent)
+                val documents = viewModel.prepareFiles(uris)
+                onIntentProcessed(documents)
+            }.onFailure {
+                Timber.e(it)
+            }
+        }
+    }
+
     /**
      * Handle processed upload intent.
      *
-     * @param infoList List<ShareInfo> containing all the upload info.
-    </ShareInfo> */
-    private fun onIntentProcessed(infoList: List<ShareInfo>?) {
+     * @param entities List<DocumentEntity> containing all the upload info.
+     */
+    private fun onIntentProcessed(entities: List<DocumentEntity>) {
         Timber.d("onIntentProcessed")
         val parentNode: MegaNode? = getCurrentParentNode(currentParentHandle, -1)
         if (parentNode == null) {
@@ -6426,7 +6396,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             return
         }
         val parentHandle = parentNode.handle
-        if (infoList == null) {
+        if (entities.isEmpty()) {
             dismissAlertDialogIfExists(statusDialog)
             dismissAlertDialogIfExists(processFileDialog)
             showSnackbar(
@@ -6446,14 +6416,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         lifecycleScope.launch {
             runCatching {
                 checkFileNameCollisionsUseCase(
-                    files = infoList.map {
-                        DocumentEntity(
-                            name = it.originalFileName,
-                            size = it.size,
-                            lastModified = it.lastModified,
-                            uri = UriPath(it.fileAbsolutePath),
-                        )
-                    },
+                    files = entities,
                     parentNodeId = NodeId(parentHandle)
                 )
             }.onSuccess { collisions ->
@@ -6465,46 +6428,16 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                     }
                 }
                 val collidedSharesPath = collisions.map { it.path.value }.toSet()
-                val sharesWithoutCollision = infoList.filter {
-                    collidedSharesPath.contains(it.fileAbsolutePath).not()
+                val sharesWithoutCollision = entities.filter {
+                    collidedSharesPath.contains(it.uri.value).not()
                 }
                 if (sharesWithoutCollision.isNotEmpty()) {
                     lifecycleScope.launch {
-                        if (getFeatureFlagValueUseCase(AppFeatures.UploadWorker)) {
-                            sharesWithoutCollision.filter { it.isContact }.forEach {
-                                requestContactsPermissions(it, parentNode)
-                            }
-                            val shareInfo = sharesWithoutCollision.filter { !it.isContact }
-                            viewModel.uploadShareInfo(shareInfo, parentNode.handle)
-                        } else {
-                            showSnackbar(
-                                Constants.SNACKBAR_TYPE,
-                                resources.getQuantityString(
-                                    R.plurals.upload_began,
-                                    sharesWithoutCollision.size,
-                                    sharesWithoutCollision.size
-                                ),
-                                MEGACHAT_INVALID_HANDLE
-                            )
-                            for (info in sharesWithoutCollision) {
-                                if (info.isContact) {
-                                    requestContactsPermissions(info, parentNode)
-                                } else {
-                                    uploadUseCase.upload(
-                                        this@ManagerActivity,
-                                        info,
-                                        null,
-                                        parentNode.handle
-                                    )
-                                        .subscribeOn(Schedulers.io())
-                                        .observeOn(AndroidSchedulers.mainThread())
-                                        .subscribe(
-                                            { Timber.d("Upload started") },
-                                            { t: Throwable? -> Timber.e(t) })
-                                        .addTo(composite)
-                                }
-                            }
-                        }
+                        viewModel.uploadFiles(
+                            pathsAndNames = sharesWithoutCollision.map { it.uri.value }
+                                .associateWith { null },
+                            destinationId = NodeId(parentNode.handle)
+                        )
                     }
                 }
             }.onFailure {
@@ -6516,108 +6449,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                     this@ManagerActivity
                 )
             }
-        }
-    }
-
-    private fun requestContactsPermissions(info: ShareInfo?, parentNode: MegaNode?) {
-        Timber.d("requestContactsPermissions")
-        if (!hasPermissions(this, Manifest.permission.READ_CONTACTS)) {
-            Timber.w("No read contacts permission")
-            infoManager = info
-            parentNodeManager = parentNode
-            requestPermission(
-                this,
-                Constants.REQUEST_UPLOAD_CONTACT,
-                Manifest.permission.READ_CONTACTS
-            )
-        } else {
-            uploadContactInfo(info, parentNode)
-        }
-    }
-
-    private fun uploadContactInfo(info: ShareInfo?, parentNode: MegaNode?) {
-        Timber.d("Upload contact info")
-        runCatching {
-            val cursorID =
-                info?.contactUri?.let { contentResolver.query(it, null, null, null, null) }
-                    ?: throw NullPointerException("Cursor of ${info?.contactUri} is null")
-            if (cursorID.moveToFirst()) {
-                Timber.d("It is a contact")
-                var id: String? = null
-                try {
-                    id =
-                        cursorID.getString(cursorID.getColumnIndexOrThrow(ContactsContract.Contacts._ID))
-                } catch (exception: IllegalArgumentException) {
-                    Timber.w(exception, "Exception getting contact ID.")
-                }
-                var name: String? = null
-                try {
-                    name =
-                        cursorID.getString(cursorID.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME))
-                } catch (exception: IllegalArgumentException) {
-                    Timber.w(exception, "Exception getting contact display name.")
-                }
-                var hasPhone = -1
-                try {
-                    hasPhone =
-                        cursorID.getInt(cursorID.getColumnIndexOrThrow(ContactsContract.Contacts.HAS_PHONE_NUMBER))
-                } catch (exception: IllegalArgumentException) {
-                    Timber.w(exception, "Exception getting contact details.")
-                }
-
-                // get the user's email address
-                var email: String? = null
-                val ce = contentResolver.query(
-                    ContactsContract.CommonDataKinds.Email.CONTENT_URI,
-                    null,
-                    ContactsContract.CommonDataKinds.Email.CONTACT_ID + " = ?",
-                    arrayOf(id),
-                    null
-                )
-                if (ce != null && ce.moveToFirst()) {
-                    try {
-                        email =
-                            ce.getString(ce.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Email.DATA))
-                    } catch (exception: IllegalArgumentException) {
-                        Timber.w(exception, "Exception getting contact email.")
-                    }
-                    ce.close()
-                }
-
-                // get the user's phone number
-                var phone: String? = null
-                if (hasPhone > 0) {
-                    val cp = contentResolver.query(
-                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                        null,
-                        ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
-                        arrayOf(id),
-                        null
-                    )
-                    if (cp != null && cp.moveToFirst()) {
-                        try {
-                            phone =
-                                cp.getString(cp.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER))
-                        } catch (exception: IllegalArgumentException) {
-                            Timber.w(exception, "Exception getting contact phone number.")
-                        }
-                        cp.close()
-                    }
-                }
-                val data = StringBuilder()
-                data.append(name)
-                if (phone != null) {
-                    data.append(", $phone")
-                }
-                if (email != null) {
-                    data.append(", $email")
-                }
-                createFile(name, data.toString(), parentNode)
-            }
-            cursorID.close()
-        }.onFailure {
-            Timber.e(it)
-            showSnackbar(Constants.SNACKBAR_TYPE, getString(R.string.error_temporary_unavaible), -1)
         }
     }
 
@@ -6646,7 +6477,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             }.onSuccess { collisions ->
                 collisions.firstOrNull()?.let {
                     nameCollisionActivityLauncher.launch(arrayListOf(it))
-                } ?: uploadFile(file, parentHandle)
+                } ?: viewModel.uploadFile(file, parentHandle)
             }.onFailure { throwable: Throwable? ->
                 Timber.e(throwable)
                 showSnackbar(
@@ -7360,7 +7191,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
             val height: Int =
-                if (adsComposeView.isVisible) resources.getDimensionPixelSize(R.dimen.ads_web_view_and_bottom_navigation_view_height)
+                if (adsContainerView.isVisible) resources.getDimensionPixelSize(R.dimen.ads_web_view_and_bottom_navigation_view_height)
                 else resources.getDimensionPixelSize(R.dimen.bottom_navigation_view_height)
 
             if (hide && visibility == View.VISIBLE) {
@@ -7620,7 +7451,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                 ?: return
         val params = transfersWidgetLayout.layoutParams as LinearLayout.LayoutParams
         params.gravity = Gravity.END
-        if (!bNVHidden && isInMainHomePage || drawerItem == DrawerItem.SYNC) {
+        if (!bNVHidden && isInMainHomePage) {
             params.bottomMargin = Util.dp2px(TRANSFER_WIDGET_MARGIN_BOTTOM.toFloat(), outMetrics)
         } else {
             params.bottomMargin = 0
@@ -7993,33 +7824,51 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     }
 
     private fun setupAdsView() {
-        adsComposeView.apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-            setContent {
-                val themeMode by getThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.System)
-                val isDark = themeMode.isDarkMode()
-                val uiState by adsViewModel.uiState.collectAsStateWithLifecycle()
-                OriginalTempTheme(isDark = isDark) {
-                    AdsBannerView(uiState = uiState,
-                        onAdsWebpageLoaded = ::onAdsWebpageLoaded,
-                        onAdClicked = { uri ->
-                            uri?.let {
-                                val intent = Intent(Intent.ACTION_VIEW, it)
-                                if (intent.resolveActivity(packageManager) != null) {
-                                    startActivity(intent)
-                                    onAdConsumed()
-                                } else {
-                                    Timber.d("No Application found to can handle Ads intent")
-                                    adsViewModel.fetchNewAd()
-                                }
-                            }
-                        }, onAdDismissed = {
-                            onAdConsumed()
-                        }
-                    )
-                }
+        val adView = AdManagerAdView(this)
+        // This is a adUntiId only for testing, it should be replace with real one after testing is finished
+        adView.adUnitId = AD_UNIT_ID
+        // the size will be set manually for now, the better implementation will be provided when API and SDK are ready
+        adView.setAdSize(AD_SIZE)
+        adView.adListener = object : AdListener() {
+            override fun onAdClicked() {
+                // Code to be executed when the user clicks on an ad.
+                Timber.d("Ad clicked")
+            }
+
+            override fun onAdClosed() {
+                Timber.i("Ad closed")
+                // Code to be executed when the user is about to return
+                // to the app after tapping on an ad.
+            }
+
+            override fun onAdFailedToLoad(adError : LoadAdError) {
+                // Code to be executed when an ad request fails.
+                Timber.w("Ad failed to load: ${adError.message}")
+            }
+
+            override fun onAdImpression() {
+                Timber.i("Ad impression")
+                // Code to be executed when an impression is recorded
+                // for an ad.
+            }
+
+            override fun onAdLoaded() {
+                Timber.i("Ad loaded")
+                // Code to be executed when an ad finishes loading.
+            }
+
+            override fun onAdOpened() {
+                Timber.i("Ad opened")
+                // Code to be executed when an ad opens an overlay that
+                // covers the screen.
             }
         }
+        this.adView = adView
+        adsContainerView.removeAllViews()
+        adsContainerView.addView(adView)
+
+        val adRequest = AdManagerAdRequest.Builder().build()
+        adView.loadAd(adRequest)
     }
 
     private fun onAdConsumed() {
@@ -8030,11 +7879,14 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     }
 
     private fun showAdsView() {
-        adsComposeView.isVisible = true
+        if (viewModel.state().adsEnabled) {
+            adsContainerView.isVisible = true
+            setupAdsView()
+        }
     }
 
     fun hideAdsView() {
-        adsComposeView.isVisible = false
+        adsContainerView.isVisible = false
         adsViewModel.cancelFetchingAds()
     }
 
@@ -8055,6 +7907,8 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     }
 
     companion object {
+        const val AD_UNIT_ID = "ca-app-pub-2135147798858967/9835644604"
+        val AD_SIZE = AdSize(320, 50)
         const val TRANSFERS_TAB = "TRANSFERS_TAB"
         private const val BOTTOM_ITEM_BEFORE_OPEN_FULLSCREEN_OFFLINE =
             "BOTTOM_ITEM_BEFORE_OPEN_FULLSCREEN_OFFLINE"

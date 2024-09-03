@@ -12,6 +12,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -73,7 +74,7 @@ internal fun VideoItemView(
             )
             .padding(vertical = 8.dp, horizontal = 16.dp)
             .fillMaxWidth()
-            .height(87.dp)
+            .height(71.dp)
             .testTag(VIDEO_ITEM_VIEW_TEST_TAG)
     ) {
         VideoThumbnailView(
@@ -129,9 +130,8 @@ internal fun VideoThumbnailView(
     duration: String?,
     isFavourite: Boolean,
 ) {
-    Box(modifier = modifier) {
+    Box(modifier = modifier.width(126.dp).aspectRatio(1.77f)) {
         val thumbnailModifier = Modifier
-            .width(126.dp)
             .fillMaxHeight()
             .clip(RoundedCornerShape(5.dp))
             .background(colorResource(id = R.color.white_045_grey_045))
@@ -300,7 +300,7 @@ internal fun VideoSizeAndIconsView(
 private fun VideoItemViewWithFavouritePreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VideoItemView(
-            icon = iconPackR.drawable.ic_video_medium_solid,
+            icon = iconPackR.drawable.ic_video_section_video_default_thumbnail,
             name = "testing_video_file_name_long_name_testing.mp4",
             fileSize = "1.3MB",
             duration = "04:00",
@@ -320,7 +320,7 @@ private fun VideoItemViewWithFavouritePreview() {
 private fun VideoItemViewWithoutFavouritePreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VideoItemView(
-            icon = iconPackR.drawable.ic_video_medium_solid,
+            icon = iconPackR.drawable.ic_video_section_video_default_thumbnail,
             name = "name.mp4",
             fileSize = "1.3MB",
             duration = "04:00",

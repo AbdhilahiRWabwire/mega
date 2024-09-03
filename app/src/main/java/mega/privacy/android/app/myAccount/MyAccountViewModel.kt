@@ -65,7 +65,6 @@ import mega.privacy.android.app.utils.permission.PermissionUtils.hasPermissions
 import mega.privacy.android.app.utils.permission.PermissionUtils.requestPermission
 import mega.privacy.android.data.qualifier.MegaApi
 import mega.privacy.android.domain.entity.AccountType
-import mega.privacy.android.domain.entity.SubscriptionStatus
 import mega.privacy.android.domain.entity.node.TypedFolderNode
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.entity.verification.VerifiedPhoneNumber
@@ -287,6 +286,8 @@ class MyAccountViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             subscriptionDetails = accountDetail.levelDetail,
+                            accountType = accountDetail.levelDetail?.accountType
+                                ?: AccountType.FREE,
                         )
                     }
                 }
@@ -498,13 +499,7 @@ class MyAccountViewModel @Inject constructor(
      *
      * @return
      */
-    fun getAccountType(): AccountType = when (myAccountInfo.accountType) {
-        Constants.PRO_LITE -> AccountType.PRO_LITE
-        Constants.PRO_I -> AccountType.PRO_I
-        Constants.PRO_II -> AccountType.PRO_II
-        Constants.PRO_III -> AccountType.PRO_III
-        else -> AccountType.UNKNOWN
-    }
+    fun getAccountType(): AccountType = state.value.accountType
 
     /**
      * Is free account
@@ -1327,19 +1322,14 @@ class MyAccountViewModel @Inject constructor(
                 getPaymentMethodUseCase(false)
 
                 val businessProFlexiStatus = getBusinessStatusUseCase()
-
-                val subscriptionDetails = state.value.subscriptionDetails
+                val isProSubscription = isProSubscriptionCheck()
                 _state.update { state ->
                     state.copy(
                         isBusinessAccount = accountDetails.isBusinessAccount &&
                                 accountDetails.accountTypeIdentifier == AccountType.BUSINESS,
                         isProFlexiAccount = accountDetails.isBusinessAccount && accountDetails.accountTypeIdentifier == AccountType.PRO_FLEXI,
                         businessProFlexiStatus = businessProFlexiStatus,
-                        isStandardProAccount = if (subscriptionDetails?.subscriptionStatus == SubscriptionStatus.VALID) {
-                            accountDetails.accountTypeIdentifier?.let {
-                                isStandardProAccountCheck(it)
-                            } ?: false
-                        } else false
+                        isProSubscription = isProSubscription,
                     )
                 }
             }.onFailure {
@@ -1387,17 +1377,34 @@ class MyAccountViewModel @Inject constructor(
         }
     }
 
-    private fun isStandardProAccountCheck(accountType: AccountType): Boolean = when (accountType) {
-        AccountType.PRO_I -> true
-        AccountType.PRO_II -> true
-        AccountType.PRO_III -> true
-        AccountType.PRO_LITE -> true
-        else -> false
+    /**
+     * To check if user has active Pro subscription and update UI state
+     */
+    private fun isProSubscriptionCheck(): Boolean {
+        val subscriptionList =
+            state.value.subscriptionDetails?.accountSubscriptionDetailList
+        val planDetail = state.value.subscriptionDetails?.accountPlanDetail
+        val isActiveProSubscription = when (planDetail?.accountType) {
+            AccountType.PRO_LITE,
+            AccountType.PRO_I,
+            AccountType.PRO_II,
+            AccountType.PRO_III,
+            -> {
+                if (subscriptionList?.size == 1) {
+                    planDetail.accountType == subscriptionList.firstOrNull()?.subscriptionLevel
+                } else {
+                    false
+                }
+            }
+
+            else -> false
+        }
+        return isActiveProSubscription ?: false
     }
 
     /**
-     * Check if account has standard Pro subscription (Pro Lite, Pro I, Pro II, Pro III or Pro Flexi)
+     * Check if account has active Pro subscription (Pro Lite, Pro I, Pro II, Pro III)
      */
-    fun isStandardProAccount(): Boolean =
-        state.value.isStandardProAccount
+    fun isProSubscription(): Boolean =
+        state.value.isProSubscription
 }

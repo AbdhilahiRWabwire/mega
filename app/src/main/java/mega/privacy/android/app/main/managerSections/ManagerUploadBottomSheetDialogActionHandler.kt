@@ -3,16 +3,19 @@ package mega.privacy.android.app.main.managerSections
 import android.Manifest
 import android.Manifest.permission.POST_NOTIFICATIONS
 import android.app.Activity
+import android.app.Activity.RESULT_OK
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanner
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import dagger.hilt.android.scopes.ActivityScoped
 import mega.privacy.android.app.R
 import mega.privacy.android.app.interfaces.ActionNodeCallback
@@ -22,12 +25,12 @@ import mega.privacy.android.app.main.FileExplorerActivity
 import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.main.NavigationDrawerManager
 import mega.privacy.android.app.main.ParentNodeManager
-import mega.privacy.android.app.presentation.bottomsheet.ScanDocumentActionListener
 import mega.privacy.android.app.presentation.bottomsheet.ShowNewFolderDialogActionListener
 import mega.privacy.android.app.presentation.bottomsheet.ShowNewTextFileDialogActionListener
 import mega.privacy.android.app.presentation.bottomsheet.TakePictureAndUploadActionListener
 import mega.privacy.android.app.presentation.bottomsheet.UploadFilesActionListener
 import mega.privacy.android.app.presentation.bottomsheet.UploadFolderActionListener
+import mega.privacy.android.app.presentation.documentscanner.SaveScannedDocumentsActivity
 import mega.privacy.android.app.presentation.extensions.uploadFilesManually
 import mega.privacy.android.app.presentation.extensions.uploadFolderManually
 import mega.privacy.android.app.utils.Constants
@@ -42,11 +45,11 @@ import mega.privacy.android.app.utils.MegaNodeDialogUtil.showNewTxtFileDialog
 import mega.privacy.android.app.utils.Util.checkTakePicture
 import mega.privacy.android.app.utils.permission.PermissionUtilWrapper
 import nz.mega.documentscanner.DocumentScannerActivity
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
  * Upload bottom sheet dialog action handler for [ManagerActivity]
- *
  */
 @ActivityScoped
 internal class ManagerUploadBottomSheetDialogActionHandler @Inject constructor(
@@ -56,11 +59,10 @@ internal class ManagerUploadBottomSheetDialogActionHandler @Inject constructor(
     UploadFilesActionListener,
     UploadFolderActionListener,
     TakePictureAndUploadActionListener,
-    ScanDocumentActionListener,
     ShowNewFolderDialogActionListener,
     ShowNewTextFileDialogActionListener {
 
-    private val managerActivity = activity as AppCompatActivity
+    private val managerActivity = activity as ManagerActivity
     private val parentNodeManager = activity as ParentNodeManager
     private val cameraPermissionManager = activity as CameraPermissionManager
     private val navigationDrawerManager = activity as NavigationDrawerManager
@@ -94,6 +96,13 @@ internal class ManagerUploadBottomSheetDialogActionHandler @Inject constructor(
         newTextFileDialog?.dismiss()
     }
 
+    private val openMultipleDocumentLauncher =
+        managerActivity.registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {
+            if (it.isNotEmpty()) {
+                managerActivity.handleFileUris(it)
+            }
+        }
+
     /**
      * When manually uploading Files and the device is running Android 13 and above, this Launcher
      * is called to request the Notification Permission (if possible) and upload Files regardless
@@ -102,7 +111,7 @@ internal class ManagerUploadBottomSheetDialogActionHandler @Inject constructor(
     private val manualUploadFilesLauncher: ActivityResultLauncher<String> =
         managerActivity.registerForActivityResult(
             ActivityResultContracts.RequestPermission()
-        ) { activity.uploadFilesManually() }
+        ) { openMultipleDocumentLauncher.launch(arrayOf("*/*")) }
 
     /**
      * When manually uploading a Folder and the device is running Android 13 and above, this Launcher
@@ -114,9 +123,12 @@ internal class ManagerUploadBottomSheetDialogActionHandler @Inject constructor(
             ActivityResultContracts.RequestPermission()
         ) { activity.uploadFolderManually() }
 
-    private val scanDocumentLauncher =
+    /**
+     * The launcher to scan documents using the for the old Document Scanner
+     */
+    private val legacyScanDocumentLauncher =
         managerActivity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            if (it.resultCode == Activity.RESULT_OK) {
+            if (it.resultCode == RESULT_OK) {
                 it.data?.let { intent ->
                     val savedDestination: String? =
                         intent.getStringExtra(DocumentScannerActivity.EXTRA_PICKED_SAVE_DESTINATION)
@@ -138,6 +150,34 @@ internal class ManagerUploadBottomSheetDialogActionHandler @Inject constructor(
                 }
             }
         }
+
+    /**
+     * The launcher to scan documents using the new ML Document Kit Scanner. After scanning, a
+     * different screen is opened to configure where to save the scanned documents.
+     */
+    private val newScanDocumentLauncher = managerActivity.registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            GmsDocumentScanningResult.fromActivityResultIntent(result.data)?.let { data ->
+                with(data) {
+                    pdf?.uri?.let { pdfUri ->
+                        Timber.d("The PDF URI is: $pdfUri")
+                        // Do something with the PDF
+                    }
+                    pages?.forEach { page ->
+                        page.imageUri.path?.let { imagePath ->
+                            Timber.d("The Image Path is: $imagePath")
+                            // Do something with the image
+                        }
+                    }
+                    val intent =
+                        Intent(managerActivity, SaveScannedDocumentsActivity::class.java)
+                    managerActivity.startActivity(intent)
+                }
+            }
+        }
+    }
 
     override fun uploadFiles() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -176,13 +216,35 @@ internal class ManagerUploadBottomSheetDialogActionHandler @Inject constructor(
         checkTakePicture(managerActivity, Constants.TAKE_PHOTO_CODE)
     }
 
-    override fun scanDocument() {
+    /**
+     * Begin scanning Documents using the old Document Scanner
+     */
+    fun scanDocumentUsingLegacyScanner() {
         val saveDestinations = arrayOf(
             managerActivity.getString(R.string.section_cloud_drive),
             managerActivity.getString(R.string.section_chat)
         )
         val intent = DocumentScannerActivity.getIntent(managerActivity, saveDestinations)
-        scanDocumentLauncher.launch(intent)
+        legacyScanDocumentLauncher.launch(intent)
+    }
+
+    /**
+     * Begin scanning Documents using the new ML Kit Document Scanner
+     *
+     * @param documentScanner the new ML Kit Document Scanner
+     */
+    fun scanDocumentUsingNewScanner(documentScanner: GmsDocumentScanner) {
+        documentScanner.apply {
+            getStartScanIntent(managerActivity)
+                .addOnSuccessListener {
+                    newScanDocumentLauncher.launch(
+                        IntentSenderRequest.Builder(it).build()
+                    )
+                }
+                .addOnFailureListener { exception ->
+                    Timber.e("An error occurred when attempting to initialize the ML Kit Document Scanner: $exception")
+                }
+        }
     }
 
     override fun showNewFolderDialog(typedText: String?) {

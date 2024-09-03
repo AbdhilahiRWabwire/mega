@@ -90,6 +90,15 @@ android {
                 unstrippedNativeLibsDir = nativeLibsDir(project)
             }
 
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            // If you want to build release app locally uncomment the following line
+            // signingConfig = signingConfigs.getByName("debug")
+
             buildConfigField("String", "ENVIRONMENT", "\"\"")
         }
 
@@ -234,8 +243,10 @@ dependencies {
 
     // Google GMS
     implementation(lib.billing.client.ktx)
+    implementation(google.services.ads)
     implementation(google.services.location)
     implementation(google.services.maps)
+    implementation(google.services.mlkit.document.scanner)
     implementation(google.maps.utils)
     implementation(google.maps.compose)
     implementation(google.code.scanner)

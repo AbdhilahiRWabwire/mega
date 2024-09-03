@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.videosection.view.playlist
 
+import mega.privacy.android.icon.pack.R as iconPackR
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -10,6 +11,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,7 +43,8 @@ import mega.privacy.android.shared.original.core.ui.theme.extensions.textColorSe
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun VideoPlaylistItemView(
-    @DrawableRes icon: Int,
+    @DrawableRes emptyPlaylistIcon: Int,
+    @DrawableRes noThumbnailIcon: Int,
     title: String,
     numberOfVideos: Int,
     totalDuration: String?,
@@ -65,7 +68,8 @@ internal fun VideoPlaylistItemView(
         verticalAlignment = Alignment.CenterVertically
     ) {
         VideoPlaylistThumbnailView(
-            icon = icon,
+            emptyPlaylistIcon = emptyPlaylistIcon,
+            noThumbnailIcon = noThumbnailIcon,
             modifier = Modifier,
             thumbnailList = thumbnailList
         )
@@ -102,7 +106,8 @@ internal fun VideoPlaylistItemView(
 
 @Composable
 internal fun VideoPlaylistThumbnailView(
-    @DrawableRes icon: Int,
+    @DrawableRes emptyPlaylistIcon: Int,
+    @DrawableRes noThumbnailIcon: Int,
     modifier: Modifier,
     thumbnailList: List<Any?>?,
 ) {
@@ -112,12 +117,13 @@ internal fun VideoPlaylistThumbnailView(
     ) {
         val thumbnailModifier = Modifier
             .width(126.dp)
-            .height(80.dp)
+            .aspectRatio(1.77f)
             .clip(RoundedCornerShape(10.dp))
             .background(MaterialTheme.colors.grey_050_grey_800)
 
         ThumbnailListView(
-            icon = icon,
+            emptyPlaylistIcon = emptyPlaylistIcon,
+            noThumbnailIcon = noThumbnailIcon,
             modifier = thumbnailModifier,
             thumbnailList = thumbnailList,
         )
@@ -135,36 +141,23 @@ internal fun VideoPlaylistThumbnailView(
 
 @Composable
 internal fun ThumbnailListView(
-    @DrawableRes icon: Int,
+    @DrawableRes emptyPlaylistIcon: Int,
+    @DrawableRes noThumbnailIcon: Int,
     modifier: Modifier,
     thumbnailList: List<Any?>?,
 ) {
     when {
         thumbnailList == null ->
-            PlaylistEmptyView(icon = icon, modifier = modifier)
+            PlaylistEmptyView(icon = emptyPlaylistIcon, modifier = modifier)
 
-        thumbnailList.size < 4 ->
-            thumbnailList.firstNotNullOfOrNull { thumbnailData ->
-                thumbnailData?.let {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(it)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "VideoPlaylist",
-                        placeholder = painterResource(id = icon),
-                        error = painterResource(id = icon),
-                        contentScale = ContentScale.FillBounds,
-                        modifier = modifier
-                    )
-                } ?: PlaylistEmptyView(icon = icon, modifier = modifier)
-            }
+        thumbnailList.isEmpty() ->
+            PlaylistEmptyView(icon = noThumbnailIcon, modifier = modifier)
 
         else ->
             MultipleThumbnailsView(
-                icon = icon,
+                icon = emptyPlaylistIcon,
                 modifier = modifier,
-                thumbnailList = thumbnailList,
+                thumbnails = thumbnailList,
             )
     }
 }
@@ -174,59 +167,67 @@ internal fun PlaylistEmptyView(
     @DrawableRes icon: Int,
     modifier: Modifier,
 ) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Image(
-            modifier = Modifier.size(24.dp),
-            painter = painterResource(id = icon),
-            contentDescription = "VideoPlaylist",
-        )
-    }
+    Image(
+        painter = painterResource(id = icon),
+        contentDescription = "VideoPlaylist",
+    )
 }
 
 @Composable
 internal fun MultipleThumbnailsView(
     @DrawableRes icon: Int,
     modifier: Modifier,
-    thumbnailList: List<Any?>,
+    thumbnails: List<Any?>,
 ) {
-    Row(
+    val thumbnailList = if (thumbnails.size < 4) {
+        thumbnails + List(4 - thumbnails.size) { null }
+    } else {
+        thumbnails
+    }
+    Column(
         modifier = modifier
     ) {
         (thumbnailList.indices).chunked(2)
-            .mapIndexed { rowIndex, indices ->
-                Column(
+            .mapIndexed { columnIndex, indices ->
+                Row(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxHeight()
                         .weight(1f)
                 ) {
-                    indices.mapIndexed { columnIndex, itemIndex ->
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(thumbnailList[itemIndex])
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = "Video",
-                            placeholder = painterResource(id = icon),
-                            error = painterResource(id = icon),
-                            contentScale = ContentScale.FillBounds,
+                    indices.mapIndexed { rowIndex, itemIndex ->
+                        thumbnailList[itemIndex]?.let {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(it)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "Video",
+                                placeholder = painterResource(id = icon),
+                                error = painterResource(id = icon),
+                                contentScale = ContentScale.FillBounds,
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .weight(1f)
+                            )
+                        } ?: Box(
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .weight(1f)
                         )
-                        if (columnIndex == 0) {
+                        if (rowIndex == 0) {
                             Divider(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(1.dp)
+                                    .fillMaxHeight()
+                                    .width(1.dp)
                             )
                         }
                     }
                 }
-                if (rowIndex == 0) {
+                if (columnIndex == 0) {
                     Divider(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .width(1.dp)
+                            .fillMaxWidth()
+                            .height(1.dp)
                     )
                 }
             }
@@ -243,7 +244,11 @@ internal fun VideoPlaylistInfoView(
     onMenuClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.padding(vertical = 5.dp, horizontal = 10.dp).fillMaxHeight()) {
+    Column(
+        modifier = modifier
+            .padding(vertical = 5.dp, horizontal = 10.dp)
+            .fillMaxHeight()
+    ) {
         Text(
             text = title,
             modifier = Modifier.fillMaxWidth(),
@@ -277,7 +282,8 @@ internal fun VideoPlaylistInfoView(
 private fun VideoPlaylistItemViewWithoutVideosPreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VideoPlaylistItemView(
-            icon = R.drawable.ic_playlist_item_empty,
+            emptyPlaylistIcon = iconPackR.drawable.ic_video_playlist_default_thumbnail,
+            noThumbnailIcon = iconPackR.drawable.ic_video_playlist_no_thumbnail,
             title = "New Playlist",
             thumbnailList = null,
             modifier = Modifier,
@@ -294,7 +300,8 @@ private fun VideoPlaylistItemViewWithoutVideosPreview() {
 private fun VideoPlaylistItemViewWith1VideoPreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VideoPlaylistItemView(
-            icon = R.drawable.ic_playlist_item_empty,
+            emptyPlaylistIcon = iconPackR.drawable.ic_video_playlist_default_thumbnail,
+            noThumbnailIcon = iconPackR.drawable.ic_video_playlist_no_thumbnail,
             title = "1 Video Playlist",
             thumbnailList = null,
             modifier = Modifier,
@@ -311,7 +318,8 @@ private fun VideoPlaylistItemViewWith1VideoPreview() {
 private fun VideoPlaylistItemViewMultipleVideosPreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VideoPlaylistItemView(
-            icon = R.drawable.ic_playlist_item_empty,
+            emptyPlaylistIcon = iconPackR.drawable.ic_video_playlist_default_thumbnail,
+            noThumbnailIcon = iconPackR.drawable.ic_video_playlist_no_thumbnail,
             title = "Multiple Video Playlist",
             thumbnailList = null,
             modifier = Modifier,
@@ -328,9 +336,13 @@ private fun VideoPlaylistItemViewMultipleVideosPreview() {
 private fun ThumbnailListViewWith4ThumbnailsPreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VideoPlaylistThumbnailView(
-            icon = R.drawable.ic_playlist_item_empty,
+            emptyPlaylistIcon = iconPackR.drawable.ic_video_playlist_default_thumbnail,
+            noThumbnailIcon = iconPackR.drawable.ic_video_playlist_no_thumbnail,
             modifier = Modifier,
-            thumbnailList = listOf(null, null, null, null),
+            thumbnailList = listOf(
+                iconPackR.drawable.ic_playlist_item_empty,
+                iconPackR.drawable.ic_playlist_item_empty,
+            )
         )
     }
 }
@@ -340,9 +352,10 @@ private fun ThumbnailListViewWith4ThumbnailsPreview() {
 private fun ThumbnailListViewWith1NullThumbnailPreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VideoPlaylistThumbnailView(
-            icon = R.drawable.ic_playlist_item_empty,
+            emptyPlaylistIcon = iconPackR.drawable.ic_video_playlist_default_thumbnail,
+            noThumbnailIcon = iconPackR.drawable.ic_video_playlist_no_thumbnail,
             modifier = Modifier,
-            thumbnailList = listOf(null),
+            thumbnailList = emptyList(),
         )
     }
 }
@@ -352,9 +365,10 @@ private fun ThumbnailListViewWith1NullThumbnailPreview() {
 private fun ThumbnailListViewWith1ThumbnailsPreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VideoPlaylistThumbnailView(
-            icon = R.drawable.ic_playlist_item_empty,
+            emptyPlaylistIcon = iconPackR.drawable.ic_video_playlist_default_thumbnail,
+            noThumbnailIcon = iconPackR.drawable.ic_video_playlist_no_thumbnail,
             modifier = Modifier,
-            thumbnailList = listOf(R.drawable.ic_playlist_item_empty),
+            thumbnailList = listOf(iconPackR.drawable.ic_playlist_item_empty),
         )
     }
 }
@@ -364,7 +378,8 @@ private fun ThumbnailListViewWith1ThumbnailsPreview() {
 private fun ThumbnailListViewWhenThumbnailListIsNullPreview() {
     OriginalTempTheme(isDark = isSystemInDarkTheme()) {
         VideoPlaylistThumbnailView(
-            icon = R.drawable.ic_playlist_item_empty,
+            emptyPlaylistIcon = iconPackR.drawable.ic_video_playlist_default_thumbnail,
+            noThumbnailIcon = iconPackR.drawable.ic_video_playlist_no_thumbnail,
             modifier = Modifier,
             thumbnailList = null,
         )

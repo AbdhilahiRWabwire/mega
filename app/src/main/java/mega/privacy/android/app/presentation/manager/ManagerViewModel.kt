@@ -1,5 +1,6 @@
 package mega.privacy.android.app.presentation.manager
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,37 +22,41 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
-import mega.privacy.android.app.ShareInfo
 import mega.privacy.android.app.components.ChatManagement
+import mega.privacy.android.app.featuretoggle.ABTestFeatures
 import mega.privacy.android.app.featuretoggle.ApiFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.main.dialog.shares.RemoveShareResultMapper
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
+import mega.privacy.android.app.middlelayer.scanner.ScannerHandler
 import mega.privacy.android.app.objects.PasscodeManagement
+import mega.privacy.android.app.presentation.documentscanner.model.DocumentScanningErrorTypeUiItem
 import mega.privacy.android.app.presentation.extensions.getState
 import mega.privacy.android.app.presentation.manager.model.ManagerState
 import mega.privacy.android.app.presentation.manager.model.SharesTab
 import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
+import mega.privacy.android.app.service.scanner.InsufficientRAMToLaunchDocumentScanner
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.app.utils.livedata.SingleLiveEvent
 import mega.privacy.android.domain.entity.StorageState
-import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRestartMode
 import mega.privacy.android.domain.entity.call.ChatCall
+import mega.privacy.android.domain.entity.call.ChatCallStatus
+import mega.privacy.android.domain.entity.call.ChatCallTermCodeType
+import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRestartMode
 import mega.privacy.android.domain.entity.contacts.ContactRequest
 import mega.privacy.android.domain.entity.contacts.ContactRequestStatus
 import mega.privacy.android.domain.entity.environment.DevicePowerConnectionState
-import mega.privacy.android.domain.entity.call.ChatCallStatus
-import mega.privacy.android.domain.entity.call.ChatCallTermCodeType
 import mega.privacy.android.domain.entity.meeting.ScheduledMeetingStatus
 import mega.privacy.android.domain.entity.meeting.UsersCallLimitReminders
 import mega.privacy.android.domain.entity.node.FolderNode
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.entity.node.NodeSourceType
+import mega.privacy.android.domain.entity.uri.UriPath
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.usecase.GetCloudSortOrder
 import mega.privacy.android.domain.usecase.GetExtendedAccountDetail
@@ -73,6 +78,9 @@ import mega.privacy.android.domain.usecase.account.SetCopyLatestTargetPathUseCas
 import mega.privacy.android.domain.usecase.account.SetMoveLatestTargetPathUseCase
 import mega.privacy.android.domain.usecase.account.contactrequest.GetIncomingContactRequestsUseCase
 import mega.privacy.android.domain.usecase.account.contactrequest.MonitorContactRequestUpdatesUseCase
+import mega.privacy.android.domain.usecase.call.AnswerChatCallUseCase
+import mega.privacy.android.domain.usecase.call.GetChatCallUseCase
+import mega.privacy.android.domain.usecase.call.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.camerauploads.EstablishCameraUploadsSyncHandlesUseCase
 import mega.privacy.android.domain.usecase.camerauploads.MonitorCameraUploadsFolderDestinationUseCase
 import mega.privacy.android.domain.usecase.chat.GetNumUnreadChatsUseCase
@@ -81,12 +89,10 @@ import mega.privacy.android.domain.usecase.chat.link.GetChatLinkContentUseCase
 import mega.privacy.android.domain.usecase.contact.SaveContactByEmailUseCase
 import mega.privacy.android.domain.usecase.environment.MonitorDevicePowerConnectionStateUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
+import mega.privacy.android.domain.usecase.file.FilePrepareUseCase
 import mega.privacy.android.domain.usecase.login.MonitorFinishActivityUseCase
-import mega.privacy.android.domain.usecase.call.AnswerChatCallUseCase
-import mega.privacy.android.domain.usecase.call.GetChatCallUseCase
-import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
-import mega.privacy.android.domain.usecase.call.HangChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChatUseCase
+import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorUpgradeDialogClosedUseCase
@@ -183,6 +189,7 @@ import javax.inject.Inject
  * @property hangChatCallUseCase Use case for hanging a chat call.
  * @property setUsersCallLimitRemindersUseCase      [SetUsersCallLimitRemindersUseCase]
  * @property getUsersCallLimitRemindersUseCase      [GetUsersCallLimitRemindersUseCase]
+ * @property filePrepareUseCase Use case for preparing files.
  */
 @HiltViewModel
 class ManagerViewModel @Inject constructor(
@@ -258,6 +265,8 @@ class ManagerViewModel @Inject constructor(
     private val monitorUpgradeDialogClosedUseCase: MonitorUpgradeDialogClosedUseCase,
     private val monitorDevicePowerConnectionStateUseCase: MonitorDevicePowerConnectionStateUseCase,
     private val startOfflineSyncWorkerUseCase: StartOfflineSyncWorkerUseCase,
+    private val filePrepareUseCase: FilePrepareUseCase,
+    private val scannerHandler: ScannerHandler,
 ) : ViewModel() {
 
     /**
@@ -522,6 +531,15 @@ class ManagerViewModel @Inject constructor(
                 if (state == DevicePowerConnectionState.Connected) {
                     startCameraUploadUseCase()
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                val isAdseFlagEnabled = getFeatureFlagValueUseCase(ABTestFeatures.adse)
+                _state.update { it.copy(adsEnabled = isAdseFlagEnabled) }
+            }.onFailure {
+                Timber.e(it, "Failed to get the adse feature flag")
             }
         }
     }
@@ -1327,21 +1345,12 @@ class ManagerViewModel @Inject constructor(
     }
 
     /**
-     * Uploads a list of files to the specified destination.
+     * Upload files
      *
-     * @param shareInfo The files as [ShareInfo] to upload.
-     * @param destination The destination where the files will be uploaded.
+     * @param pathsAndNames Map of paths and names
+     * @param destinationId Destination node id
      */
-    fun uploadShareInfo(
-        shareInfo: List<ShareInfo>,
-        destination: Long,
-    ) {
-        val pathsAndNames = shareInfo.map { it.fileAbsolutePath }.associateWith { null }
-
-        uploadFiles(pathsAndNames, NodeId(destination))
-    }
-
-    private fun uploadFiles(
+    fun uploadFiles(
         pathsAndNames: Map<String, String?>,
         destinationId: NodeId,
     ) {
@@ -1362,6 +1371,49 @@ class ManagerViewModel @Inject constructor(
      */
     fun consumeUploadEvent() {
         _state.update { it.copy(uploadEvent = consumed()) }
+    }
+
+    /**
+     * Prepare files for upload
+     */
+    suspend fun prepareFiles(uris: List<Uri>) =
+        filePrepareUseCase(uris.map { UriPath(it.toString()) })
+
+    /**
+     * Checks whether the legacy or modern Document Scanner should be used
+     */
+    fun handleScanDocument() {
+        viewModelScope.launch {
+            runCatching {
+                scannerHandler.handleScanDocument()
+            }.onSuccess { handleScanDocumentResult ->
+                _state.update { it.copy(handleScanDocumentResult = handleScanDocumentResult) }
+            }.onFailure { exception ->
+                _state.update {
+                    it.copy(
+                        documentScanningErrorTypeUiItem = if (exception is InsufficientRAMToLaunchDocumentScanner) {
+                            DocumentScanningErrorTypeUiItem.InsufficientRAM
+                        } else {
+                            DocumentScanningErrorTypeUiItem.GenericError
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Resets the value of [ManagerState.handleScanDocumentResult]
+     */
+    fun onHandleScanDocumentResultConsumed() {
+        _state.update { it.copy(handleScanDocumentResult = null) }
+    }
+
+    /**
+     * Resets the value of [ManagerState.documentScanningErrorTypeUiItem]
+     */
+    fun onDocumentScanningErrorConsumed() {
+        _state.update { it.copy(documentScanningErrorTypeUiItem = null) }
     }
 
     internal companion object {

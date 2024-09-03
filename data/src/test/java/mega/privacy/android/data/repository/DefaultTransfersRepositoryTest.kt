@@ -26,7 +26,6 @@ import mega.privacy.android.data.mapper.transfer.CompletedTransferMapper
 import mega.privacy.android.data.mapper.transfer.InProgressTransferMapper
 import mega.privacy.android.data.mapper.transfer.PausedTransferEventMapper
 import mega.privacy.android.data.mapper.transfer.TransferAppDataStringMapper
-import mega.privacy.android.data.mapper.transfer.TransferDataMapper
 import mega.privacy.android.data.mapper.transfer.TransferEventMapper
 import mega.privacy.android.data.mapper.transfer.TransferMapper
 import mega.privacy.android.data.mapper.transfer.active.ActiveTransferTotalsMapper
@@ -90,7 +89,6 @@ class DefaultTransfersRepositoryTest {
     private val localStorageGateway: MegaLocalStorageGateway = mock()
     private val workerManagerGateway = mock<WorkManagerGateway>()
     private val megaLocalRoomGateway = mock<MegaLocalRoomGateway>()
-    private val transferDataMapper = mock<TransferDataMapper>()
     private val cancelTokenProvider = mock<CancelTokenProvider>()
     private val activeTransferTotalsMapper = mock<ActiveTransferTotalsMapper>()
     private val megaNodeMapper = mock<MegaNodeMapper>()
@@ -122,7 +120,6 @@ class DefaultTransfersRepositoryTest {
             localStorageGateway = localStorageGateway,
             workerManagerGateway = workerManagerGateway,
             megaLocalRoomGateway = megaLocalRoomGateway,
-            transferDataMapper = transferDataMapper,
             cancelTokenProvider = cancelTokenProvider,
             scope = testScope,
             megaNodeMapper = megaNodeMapper,
@@ -143,7 +140,6 @@ class DefaultTransfersRepositoryTest {
             localStorageGateway,
             workerManagerGateway,
             megaLocalRoomGateway,
-            transferDataMapper,
             cancelTokenProvider,
             completedTransferMapper,
             megaNodeMapper,
@@ -713,19 +709,6 @@ class DefaultTransfersRepositoryTest {
         }
 
     @Test
-    fun `test that addCompletedTransfer call local storage gateway addCompletedTransfer and app event gateway broadcastCompletedTransfer with the mapped transfer`() =
-        runTest {
-            val transfer = mock<Transfer>()
-            val error = mock<MegaException>()
-            val expected = mock<CompletedTransfer>()
-            val path = "path"
-            whenever(completedTransferMapper(transfer, error, path)).thenReturn(expected)
-            underTest.addCompletedTransfer(transfer, error, path)
-            verify(megaLocalRoomGateway).addCompletedTransfer(expected)
-            verify(appEventGateway).broadcastCompletedTransfer()
-        }
-
-    @Test
     fun `test that addCompletedTransfers call local storage gateway addCompletedTransfers and app event gateway broadcastCompletedTransfer with the mapped transfers`() =
         runTest {
             val transfer = mock<Transfer>()
@@ -1150,7 +1133,7 @@ class DefaultTransfersRepositoryTest {
 
         @ParameterizedTest
         @EnumSource(TransferType::class)
-        fun `test that getActiveTransfersByType gateway first result is returned when getCurrentActiveTransfersByType is called`(
+        fun `test that getActiveTransfersByType gateway result is returned when getCurrentActiveTransfersByType is called`(
             transferType: TransferType,
         ) =
             runTest {
@@ -1158,6 +1141,16 @@ class DefaultTransfersRepositoryTest {
                 whenever(megaLocalRoomGateway.getCurrentActiveTransfersByType(transferType))
                     .thenReturn(expected)
                 val actual = underTest.getCurrentActiveTransfersByType(transferType)
+                assertThat(actual).isEqualTo(expected)
+            }
+
+        @Test
+        fun `test that getActiveTransfers gateway result is returned when getCurrentActiveTransfers is called`() =
+            runTest {
+                val expected = mock<List<ActiveTransfer>>()
+                whenever(megaLocalRoomGateway.getCurrentActiveTransfers())
+                    .thenReturn(expected)
+                val actual = underTest.getCurrentActiveTransfers()
                 assertThat(actual).isEqualTo(expected)
             }
 
@@ -1185,6 +1178,13 @@ class DefaultTransfersRepositoryTest {
             underTest.deleteAllActiveTransfersByType(transferType)
             verify(megaLocalRoomGateway).deleteAllActiveTransfersByType(transferType)
         }
+
+        @Test
+        fun `test that deleteAllActiveTransfers gateway is called when deleteAllActiveTransfers is called`() =
+            runTest {
+                underTest.deleteAllActiveTransfers()
+                verify(megaLocalRoomGateway).deleteAllActiveTransfers()
+            }
 
         @Test
         fun `test that setActiveTransferAsFinishedByTag gateway is called when setActiveTransferAsFinishedByTag is called`(
@@ -1441,64 +1441,6 @@ class DefaultTransfersRepositoryTest {
                 assertThat(awaitItem()).isEqualTo(emptyMap<Int, InProgressTransfer>())
                 underTest.updateInProgressTransfer(transfer)
                 assertThat(awaitItem()).isEqualTo(mapOf(Pair(tag, expected)))
-            }
-        }
-
-    @Test
-    fun `test that monitorInProgressTransfers correctly after different calls to updateInProgressTransfer and addCompletedTransfer`() =
-        runTest {
-            val tag1 = 1
-            val tag2 = 2
-            val tag3 = 3
-            val tag4 = 4
-            val transfer1 = mock<Transfer> {
-                on { this.tag } doReturn tag1
-            }
-            val transfer2 = mock<Transfer> {
-                on { this.tag } doReturn tag2
-            }
-            val transfer3 = mock<Transfer> {
-                on { this.tag } doReturn tag3
-            }
-            val transfer4 = mock<Transfer> {
-                on { this.tag } doReturn tag4
-            }
-            val inProgressTransfer1 = mock<InProgressTransfer.Download> {
-                on { this.tag } doReturn tag1
-            }
-            val inProgressTransfer2 = mock<InProgressTransfer.Upload> {
-                on { this.tag } doReturn tag2
-            }
-            val inProgressTransfer3 = mock<InProgressTransfer.Download> {
-                on { this.tag } doReturn tag3
-            }
-
-            setUp()
-            whenever(inProgressTransferMapper(transfer1)).thenReturn(inProgressTransfer1)
-            whenever(inProgressTransferMapper(transfer2)).thenReturn(inProgressTransfer2)
-            whenever(inProgressTransferMapper(transfer3)).thenReturn(inProgressTransfer3)
-
-            underTest.monitorInProgressTransfers().test {
-                assertThat(awaitItem()).isEqualTo(emptyMap<Int, InProgressTransfer>())
-                underTest.updateInProgressTransfer(transfer1)
-                assertThat(awaitItem()).isEqualTo(mapOf(Pair(tag1, inProgressTransfer1)))
-                underTest.updateInProgressTransfer(transfer2)
-                assertThat(awaitItem()).isEqualTo(
-                    mapOf(
-                        Pair(tag1, inProgressTransfer1),
-                        Pair(tag2, inProgressTransfer2)
-                    )
-                )
-                underTest.addCompletedTransfer(transfer1, null, "")
-                assertThat(awaitItem()).isEqualTo(mapOf(Pair(tag2, inProgressTransfer2)))
-                underTest.updateInProgressTransfer(transfer3)
-                assertThat(awaitItem()).isEqualTo(
-                    mapOf(
-                        Pair(tag2, inProgressTransfer2),
-                        Pair(tag3, inProgressTransfer3)
-                    )
-                )
-                underTest.addCompletedTransfer(transfer4, null, "")
             }
         }
 

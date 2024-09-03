@@ -34,7 +34,6 @@ import mega.privacy.android.app.presentation.login.model.MultiFactorAuthState
 import mega.privacy.android.app.presentation.twofactorauthentication.extensions.getTwoFactorAuthentication
 import mega.privacy.android.app.presentation.twofactorauthentication.extensions.getUpdatedTwoFactorAuthentication
 import mega.privacy.android.app.utils.Constants
-import mega.privacy.android.domain.entity.Feature
 import mega.privacy.android.domain.entity.account.AccountBlockedType
 import mega.privacy.android.domain.entity.account.AccountSession
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsRestartMode
@@ -210,11 +209,6 @@ class LoginViewModel @Inject constructor(
                         state.copy(enabledFlags = if (enabled) state.enabledFlags + AppFeatures.LoginReportIssueButton else state.enabledFlags - AppFeatures.LoginReportIssueButton)
                     }
                 },
-                flowOf(getFeatureFlagValueUseCase(AppFeatures.NewConfirmEmailFragment)).map { enabled ->
-                    { state: LoginState ->
-                        state.copy(enabledFlags = if (enabled) state.enabledFlags + AppFeatures.NewConfirmEmailFragment else state.enabledFlags - AppFeatures.NewConfirmEmailFragment)
-                    }
-                },
             ).collect {
                 _state.update(it)
             }
@@ -232,11 +226,6 @@ class LoginViewModel @Inject constructor(
                 }.collectLatest { stopLogin() }
         }
     }
-
-    /**
-     * Check if given feature flag is enabled or not
-     */
-    fun isFeatureEnabled(feature: Feature) = state.value.enabledFlags.contains(feature)
 
     /**
      * Sets confirm email fragment as pending in state.
@@ -603,6 +592,7 @@ class LoginViewModel @Inject constructor(
                 isLoginRequired = false,
                 is2FARequired = false,
                 isAlreadyLoggedIn = true,
+                isFastLoginInProgress = true,
                 fetchNodesUpdate = cleanFetchNodesUpdate
             )
         }
@@ -658,15 +648,20 @@ class LoginViewModel @Inject constructor(
         }
 
         LoginStatus.LoginSucceed -> {
-            //If fast login, state already updated.
+            // If fast login, state already updated.
             Timber.d("Login finished")
-            if (!isFastLogin) {
+            if (isFastLogin) {
+                _state.update {
+                    it.copy(isFastLoginInProgress = false)
+                }
+            } else {
                 _state.update {
                     it.copy(
                         isLoginInProgress = false,
                         isLoginRequired = false,
                         is2FARequired = false,
                         isAlreadyLoggedIn = true,
+                        isFastLoginInProgress = false,
                         fetchNodesUpdate = cleanFetchNodesUpdate,
                         multiFactorAuthState = null
                     )
@@ -681,6 +676,7 @@ class LoginViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     isLoginInProgress = false,
+                    isFastLoginInProgress = false,
                     isLoginRequired = true,
                     is2FAEnabled = false,
                     is2FARequired = false
@@ -725,9 +721,7 @@ class LoginViewModel @Inject constructor(
                     in order to monitor current transfers and update the related notification.*/
                     startDownloadWorkerUseCase()
                     startChatUploadsWorkerUseCase()
-                    if (getFeatureFlagValueUseCase(AppFeatures.UploadWorker)) {
-                        startUploadsWorkerUseCase()
-                    }
+                    startUploadsWorkerUseCase()
                     //Login check resumed pending transfers
                     transfersManagement.checkResumedPendingTransfers()
                 } else {
@@ -835,6 +829,12 @@ class LoginViewModel @Inject constructor(
      */
     suspend fun getEphemeral() =
         runCatching { monitorEphemeralCredentialsUseCase().firstOrNull() }.getOrNull()
+
+    /**
+     * Get session
+     */
+    suspend fun getSession() =
+        runCatching { getSessionUseCase() }.getOrNull()
 
     /**
      * Set temporal email
@@ -947,9 +947,6 @@ class LoginViewModel @Inject constructor(
             clearUserCredentialsUseCase()
         }
     }
-
-    internal suspend fun isNewTourFragmentEnabled() =
-        getFeatureFlagValueUseCase(AppFeatures.NewTourFragment)
 
     companion object {
         /**

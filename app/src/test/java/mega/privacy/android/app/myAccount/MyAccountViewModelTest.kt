@@ -21,10 +21,13 @@ import mega.privacy.android.app.presentation.snackbar.SnackBarHandler
 import mega.privacy.android.app.utils.Constants.SNACKBAR_TYPE
 import mega.privacy.android.domain.entity.AccountSubscriptionCycle
 import mega.privacy.android.domain.entity.AccountType
+import mega.privacy.android.domain.entity.PaymentMethodType
 import mega.privacy.android.domain.entity.SubscriptionStatus
 import mega.privacy.android.domain.entity.UserAccount
 import mega.privacy.android.domain.entity.account.AccountDetail
 import mega.privacy.android.domain.entity.account.AccountLevelDetail
+import mega.privacy.android.domain.entity.account.AccountPlanDetail
+import mega.privacy.android.domain.entity.account.AccountSubscriptionDetail
 import mega.privacy.android.domain.entity.account.business.BusinessAccountStatus
 import mega.privacy.android.domain.entity.billing.PaymentMethodFlags
 import mega.privacy.android.domain.entity.node.NodeId
@@ -556,26 +559,98 @@ internal class MyAccountViewModelTest {
         Arguments.of(false, false)
     )
 
-    private fun provideAccountTypeIdentifierParameters() = Stream.of(
-        Arguments.of(AccountType.PRO_I, accountDetailsWithValidSubscription, true),
-        Arguments.of(AccountType.PRO_II, accountDetailsWithValidSubscription, true),
-        Arguments.of(AccountType.PRO_III, accountDetailsWithValidSubscription, true),
-        Arguments.of(AccountType.PRO_LITE, accountDetailsWithValidSubscription, true),
-        Arguments.of(AccountType.PRO_I, accountDetailsWithInvalidSubscription, false),
-        Arguments.of(AccountType.PRO_II, accountDetailsWithInvalidSubscription, false),
-        Arguments.of(AccountType.PRO_III, accountDetailsWithInvalidSubscription, false),
-        Arguments.of(AccountType.PRO_LITE, accountDetailsWithInvalidSubscription, false),
-        Arguments.of(AccountType.PRO_FLEXI, accountDetailsWithValidSubscription, false),
-        Arguments.of(AccountType.BUSINESS, accountDetailsWithInvalidSubscription, false),
-        Arguments.of(AccountType.STARTER, accountDetailsWithValidSubscription, false),
-        Arguments.of(AccountType.BASIC, accountDetailsWithValidSubscription, false),
-        Arguments.of(AccountType.ESSENTIAL, accountDetailsWithValidSubscription, false),
+    private fun provideAccountDetailParameters() = Stream.of(
+        Arguments.of(
+            AccountType.PRO_I,
+            accountDetailsWithValidSubscription(AccountType.PRO_I),
+            true
+        ),
+        Arguments.of(
+            AccountType.PRO_II,
+            accountDetailsWithValidSubscription(AccountType.PRO_II),
+            true
+        ),
+        Arguments.of(
+            AccountType.PRO_III,
+            accountDetailsWithValidSubscription(AccountType.PRO_III),
+            true
+        ),
+        Arguments.of(
+            AccountType.PRO_LITE,
+            accountDetailsWithValidSubscription(AccountType.PRO_LITE),
+            true
+        ),
+        Arguments.of(
+            AccountType.PRO_I,
+            accountDetailsWithInvalidSubscription(AccountType.PRO_I),
+            false
+        ),
+        Arguments.of(
+            AccountType.PRO_II,
+            accountDetailsWithInvalidSubscription(AccountType.PRO_II),
+            false
+        ),
+        Arguments.of(
+            AccountType.PRO_III,
+            accountDetailsWithInvalidSubscription(AccountType.PRO_III),
+            false
+        ),
+        Arguments.of(
+            AccountType.PRO_LITE,
+            accountDetailsWithInvalidSubscription(AccountType.PRO_LITE),
+            false
+        ),
+        Arguments.of(
+            AccountType.PRO_FLEXI,
+            accountDetailsWithValidSubscription(AccountType.PRO_FLEXI),
+            false
+        ),
+        Arguments.of(
+            AccountType.BUSINESS,
+            accountDetailsWithValidSubscription(AccountType.BUSINESS),
+            false
+        ),
+        Arguments.of(
+            AccountType.STARTER,
+            accountDetailsWithValidSubscription(AccountType.STARTER),
+            false
+        ),
+        Arguments.of(
+            AccountType.BASIC,
+            accountDetailsWithValidSubscription(AccountType.BASIC),
+            false
+        ),
+        Arguments.of(
+            AccountType.ESSENTIAL,
+            accountDetailsWithValidSubscription(AccountType.ESSENTIAL),
+            false
+        ),
+        Arguments.of(
+            AccountType.PRO_I,
+            accountDetailsOneOffPlan(AccountType.PRO_I),
+            false
+        ),
+        Arguments.of(
+            AccountType.PRO_II,
+            accountDetailsOneOffPlan(AccountType.PRO_II),
+            false
+        ),
+        Arguments.of(
+            AccountType.PRO_III,
+            accountDetailsOneOffPlan(AccountType.PRO_III),
+            true
+        ),
+        Arguments.of(
+            AccountType.PRO_LITE,
+            accountDetailsOneOffPlan(AccountType.PRO_LITE),
+            false
+        ),
         Arguments.of(AccountType.UNKNOWN, AccountDetail(), false),
     )
 
-    @ParameterizedTest(name = "when account type is {0} and account details are {1}, then isStandardProAccount is {2}")
-    @MethodSource("provideAccountTypeIdentifierParameters")
-    fun `test that isStandardProAccount is updated correctly when account details are provided`(
+    @ParameterizedTest(name = "when account type is {0} and account details are {1}, then isProSubscription is {2}")
+    @MethodSource("provideAccountDetailParameters")
+    fun `test that isProSubscription is updated correctly when account details are provided`(
         accountType: AccountType,
         accountDetails: AccountDetail,
         expected: Boolean,
@@ -597,7 +672,7 @@ internal class MyAccountViewModelTest {
 
         underTest.refreshAccountInfo()
         underTest.state.test {
-            assertThat(awaitItem().isStandardProAccount).isEqualTo(expected)
+            assertThat(awaitItem().isProSubscription).isEqualTo(expected)
         }
     }
 
@@ -618,38 +693,147 @@ internal class MyAccountViewModelTest {
         runTest {
             whenever(monitorAccountDetailUseCase()).thenReturn(accountDetailFlow)
 
-            accountDetailFlow.emit(accountDetailsWithValidSubscription)
+            accountDetailFlow.emit(expectedAccountDetails)
             initializeViewModel()
             underTest.state.test {
                 assertThat(awaitItem().subscriptionDetails).isEqualTo(
-                    accountDetailsWithValidSubscription.levelDetail
+                    expectedAccountDetails.levelDetail
                 )
             }
         }
 
-    private val accountDetailsWithValidSubscription = AccountDetail(
+    private fun provideAccountTypeParameters() = Stream.of(
+        Arguments.of(accountDetailsWithValidSubscription(AccountType.PRO_I), AccountType.PRO_I),
+        Arguments.of(accountDetailsWithValidSubscription(AccountType.PRO_II), AccountType.PRO_II),
+        Arguments.of(accountDetailsWithValidSubscription(AccountType.PRO_III), AccountType.PRO_III),
+        Arguments.of(
+            accountDetailsWithValidSubscription(AccountType.PRO_LITE),
+            AccountType.PRO_LITE
+        ),
+        Arguments.of(
+            accountDetailsWithValidSubscription(AccountType.PRO_FLEXI),
+            AccountType.PRO_FLEXI
+        ),
+        Arguments.of(
+            accountDetailsWithInvalidSubscription(AccountType.BUSINESS),
+            AccountType.BUSINESS
+        ),
+        Arguments.of(accountDetailsWithValidSubscription(AccountType.STARTER), AccountType.STARTER),
+        Arguments.of(accountDetailsWithValidSubscription(AccountType.BASIC), AccountType.BASIC),
+        Arguments.of(
+            accountDetailsWithValidSubscription(AccountType.ESSENTIAL),
+            AccountType.ESSENTIAL
+        ),
+        Arguments.of(AccountDetail(), AccountType.FREE),
+    )
+
+    @ParameterizedTest(name = "when account details are {1}, then accountType is {2}")
+    @MethodSource("provideAccountTypeParameters")
+    fun `test that accountType is updated correctly when account details are provided`(
+        accountDetails: AccountDetail,
+        expected: AccountType,
+    ) = runTest {
+        whenever(monitorAccountDetailUseCase()).thenReturn(accountDetailFlow)
+
+        accountDetailFlow.emit(accountDetails)
+
+        initializeViewModel()
+        underTest.state.test {
+            assertThat(awaitItem().accountType).isEqualTo(expected)
+        }
+    }
+
+    private val expectedSubscriptionRenewTime = 1873874783274L
+    private val expectedProExpirationTime = 378672463728467L
+    private val expectedSubscriptionId = "subscriptionId"
+    private val expectedAccountType = AccountType.PRO_II
+    private fun expectedAccountPlanDetail(accountType: AccountType) = AccountPlanDetail(
+        accountType = accountType,
+        isProPlan = true,
+        expirationTime = expectedProExpirationTime,
+        subscriptionId = expectedSubscriptionId,
+        featuresList = listOf("vpn", "pwm"),
+        isFreeTrial = false,
+    )
+
+    private val expectedAccountPlanDetailOneOff = AccountPlanDetail(
+        accountType = AccountType.PRO_III,
+        isProPlan = true,
+        expirationTime = expectedProExpirationTime,
+        subscriptionId = "",
+        featuresList = listOf("vpn", "pwm"),
+        isFreeTrial = false,
+    )
+
+    private fun expectedAccountSubscriptionDetail(accountType: AccountType) =
+        AccountSubscriptionDetail(
+            subscriptionId = expectedSubscriptionId,
+            subscriptionStatus = SubscriptionStatus.VALID,
+            subscriptionCycle = AccountSubscriptionCycle.MONTHLY,
+            subscriptionLevel = accountType,
+            paymentMethodType = PaymentMethodType.STRIPE2,
+            renewalTime = expectedSubscriptionRenewTime,
+            featuresList = listOf("vpn", "pwm"),
+            isFreeTrial = false,
+        )
+
+    private val expectedAccountDetails = AccountDetail(
         storageDetail = null,
         sessionDetail = null,
         transferDetail = null,
         levelDetail = AccountLevelDetail(
-            accountType = AccountType.PRO_I,
+            accountType = expectedAccountType,
             subscriptionStatus = SubscriptionStatus.VALID,
-            subscriptionRenewTime = 1873874783274L,
+            subscriptionRenewTime = expectedSubscriptionRenewTime,
             accountSubscriptionCycle = AccountSubscriptionCycle.MONTHLY,
-            proExpirationTime = 378672463728467L,
+            proExpirationTime = expectedProExpirationTime,
+            accountPlanDetail = null,
+            accountSubscriptionDetailList = listOf()
         )
     )
 
-    private val accountDetailsWithInvalidSubscription = AccountDetail(
+    private fun accountDetailsWithValidSubscription(accountType: AccountType) = AccountDetail(
         storageDetail = null,
         sessionDetail = null,
         transferDetail = null,
         levelDetail = AccountLevelDetail(
-            accountType = AccountType.PRO_I,
-            subscriptionStatus = SubscriptionStatus.INVALID,
-            subscriptionRenewTime = 1873874783274L,
+            accountType = accountType,
+            subscriptionStatus = SubscriptionStatus.VALID,
+            subscriptionRenewTime = expectedSubscriptionRenewTime,
             accountSubscriptionCycle = AccountSubscriptionCycle.MONTHLY,
-            proExpirationTime = 378672463728467L,
+            proExpirationTime = expectedProExpirationTime,
+            accountPlanDetail = expectedAccountPlanDetail(accountType),
+            accountSubscriptionDetailList = listOf(expectedAccountSubscriptionDetail(accountType))
+        )
+    )
+
+    private fun accountDetailsWithInvalidSubscription(accountType: AccountType) = AccountDetail(
+        storageDetail = null,
+        sessionDetail = null,
+        transferDetail = null,
+        levelDetail = AccountLevelDetail(
+            accountType = accountType,
+            subscriptionStatus = SubscriptionStatus.INVALID,
+            subscriptionRenewTime = expectedSubscriptionRenewTime,
+            accountSubscriptionCycle = AccountSubscriptionCycle.MONTHLY,
+            proExpirationTime = expectedProExpirationTime,
+            accountPlanDetail = expectedAccountPlanDetail(accountType),
+            accountSubscriptionDetailList = listOf()
+        )
+    )
+
+    private fun accountDetailsOneOffPlan(accountType: AccountType) = AccountDetail(
+        storageDetail = null,
+        sessionDetail = null,
+        transferDetail = null,
+        levelDetail = AccountLevelDetail(
+            accountType = accountType,
+            subscriptionStatus = SubscriptionStatus.NONE,
+            subscriptionRenewTime = expectedSubscriptionRenewTime,
+            accountSubscriptionCycle = AccountSubscriptionCycle.UNKNOWN,
+            proExpirationTime = expectedProExpirationTime,
+            accountPlanDetail = expectedAccountPlanDetailOneOff,
+            accountSubscriptionDetailList = listOf(expectedAccountSubscriptionDetail(accountType))
         )
     )
 

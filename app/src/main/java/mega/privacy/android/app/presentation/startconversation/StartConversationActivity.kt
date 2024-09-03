@@ -19,9 +19,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import mega.privacy.android.analytics.Analytics
 import mega.privacy.android.app.main.AddContactActivity
 import mega.privacy.android.app.presentation.contact.invite.InviteContactActivity
-import mega.privacy.android.app.presentation.contact.invite.InviteContactActivityV2
 import mega.privacy.android.app.presentation.extensions.changeStatusBarColor
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.security.PasscodeCheck
@@ -31,6 +31,8 @@ import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.mobile.analytics.event.GroupChatPressedEvent
+import mega.privacy.mobile.analytics.event.InviteContactsPressedEvent
 import javax.inject.Inject
 
 /**
@@ -145,6 +147,7 @@ class StartConversationActivity : ComponentActivity() {
     }
 
     private fun onNewGroup() {
+        Analytics.tracker.trackEvent(GroupChatPressedEvent)
         addContactActivityLauncher.launch(
             Intent(this, AddContactActivity::class.java)
                 .putExtra(Constants.INTENT_EXTRA_KEY_CONTACT_TYPE, Constants.CONTACT_TYPE_MEGA)
@@ -164,11 +167,9 @@ class StartConversationActivity : ComponentActivity() {
     }
 
     private fun onInviteContacts() {
-        val activity = if (viewModel.state.value.isNewInviteContactActivityEnabled) {
-            InviteContactActivityV2::class.java
-        } else InviteContactActivity::class.java
+        Analytics.tracker.trackEvent(InviteContactsPressedEvent)
         resultLauncher.launch(
-            Intent(this, activity).putExtra(
+            Intent(this, InviteContactActivity::class.java).putExtra(
                 Constants.INTENT_EXTRA_KEY_CONTACT_TYPE,
                 Constants.CONTACT_TYPE_DEVICE
             )

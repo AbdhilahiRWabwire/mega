@@ -1,5 +1,6 @@
 package test.mega.privacy.android.app.presentation.manager
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.Event
 import app.cash.turbine.test
@@ -27,11 +28,16 @@ import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.main.dialog.shares.RemoveShareResultMapper
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
+import mega.privacy.android.app.middlelayer.scanner.ScannerHandler
 import mega.privacy.android.app.objects.PasscodeManagement
+import mega.privacy.android.app.presentation.documentscanner.model.DocumentScanningErrorTypeUiItem
+import mega.privacy.android.app.presentation.documentscanner.model.HandleScanDocumentResult
 import mega.privacy.android.app.presentation.manager.ManagerViewModel
 import mega.privacy.android.app.presentation.manager.model.SharesTab
 import mega.privacy.android.app.presentation.meeting.chat.model.InfoToShow
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
+import mega.privacy.android.app.service.scanner.InsufficientRAMToLaunchDocumentScanner
+import mega.privacy.android.app.service.scanner.UnexpectedErrorInDocumentScanner
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
 import mega.privacy.android.domain.entity.CameraUploadsFolderDestinationUpdate
@@ -63,6 +69,7 @@ import mega.privacy.android.domain.entity.node.NodeSourceType
 import mega.privacy.android.domain.entity.node.NodeUpdate
 import mega.privacy.android.domain.entity.node.SingleNodeRestoreResult
 import mega.privacy.android.domain.entity.shares.AccessPermission
+import mega.privacy.android.domain.entity.uri.UriPath
 import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.entity.user.UserUpdate
 import mega.privacy.android.domain.exception.MegaException
@@ -95,6 +102,7 @@ import mega.privacy.android.domain.usecase.call.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.call.GetChatCallUseCase
 import mega.privacy.android.domain.usecase.meeting.GetUsersCallLimitRemindersUseCase
 import mega.privacy.android.domain.usecase.call.HangChatCallUseCase
+import mega.privacy.android.domain.usecase.file.FilePrepareUseCase
 import mega.privacy.android.domain.usecase.meeting.GetScheduledMeetingByChatUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
@@ -132,6 +140,8 @@ import nz.mega.sdk.MegaNode
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.assertDoesNotThrow
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.junit.jupiter.params.ParameterizedTest
@@ -317,6 +327,7 @@ class ManagerViewModelTest {
     private val monitorChatSessionUpdatesUseCase: MonitorChatSessionUpdatesUseCase = mock()
     private val hangChatCallUseCase: HangChatCallUseCase = mock()
     private val startOfflineSyncWorkerUseCase: StartOfflineSyncWorkerUseCase = mock()
+    private val scannerHandler: ScannerHandler = mock()
     private val fakeCallUpdatesFlow = MutableSharedFlow<ChatCall>()
     private var monitorDevicePowerConnectionFakeFlow =
         MutableSharedFlow<DevicePowerConnectionState>()
@@ -331,6 +342,8 @@ class ManagerViewModelTest {
     private val monitorUpgradeDialogClosedUseCase: MonitorUpgradeDialogClosedUseCase = mock {
         onBlocking { invoke() }.thenReturn(monitorUpgradeDialogClosedFlow)
     }
+
+    private val filePrepareUseCase = mock<FilePrepareUseCase>()
 
 
     private fun initViewModel() {
@@ -414,7 +427,9 @@ class ManagerViewModelTest {
             monitorDevicePowerConnectionStateUseCase = mock {
                 on { invoke() }.thenReturn(monitorDevicePowerConnectionFakeFlow)
             },
-            startOfflineSyncWorkerUseCase = startOfflineSyncWorkerUseCase
+            startOfflineSyncWorkerUseCase = startOfflineSyncWorkerUseCase,
+            filePrepareUseCase = filePrepareUseCase,
+            scannerHandler = scannerHandler,
         )
     }
 
@@ -464,7 +479,9 @@ class ManagerViewModelTest {
             broadcastHomeBadgeCountUseCase,
             monitorUpgradeDialogClosedUseCase,
             monitorContactRequestUpdatesUseCase,
-            startOfflineSyncWorkerUseCase
+            startOfflineSyncWorkerUseCase,
+            filePrepareUseCase,
+            scannerHandler,
         )
         wheneverBlocking { getCloudSortOrder() }.thenReturn(SortOrder.ORDER_DEFAULT_ASC)
         whenever(getUsersCallLimitRemindersUseCase()).thenReturn(emptyFlow())
@@ -1484,20 +1501,74 @@ class ManagerViewModelTest {
     fun `test that state is updated correctly if upload a ShareInfo`() = runTest {
         val file = File("path")
         val path = file.absolutePath
-        val shareInfo = mock<ShareInfo> {
-            on { fileAbsolutePath } doReturn path
-        }
         val parentHandle = 123L
+        val pathsAndNames = mapOf(path to path)
         val expected = triggered(
             TransferTriggerEvent.StartUpload.Files(
-                mapOf(path to null),
+                pathsAndNames,
                 NodeId(parentHandle)
             )
         )
 
-        underTest.uploadShareInfo(listOf(shareInfo), parentHandle)
+        underTest.uploadFiles(pathsAndNames, NodeId(parentHandle))
         underTest.state.map { it.uploadEvent }.test {
             assertThat(awaitItem()).isEqualTo(expected)
+        }
+    }
+
+    @Test
+    fun `test that prepareFiles invokes correctly`() = runTest {
+        val uri = mock<Uri> {
+            on { toString() } doReturn "uri"
+        }
+
+        underTest.prepareFiles(listOf(uri))
+        verify(filePrepareUseCase).invoke(listOf(UriPath("uri")))
+    }
+
+    @Test
+    fun `test that the old document scanner is used for scanning documents`() = runTest {
+        val handleScanDocumentResult = HandleScanDocumentResult.UseLegacyImplementation
+        whenever(scannerHandler.handleScanDocument()).thenReturn(handleScanDocumentResult)
+
+        underTest.handleScanDocument()
+        testScheduler.advanceUntilIdle()
+
+        underTest.state.test {
+            assertThat(awaitItem().handleScanDocumentResult).isEqualTo(handleScanDocumentResult)
+        }
+    }
+
+    @Test
+    fun `test that the new ML Document Kit Scanner is used for scanning documents`() = runTest {
+        val handleScanDocumentResult = HandleScanDocumentResult.UseNewImplementation(mock())
+        whenever(scannerHandler.handleScanDocument()).thenReturn(handleScanDocumentResult)
+
+        underTest.handleScanDocument()
+        testScheduler.advanceUntilIdle()
+
+        underTest.state.test {
+            assertThat(awaitItem().handleScanDocumentResult).isEqualTo(handleScanDocumentResult)
+        }
+    }
+
+    @Test
+    fun `test that the handle scan document result is reset`() = runTest {
+        underTest.onHandleScanDocumentResultConsumed()
+        testScheduler.advanceUntilIdle()
+
+        underTest.state.test {
+            assertThat(awaitItem().handleScanDocumentResult).isNull()
+        }
+    }
+
+    @Test
+    fun `test that the document scanning error type is reset`() = runTest {
+        underTest.onDocumentScanningErrorConsumed()
+        testScheduler.advanceUntilIdle()
+
+        underTest.state.test {
+            assertThat(awaitItem().documentScanningErrorTypeUiItem).isNull()
         }
     }
 

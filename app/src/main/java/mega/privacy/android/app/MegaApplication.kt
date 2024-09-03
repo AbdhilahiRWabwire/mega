@@ -15,6 +15,7 @@ import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import coil.decode.SvgDecoder
 import coil.decode.VideoFrameDecoder
+import com.google.android.gms.ads.MobileAds
 import com.google.firebase.crashlytics.ktx.crashlytics
 import com.google.firebase.ktx.Firebase
 import com.jeremyliao.liveeventbus.LiveEventBus
@@ -205,7 +206,6 @@ class MegaApplication : MultiDexApplication(), DefaultLifecycleObserver,
         super<MultiDexApplication>.onCreate()
         enableStrictMode()
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
-
         themeModeState.initialise()
         callChangesObserver.init()
         LiveEventBus.config().enableLogger(false)
@@ -225,19 +225,24 @@ class MegaApplication : MultiDexApplication(), DefaultLifecycleObserver,
 
         setupMegaChatApi()
         getMiscFlagsIfNeeded()
-
         applicationScope.launch {
+            runCatching {
+                // Initialize the Google Mobile Ads SDK on a background thread.
+                MobileAds.initialize(this@MegaApplication) {}
+                Timber.i("MobileAds initialized")
+            }.onFailure {
+                Timber.e(it, "MobileAds initialization failed")
+            }
             runCatching { updateApiServerUseCase() }
             dbH.resetExtendedAccountDetailsTimestamp()
+            // clear the cache files stored in the external cache folder.
+            clearPublicCache()
         }
 
         val useHttpsOnly = java.lang.Boolean.parseBoolean(dbH.useHttpsOnly)
         Timber.d("Value of useHttpsOnly: %s", useHttpsOnly)
         megaApi.useHttpsOnly(useHttpsOnly)
         myAccountInfo.resetDefaults()
-
-        // clear the cache files stored in the external cache folder.
-        clearPublicCache()
         ContextUtils.initialize(applicationContext)
 
         if (BuildConfig.ACTIVATE_GREETER) greeter.get().initialize()
@@ -267,10 +272,12 @@ class MegaApplication : MultiDexApplication(), DefaultLifecycleObserver,
      *
      */
     override fun onStart(owner: LifecycleOwner) {
-        val backgroundStatus = megaChatApi.backgroundStatus
-        Timber.d("Application start with backgroundStatus: %s", backgroundStatus)
-        if (backgroundStatus != -1 && backgroundStatus != 0) {
-            megaChatApi.setBackgroundStatus(false)
+        applicationScope.launch {
+            val backgroundStatus = megaChatApi.backgroundStatus
+            Timber.d("Application start with backgroundStatus: %s", backgroundStatus)
+            if (backgroundStatus != -1 && backgroundStatus != 0) {
+                megaChatApi.setBackgroundStatus(false)
+            }
         }
     }
 
@@ -279,10 +286,12 @@ class MegaApplication : MultiDexApplication(), DefaultLifecycleObserver,
      *
      */
     override fun onStop(owner: LifecycleOwner) {
-        val backgroundStatus = megaChatApi.backgroundStatus
-        Timber.d("Application stop with backgroundStatus: %s", backgroundStatus)
-        if (backgroundStatus != -1 && backgroundStatus != 1) {
-            megaChatApi.setBackgroundStatus(true)
+        applicationScope.launch {
+            val backgroundStatus = megaChatApi.backgroundStatus
+            Timber.d("Application stop with backgroundStatus: %s", backgroundStatus)
+            if (backgroundStatus != -1 && backgroundStatus != 1) {
+                megaChatApi.setBackgroundStatus(true)
+            }
         }
     }
 

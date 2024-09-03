@@ -13,9 +13,9 @@ import mega.privacy.android.domain.entity.CameraUploadsFolderDestinationUpdate
 import mega.privacy.android.domain.entity.MyAccountUpdate
 import mega.privacy.android.domain.entity.account.AccountBlockedDetail
 import mega.privacy.android.domain.entity.backup.BackupInfoType
+import mega.privacy.android.domain.entity.call.AudioDevice
 import mega.privacy.android.domain.entity.camerauploads.CameraUploadsSettingsAction
 import mega.privacy.android.domain.entity.settings.cookie.CookieType
-import mega.privacy.android.domain.entity.transfer.TransfersFinishedState
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import javax.inject.Inject
 
@@ -35,14 +35,12 @@ internal class AppEventFacade @Inject constructor(
     private val logout = MutableSharedFlow<Boolean>()
     private val fetchNodesFinish = MutableSharedFlow<Boolean>()
     private val _transferFailed = MutableSharedFlow<Boolean>()
-    private val transfersFinished = MutableSharedFlow<TransfersFinishedState>()
     private val pushNotificationSettingsUpdate = MutableSharedFlow<Boolean>()
     private val myAccountUpdate = MutableSharedFlow<MyAccountUpdate>()
     private val chatArchived = MutableSharedFlow<String>()
     private val homeBadgeCount = MutableSharedFlow<Int>()
     private val isJoinedSuccessfullyToChat = MutableSharedFlow<Boolean>()
     private val leaveChat = MutableSharedFlow<Long>()
-    private val stopTransfersWork = MutableSharedFlow<Boolean>()
     private val chatSignalPresence = MutableSharedFlow<Unit>()
     private val accountBlocked = MutableSharedFlow<AccountBlockedDetail>()
     private val scheduledMeetingCanceled = MutableSharedFlow<Int>()
@@ -68,6 +66,7 @@ internal class AppEventFacade @Inject constructor(
 
     private val callEnded = MutableSharedFlow<Long>()
     private val callScreenOpened = MutableSharedFlow<Boolean>()
+    private val audioOutput = MutableSharedFlow<AudioDevice>()
 
     private val updateUserData = MutableSharedFlow<Unit>()
 
@@ -140,12 +139,6 @@ internal class AppEventFacade @Inject constructor(
     override suspend fun broadcastMyAccountUpdate(data: MyAccountUpdate) =
         myAccountUpdate.emit(data)
 
-    override fun monitorTransfersFinished(): Flow<TransfersFinishedState> =
-        transfersFinished.toSharedFlow(appScope)
-
-    override suspend fun broadcastTransfersFinished(transfersFinishedState: TransfersFinishedState) =
-        transfersFinished.emit(transfersFinishedState)
-
     override fun monitorCameraUploadsFolderDestination(): Flow<CameraUploadsFolderDestinationUpdate> =
         cameraUploadsFolderDestinationUpdate.toSharedFlow(appScope)
 
@@ -171,10 +164,6 @@ internal class AppEventFacade @Inject constructor(
     override fun monitorLeaveChat(): Flow<Long> = leaveChat.toSharedFlow(appScope)
 
     override suspend fun broadcastLeaveChat(chatId: Long) = leaveChat.emit(chatId)
-
-    override fun monitorStopTransfersWork() = stopTransfersWork.toSharedFlow(appScope)
-
-    override suspend fun broadcastStopTransfersWork() = stopTransfersWork.emit(true)
 
     override suspend fun broadcastRefreshSession() = _monitorRefreshSession.emit(Unit)
 
@@ -221,6 +210,11 @@ internal class AppEventFacade @Inject constructor(
 
     override suspend fun broadcastCallScreenOpened(isOpened: Boolean) =
         callScreenOpened.emit(isOpened)
+
+    override fun monitorAudioOutput() = audioOutput.asSharedFlow()
+
+    override suspend fun broadcastAudioOutput(audioDevice: AudioDevice) =
+        audioOutput.emit(audioDevice)
 
     override suspend fun broadcastUpdateUserData() {
         updateUserData.emit(Unit)

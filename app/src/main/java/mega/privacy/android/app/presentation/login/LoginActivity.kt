@@ -23,16 +23,15 @@ import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.databinding.ActivityLoginBinding
-import mega.privacy.android.app.featuretoggle.AppFeatures
+import mega.privacy.android.app.extensions.isTablet
 import mega.privacy.android.app.globalmanagement.MegaChatRequestHandler
 import mega.privacy.android.app.interfaces.OnKeyboardVisibilityListener
 import mega.privacy.android.app.main.CreateAccountFragment
-import mega.privacy.android.app.main.TourFragment
+import mega.privacy.android.app.main.ManagerActivity
 import mega.privacy.android.app.presentation.extensions.toConstant
 import mega.privacy.android.app.presentation.login.confirmemail.ConfirmEmailFragment
-import mega.privacy.android.app.presentation.login.confirmemail.ConfirmEmailFragmentV2
 import mega.privacy.android.app.presentation.login.model.LoginFragmentType
-import mega.privacy.android.app.presentation.login.onboarding.TourFragmentV2
+import mega.privacy.android.app.presentation.login.onboarding.TourFragment
 import mega.privacy.android.app.presentation.login.reportissue.ReportIssueViaEmailFragment
 import mega.privacy.android.app.presentation.meeting.view.dialog.ACTION_JOIN_AS_GUEST
 import mega.privacy.android.app.presentation.openlink.OpenLinkActivity
@@ -111,6 +110,15 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
         Timber.d("onCreate")
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (intent.action == Intent.ACTION_MAIN
+            && intent.hasCategory(Intent.CATEGORY_LAUNCHER)
+            && !viewModel.isConnected
+        ) {
+            // in case offline mode, go to ManagerActivity
+            startActivity(Intent(this, ManagerActivity::class.java))
+            finish()
+            return
+        }
         onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
         chatRequestHandler.setIsLoggingRunning(true)
         binding = ActivityLoginBinding.inflate(layoutInflater)
@@ -138,6 +146,13 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
                 firstNameTemp = it.firstName
                 lastNameTemp = it.lastName
                 megaApi.resumeCreateAccount(sessionTemp, this@LoginActivity)
+            } ?: run {
+                if (!intent.hasExtra(Constants.VISIBLE_FRAGMENT)) {
+                    val session = viewModel.getSession()
+                    if (session.isNullOrEmpty()) {
+                        visibleFragment = Constants.TOUR_FRAGMENT
+                    }
+                }
             }
 
             showFragment(visibleFragment)
@@ -225,57 +240,29 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
 
             Constants.TOUR_FRAGMENT -> {
                 Timber.d("Show TOUR_FRAGMENT")
-                // Need to make the call first, otherwise the TourFragment will be shown
-                // before we successfully fetch the flag
-                lifecycleScope.launch {
-                    var isNewTourFragmentEnabled = false
-                    runCatching { viewModel.isNewTourFragmentEnabled() }
-                        .onSuccess { isNewTourFragmentEnabled = it }
-                    val tourFragment =
-                        if (isNewTourFragmentEnabled) {
-                            TourFragmentV2().apply {
-                                onLoginClick = {
-                                    showFragment(LoginFragmentType.Login)
-                                }
-                                onCreateAccountClick = {
-                                    showFragment(LoginFragmentType.CreateAccount)
-                                }
-                                onOpenLink = ::startOpenLinkActivity
-                            }
-                        } else {
-                            when {
-                                Constants.ACTION_RESET_PASS == intent?.action -> {
-                                    TourFragment.newInstance(intent?.dataString, null)
-                                }
-
-                                Constants.ACTION_PARK_ACCOUNT == intent?.action -> {
-                                    TourFragment.newInstance(null, intent?.dataString)
-                                }
-
-                                else -> {
-                                    TourFragment.newInstance(null, null)
-                                }
-                            }
-                        }
-
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.fragment_container_login, tourFragment)
-                        .commitNowAllowingStateLoss()
-
-                    Util.setDrawUnderStatusBar(this@LoginActivity, true)
+                val tourFragment = TourFragment().apply {
+                    onLoginClick = {
+                        showFragment(LoginFragmentType.Login)
+                    }
+                    onCreateAccountClick = {
+                        showFragment(LoginFragmentType.CreateAccount)
+                    }
+                    onOpenLink = ::startOpenLinkActivity
                 }
+
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container_login, tourFragment)
+                    .commitNowAllowingStateLoss()
+
+                Util.setDrawUnderStatusBar(this@LoginActivity, true)
             }
 
             Constants.CONFIRM_EMAIL_FRAGMENT -> {
                 val confirmEmailFragment =
-                    if (viewModel.isFeatureEnabled(AppFeatures.NewConfirmEmailFragment)) {
-                        ConfirmEmailFragmentV2.newInstance(emailTemp, firstNameTemp).apply {
-                            onShowPendingFragment = ::showFragment
-                            onSetTemporalEmail = ::setTemporalEmail
-                            onCancelConfirmationAccount = ::cancelConfirmationAccount
-                        }
-                    } else {
-                        ConfirmEmailFragment.newInstance(emailTemp, firstNameTemp)
+                    ConfirmEmailFragment.newInstance(emailTemp, firstNameTemp).apply {
+                        onShowPendingFragment = ::showFragment
+                        onSetTemporalEmail = ::setTemporalEmail
+                        onCancelConfirmationAccount = ::cancelConfirmationAccount
                     }
 
                 with(supportFragmentManager) {
@@ -308,7 +295,7 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
      */
     @SuppressLint("SourceLockedOrientationActivity")
     private fun restrictOrientation() {
-        if (Util.isTablet(this)) {
+        if (isTablet()) {
             requestedOrientation =
                 if (visibleFragment == Constants.TOUR_FRAGMENT) {
                     Timber.d("Tablet landscape mode allowed")

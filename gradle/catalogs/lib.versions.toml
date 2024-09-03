@@ -26,7 +26,7 @@ karma = "1.3"
 sqlcipher = "4.5.4"
 kotlin-serialisation = "1.6.3"
 eclipse-jgit = "6.6.0.202305301015-r"
-json = "20230227"
+json = "20240303"
 mega-core-ui = "2.10.20240531102524"
 kotlinx-collections-immutable = "0.3.7"
 
@@ -69,7 +69,7 @@ shimmerlayout = 'io.supercharge:shimmerlayout:2.1.0'
 simplestorage = { module = "com.anggrayudi:storage", version.ref = "simplestorage" }
 vdurmont-emoji = 'com.vdurmont:emoji-java:4.0.0'
 compose-state-events = { module = "com.github.leonard-palm:compose-state-events", version.ref = "compose-state-events" }
-mega-analytics = "mega.privacy.mobile:analytics-events-android:20240731.123949"
+mega-analytics = "mega.privacy.mobile:analytics-events-android:20240814.084644"
 kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
 balloon = "com.github.skydoves:balloon-compose:1.6.4"
 xray = { module = "mega.privacy.android.xray:xray", version.ref = "xray" }
