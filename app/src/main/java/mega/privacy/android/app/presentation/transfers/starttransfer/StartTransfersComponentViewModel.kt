@@ -611,7 +611,7 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                         if (checkShowDownloadRating && !paused && transferTotals.totalFileTransfers > 0) {
                             val currentDownloadSpeed = getCurrentDownloadSpeedUseCase()
                             RatingHandlerImpl().showRatingBaseOnSpeedAndSize(
-                                size = transferTotals.totalFileTransfers.toLong(),
+                                size = transferTotals.totalBytes,
                                 speed = currentDownloadSpeed.toLong(),
                                 listener = object : OnCompleteListener {
                                     override fun onComplete() {
@@ -705,7 +705,8 @@ internal class StartTransfersComponentViewModel @Inject constructor(
         var startMessageShown = false
         startUploadWithWorkerUseCase(
             pathsAndNames,
-            destinationId
+            destinationId,
+            transferTriggerEvent.isHighPriority,
         ).catch {
             if (transferTriggerEvent is TransferTriggerEvent.StartUpload.TextFile) {
                 _uiState.updateEventAndClearProgress(
@@ -763,7 +764,7 @@ internal class StartTransfersComponentViewModel @Inject constructor(
                         if (checkShowUploadRating && !paused && transferTotals.totalFileTransfers > 0) {
                             val currentUploadSpeed = getCurrentUploadSpeedUseCase()
                             RatingHandlerImpl().showRatingBaseOnSpeedAndSize(
-                                size = transferTotals.totalFileTransfers.toLong(),
+                                size = transferTotals.totalBytes,
                                 speed = currentUploadSpeed,
                                 listener = object : OnCompleteListener {
                                     override fun onComplete() {

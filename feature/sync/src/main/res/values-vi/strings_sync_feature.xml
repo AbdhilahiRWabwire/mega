@@ -51,7 +51,7 @@
     <!-- Sync dialog not now button -->
     <string name="sync_dialog_file_permission_negative_button">Không Phải Lúc Này</string>
     <!-- Sync dialog title for storage access -->
-    <string name="sync_dialog_storage_access_title">Truy&#160;cập vào tất&#160;cả các tập&#160;tin</string>
+    <string name="sync_dialog_storage_access_title">Truy&#160;cập vào tất&#160;cả tệp&#160;tin</string>
     <!-- Sync dialog title for battery optimization -->
     <string name="sync_dialog_battery_optimization_title">Tối&#160;ưu hóa pin</string>
     <!-- Sync dialog cancel button text -->
@@ -73,9 +73,9 @@
     <!-- Sync state synced -->
     <string name="sync_list_sync_state_synced">Đã đồng&#160;bộ</string>
     <!-- Sync permission title for device storage -->
-    <string name="sync_folders_device_storage">Thư&#160;mục&#160;thiết bị</string>
+    <string name="sync_folders_device_storage">Thư&#160;mục thiết&#160;bị</string>
     <!-- Sync permission title for mega storage -->
-    <string name="sync_folders_mega_storage">Thư mục trên MEGA</string>
+    <string name="sync_folders_mega_storage">Thư&#160;mục trên MEGA</string>
     <!-- Sync while syncing title for Issues info -->
     <string name="sync_card_sync_issues_info">Th.tin vấn&#160;đề</string>
     <!-- Sync Pause -->

@@ -17,9 +17,11 @@ class UploadDestinationViewTest {
     fun `test that empty screen is displayed to the user when there is no files`() {
         composeTestRule.setContent {
             UploadDestinationView(
-                editableFile = "",
-                importUiItems = emptyList(),
-                isUrl = false
+                editFileName = {},
+                confirmImport = {},
+                consumeNameValidationError = {},
+                updateFileName = {},
+                uiState = UploadDestinationUiState(),
             )
         }
         composeTestRule.onNodeWithText("Upload to MEGA", useUnmergedTree = true).assertExists()
@@ -41,13 +43,17 @@ class UploadDestinationViewTest {
     fun `test that show more options are not shown to user when less than 4 number of files selected`() {
         composeTestRule.setContent {
             UploadDestinationView(
-                editableFile = "",
-                importUiItems = listOf(
-                    ImportUiItem("file1", "path1"),
-                    ImportUiItem("file2", "path2"),
-                    ImportUiItem("file3", "path3"),
+                editFileName = {},
+                confirmImport = {},
+                consumeNameValidationError = {},
+                updateFileName = {},
+                uiState = UploadDestinationUiState(
+                    importUiItems = listOf(
+                        ImportUiItem("file1", "path1"),
+                        ImportUiItem("file2", "path2"),
+                        ImportUiItem("file3", "path3"),
+                    )
                 ),
-                isUrl = false
             )
         }
         composeTestRule.onNodeWithText("Upload to MEGA", useUnmergedTree = true).assertExists()
@@ -69,19 +75,23 @@ class UploadDestinationViewTest {
     fun `test that show more options is shown to user when more than 4 files are selected`() {
         composeTestRule.setContent {
             UploadDestinationView(
-                editableFile = "",
-                importUiItems = listOf(
-                    ImportUiItem(fileName = "file1", filePath = "path1"),
-                    ImportUiItem(fileName = "file2", filePath = "path2"),
-                    ImportUiItem(fileName = "file3", filePath = "path3"),
-                    ImportUiItem(fileName = "file4", filePath = "path4"),
-                    ImportUiItem(fileName = "file5", filePath = "path5"),
-                    ImportUiItem(fileName = "file6", filePath = "path6"),
-                    ImportUiItem(fileName = "file7", filePath = "path7"),
-                    ImportUiItem(fileName = "file8", filePath = "path8"),
-                    ImportUiItem(fileName = "file9", filePath = "path9"),
+                editFileName = {},
+                confirmImport = {},
+                consumeNameValidationError = {},
+                updateFileName = {},
+                uiState = UploadDestinationUiState(
+                    importUiItems = listOf(
+                        ImportUiItem(fileName = "file1", filePath = "path1"),
+                        ImportUiItem(fileName = "file2", filePath = "path2"),
+                        ImportUiItem(fileName = "file3", filePath = "path3"),
+                        ImportUiItem(fileName = "file4", filePath = "path4"),
+                        ImportUiItem(fileName = "file5", filePath = "path5"),
+                        ImportUiItem(fileName = "file6", filePath = "path6"),
+                        ImportUiItem(fileName = "file7", filePath = "path7"),
+                        ImportUiItem(fileName = "file8", filePath = "path8"),
+                        ImportUiItem(fileName = "file9", filePath = "path9"),
+                    ),
                 ),
-                isUrl = false
             )
         }
         composeTestRule.onNodeWithText("Upload to MEGA", useUnmergedTree = true).assertExists()
@@ -103,12 +113,15 @@ class UploadDestinationViewTest {
     fun `test that header shows Link test when selected content is url`() {
         composeTestRule.setContent {
             UploadDestinationView(
-                editableFile = "",
-                importUiItems = listOf(
-                    ImportUiItem("file1", "path1"),
-                    ImportUiItem("file2", "path2"),
+                editFileName = {},
+                confirmImport = {},
+                consumeNameValidationError = {},
+                updateFileName = {},
+                uiState = UploadDestinationUiState(
+                    importUiItems = listOf(
+                        ImportUiItem("file1", "path1", isUrl = true),
+                    ),
                 ),
-                isUrl = true
             )
         }
         composeTestRule.onNodeWithText("Link", useUnmergedTree = true).assertExists()

@@ -121,4 +121,16 @@ interface VideoSectionRepository {
      * @return the list of video nodes that includes the watched timestamp
      */
     suspend fun getRecentlyWatchedVideoNodes(): List<TypedVideoNode>
+
+    /**
+     * Clear the data of video recently watched
+     */
+    suspend fun clearRecentlyWatchedVideos()
+
+    /**
+     * Remove the item of recently watched
+     *
+     * @param handle removed item handle
+     */
+    suspend fun removeRecentlyWatchedItem(handle: Long)
 }

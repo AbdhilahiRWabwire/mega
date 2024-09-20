@@ -1,7 +1,9 @@
 package mega.privacy.android.data.facade
 
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.Bitmap.CompressFormat
@@ -13,7 +15,9 @@ import android.os.StatFs
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.MediaStore.MediaColumns.DATA
+import android.provider.MediaStore.MediaColumns.DATE_ADDED
 import android.provider.MediaStore.MediaColumns.DATE_MODIFIED
+import android.provider.MediaStore.MediaColumns.DATE_TAKEN
 import android.provider.MediaStore.MediaColumns.DISPLAY_NAME
 import android.provider.MediaStore.MediaColumns.SIZE
 import android.provider.MediaStore.VOLUME_EXTERNAL
@@ -440,14 +444,39 @@ internal class FileFacade @Inject constructor(
         }
     }
 
-    private suspend fun copyFile(sourceFile: DocumentFile, targetFile: File) {
+    private fun copyFile(sourceFile: DocumentFile, targetFile: File) {
         context.contentResolver.openInputStream(sourceFile.uri)?.use { inputStream ->
             targetFile.outputStream().use { output ->
                 inputStream.copyTo(output)
             }
-            targetFile.setLastModified(sourceFile.lastModified())
+            (sourceFile.lastModified().takeIf { it > 0 }
+                ?: getLastModifiedFromContentResolver(sourceFile.uri)).let { lastModified ->
+                lastModified.takeIf { it > 0 }?.let {
+                    targetFile.setLastModified(lastModified)
+                }
+            }
         }
     }
+
+    private fun getLastModifiedFromContentResolver(uri: Uri) =
+        context.contentResolver.acquireContentProviderClient(uri)
+            ?.use { client ->
+                client.query(uri, null, null, null, null)
+                    ?.use { cursor ->
+                        var lastModified = 0L
+
+                        cursor.moveToFirst()
+                        cursor.getColumnIndex(DATE_MODIFIED).takeIf { it != -1 }?.let { index ->
+                            lastModified = cursor.getLong(index) * 1000
+                        } ?: cursor.getColumnIndex(DATE_ADDED).takeIf { it != -1 }?.let { index ->
+                            lastModified = cursor.getLong(index) * 1000
+                        } ?: cursor.getColumnIndex(DATE_TAKEN).takeIf { it != -1 }?.let { index ->
+                            lastModified = cursor.getLong(index)
+                        }
+
+                        lastModified
+                    } ?: 0
+            } ?: 0
 
     override fun downscaleImage(file: File, destination: File, maxPixels: Long) {
         val orientation = AndroidGfxProcessor.getExifOrientation(file.absolutePath)
@@ -659,11 +688,30 @@ internal class FileFacade @Inject constructor(
     override suspend fun findFileInDirectory(directoryPath: String, fileNameToFind: String): File? =
         File(directoryPath).listFiles()?.toList()?.find { it.name == fileNameToFind }
 
+    override fun isPathInsecure(path: String): Boolean = path.contains("../")
+            || path.contains(APP_PRIVATE_DIR1)
+            || path.contains(APP_PRIVATE_DIR2)
+
+    override fun isMalformedPathFromExternalApp(action: String?, path: String): Boolean {
+        // Method to check if intent is received from external app with action: ACTION_SEND / ACTION_SEND_MULTIPLE
+        val isDataFromExternalApp = action != null &&
+                (action == Intent.ACTION_SEND || action == Intent.ACTION_SEND_MULTIPLE)
+        val sanitized = path.replace(" ", "")
+
+        return isDataFromExternalApp && isPathInsecure(sanitized)
+    }
+
     private companion object {
         const val DOWNLOAD_DIR = "MEGA Downloads"
         const val PHOTO_DIR = "MEGA Photos"
         const val OFFLINE_DIR = "MEGA Offline"
         const val LAT_LNG = "0/1,0/1,0/1000"
         const val REF_LAT_LNG = "0"
+
+        @SuppressLint("SdCardPath")
+        const val APP_PRIVATE_DIR1: String = "/data/data/mega.privacy.android.app"
+
+        @SuppressLint("SdCardPath")
+        const val APP_PRIVATE_DIR2: String = "/data/user/0/mega.privacy.android.app"
     }
 }

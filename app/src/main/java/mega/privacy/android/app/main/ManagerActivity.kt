@@ -110,10 +110,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import mega.privacy.android.analytics.Analytics
+import mega.privacy.android.app.BuildConfig
 import mega.privacy.android.app.BusinessExpiredAlertActivity
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
-import mega.privacy.android.app.ShareInfo
+import mega.privacy.android.app.activities.PasscodeActivity
 import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.constants.IntentConstants
@@ -148,6 +149,7 @@ import mega.privacy.android.app.main.dialog.link.OpenLinkDialogFragment
 import mega.privacy.android.app.main.dialog.storagestatus.StorageStatusDialogFragment
 import mega.privacy.android.app.main.listeners.FabButtonListener
 import mega.privacy.android.app.main.managerSections.ManagerUploadBottomSheetDialogActionHandler
+import mega.privacy.android.app.main.managerSections.TransfersViewModel
 import mega.privacy.android.app.main.managerSections.TurnOnNotificationsFragment
 import mega.privacy.android.app.main.mapper.ManagerRedirectIntentMapper
 import mega.privacy.android.app.main.megachat.BadgeDrawerArrowDrawable
@@ -239,7 +241,7 @@ import mega.privacy.android.app.presentation.shares.outgoing.OutgoingSharesCompo
 import mega.privacy.android.app.presentation.shares.outgoing.OutgoingSharesComposeViewModel
 import mega.privacy.android.app.presentation.shares.outgoing.model.OutgoingSharesState
 import mega.privacy.android.app.presentation.startconversation.StartConversationActivity
-import mega.privacy.android.app.presentation.transfers.TransfersManagementActivity
+import mega.privacy.android.app.presentation.transfers.TransfersManagementViewModel
 import mega.privacy.android.app.presentation.transfers.attach.NodeAttachmentViewModel
 import mega.privacy.android.app.presentation.transfers.attach.createNodeAttachmentView
 import mega.privacy.android.app.presentation.transfers.page.TransferPageFragment
@@ -319,11 +321,15 @@ import mega.privacy.android.domain.monitoring.CrashReporter
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
+import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.domain.usecase.environment.IsFirstLaunchUseCase
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.file.CheckFileNameCollisionsUseCase
 import mega.privacy.android.domain.usecase.login.MonitorEphemeralCredentialsUseCase
 import mega.privacy.android.feature.devicecenter.ui.DeviceCenterFragment
+import mega.privacy.android.feature.sync.ui.SyncMonitorViewModel
 import mega.privacy.android.feature.sync.ui.navigator.SyncNavigator
+import mega.privacy.android.navigation.MegaNavigator
 import mega.privacy.android.shared.original.core.ui.controls.sheets.BottomSheet
 import mega.privacy.android.shared.original.core.ui.controls.widgets.setTransfersWidgetContent
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
@@ -331,9 +337,12 @@ import mega.privacy.mobile.analytics.event.ChatRoomsBottomNavigationItemEvent
 import mega.privacy.mobile.analytics.event.CloudDriveBottomNavigationItemEvent
 import mega.privacy.mobile.analytics.event.CloudDriveSearchMenuToolbarEvent
 import mega.privacy.mobile.analytics.event.IncomingSharesTabEvent
+import mega.privacy.mobile.analytics.event.JoinMeetingPressedEvent
 import mega.privacy.mobile.analytics.event.LinkSharesTabEvent
 import mega.privacy.mobile.analytics.event.OutgoingSharesTabEvent
+import mega.privacy.mobile.analytics.event.ScheduleMeetingPressedEvent
 import mega.privacy.mobile.analytics.event.SharedItemsScreenEvent
+import mega.privacy.mobile.analytics.event.StartMeetingNowPressedEvent
 import nz.mega.sdk.MegaAccountDetails
 import nz.mega.sdk.MegaApiAndroid
 import nz.mega.sdk.MegaApiJava
@@ -356,7 +365,7 @@ import javax.inject.Inject
 
 @Suppress("KDocMissingDocumentation")
 @AndroidEntryPoint
-class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterface,
+class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     NavigationView.OnNavigationItemSelectedListener,
     View.OnClickListener,
     BottomNavigationView.OnNavigationItemSelectedListener, UploadBottomSheetDialogActionListener,
@@ -387,6 +396,15 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     private val startDownloadViewModel: StartDownloadViewModel by viewModels()
     private val nodeAttachmentViewModel by viewModels<NodeAttachmentViewModel>()
     private val sortByHeaderViewModel: SortByHeaderViewModel by viewModels()
+    private val syncMonitorViewModel: SyncMonitorViewModel by viewModels()
+    private val transfersManagementViewModel: TransfersManagementViewModel by viewModels()
+    private val transfersViewModel: TransfersViewModel by viewModels()
+
+    /**
+     * [MegaNavigator]
+     */
+    @Inject
+    lateinit var navigator: MegaNavigator
 
     private val searchResultLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -405,6 +423,18 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
             showSnackbar(SNACKBAR_TYPE, it, INVALID_HANDLE)
         }
     }
+
+    /**
+     * Application Theme Mode
+     */
+    @Inject
+    lateinit var getThemeMode: GetThemeMode
+
+    /**
+     * [GetFeatureFlagValueUseCase]
+     */
+    @Inject
+    lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
 
     @Inject
     lateinit var cookieDialogHandler: CookieDialogHandler
@@ -492,8 +522,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     private lateinit var appBarLayout: AppBarLayout
 
     private var selectedAccountType = 0
-    private var infoManager: ShareInfo? = null
-    private var parentNodeManager: MegaNode? = null
 
     lateinit var drawerLayout: DrawerLayout
 
@@ -640,7 +668,40 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         }
     }
 
-    private var adView: AdManagerAdView? = null
+    private val adView: AdManagerAdView by lazy {
+        AdManagerAdView(this).apply {
+            adUnitId = BuildConfig.AD_UNIT_ID
+            setAdSize(AD_SIZE)
+            adListener = object : AdListener() {
+                override fun onAdClicked() {
+                    Timber.d("Ad clicked")
+                }
+
+                override fun onAdClosed() {
+                    Timber.i("Ad closed")
+                }
+
+                override fun onAdFailedToLoad(adError: LoadAdError) {
+                    Timber.w("Ad failed to load: ${adError.message}")
+                    hideAdsView()
+                    fetchNewAd()
+                }
+
+                override fun onAdImpression() {
+                    Timber.i("Ad impression")
+                }
+
+                override fun onAdLoaded() {
+                    Timber.i("Ad loaded")
+                    onAdsViewLoaded()
+                }
+
+                override fun onAdOpened() {
+                    Timber.i("Ad opened")
+                }
+            }
+        }
+    }
 
     override fun onRequestPermissionsResult(
         requestCode: Int,
@@ -936,7 +997,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                         hideAdsView()
                     }
                     adsViewModel.enableAdsFeature()
-                    adsViewModel.getDefaultStartScreen()
                 }
             }.onFailure {
                 Timber.e("Failed to fetch ab_adse flag with error: ${it.message}")
@@ -1961,7 +2021,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                 viewModel.markHandleCheckLinkResult()
             }
 
-            if (managerState.androidSyncServiceEnabled) {
+            if (managerState.androidSyncServiceEnabled && !managerState.isAndroidSyncWorkManagerFeatureFlagEnabled) {
                 syncNavigator.startSyncService(this)
             } else {
                 syncNavigator.stopSyncService(this)
@@ -1969,6 +2029,9 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
 
             if (managerState.uploadEvent is StateEventWithContentTriggered) {
                 startDownloadViewModel.onUploadClicked(managerState.uploadEvent.content)
+            }
+            if (managerState.isAndroidSyncWorkManagerFeatureFlagEnabled) {
+                syncMonitorViewModel.startMonitoring()
             }
         }
         this.collectFlow(
@@ -2313,10 +2376,49 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
 
     /**
      * Checks for the screen orientation and handle showing the Ads view
+     * @param slotId assigned Ad slot id to be used to fetch new ad
      */
     fun handleShowingAds(slotId: String) {
-        if (this.isPortrait() && adsViewModel.canConsumeAdSlot(slotId)) {
+        //slotId is not used for now during the implementation of the new Ads SDK
+        if (this.isPortrait() && adsViewModel.isAdsFeatureEnabled()) {
+            fetchNewAd()
+        } else {
+            hideAdsView()
+        }
+    }
+
+    private fun setupAdsView() {
+        adsContainerView.removeAllViews()
+        adsContainerView.addView(adView)
+    }
+
+    /**
+     * Fetch a new Ad by creating new request
+     */
+    private fun fetchNewAd() {
+        val adRequest = AdManagerAdRequest.Builder().build()
+        adView.loadAd(adRequest)
+    }
+
+    private fun showAdsView() {
+        adsContainerView.isVisible = true
+    }
+
+    fun hideAdsView() {
+        adsContainerView.isVisible = false
+    }
+
+    /**
+     * Checks if we can still show the Ad because loading the webpage takes
+     * time and the user could have navigated to another screen where the Ad shouldn't show
+     */
+    private fun onAdsViewLoaded() {
+
+        if (drawerItem == DrawerItem.CLOUD_DRIVE || isInMainHomePage || isInPhotosPage
+        ) {
             showAdsView()
+            showBNVImmediate()
+            showHideBottomNavigationView(hide = false)
         } else {
             hideAdsView()
         }
@@ -2334,7 +2436,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         checkForInAppUpdateInstallStatus()
         cookieDialogHandler.onResume()
         updateTransfersWidgetVisibility()
-        adView?.resume()
+        adView.resume()
     }
 
     private fun checkForInAppUpdateInstallStatus() {
@@ -5454,40 +5556,55 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         Timber.d("createFolder")
         if (!viewModel.isConnected) {
             showSnackbar(
-                Constants.SNACKBAR_TYPE,
+                SNACKBAR_TYPE,
                 getString(R.string.error_server_connection_problem),
                 -1
             )
             return
         }
-        if (isFinishing) {
-            return
-        }
-        val parentNode = getCurrentParentNode(
-            currentParentHandle,
-            R.string.context_folder_no_created
-        )
-            ?: return
-        val nL: ArrayList<MegaNode> = megaApi.getChildren(parentNode)
-        for (i in nL.indices) {
-            if (folderName.compareTo(nL[i].name) == 0) {
+        lifecycleScope.launch {
+            statusDialog = createProgressDialog(
+                this@ManagerActivity,
+                getString(R.string.context_creating_folder)
+            )
+            runCatching {
+                viewModel.createFolder(currentParentHandle, folderName)
+            }.onSuccess { node ->
                 showSnackbar(
                     Constants.SNACKBAR_TYPE,
-                    getString(R.string.context_folder_already_exists),
+                    getString(R.string.context_folder_created),
                     -1
                 )
-                Timber.d("Folder not created: folder already exists")
-                return
+                if (drawerItem === DrawerItem.CLOUD_DRIVE) {
+                    if (isCloudAdded) {
+                        fileBrowserViewModel.setFileBrowserHandle(node.longValue)
+                    }
+                } else if (drawerItem === DrawerItem.SHARED_ITEMS) {
+                    when (tabItemShares) {
+                        SharesTab.INCOMING_TAB -> if (isIncomingAdded) {
+                            incomingSharesViewModel.setCurrentHandle(node.longValue)
+                        }
+
+                        SharesTab.OUTGOING_TAB -> if (isOutgoingAdded) {
+                            outgoingSharesViewModel.setCurrentHandle(node.longValue)
+                        }
+
+                        SharesTab.LINKS_TAB -> if (isLinksAdded) {
+                            linksViewModel.openFolderByHandleWithRetry(node.longValue)
+                        }
+
+                        else -> {}
+                    }
+                }
+            }.onFailure {
+                showSnackbar(SNACKBAR_TYPE, getString(R.string.context_folder_no_created), -1)
             }
+            dismissAlertDialogIfExists(statusDialog)
         }
-        statusDialog = createProgressDialog(
-            this,
-            getString(R.string.context_creating_folder)
-        )
-        megaApi.createFolder(folderName, parentNode, this)
     }
 
     override fun onJoinMeeting() {
+        Analytics.tracker.trackEvent(JoinMeetingPressedEvent)
         if (CallUtil.participatingInACall()) {
             CallUtil.showConfirmationInACall(
                 this,
@@ -5500,10 +5617,12 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
     }
 
     override fun onCreateMeeting() {
+        Analytics.tracker.trackEvent(StartMeetingNowPressedEvent)
         chatsFragment?.onCreateMeeting()
     }
 
     override fun onScheduleMeeting() {
+        Analytics.tracker.trackEvent(ScheduleMeetingPressedEvent)
         startActivity(Intent(this, CreateScheduledMeetingActivity::class.java))
     }
 
@@ -6452,43 +6571,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         }
     }
 
-    private fun createFile(name: String?, data: String, parentNode: MegaNode?) {
-        if (viewModel.getStorageState() === StorageState.PayWall) {
-            showOverDiskQuotaPaywallWarning()
-            return
-        }
-        val file = FileUtil.createTemporalTextFile(this, name, data)
-        if (file == null) {
-            showSnackbar(
-                Constants.SNACKBAR_TYPE,
-                getString(R.string.general_text_error),
-                MEGACHAT_INVALID_HANDLE
-            )
-            return
-        }
-        if (parentNode == null) return
-        val parentHandle = parentNode.handle
-        lifecycleScope.launch {
-            runCatching {
-                checkFileNameCollisionsUseCase(
-                    files = listOf(file.toDocumentEntity()),
-                    parentNodeId = NodeId(parentHandle)
-                )
-            }.onSuccess { collisions ->
-                collisions.firstOrNull()?.let {
-                    nameCollisionActivityLauncher.launch(arrayListOf(it))
-                } ?: viewModel.uploadFile(file, parentHandle)
-            }.onFailure { throwable: Throwable? ->
-                Timber.e(throwable)
-                showSnackbar(
-                    Constants.SNACKBAR_TYPE,
-                    getString(R.string.general_error),
-                    MEGACHAT_INVALID_HANDLE
-                )
-            }
-        }
-    }
-
     override fun onRequestStart(api: MegaApiJava, request: MegaRequest) {
         Timber.d("onRequestStart: %s", request.requestString)
     }
@@ -6657,47 +6739,6 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
                             )
                         }
                     }
-                }
-            }
-
-            MegaRequest.TYPE_CREATE_FOLDER -> {
-                dismissAlertDialogIfExists(statusDialog)
-                if (e.errorCode == MegaError.API_OK) {
-                    showSnackbar(
-                        Constants.SNACKBAR_TYPE,
-                        getString(R.string.context_folder_created),
-                        -1
-                    )
-                    val folderNode =
-                        megaApi.getNodeByHandle(request.nodeHandle) ?: return
-                    if (drawerItem === DrawerItem.CLOUD_DRIVE) {
-                        if (isCloudAdded) {
-                            fileBrowserViewModel.setFileBrowserHandle(folderNode.handle)
-                        }
-                    } else if (drawerItem === DrawerItem.SHARED_ITEMS) {
-                        when (tabItemShares) {
-                            SharesTab.INCOMING_TAB -> if (isIncomingAdded) {
-                                incomingSharesViewModel.setCurrentHandle(folderNode.handle)
-                            }
-
-                            SharesTab.OUTGOING_TAB -> if (isOutgoingAdded) {
-                                outgoingSharesViewModel.setCurrentHandle(folderNode.handle)
-                            }
-
-                            SharesTab.LINKS_TAB -> if (isLinksAdded) {
-                                linksViewModel.openFolderByHandleWithRetry(folderNode.handle)
-                            }
-
-                            else -> {}
-                        }
-                    }
-                } else {
-                    Timber.e("TYPE_CREATE_FOLDER ERROR: %s___%s", e.errorCode, e.errorString)
-                    showSnackbar(
-                        Constants.SNACKBAR_TYPE,
-                        getString(R.string.context_folder_no_created),
-                        -1
-                    )
                 }
             }
 
@@ -7823,91 +7864,7 @@ class ManagerActivity : TransfersManagementActivity(), MegaRequestListenerInterf
         }
     }
 
-    private fun setupAdsView() {
-        val adView = AdManagerAdView(this)
-        // This is a adUntiId only for testing, it should be replace with real one after testing is finished
-        adView.adUnitId = AD_UNIT_ID
-        // the size will be set manually for now, the better implementation will be provided when API and SDK are ready
-        adView.setAdSize(AD_SIZE)
-        adView.adListener = object : AdListener() {
-            override fun onAdClicked() {
-                // Code to be executed when the user clicks on an ad.
-                Timber.d("Ad clicked")
-            }
-
-            override fun onAdClosed() {
-                Timber.i("Ad closed")
-                // Code to be executed when the user is about to return
-                // to the app after tapping on an ad.
-            }
-
-            override fun onAdFailedToLoad(adError : LoadAdError) {
-                // Code to be executed when an ad request fails.
-                Timber.w("Ad failed to load: ${adError.message}")
-            }
-
-            override fun onAdImpression() {
-                Timber.i("Ad impression")
-                // Code to be executed when an impression is recorded
-                // for an ad.
-            }
-
-            override fun onAdLoaded() {
-                Timber.i("Ad loaded")
-                // Code to be executed when an ad finishes loading.
-            }
-
-            override fun onAdOpened() {
-                Timber.i("Ad opened")
-                // Code to be executed when an ad opens an overlay that
-                // covers the screen.
-            }
-        }
-        this.adView = adView
-        adsContainerView.removeAllViews()
-        adsContainerView.addView(adView)
-
-        val adRequest = AdManagerAdRequest.Builder().build()
-        adView.loadAd(adRequest)
-    }
-
-    private fun onAdConsumed() {
-        hideAdsView()
-        showBNVImmediate()
-        showHideBottomNavigationView(hide = false)
-        adsViewModel.onAdConsumed()
-    }
-
-    private fun showAdsView() {
-        if (viewModel.state().adsEnabled) {
-            adsContainerView.isVisible = true
-            setupAdsView()
-        }
-    }
-
-    fun hideAdsView() {
-        adsContainerView.isVisible = false
-        adsViewModel.cancelFetchingAds()
-    }
-
-    /**
-     * Checks if we can still show the Ad because loading the webpage takes
-     * time and the user could have navigated to another screen where the Ad shouldn't show
-     */
-    private fun onAdsWebpageLoaded() {
-
-        if (drawerItem == DrawerItem.CLOUD_DRIVE || isInMainHomePage || isInPhotosPage
-        ) {
-            showAdsView()
-            showBNVImmediate()
-            showHideBottomNavigationView(hide = false)
-        } else {
-            hideAdsView()
-        }
-    }
-
     companion object {
-        const val AD_UNIT_ID = "ca-app-pub-2135147798858967/9835644604"
         val AD_SIZE = AdSize(320, 50)
         const val TRANSFERS_TAB = "TRANSFERS_TAB"
         private const val BOTTOM_ITEM_BEFORE_OPEN_FULLSCREEN_OFFLINE =

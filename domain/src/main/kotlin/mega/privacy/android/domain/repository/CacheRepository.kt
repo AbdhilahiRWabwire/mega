@@ -31,6 +31,13 @@ interface CacheRepository {
     suspend fun getCacheFolder(folderName: String): File?
 
     /**
+     * Get the folder name for uploads
+     * @param isForChat true if the folder is to upload chat files, false otherwise
+     * @return the folder name to upload temporary files
+     */
+    fun getCacheFolderNameForUpload(isForChat: Boolean): String
+
+    /**
      * Get preview file
      *
      * @param fileName The name of the file
@@ -41,4 +48,9 @@ interface CacheRepository {
      * Get the path to download file for preview
      */
     suspend fun getPreviewDownloadPathForNode(): String
+
+    /**
+     * @return true if the path represents a file or folder in the device cache directory, false otherwise
+     */
+    fun isFileInCacheDirectory(file: File): Boolean
 }

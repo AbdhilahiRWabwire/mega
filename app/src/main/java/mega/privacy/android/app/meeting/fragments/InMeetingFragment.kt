@@ -10,7 +10,6 @@ import android.os.Bundle
 import android.os.CountDownTimer
 import android.os.SystemClock
 import android.util.DisplayMetrics
-import android.util.Pair
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -50,12 +49,10 @@ import mega.privacy.android.app.R
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.components.twemoji.EmojiTextView
-import mega.privacy.android.app.constants.EventConstants.EVENT_CHAT_CONNECTION_STATUS
 import mega.privacy.android.app.constants.EventConstants.EVENT_CONTACT_NAME_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_ENABLE_OR_DISABLE_LOCAL_VIDEO_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_MEETING_AVATAR_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_MEETING_GET_AVATAR
-import mega.privacy.android.app.constants.EventConstants.EVENT_PRIVILEGES_CHANGE
 import mega.privacy.android.app.constants.EventConstants.EVENT_USER_VISIBILITY_CHANGE
 import mega.privacy.android.app.databinding.InMeetingFragmentBinding
 import mega.privacy.android.app.interfaces.SnackbarShower
@@ -123,6 +120,7 @@ import mega.privacy.android.domain.entity.call.CallUIStatusType
 import mega.privacy.android.domain.entity.call.ChatCallStatus
 import mega.privacy.android.domain.entity.call.ChatSession
 import mega.privacy.android.domain.entity.call.ChatSessionStatus
+import mega.privacy.android.domain.entity.chat.ChatConnectionStatus
 import mega.privacy.android.domain.entity.meeting.ParticipantsSection
 import mega.privacy.android.domain.entity.meeting.SubtitleCallType
 import mega.privacy.android.domain.entity.meeting.TypeRemoteAVFlagChange
@@ -132,7 +130,6 @@ import nz.mega.sdk.MegaApiAndroid
 import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaChatApiJava.MEGACHAT_INVALID_HANDLE
 import nz.mega.sdk.MegaChatListItem
-import nz.mega.sdk.MegaChatRoom
 import nz.mega.sdk.MegaUser.VISIBILITY_VISIBLE
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
@@ -263,32 +260,6 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
         inMeetingViewModel.updateParticipantsVisibility(it)
     }
 
-    private val privilegesChangeObserver = Observer<MegaChatListItem> { item ->
-        if (inMeetingViewModel.isSameChatRoom(item.chatId)) {
-            inMeetingViewModel.getCall()?.let { call ->
-                if (call.status == ChatCallStatus.InProgress) {
-                    if (item.hasChanged(MegaChatListItem.CHANGE_TYPE_OWN_PRIV)) {
-                        Timber.d("Change in my privileges")
-                        if (MegaChatRoom.PRIV_MODERATOR == inMeetingViewModel.getOwnPrivileges()) {
-                            showSnackbar(
-                                SNACKBAR_TYPE,
-                                getString(R.string.be_new_moderator),
-                                MEGACHAT_INVALID_HANDLE
-                            )
-                        }
-
-                        inMeetingViewModel.updateOwnPrivileges()
-                    }
-
-                    if (item.hasChanged(MegaChatListItem.CHANGE_TYPE_PARTICIPANTS)) {
-                        Timber.d("Change in the privileges of a participant")
-                        inMeetingViewModel.updateParticipantsPrivileges()
-                    }
-                }
-            }
-        }
-    }
-
     /**
      * Method that updates the Bottom panel
      */
@@ -334,13 +305,6 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
 
         showMuteBanner()
     }
-
-    private val chatConnectionStatusObserver =
-        Observer<Pair<Long, Int>> { chatAndState ->
-            if (inMeetingViewModel.isSameChatRoom(chatAndState.first) && MegaApplication.isWaitingForCall) {
-                startCall()
-            }
-        }
 
     private fun sessionLowRes(session: ChatSession) {
         inMeetingViewModel.getParticipant(
@@ -741,9 +705,6 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
         LiveEventBus.get(EVENT_CONTACT_NAME_CHANGE, Long::class.java)
             .observe(this, nameChangeObserver)
 
-        LiveEventBus.get(EVENT_PRIVILEGES_CHANGE, MegaChatListItem::class.java)
-            .observe(this, privilegesChangeObserver)
-
         LiveEventBus.get(EVENT_USER_VISIBILITY_CHANGE, Long::class.java)
             .observe(this, visibilityChangeObserver)
 
@@ -752,9 +713,6 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
 
         LiveEventBus.get(EVENT_MEETING_AVATAR_CHANGE, Long::class.java)
             .observe(this, avatarChangeObserver)
-
-        LiveEventBus.get<Pair<Long, Int>>(EVENT_CHAT_CONNECTION_STATUS)
-            .observe(this, chatConnectionStatusObserver)
     }
 
     private fun initToolbar() {
@@ -871,6 +829,17 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
             }
         }
 
+        viewLifecycleOwner.collectFlow(inMeetingViewModel.state.map { it.snackbarMsg }
+            .distinctUntilChanged()) { msg ->
+            msg?.let {
+                inMeetingViewModel.onSnackbarMsgConsumed()
+                showSnackbar(
+                    SNACKBAR_TYPE,
+                    msg,
+                    MEGACHAT_INVALID_HANDLE
+                )
+            }
+        }
 
         viewLifecycleOwner.collectFlow(inMeetingViewModel.state) { state: InMeetingUiState ->
             if (state.shouldFinish) {
@@ -1280,6 +1249,11 @@ class InMeetingFragment : MeetingBaseFragment(), BottomFloatingPanelListener, Sn
                             false -> changeToGridView()
                         }
                     }
+                }
+
+                state.isWaitingForCall && state.chatConnectionStatus == ChatConnectionStatus.Online -> {
+                    startCall()
+                    sharedModel.setIsWaitingForCall(false)
                 }
             }
 

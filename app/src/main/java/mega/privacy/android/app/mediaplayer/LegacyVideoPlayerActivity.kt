@@ -15,6 +15,7 @@ import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import android.database.ContentObserver
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -69,7 +70,6 @@ import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.interfaces.ActionNodeCallback
 import mega.privacy.android.app.listeners.OptionalMegaRequestListenerInterface
 import mega.privacy.android.app.main.FileExplorerActivity
-import mega.privacy.android.app.main.controllers.ChatController
 import mega.privacy.android.app.main.controllers.NodeController
 import mega.privacy.android.app.mediaplayer.LegacyVideoPlayerViewModel.Companion.VIDEO_TYPE_RESTART_PLAYBACK_POSITION
 import mega.privacy.android.app.mediaplayer.LegacyVideoPlayerViewModel.Companion.VIDEO_TYPE_RESUME_PLAYBACK_POSITION
@@ -128,7 +128,6 @@ import mega.privacy.android.app.utils.MenuUtils.toggleAllMenuItemsVisibility
 import mega.privacy.android.app.utils.RunOnUIThreadUtils
 import mega.privacy.android.app.utils.Util.isDarkMode
 import mega.privacy.android.app.utils.getFragmentFromNavHost
-import mega.privacy.android.app.utils.permission.PermissionUtils
 import mega.privacy.android.domain.entity.StorageState
 import mega.privacy.android.domain.entity.mediaplayer.RepeatToggleMode
 import mega.privacy.android.domain.entity.node.NodeId
@@ -149,6 +148,7 @@ import nz.mega.sdk.MegaError
 import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaShare
 import timber.log.Timber
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -351,6 +351,7 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
                             Analytics.tracker.trackEvent(VideoPlayerIsActivatedEvent)
                         }
                         setCurrentPlayingHandle(it.toLong())
+                        videoViewModel.saveVideoWatchedTime()
                         lifecycleScope.launch {
                             monitorPlaybackTimes(it.toLong()) { positionInMs ->
                                 when (videoPlayType) {
@@ -459,6 +460,10 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
     @OptIn(FlowPreview::class)
     private fun setupObserver() {
         with(viewModel) {
+            onStartChatFileOfflineDownload().observe(this@LegacyVideoPlayerActivity) {
+                startDownloadViewModel.onSaveOfflineClicked(it)
+            }
+
             getCollision().observe(this@LegacyVideoPlayerActivity) { collision ->
                 nameCollisionActivityContract.launch(arrayListOf(collision))
             }
@@ -593,13 +598,25 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
                     Analytics.tracker.trackEvent(VideoPlayerShareMenuToolbarEvent)
                     when (adapterType) {
                         OFFLINE_ADAPTER, ZIP_ADAPTER -> {
-                            val mediaItem = mediaPlayerGateway.getCurrentMediaItem()
-                            videoViewModel.getPlaylistItem(mediaItem?.mediaId)?.nodeName
-                                ?.let { nodeName ->
-                                    mediaItem?.localConfiguration?.uri?.let { uri ->
-                                        FileUtil.shareUri(this, nodeName, uri)
+                            lifecycleScope.launch {
+                                runCatching {
+                                    mediaPlayerGateway.getCurrentMediaItem()?.let { mediaItem ->
+                                        mediaItem.localConfiguration?.uri?.path?.let { path ->
+                                            val file = File(path)
+                                            if (file.exists()) {
+                                                val contentUri = videoViewModel.getContentUri(file)
+                                                FileUtil.shareUri(
+                                                    this@LegacyVideoPlayerActivity,
+                                                    file.name,
+                                                    Uri.parse(contentUri)
+                                                )
+                                            }
+                                        }
                                     }
+                                }.onFailure {
+                                    Timber.e(it)
                                 }
+                            }
                         }
 
                         FILE_LINK_ADAPTER -> {
@@ -665,17 +682,7 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
                 }
 
                 R.id.chat_save_for_offline -> {
-                    PermissionUtils.checkNotificationsPermission(this)
-                    getChatMessage().let { (chatId, message) ->
-                        message?.let {
-                            ChatController(this).saveForOffline(
-                                it.megaNodeList,
-                                megaChatApi.getChatRoom(chatId),
-                                true,
-                                this
-                            )
-                        }
-                    }
+                    viewModel.saveChatNodeToOffline(chatId = getChatId(), messageId = getMessageId())
                 }
 
                 R.id.rename -> {

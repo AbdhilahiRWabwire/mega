@@ -3,6 +3,8 @@ package mega.privacy.android.app.presentation.videosection
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.palm.composestateevents.consumed
+import de.palm.composestateevents.triggered
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -35,6 +37,7 @@ import mega.privacy.android.app.presentation.videosection.model.VideoSectionStat
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionTab
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionTabState
 import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
+import mega.privacy.android.app.presentation.videosection.view.recentlywatched.videoRecentlyWatchedRoute
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.TypedFileNode
 import mega.privacy.android.domain.entity.node.TypedNode
@@ -53,11 +56,14 @@ import mega.privacy.android.domain.usecase.offline.MonitorOfflineNodeUpdatesUseC
 import mega.privacy.android.domain.usecase.photos.GetNextDefaultAlbumNameUseCase
 import mega.privacy.android.domain.usecase.setting.MonitorShowHiddenItemsUseCase
 import mega.privacy.android.domain.usecase.videosection.AddVideosToPlaylistUseCase
+import mega.privacy.android.domain.usecase.videosection.ClearRecentlyWatchedVideosUseCase
 import mega.privacy.android.domain.usecase.videosection.CreateVideoPlaylistUseCase
 import mega.privacy.android.domain.usecase.videosection.GetAllVideosUseCase
 import mega.privacy.android.domain.usecase.videosection.GetSyncUploadsFolderIdsUseCase
 import mega.privacy.android.domain.usecase.videosection.GetVideoPlaylistsUseCase
+import mega.privacy.android.domain.usecase.videosection.GetVideoRecentlyWatchedUseCase
 import mega.privacy.android.domain.usecase.videosection.MonitorVideoPlaylistSetsUpdateUseCase
+import mega.privacy.android.domain.usecase.videosection.RemoveRecentlyWatchedItemUseCase
 import mega.privacy.android.domain.usecase.videosection.RemoveVideoPlaylistsUseCase
 import mega.privacy.android.domain.usecase.videosection.RemoveVideosFromPlaylistUseCase
 import mega.privacy.android.domain.usecase.videosection.UpdateVideoPlaylistTitleUseCase
@@ -95,6 +101,9 @@ class VideoSectionViewModel @Inject constructor(
     @DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher,
     private val getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase,
     private val getNodeContentUriUseCase: GetNodeContentUriUseCase,
+    private val getVideoRecentlyWatchedUseCase: GetVideoRecentlyWatchedUseCase,
+    private val clearRecentlyWatchedVideosUseCase: ClearRecentlyWatchedVideosUseCase,
+    private val removeRecentlyWatchedItemUseCase: RemoveRecentlyWatchedItemUseCase,
 ) : ViewModel() {
     private val _state = MutableStateFlow(VideoSectionState())
 
@@ -180,12 +189,15 @@ class VideoSectionViewModel @Inject constructor(
                     Timber.e(it)
                 }.collect {
                     setPendingRefreshNodes()
+                    if (_state.value.currentDestinationRoute == videoRecentlyWatchedRoute) {
+                        loadRecentlyWatchedVideos()
+                    }
                 }
         }
     }
 
     private fun loadVideoPlaylists() {
-        viewModelScope.launch {
+        viewModelScope.launch(defaultDispatcher) {
             val videoPlaylists =
                 getVideoPlaylists().updateOriginalPlaylistEntities()
                     .filterVideoPlaylistsBySearchQuery()
@@ -225,7 +237,7 @@ class VideoSectionViewModel @Inject constructor(
 
     private fun setPendingRefreshNodes() = _state.update { it.copy(isPendingRefresh = true) }
 
-    internal fun refreshNodes() = viewModelScope.launch {
+    internal fun refreshNodes() = viewModelScope.launch(defaultDispatcher) {
         val videoList = filterNonSensitiveItems(
             items = getVideoUIEntityList(),
             showHiddenItems = this@VideoSectionViewModel.showHiddenItems,
@@ -997,6 +1009,68 @@ class VideoSectionViewModel @Inject constructor(
             )
         }
     }
+
+    internal fun loadRecentlyWatchedVideos() = viewModelScope.launch {
+        runCatching {
+            getVideoRecentlyWatchedUseCase().map {
+                videoUIEntityMapper(it)
+            }.groupBy { it.watchedDate }
+        }.onSuccess { group ->
+            _state.update {
+                it.copy(groupedVideoRecentlyWatchedItems = group)
+            }
+        }.onFailure { error ->
+            Timber.e(error)
+            _state.update {
+                it.copy(groupedVideoRecentlyWatchedItems = emptyMap())
+            }
+        }
+    }
+
+    internal suspend fun isRecentlyWatchedEnabled() =
+        getFeatureFlagValueUseCase(AppFeatures.VideoRecentlyWatched)
+
+    internal fun clearRecentlyWatchedVideos() {
+        viewModelScope.launch {
+            runCatching {
+                clearRecentlyWatchedVideosUseCase()
+                _state.update {
+                    it.copy(
+                        groupedVideoRecentlyWatchedItems = emptyMap(),
+                        clearRecentlyWatchedVideosSuccess = triggered
+                    )
+                }
+            }.onFailure {
+                Timber.e(it)
+            }
+        }
+    }
+
+    internal fun removeRecentlyWatchedItem(handle: Long) {
+        viewModelScope.launch {
+            runCatching {
+                removeRecentlyWatchedItemUseCase(handle)
+                _state.update {
+                    it.copy(
+                        removeRecentlyWatchedItemSuccess = triggered
+                    )
+                }
+                loadRecentlyWatchedVideos()
+            }.onFailure {
+                Timber.e(it)
+            }
+        }
+    }
+
+    internal fun resetClearRecentlyWatchedVideosSuccess() =
+        _state.update {
+            it.copy(clearRecentlyWatchedVideosSuccess = consumed)
+        }
+
+    internal fun resetRemoveRecentlyWatchedItemSuccess() =
+        _state.update {
+            it.copy(removeRecentlyWatchedItemSuccess = consumed)
+        }
 
     companion object {
         private const val ERROR_MESSAGE_REPEATED_TITLE = 0

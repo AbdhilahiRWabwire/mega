@@ -23,7 +23,6 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
-import mega.privacy.android.app.featuretoggle.ABTestFeatures
 import mega.privacy.android.app.featuretoggle.ApiFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
@@ -102,6 +101,7 @@ import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
 import mega.privacy.android.domain.usecase.network.MonitorConnectivityUseCase
 import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodesUseCase
+import mega.privacy.android.domain.usecase.node.CreateFolderNodeUseCase
 import mega.privacy.android.domain.usecase.node.DeleteNodesUseCase
 import mega.privacy.android.domain.usecase.node.DisableExportNodesUseCase
 import mega.privacy.android.domain.usecase.node.MonitorNodeUpdatesUseCase
@@ -124,6 +124,7 @@ import mega.privacy.android.domain.usecase.workers.StartCameraUploadUseCase
 import mega.privacy.android.domain.usecase.workers.StopCameraUploadsUseCase
 import mega.privacy.android.feature.sync.domain.usecase.sync.MonitorSyncStalledIssuesUseCase
 import mega.privacy.android.feature.sync.domain.usecase.sync.MonitorSyncsUseCase
+import mega.privacy.android.shared.sync.featuretoggles.SyncFeatures
 import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
@@ -267,6 +268,7 @@ class ManagerViewModel @Inject constructor(
     private val startOfflineSyncWorkerUseCase: StartOfflineSyncWorkerUseCase,
     private val filePrepareUseCase: FilePrepareUseCase,
     private val scannerHandler: ScannerHandler,
+    private val createFolderNodeUseCase: CreateFolderNodeUseCase,
 ) : ViewModel() {
 
     /**
@@ -348,6 +350,7 @@ class ManagerViewModel @Inject constructor(
     init {
         checkUsersCallLimitReminders()
         getApiFeatureFlag()
+        loadAndroidSyncWorkManagerFeatureFlag()
 
         viewModelScope.launch {
             val order = getCloudSortOrder()
@@ -533,13 +536,20 @@ class ManagerViewModel @Inject constructor(
                 }
             }
         }
+    }
 
+    private fun loadAndroidSyncWorkManagerFeatureFlag() {
         viewModelScope.launch {
             runCatching {
-                val isAdseFlagEnabled = getFeatureFlagValueUseCase(ABTestFeatures.adse)
-                _state.update { it.copy(adsEnabled = isAdseFlagEnabled) }
-            }.onFailure {
-                Timber.e(it, "Failed to get the adse feature flag")
+                getFeatureFlagValueUseCase(SyncFeatures.AndroidSyncWorkManager)
+            }.onFailure { exception ->
+                Timber.e(exception)
+            }.onSuccess { flag ->
+                _state.update { state ->
+                    state.copy(
+                        isAndroidSyncWorkManagerFeatureFlagEnabled = flag,
+                    )
+                }
             }
         }
     }
@@ -1415,6 +1425,14 @@ class ManagerViewModel @Inject constructor(
     fun onDocumentScanningErrorConsumed() {
         _state.update { it.copy(documentScanningErrorTypeUiItem = null) }
     }
+
+    /**
+     * Create a folder
+     */
+    suspend fun createFolder(parentId: Long, folderName: String) = createFolderNodeUseCase(
+        parentNodeId = NodeId(parentId).takeIf { it.longValue != INVALID_HANDLE },
+        name = folderName,
+    )
 
     internal companion object {
         internal const val IS_FIRST_LOGIN_KEY = "EXTRA_FIRST_LOGIN"

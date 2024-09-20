@@ -17,6 +17,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import androidx.appcompat.app.AlertDialog
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
@@ -26,6 +27,7 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import mega.privacy.android.app.MegaApplication.Companion.getChatManagement
 import mega.privacy.android.app.MegaApplication.Companion.isIsHeartBeatAlive
@@ -152,19 +154,22 @@ class LoginFragment : Fragment() {
                 onLostAuthenticatorDevice = ::onLostAuthenticationDevice,
                 onBackPressed = { onBackPressed(uiState) },
                 onFirstTime2FAConsumed = viewModel::onFirstTime2FAConsumed,
-                onReportIssue = {
-                    viewModel.onReportIssue(
-                        getString(R.string.setting_feedback_body),
-                        ::sendSupportEmail,
-                        ::openReportIssueFragment
-                    )
-                },
+                onReportIssue = ::openLoginIssueHelpdeskPage,
             )
+        }
+
+        // Hide splash after UI is rendered, to prevent blinking
+        LaunchedEffect(key1 = Unit) {
+            delay(100)
+            (activity as? LoginActivity)?.stopShowingSplashScreen()
         }
     }
 
-    private fun openReportIssueFragment() {
-        (requireActivity() as LoginActivity).showFragment(LoginFragmentType.ReportIssue)
+    private fun openLoginIssueHelpdeskPage() {
+        Intent(Intent.ACTION_VIEW).apply {
+            data = Uri.parse(Companion.LOGIN_HELP_URL)
+            startActivity(this)
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -921,5 +926,9 @@ class LoginFragment : Fragment() {
             putExtra(Intent.EXTRA_STREAM, it)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
+    }
+
+    companion object {
+        private const val LOGIN_HELP_URL = "https://help.mega.io/accounts/login-issues"
     }
 }

@@ -648,6 +648,12 @@ internal class FileSystemRepositoryImpl @Inject constructor(
             )
         }
 
+    override fun isPathInsecure(path: String): Boolean =
+        fileGateway.isPathInsecure(path)
+
+    override fun isMalformedPathFromExternalApp(action: String?, path: String): Boolean =
+        fileGateway.isMalformedPathFromExternalApp(action, path)
+
     override suspend fun getDocumentFileName(uri: UriPath): String = withContext(ioDispatcher) {
         val rawUri = uri.value.toUri()
         val isTreeUri = DocumentsContract.isTreeUri(rawUri)

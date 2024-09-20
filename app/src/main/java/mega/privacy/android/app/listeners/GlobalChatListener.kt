@@ -1,15 +1,11 @@
 package mega.privacy.android.app.listeners
 
 import android.app.Application
-import android.util.Pair
-import com.jeremyliao.liveeventbus.LiveEventBus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
-import mega.privacy.android.app.constants.EventConstants.EVENT_CHAT_CONNECTION_STATUS
-import mega.privacy.android.app.constants.EventConstants.EVENT_PRIVILEGES_CHANGE
 import mega.privacy.android.app.globalmanagement.ActivityLifecycleHandler
 import mega.privacy.android.app.utils.RunOnUIThreadUtils.post
 import mega.privacy.android.app.utils.Util
@@ -34,16 +30,6 @@ class GlobalChatListener @Inject constructor(
 ) : MegaChatListenerInterface {
     override fun onChatListItemUpdate(api: MegaChatApiJava?, item: MegaChatListItem?) {
         if (item != null) {
-            if (item.hasChanged(MegaChatListItem.CHANGE_TYPE_OWN_PRIV) || item.hasChanged(
-                    MegaChatListItem.CHANGE_TYPE_PARTICIPANTS
-                )
-            ) {
-                LiveEventBus.get(
-                    EVENT_PRIVILEGES_CHANGE,
-                    MegaChatListItem::class.java
-                ).post(item)
-            }
-
             onChatListItemUpdate(item)
         }
     }
@@ -81,14 +67,6 @@ class GlobalChatListener @Inject constructor(
     }
 
     override fun onChatConnectionStateUpdate(api: MegaChatApiJava?, chatid: Long, newState: Int) {
-        val chatRoom = api!!.getChatRoom(chatid)
-        if (newState == MegaChatApi.CHAT_CONNECTION_ONLINE && chatRoom != null) {
-            val chatIdAndState = Pair.create(chatid, newState)
-            LiveEventBus.get(
-                EVENT_CHAT_CONNECTION_STATUS,
-                Pair::class.java
-            ).post(chatIdAndState)
-        }
     }
 
     override fun onChatPresenceLastGreen(api: MegaChatApiJava?, userhandle: Long, lastGreen: Int) {

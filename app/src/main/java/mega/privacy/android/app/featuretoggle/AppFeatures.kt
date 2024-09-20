@@ -16,6 +16,22 @@ enum class AppFeatures(override val description: String, private val defaultValu
     Feature {
 
     /**
+     * Enable video recently watched feature
+     */
+    VideoRecentlyWatched(
+        "Enable video recently watched feature",
+        true
+    ),
+
+    /**
+     * Compose passcode settings
+     */
+    ComposePasscodeSettings(
+        "Use the new compose version of the passcode settings screens",
+        false
+    ),
+
+    /**
      * Enables document scanner
      */
     DocumentScanner(
@@ -37,14 +53,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     NewVideoPlayer(
         "Enable new video player",
         false,
-    ),
-
-    /**
-     * Enables report issue via email in login screen
-     */
-    ReportIssueViaEmail(
-        "Enable report issue via email in login screen",
-        true,
     ),
 
     /**
@@ -96,30 +104,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     ),
 
     /**
-     * Enable album sharing feature.
-     */
-    AlbumSharing(
-        "Enable album sharing feature",
-        true
-    ),
-
-    /**
-     * To switch into new compose slideshow or not toggle.
-     */
-    SlideShowCompose(
-        "Enable slideshow compose",
-        true
-    ),
-
-    /**
-     * To switch into new photos modularization architecture or not toggle
-     */
-    PhotosCompose(
-        "Enable compose-world photos feature (modularization)",
-        false
-    ),
-
-    /**
      * Permanent logging toggle
      */
     PermanentLogging("Permanently enable logging, removing functionality to turn it on/off", true),
@@ -156,25 +140,25 @@ enum class AppFeatures(override val description: String, private val defaultValu
     ),
 
     /**
+     * To enable search by node tags
+     */
+    SearchWithTags(
+        "Enable search with tags",
+        false
+    ),
+
+    /**
      * To enable the new cancel subscription feature
      */
     CancelSubscription(
         "Enable cancel subscription feature",
-        false
+        true
     ),
 
     /**
      * Raise to speak in a call
      */
     RaiseToSpeak("Raise to speak in a call or a meeting", true),
-
-    /**
-     * Camera uploads utilizes active transfers to monitor transfers
-     */
-    ActiveTransfersInCameraUploads(
-        "Camera Uploads uses Active transfers to monitor the transfer progress",
-        true,
-    ),
 
     /**
      * To enable the new add and manage description feature to node
@@ -205,6 +189,14 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     NewUploadDestinationActivity(
         "Enable upload destination activity",
+        false
+    ),
+
+    /**
+     * To show cancellation survey
+     */
+    CancellationSurvey(
+        "Enable Cancellation survey feature",
         false
     );
 

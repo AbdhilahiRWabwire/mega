@@ -69,7 +69,7 @@ android {
         resValue("string", "sdk_version", "\"${getSdkGitHash(megaSdkVersion, project)}\"")
         resValue("string", "karere_version", "\"${getChatGitHash(megaSdkVersion, project)}\"")
 
-        testInstrumentationRunner = "test.mega.privacy.android.app.HiltTestRunner"
+        testInstrumentationRunner = "mega.privacy.android.app.HiltTestRunner"
     }
 
     buildTypes {
@@ -78,6 +78,7 @@ android {
             extra["enableCrashlytics"] = false
             extra["alwaysUpdateBuildId"] = false
             buildConfigField("String", "ENVIRONMENT", "\"MEGAEnv/Dev\"")
+            buildConfigField("String", "AD_UNIT_ID", "\"ca-app-pub-3940256099942544/9214589741\"")
         }
         release {
             firebaseAppDistribution {
@@ -100,6 +101,8 @@ android {
             // signingConfig = signingConfigs.getByName("debug")
 
             buildConfigField("String", "ENVIRONMENT", "\"\"")
+            buildConfigField("String", "AD_UNIT_ID", "\"ca-app-pub-2135147798858967/9835644604\"")
+
         }
 
         register("qa") {
@@ -108,6 +111,7 @@ android {
             matchingFallbacks += listOf("debug", "release")
             applicationIdSuffix = ".qa"
             buildConfigField("String", "ENVIRONMENT", "\"MEGAEnv/QA\"")
+            buildConfigField("String", "AD_UNIT_ID", "\"ca-app-pub-3940256099942544/9214589741\"")
             firebaseAppDistribution {
                 releaseNotes = readReleaseNotes()
                 groups = readTesterGroupList()
@@ -213,6 +217,7 @@ dependencies {
     implementation(androidx.work.ktx)
     implementation(androidx.paging)
     implementation(androidx.sqlite.ktx)
+    implementation(androidx.splashscreen)
 
     // Compose
     implementation(androidx.bundles.compose.bom)

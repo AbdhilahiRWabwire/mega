@@ -31,6 +31,7 @@ import mega.privacy.android.app.presentation.search.model.TypeFilterWithName
 import mega.privacy.android.app.presentation.search.navigation.DATE_ADDED
 import mega.privacy.android.app.presentation.search.navigation.DATE_MODIFIED
 import mega.privacy.android.app.presentation.search.navigation.TYPE
+import mega.privacy.android.domain.entity.SortOrder
 import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeSourceType
 import mega.privacy.android.domain.entity.node.NodeSourceType.OTHER
@@ -108,7 +109,7 @@ class SearchActivityViewModel @Inject constructor(
     private var showHiddenItems: Boolean = true
 
     init {
-        checkSearchDescriptionFlag()
+        checkSearchFlags()
         monitorNodeUpdatesForSearch()
         initializeSearch()
         checkViewType()
@@ -116,13 +117,15 @@ class SearchActivityViewModel @Inject constructor(
         monitorShowHiddenItems()
     }
 
-    private fun checkSearchDescriptionFlag() {
+    private fun checkSearchFlags() {
         viewModelScope.launch {
             runCatching {
-                getFeatureFlagValueUseCase(AppFeatures.SearchWithDescription)
-            }.onSuccess { flag ->
+                val description = getFeatureFlagValueUseCase(AppFeatures.SearchWithDescription)
+                val tags = getFeatureFlagValueUseCase(AppFeatures.SearchWithTags)
+                description to tags
+            }.onSuccess { (description, tags) ->
                 _state.update {
-                    it.copy(searchDescriptionEnabled = flag)
+                    it.copy(searchDescriptionEnabled = description, searchTagsEnabled = tags)
                 }
             }.onFailure {
                 Timber.e("Get feature flag failed $it")
@@ -173,6 +176,7 @@ class SearchActivityViewModel @Inject constructor(
                         modificationDate = state.value.dateModifiedSelectedFilterOption?.date,
                         creationDate = state.value.dateAddedSelectedFilterOption?.date,
                         description = if (state.value.searchDescriptionEnabled == true) getCurrentSearchQuery() else null,
+                        tag = if (state.value.searchTagsEnabled == true) getCurrentSearchQuery() else null,
                     )
                 )
             }.onSuccess {
@@ -218,10 +222,14 @@ class SearchActivityViewModel @Inject constructor(
             }
         } else {
             val nodeUIItems = searchResults.distinctBy { it.id.longValue }.map { typedNode ->
-                NodeUIItem(node = typedNode, isSelected = false)
+                NodeUIItem(
+                    node = typedNode,
+                    isSelected = false,
+                )
             }
+            val cloudSortOrder =
+                runCatching { getCloudSortOrder() }.getOrDefault(SortOrder.ORDER_NONE)
             _state.update { state ->
-                val cloudSortOrder = getCloudSortOrder()
                 state.copy(
                     searchItemList = nodeUIItems,
                     isSearching = false,

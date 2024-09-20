@@ -12,8 +12,8 @@ import mega.privacy.android.domain.usecase.GetFileUrlByImageNodeUseCase
 import mega.privacy.android.domain.usecase.file.GetFileTypeInfoUseCase
 import mega.privacy.android.domain.usecase.file.GetFingerprintUseCase
 import mega.privacy.android.domain.usecase.node.AddImageTypeUseCase
-import mega.privacy.android.domain.usecase.node.GetFileLinkNodeContentUriUseCase
 import mega.privacy.android.domain.usecase.node.GetFolderLinkNodeContentUriUseCase
+import mega.privacy.android.domain.usecase.node.GetNodeContentUriUseCase
 import mega.privacy.android.navigation.MegaNavigator
 import nz.mega.sdk.MegaNode
 import timber.log.Timber
@@ -28,8 +28,8 @@ class ImagePreviewVideoLauncher @Inject constructor(
     private val getFingerprintUseCase: GetFingerprintUseCase,
     private val getFileUrlByImageNodeUseCase: GetFileUrlByImageNodeUseCase,
     private val addImageTypeUseCase: AddImageTypeUseCase,
-    private val getFileLinkNodeContentUriUseCase: GetFileLinkNodeContentUriUseCase,
     private val getFolderLinkNodeContentUriUseCase: GetFolderLinkNodeContentUriUseCase,
+    private val getNodeContentUriUseCase: GetNodeContentUriUseCase,
     private val getFileTypeInfoUseCase: GetFileTypeInfoUseCase,
     private val megaNavigator: MegaNavigator,
 ) {
@@ -60,12 +60,10 @@ class ImagePreviewVideoLauncher @Inject constructor(
             } ?: run {
                 val typedFileNode = addImageTypeUseCase(imageNode)
                 if (source == ImagePreviewFetcherSource.CHAT) {
-                    getFileUrlByImageNodeUseCase(imageNode as ChatImageFile)?.let {
-                        getFileLinkNodeContentUriUseCase(it)
-                    }
+                    getNodeContentUriUseCase(imageNode as ChatImageFile)
                 } else {
                     getFolderLinkNodeContentUriUseCase(typedFileNode)
-                }?.let { contentUri ->
+                }.let { contentUri ->
                     megaNavigator.openMediaPlayerActivityByFileNode(
                         context = context,
                         contentUri = contentUri,

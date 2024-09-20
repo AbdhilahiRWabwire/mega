@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import mega.privacy.android.app.MegaApplication.Companion.isClosedChat
 import mega.privacy.android.app.MimeTypeList.Companion.typeForName
 import mega.privacy.android.app.R
+import mega.privacy.android.app.activities.PasscodeActivity
 import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.extensions.isPortrait
@@ -42,7 +43,7 @@ import mega.privacy.android.app.presentation.imagepreview.model.ImagePreviewMenu
 import mega.privacy.android.app.presentation.login.LoginActivity
 import mega.privacy.android.app.presentation.manager.model.TransfersTab
 import mega.privacy.android.app.presentation.pdfviewer.PdfViewerActivity
-import mega.privacy.android.app.presentation.transfers.TransfersManagementActivity
+import mega.privacy.android.app.presentation.transfers.TransfersManagementViewModel
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.StartTransferComponent
 import mega.privacy.android.app.presentation.transfers.view.IN_PROGRESS_TAB_INDEX
 import mega.privacy.android.app.textEditor.TextEditorActivity
@@ -53,6 +54,8 @@ import mega.privacy.android.app.utils.Constants.SNACKBAR_TYPE
 import mega.privacy.android.app.utils.MegaNodeUtil
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.node.TypedFileNode
+import mega.privacy.android.domain.usecase.GetThemeMode
+import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.navigation.MegaNavigator
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
@@ -63,8 +66,20 @@ import javax.inject.Inject
  * FileLinkActivity with compose view
  */
 @AndroidEntryPoint
-class FileLinkComposeActivity : TransfersManagementActivity(),
+class FileLinkComposeActivity : PasscodeActivity(),
     DecryptAlertDialog.DecryptDialogListener {
+
+    /**
+     * Application Theme Mode
+     */
+    @Inject
+    lateinit var getThemeMode: GetThemeMode
+
+    /**
+     * [GetFeatureFlagValueUseCase]
+     */
+    @Inject
+    lateinit var getFeatureFlagValueUseCase: GetFeatureFlagValueUseCase
 
     /**
      * MegaNavigator
@@ -72,7 +87,14 @@ class FileLinkComposeActivity : TransfersManagementActivity(),
     @Inject
     lateinit var megaNavigator: MegaNavigator
 
+    /**
+     * [MegaNavigator]
+     */
+    @Inject
+    lateinit var navigator: MegaNavigator
+
     private val viewModel: FileLinkViewModel by viewModels()
+    private val transfersManagementViewModel: TransfersManagementViewModel by viewModels()
 
     private var mKey: String? = null
 

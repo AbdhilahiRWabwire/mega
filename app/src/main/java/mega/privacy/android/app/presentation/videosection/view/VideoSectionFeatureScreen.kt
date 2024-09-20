@@ -9,12 +9,16 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import mega.privacy.android.app.presentation.bottomsheet.NodeOptionsBottomSheetDialogFragment.Companion.CLOUD_DRIVE_MODE
+import mega.privacy.android.app.presentation.bottomsheet.NodeOptionsBottomSheetDialogFragment.Companion.VIDEO_RECENTLY_WATCHED_MODE
 import mega.privacy.android.app.presentation.videosection.VideoSectionViewModel
 import mega.privacy.android.app.presentation.videosection.model.VideoPlaylistUIEntity
 import mega.privacy.android.app.presentation.videosection.model.VideoSectionMenuAction
 import mega.privacy.android.app.presentation.videosection.model.VideoUIEntity
 import mega.privacy.android.app.presentation.videosection.view.playlist.VideoPlaylistDetailView
 import mega.privacy.android.app.presentation.videosection.view.playlist.videoPlaylistDetailRoute
+import mega.privacy.android.app.presentation.videosection.view.recentlywatched.VideoRecentlyWatchedView
+import mega.privacy.android.app.presentation.videosection.view.recentlywatched.videoRecentlyWatchedRoute
 
 @Composable
 internal fun VideoSectionFeatureScreen(
@@ -22,7 +26,7 @@ internal fun VideoSectionFeatureScreen(
     videoSectionViewModel: VideoSectionViewModel,
     onAddElementsClicked: () -> Unit,
     onSortOrderClick: () -> Unit,
-    onMenuClick: (VideoUIEntity) -> Unit,
+    onMenuClick: (VideoUIEntity, index: Int) -> Unit,
     onMenuAction: (VideoSectionMenuAction?) -> Unit,
 ) {
     val navHostController = rememberNavController()
@@ -42,7 +46,7 @@ internal fun VideoSectionFeatureScreen(
 internal fun VideoSectionNavHost(
     navHostController: NavHostController,
     onSortOrderClick: () -> Unit,
-    onMenuClick: (VideoUIEntity) -> Unit,
+    onMenuClick: (VideoUIEntity, index: Int) -> Unit,
     onAddElementsClicked: () -> Unit,
     modifier: Modifier,
     onMenuAction: (VideoSectionMenuAction?) -> Unit,
@@ -79,6 +83,9 @@ internal fun VideoSectionNavHost(
         }
     }
 
+    val onBackPressedDispatcher =
+        LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+
     NavHost(
         modifier = modifier,
         navController = navHostController,
@@ -91,7 +98,7 @@ internal fun VideoSectionNavHost(
                 videoSectionViewModel = viewModel,
                 onClick = viewModel::onItemClicked,
                 onSortOrderClick = onSortOrderClick,
-                onMenuClick = onMenuClick,
+                onMenuClick = { onMenuClick(it, CLOUD_DRIVE_MODE) },
                 onLongClick = viewModel::onItemLongClicked,
                 onPlaylistItemClick = { playlist, index ->
                     if (state.isInSelection) {
@@ -103,14 +110,20 @@ internal fun VideoSectionNavHost(
                 },
                 onPlaylistItemLongClick = viewModel::onVideoPlaylistItemClicked,
                 onDeleteDialogButtonClicked = viewModel::clearAllSelectedVideoPlaylists,
-                onMenuAction = onMenuAction
+                onMenuAction = { action ->
+                    if (action is VideoSectionMenuAction.VideoRecentlyWatchedAction) {
+                        viewModel.loadRecentlyWatchedVideos()
+                        navHostController.navigate(route = videoRecentlyWatchedRoute)
+                    } else {
+                        onMenuAction(action)
+                    }
+                }
             )
         }
         composable(
             route = videoPlaylistDetailRoute
         ) {
-            val onBackPressedDispatcher =
-                LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+
             VideoPlaylistDetailView(
                 playlist = state.currentVideoPlaylist,
                 selectedSize = state.selectedVideoElementIDs.size,
@@ -130,7 +143,7 @@ internal fun VideoSectionNavHost(
                         viewModel.onVideoItemOfPlaylistClicked(item, index)
                     }
                 },
-                onMenuClick = onMenuClick,
+                onMenuClick = { onMenuClick(it, CLOUD_DRIVE_MODE) },
                 onLongClick = viewModel::onVideoItemOfPlaylistLongClicked,
                 onDeleteVideosDialogPositiveButtonClicked = onDeleteVideosDialogPositiveButtonClicked,
                 onPlayAllClicked = viewModel::playAllButtonClicked,
@@ -152,6 +165,25 @@ internal fun VideoSectionNavHost(
                         else -> {}
                     }
                 }
+            )
+        }
+
+        composable(route = videoRecentlyWatchedRoute) {
+            VideoRecentlyWatchedView(
+                group = state.groupedVideoRecentlyWatchedItems,
+                clearRecentlyWatchedVideosSuccess = state.clearRecentlyWatchedVideosSuccess,
+                removeRecentlyWatchedItemSuccess = state.removeRecentlyWatchedItemSuccess,
+                modifier = Modifier,
+                onBackPressed = { onBackPressedDispatcher?.onBackPressed() },
+                onClick = viewModel::onItemClicked,
+                onActionPressed = {
+                    if (it is VideoSectionMenuAction.VideoRecentlyWatchedClearAction) {
+                        viewModel.clearRecentlyWatchedVideos()
+                    }
+                },
+                onMenuClick = { onMenuClick(it, VIDEO_RECENTLY_WATCHED_MODE) },
+                clearRecentlyWatchedVideosMessageShown = viewModel::resetClearRecentlyWatchedVideosSuccess,
+                removedRecentlyWatchedItemMessageShown = viewModel::resetRemoveRecentlyWatchedItemSuccess
             )
         }
     }

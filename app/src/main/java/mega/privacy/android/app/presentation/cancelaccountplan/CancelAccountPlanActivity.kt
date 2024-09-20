@@ -10,27 +10,30 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import mega.privacy.android.analytics.Analytics
+import mega.privacy.android.app.presentation.account.AccountStorageViewModel
 import mega.privacy.android.app.presentation.cancelaccountplan.model.CancellationInstructionsType
-import mega.privacy.android.app.presentation.cancelaccountplan.model.UIAccountDetails
 import mega.privacy.android.app.presentation.cancelaccountplan.view.CancelAccountPlanView
 import mega.privacy.android.app.presentation.cancelaccountplan.view.CancelSubscriptionSurveyView
 import mega.privacy.android.app.presentation.cancelaccountplan.view.instructionscreens.CancellationInstructionsView
 import mega.privacy.android.app.presentation.extensions.isDarkMode
-import mega.privacy.android.app.presentation.myaccount.mapper.AccountNameMapper
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountViewModel.Companion.getProductId
 import mega.privacy.android.app.utils.MANAGE_PLAY_STORE_SUBSCRIPTION_URL
 import mega.privacy.android.domain.entity.AccountType
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
-import mega.privacy.android.shared.resources.R
 import mega.privacy.mobile.analytics.event.CancelSubscriptionContinueCancellationButtonPressedEvent
 import mega.privacy.mobile.analytics.event.CancelSubscriptionKeepPlanButtonPressedEvent
+import mega.privacy.mobile.analytics.event.SubscriptionCancellationSurveyCancelSubscriptionButtonEvent
+import mega.privacy.mobile.analytics.event.SubscriptionCancellationSurveyDontCancelButtonEvent
+import mega.privacy.mobile.analytics.event.SubscriptionCancellationSurveyScreenEvent
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -41,56 +44,31 @@ import javax.inject.Inject
 class CancelAccountPlanActivity : AppCompatActivity() {
 
     companion object {
-        const val EXTRA_ACCOUNT_TYPE = "EXTRA_ACCOUNT_TYPE"
-        const val EXTRA_TRANSFER_QUOTA = "EXTRA_TRANSFER_QUOTA"
-        const val EXTRA_STORAGE_QUOTA = "EXTRA_STORAGE_QUOTA"
         const val EXTRA_USED_STORAGE = "EXTRA_USED_STORAGE"
-
     }
-
-    private val REWIND_DAYS_QUOTA_PRO_LITE = "90"
-    private val REWIND_DAYS_QUOTA_OTHERS = "180"
-    private val FREE_STORAGE_QUOTA = "20"
 
     @Inject
     lateinit var getThemeMode: GetThemeMode
 
-    @Inject
-    lateinit var accountNameMapper: AccountNameMapper
-
     private val viewModel: CancelAccountPlanViewModel by viewModels()
+    private val accountStorageViewModel: AccountStorageViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-
-        val accountType = intent.getStringExtra(EXTRA_ACCOUNT_TYPE)?.let { AccountType.valueOf(it) }
-            ?: AccountType.UNKNOWN
         val usedStorage = intent.getStringExtra(EXTRA_USED_STORAGE) ?: ""
-        val transferQuota = intent.getStringExtra(EXTRA_TRANSFER_QUOTA) ?: ""
-        val storageQuota = intent.getStringExtra(EXTRA_STORAGE_QUOTA) ?: ""
-
         val cancelAccountPlanRoute = "cancelAccount/plan"
         val cancellationInstructionsRoute = "cancelAccount/cancellationInstructions"
         val cancellationSurveyRoute = "cancelAccount/cancellationSurvey"
-
-        val possibleCancellationReasons = listOf(
-            R.string.account_cancel_subscription_survey_option_expensive,
-            R.string.account_cancel_subscription_survey_option_cannot_afford,
-            R.string.account_cancel_subscription_survey_option_no_subscription,
-            R.string.account_cancel_subscription_survey_option_no_storage_need,
-            R.string.account_cancel_subscription_survey_option_missing_features,
-            R.string.account_cancel_subscription_survey_option_switch_provider,
-            R.string.account_cancel_subscription_survey_option_confusing,
-            R.string.account_cancel_subscription_survey_option_dissatisfied_support,
-            R.string.account_cancel_subscription_survey_option_temporary_use,
-        ).shuffled() + R.string.account_cancel_subscription_survey_option_other
 
         setContent {
             val navController = rememberNavController()
             val themeMode by getThemeMode()
                 .collectAsStateWithLifecycle(initialValue = ThemeMode.System)
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            val accountUiState by accountStorageViewModel.state.collectAsStateWithLifecycle()
+
+            val accountType = uiState.accountType
             OriginalTempTheme(isDark = themeMode.isDarkMode()) {
                 NavHost(
                     navController = navController,
@@ -102,18 +80,9 @@ class CancelAccountPlanActivity : AppCompatActivity() {
                 ) {
                     composable(cancelAccountPlanRoute) {
                         CancelAccountPlanView(
-                            accountDetailsUI = UIAccountDetails(
-                                accountType = getString(accountNameMapper(accountType)),
-                                storageQuotaSize = storageQuota,
-                                usedStorageSize = usedStorage,
-                                transferQuotaSize = transferQuota,
-                                rewindDaysQuota = if (accountType == AccountType.PRO_LITE) {
-                                    REWIND_DAYS_QUOTA_PRO_LITE
-                                } else {
-                                    REWIND_DAYS_QUOTA_OTHERS
-                                },
-                                freeStorageQuota = FREE_STORAGE_QUOTA
-                            ),
+                            uiState = uiState,
+                            accountUiState = accountUiState,
+                            formattedUsedStorage = usedStorage,
                             onKeepPlanButtonClicked = {
                                 Analytics.tracker.trackEvent(
                                     CancelSubscriptionKeepPlanButtonPressedEvent
@@ -132,13 +101,19 @@ class CancelAccountPlanActivity : AppCompatActivity() {
                                             cancellationInstructionsRoute
                                         )
 
-                                        CancellationInstructionsType.PlayStore ->
+                                        CancellationInstructionsType.PlayStore,
+                                        -> if (uiState.showCancellationSurvey) {
+                                            navController.navigate(
+                                                cancellationSurveyRoute
+                                            )
+                                        } else {
                                             uiState.isMonthlySubscription?.let { isMonthlySubscription ->
                                                 redirectToCancelPlayStoreSubscription(
                                                     accountType,
                                                     isMonthlySubscription
                                                 )
                                             }
+                                        }
                                     }
                                 }
                             })
@@ -163,28 +138,25 @@ class CancelAccountPlanActivity : AppCompatActivity() {
                         )
                     }
                     composable(cancellationSurveyRoute) {
+                        Analytics.tracker.trackEvent(SubscriptionCancellationSurveyScreenEvent)
                         CancelSubscriptionSurveyView(
-                            possibleCancellationReasons = possibleCancellationReasons,
-                            onCancelSubscriptionButtonClicked = {
-                                uiState.cancellationInstructionsType?.let { cancellationInstructionsType ->
-                                    when (cancellationInstructionsType) {
-                                        CancellationInstructionsType.AppStore,
-                                        CancellationInstructionsType.WebClient,
-                                        -> navController.navigate(
-                                            cancellationInstructionsRoute
-                                        )
-
-                                        CancellationInstructionsType.PlayStore ->
-                                            uiState.isMonthlySubscription?.let { isMonthlySubscription ->
-                                                redirectToCancelPlayStoreSubscription(
-                                                    accountType,
-                                                    isMonthlySubscription
-                                                )
-                                            }
-                                    }
+                            possibleCancellationReasons = uiState.cancellationReasons,
+                            onCancelSubscriptionButtonClicked = { reason, canContact ->
+                                Analytics.tracker.trackEvent(
+                                    SubscriptionCancellationSurveyCancelSubscriptionButtonEvent
+                                )
+                                viewModel.cancelSubscription(reason, canContact)
+                                uiState.isMonthlySubscription?.let { isMonthlySubscription ->
+                                    redirectToCancelPlayStoreSubscription(
+                                        accountType,
+                                        isMonthlySubscription
+                                    )
                                 }
                             },
                             onDoNotCancelButtonClicked = {
+                                Analytics.tracker.trackEvent(
+                                    SubscriptionCancellationSurveyDontCancelButtonEvent
+                                )
                                 finish()
                             })
                     }

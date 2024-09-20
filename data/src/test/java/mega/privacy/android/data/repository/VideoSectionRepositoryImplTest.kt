@@ -53,7 +53,6 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.reset
-import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import org.mockito.kotlin.wheneverBlocking
@@ -663,10 +662,38 @@ class VideoSectionRepositoryImplTest {
                 addedRecentlyWatchedItem
             )
             underTest.saveVideoRecentlyWatched(addedHandle, addedTimestamp)
-            verify(
-                appPreferencesGateway,
-                times(1)
-            ).putString("PREFERENCE_KEY_VIDEO_RECENTLY_WATCHED", newJsonString)
+            verify(appPreferencesGateway).putString(
+                "PREFERENCE_KEY_RECENTLY_WATCHED_VIDEOS",
+                newJsonString
+            )
+        }
+
+    @Test
+    fun `test that saveVideoRecentlyWatched function updated the existing value when added video node is existing`() =
+        runTest {
+            val testHandle = 12345L
+            val testTimestamp = 100000L
+            val testVideoRecentlyWatchedData = mutableListOf<VideoRecentlyWatchedItem>().apply {
+                add(VideoRecentlyWatchedItem(testHandle, testTimestamp))
+            }
+            val addedHandle = 12345L
+            val addedTimestamp = 200000L
+            val testJsonString = Json.encodeToString(testVideoRecentlyWatchedData)
+            val addedRecentlyWatchedItem = VideoRecentlyWatchedItem(addedHandle, addedTimestamp)
+            testVideoRecentlyWatchedData[0] = addedRecentlyWatchedItem
+            val newJsonString = Json.encodeToString(testVideoRecentlyWatchedData)
+            initUnderTest()
+            whenever(appPreferencesGateway.monitorString(anyOrNull(), anyOrNull())).thenReturn(
+                flowOf(testJsonString)
+            )
+            whenever(videoRecentlyWatchedItemMapper(addedHandle, addedTimestamp)).thenReturn(
+                addedRecentlyWatchedItem
+            )
+            underTest.saveVideoRecentlyWatched(addedHandle, addedTimestamp)
+            verify(appPreferencesGateway).putString(
+                "PREFERENCE_KEY_RECENTLY_WATCHED_VIDEOS",
+                newJsonString
+            )
         }
 
     @Test
@@ -730,4 +757,39 @@ class VideoSectionRepositoryImplTest {
         on { duration }.thenReturn(100.seconds)
         on { watchedTimestamp }.thenReturn(timestamp)
     }
+
+    @Test
+    fun `test that clearRecentlyWatchedVideos function is invoked as expected`() = runTest {
+        underTest.clearRecentlyWatchedVideos()
+        val jsonString = Json.encodeToString(emptyList<VideoRecentlyWatchedItem>())
+        verify(appPreferencesGateway).putString(
+            "PREFERENCE_KEY_RECENTLY_WATCHED_VIDEOS",
+            jsonString
+        )
+    }
+
+    @Test
+    fun `test that removeRecentlyWatchedItem function is invoked with the correct parameters`() =
+        runTest {
+            val testHandle = 12345L
+            val testTimestamp = 100000L
+            val testRecentlyWatchedItem = VideoRecentlyWatchedItem(testHandle, testTimestamp)
+            val addedHandle = 54321L
+            val addedTimestamp = 200000L
+            val addedRecentlyWatchedItem = VideoRecentlyWatchedItem(addedHandle, addedTimestamp)
+            val testVideoRecentlyWatchedData =
+                mutableListOf(addedRecentlyWatchedItem, testRecentlyWatchedItem)
+            val testJsonString = Json.encodeToString(testVideoRecentlyWatchedData)
+            initUnderTest()
+            whenever(appPreferencesGateway.monitorString(anyOrNull(), anyOrNull())).thenReturn(
+                flowOf(testJsonString)
+            )
+            testVideoRecentlyWatchedData.removeAll { it.videoHandle == addedHandle }
+            val expectedJson = Json.encodeToString(testVideoRecentlyWatchedData)
+            underTest.removeRecentlyWatchedItem(addedHandle)
+            verify(appPreferencesGateway).putString(
+                "PREFERENCE_KEY_RECENTLY_WATCHED_VIDEOS",
+                expectedJson
+            )
+        }
 }
