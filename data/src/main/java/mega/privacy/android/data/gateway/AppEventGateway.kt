@@ -212,6 +212,18 @@ internal interface AppEventGateway {
     suspend fun broadcastJoinedSuccessfully()
 
     /**
+     * Monitor if waiting for others participants has ended
+     *
+     * @return Flow [Boolean]
+     */
+    fun monitorWaitingForOtherParticipantsHasEnded(): Flow<Pair<Long, Boolean>>
+
+    /**
+     * Broadcast if waiting for others participants has ended
+     */
+    suspend fun broadcastWaitingForOtherParticipantsHasEnded(chatId: Long, isEnded: Boolean)
+
+    /**
      * Monitor if should leave a chat.
      *
      * @return Flow [Long] ID of the chat to leave.
@@ -337,7 +349,7 @@ internal interface AppEventGateway {
     suspend fun broadcastCallScreenOpened(isOpened: Boolean)
 
     /**
-     * Monitor that audio output has changed..
+     * Monitor that audio output has changed.
      *
      * @return Flow of AudioDevice.
      */
@@ -349,6 +361,20 @@ internal interface AppEventGateway {
      * @param audioDevice   [AudioDevice]
      */
     suspend fun broadcastAudioOutput(audioDevice: AudioDevice)
+
+    /**
+     * Monitor that local video has changed due to proximity sensor.
+     *
+     * @return Flow of Boolean.
+     */
+    fun monitorLocalVideoChangedDueToProximitySensor(): Flow<Boolean>
+
+    /**
+     * Broadcast that local video has changed due to proximity sensor.
+     *
+     * @param isVideoOn   True, video is on. False, video is off.
+     */
+    suspend fun broadcastLocalVideoChangedDueToProximitySensor(isVideoOn: Boolean)
 
     /**
      * Monitor that a specific call has ended.

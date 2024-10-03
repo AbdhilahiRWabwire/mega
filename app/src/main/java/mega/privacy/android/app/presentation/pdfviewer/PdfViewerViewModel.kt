@@ -1,8 +1,11 @@
 package mega.privacy.android.app.presentation.pdfviewer
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.palm.composestateevents.consumed
+import de.palm.composestateevents.triggered
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
@@ -15,9 +18,13 @@ import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.usecase.IsHiddenNodesOnboardedUseCase
 import mega.privacy.android.domain.usecase.UpdateNodeSensitiveUseCase
 import mega.privacy.android.domain.usecase.account.MonitorAccountDetailUseCase
+import mega.privacy.android.domain.usecase.favourites.IsAvailableOfflineUseCase
 import mega.privacy.android.domain.usecase.file.GetDataBytesFromUrlUseCase
 import mega.privacy.android.domain.usecase.node.CheckChatNodesNameCollisionAndCopyUseCase
 import mega.privacy.android.domain.usecase.node.CheckNodesNameCollisionWithActionUseCase
+import mega.privacy.android.domain.usecase.node.IsNodeInBackupsUseCase
+import mega.privacy.android.domain.usecase.node.chat.GetChatFileUseCase
+import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import timber.log.Timber
 import java.net.URL
 import javax.inject.Inject
@@ -33,7 +40,14 @@ class PdfViewerViewModel @Inject constructor(
     private val updateNodeSensitiveUseCase: UpdateNodeSensitiveUseCase,
     private val monitorAccountDetailUseCase: MonitorAccountDetailUseCase,
     private val isHiddenNodesOnboardedUseCase: IsHiddenNodesOnboardedUseCase,
+    private val isAvailableOfflineUseCase: IsAvailableOfflineUseCase,
+    private val getChatFileUseCase: GetChatFileUseCase,
+    private val isNodeInBackupsUseCase: IsNodeInBackupsUseCase,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
+
+    private val handle: Long
+        get() = savedStateHandle["HANDLE"] ?: INVALID_HANDLE
 
     private val _state = MutableStateFlow(PdfViewerState())
 
@@ -46,6 +60,14 @@ class PdfViewerViewModel @Inject constructor(
     init {
         monitorAccountDetail()
         monitorIsHiddenNodesOnboarded()
+        checkIsNodeInBackups()
+    }
+
+    private fun checkIsNodeInBackups() {
+        viewModelScope.launch {
+            val isNodeInBackups = isNodeInBackupsUseCase(handle)
+            _state.update { it.copy(isNodeInBackups = isNodeInBackups) }
+        }
     }
 
     /**
@@ -239,6 +261,42 @@ class PdfViewerViewModel @Inject constructor(
     fun setHiddenNodesOnboarded() {
         _state.update {
             it.copy(isHiddenNodesOnboarded = true)
+        }
+    }
+
+    /**
+     * Save chat node to offline
+     *
+     * @param chatId    Chat ID where the node is.
+     * @param messageId Message ID where the node is.
+     */
+    fun saveChatNodeToOffline(chatId: Long, messageId: Long) {
+        viewModelScope.launch {
+            runCatching {
+                val chatFile = getChatFileUseCase(chatId = chatId, messageId = messageId)
+                    ?: throw IllegalStateException("Chat file not found")
+                val isAvailableOffline = isAvailableOfflineUseCase(chatFile)
+                if (isAvailableOffline) {
+                    _state.update {
+                        it.copy(snackBarMessage = R.string.file_already_exists)
+                    }
+                } else {
+                    _state.update {
+                        it.copy(startChatOfflineDownloadEvent = triggered(chatFile))
+                    }
+                }
+            }.onFailure {
+                Timber.e(it)
+            }
+        }
+    }
+
+    /**
+     * Reset state event once consumed
+     */
+    fun onConsumeStartChatOfflineDownloadEvent() {
+        _state.update {
+            it.copy(startChatOfflineDownloadEvent = consumed())
         }
     }
 }

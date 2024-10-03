@@ -4,7 +4,7 @@ bannerviewpager = "3.4.0"
 billing-client = "6.2.0"
 coil = "2.5.0"
 coroutines = "1.8.0"
-fresco = "2.6.0"
+fresco = "3.2.0"
 javax = "1"
 kotlin = "1.9.24"
 kotlin-ktx = "1.12.0"
@@ -43,7 +43,7 @@ coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
-documentscanner = 'com.github.meganz.AndroidDocumentScanner:documentscanner:2.0.12'
+documentscanner = 'com.github.meganz.AndroidDocumentScanner:documentscanner:2.0.13'
 facebook-inferannotation = "com.facebook.infer.annotation:infer-annotation:0.18.0"
 fresco = { module = "com.facebook.fresco:fresco", version.ref = "fresco" }
 fresco-gif = { module = "com.facebook.fresco:animated-gif", version.ref = "fresco" }
@@ -69,7 +69,7 @@ shimmerlayout = 'io.supercharge:shimmerlayout:2.1.0'
 simplestorage = { module = "com.anggrayudi:storage", version.ref = "simplestorage" }
 vdurmont-emoji = 'com.vdurmont:emoji-java:4.0.0'
 compose-state-events = { module = "com.github.leonard-palm:compose-state-events", version.ref = "compose-state-events" }
-mega-analytics = "mega.privacy.mobile:analytics-events-android:20240903.072432"
+mega-analytics = "mega.privacy.mobile:analytics-events-android:20240918.114742"
 kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
 balloon = "com.github.skydoves:balloon-compose:1.6.4"
 xray = { module = "mega.privacy.android.xray:xray", version.ref = "xray" }

@@ -682,7 +682,14 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
                 }
 
                 R.id.chat_save_for_offline -> {
-                    viewModel.saveChatNodeToOffline(chatId = getChatId(), messageId = getMessageId())
+                    if (getStorageState() == StorageState.PayWall) {
+                        AlertsAndWarnings.showOverDiskQuotaPaywallWarning()
+                    } else {
+                        viewModel.saveChatNodeToOffline(
+                            chatId = getChatId(),
+                            messageId = getMessageId()
+                        )
+                    }
                 }
 
                 R.id.rename -> {
@@ -1183,19 +1190,23 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
                             val isRootParentInShare = megaApi.getRootParentNode(node).isInShare
                             val accountType = viewModel.state.value.accountType
                             val isPaidAccount = accountType?.isPaid == true
+                            val isNodeInBackup = megaApi.isInInbox(node)
 
-                            val shouldShowHideNode = isHiddenNodesEnabled &&
-                                    !isInSharedItems &&
-                                    !isRootParentInShare &&
-                                    (!node.isMarkedSensitive || !isPaidAccount) &&
-                                    !isSensitiveInherited
+                            val shouldShowHideNode = isHiddenNodesEnabled
+                                    && (!isPaidAccount
+                                    || (!isInSharedItems
+                                    && !isRootParentInShare
+                                    && !isNodeInBackup
+                                    && !node.isMarkedSensitive
+                                    && !isSensitiveInherited))
 
-                            val shouldShowUnhideNode = isHiddenNodesEnabled &&
-                                    !isInSharedItems &&
-                                    !isRootParentInShare &&
-                                    node.isMarkedSensitive &&
-                                    isPaidAccount &&
-                                    !isSensitiveInherited
+                            val shouldShowUnhideNode = isHiddenNodesEnabled
+                                    && !isInSharedItems
+                                    && !isRootParentInShare
+                                    && node.isMarkedSensitive
+                                    && isPaidAccount
+                                    && !isSensitiveInherited
+                                    && !isNodeInBackup
 
                             menu.findItem(R.id.hide)?.apply {
                                 isVisible = shouldShowHideNode
@@ -1235,19 +1246,24 @@ class LegacyVideoPlayerActivity : MediaPlayerActivity() {
                             val isRootParentInShare = megaApi.getRootParentNode(node).isInShare
                             val accountType = viewModel.state.value.accountType
                             val isPaidAccount = accountType?.isPaid == true
+                            val isNodeInBackup = megaApi.isInInbox(node)
 
-                            val shouldShowHideNode = isHiddenNodesEnabled &&
-                                    !isInSharedItems &&
-                                    !isRootParentInShare &&
-                                    (!node.isMarkedSensitive || !isPaidAccount) &&
-                                    !isSensitiveInherited
 
-                            val shouldShowUnhideNode = isHiddenNodesEnabled &&
-                                    !isInSharedItems &&
-                                    !isRootParentInShare &&
-                                    node.isMarkedSensitive &&
-                                    isPaidAccount &&
-                                    !isSensitiveInherited
+                            val shouldShowHideNode = isHiddenNodesEnabled
+                                    && (!isPaidAccount
+                                    || (!isInSharedItems
+                                    && !isRootParentInShare
+                                    && !isNodeInBackup
+                                    && !node.isMarkedSensitive
+                                    && !isSensitiveInherited))
+
+                            val shouldShowUnhideNode = isHiddenNodesEnabled
+                                    && !isInSharedItems
+                                    && !isRootParentInShare
+                                    && node.isMarkedSensitive
+                                    && isPaidAccount
+                                    && !isSensitiveInherited
+                                    && !isNodeInBackup
 
                             menu.findItem(R.id.hide)?.apply {
                                 isVisible = shouldShowHideNode

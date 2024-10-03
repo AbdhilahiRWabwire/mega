@@ -307,11 +307,11 @@
     <!-- The body of the warning dialog shown to a suspended Pro Flexi Account User -->
     <string name="account_pro_flexi_account_deactivated_dialog_body">Twoje konto Pro &#160; Flexi zostało dezaktywowane z powodu niepowodzenia płatności lub anulowania subskrypcja. Nie będziesz mieć dostępu do danych przechowywanych na Twoim konto. \nAby dokonać płatności i ponownie aktywować subskrypcja, zaloguj się do MEGA przez przeglądarkę.</string>
     <!-- Label for new low-tier plan Starter. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
-    <string name="general_low_tier_plan_starter_label">Starter</string>
+    <string name="general_low_tier_plan_starter_label">MEGA&#160;Starter</string>
     <!-- Label for new low-tier plan Basic. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
-    <string name="general_low_tier_plan_basic_label">Basic</string>
+    <string name="general_low_tier_plan_basic_label">MEGA&#160;Basic</string>
     <!-- Label for new low-tier plan Essential. Do not translate. Can be shown on My account screen to indicate current user's plan. -->
-    <string name="general_low_tier_plan_essential_label">Essential</string>
+    <string name="general_low_tier_plan_essential_label">MEGA&#160;Essential</string>
     <!-- The Body Text of a Settings Camera Uploads Option that decides whether or not the Device must be charged for Camera Uploads to start uploading content -->
     <string name="settings_camera_uploads_upload_only_while_charging_option_body">Przesyłanie zostanie wstrzymane, dopóki nie zaczniesz ładować urządzenie. Przesyłanie nadal pozostanie wstrzymane, jeśli bateria jest poniżej 20%.</string>
     <!-- Title of the synced folder list empty state -->
@@ -691,9 +691,9 @@
     <!--Title text to start a meeting from Meeting screen empty view-->
     <string name="meeting_recent_list_empty_title">Chroń swoje połączenia</string>
     <!--Subtitle text from Meeting screen empty view-->
-    <string name="meeting_recent_list_empty_subtitle">Your meetings, family calls, and private conversations are protected by our zero-knowledge encryption. [A]Learn more[/A]</string>
+    <string name="meeting_recent_list_empty_subtitle">Twoje spotkania, rozmowy rodzinne i prywatne rozmowy są chronione przez nasze szyfrowanie z zerową wiedzą. [A]Dowiedz się więcej[/A]</string>
     <!--Warning message to inform the user the minimum number of characters to enter into the edit text field for the survey-->
-    <string name="account_cancel_subscription_survey_minimum_character_limit">Message must be at least 10 characters</string>
+    <string name="account_cancel_subscription_survey_minimum_character_limit">Wiadomość musi zawierać co najmniej 10 znaków</string>
     <!--Warning message to inform the user that the edit text field for the survey is empty and needs to be filled with details-->
     <string name="account_cancel_subscription_survey_enter_details">Wprowadź szczegóły</string>
     <!-- the bonus title of join without account on left meeting page-->
@@ -701,23 +701,29 @@
     <!-- Label "What’s new" of the bottom sheet to promote Sync feature -->
     <string name="sync_promotion_bottom_sheet_whats_new_label">Co nowego</string>
     <!-- Title of the bottom sheet to promote Sync feature -->
-    <string name="sync_promotion_bottom_sheet_title">Easy, automated sync</string>
+    <string name="sync_promotion_bottom_sheet_title">Łatwa, automatyczna synchronizacja</string>
     <!-- Body message of the bottom sheet to promote Sync feature -->
-    <string name="sync_promotion_bottom_sheet_body_message">Sync a folder on your device with MEGA to access the latest version of your files anywhere</string>
+    <string name="sync_promotion_bottom_sheet_body_message">Synchronizuj katalog na urządzeniu z MEGA, aby uzyskać dostęp do najnowszej wersji plik w dowolnym miejscu</string>
     <!-- Text of the primary button of the bottom sheet to promote Sync feature for Pro users ("Sync folders") -->
-    <string name="sync_promotion_bottom_sheet_primary_button_text_pro">Sync folders</string>
+    <string name="sync_promotion_bottom_sheet_primary_button_text_pro">Synchronizuj katalogi</string>
     <!-- Text of the primary button of the bottom sheet to promote Sync feature for Free users ("Upgrade") -->
-    <string name="sync_promotion_bottom_sheet_primary_button_text_free">Upgrade to use sync</string>
+    <string name="sync_promotion_bottom_sheet_primary_button_text_free">Uaktualnij, aby użyć synchronizacji</string>
     <!-- Text of the secondary button of the bottom sheet to promote Sync feature ("Learn more") -->
     <string name="sync_promotion_bottom_sheet_secondary_button_text">Dowiedz się więcej</string>
     <!-- Sync option dialog cancel button -->
     <string name="settings_sync_option_cancel">Anuluj</string>
     <!-- Snackbar message displayed when sync option is selected -->
-    <string name="settings_sync_option_updated_message">Sync options updated</string>
+    <string name="settings_sync_option_updated_message">Zaktualizowano opcje synchronizacji</string>
     <!-- Title of the Contact Permission Explanation -->
-    <string name="title_enable_access_contact">Enable access to invite friends</string>
+    <string name="title_enable_access_contact">Włącz dostęp do zapraszania znajomych</string>
     <!-- Sub title of the Contact Permission Explanation -->
-    <string name="subtitle_enable_access_contact">In order to invite friends, you must allow MEGA to access your contact list</string>
+    <string name="subtitle_enable_access_contact">Aby zaprosić znajomych, musisz zezwolić MEGA na dostęp do listy kontaktów</string>
     <!-- Button text of Contact Permission Explanation -->
     <string name="grant_permission">Udostępnik</string>
+    <!-- One of the Options in the Scan Confirmation page where the scanned Documents are uploaded as one PDF file -->
+    <string name="document_scanning_confirmation_file_type_pdf">PDF</string>
+    <!-- One of the Options in the Scan Confirmation page where the scanned Document is uploaded as a JPEG file. This option can only be selected when there is only one scanned document-->
+    <string name="document_scanning_confirmation_file_type_jpg">JPG</string>
+    <!-- One of the Options in the Scan Confirmation page where the scanned Documents are saved to Chat -->
+    <string name="document_scanning_confirmation_destination_chat">Chat</string>
 </resources>

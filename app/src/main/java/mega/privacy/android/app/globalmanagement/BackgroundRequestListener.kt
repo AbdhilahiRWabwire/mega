@@ -2,6 +2,7 @@ package mega.privacy.android.app.globalmanagement
 
 import android.app.Application
 import android.content.Intent
+import dagger.Lazy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -13,7 +14,10 @@ import mega.privacy.android.data.database.DatabaseHandler
 import mega.privacy.android.data.qualifier.MegaApi
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.qualifier.LoginMutex
+import mega.privacy.android.domain.usecase.IsUseHttpsEnabledUseCase
+import mega.privacy.android.domain.usecase.SetUseHttpsUseCase
 import mega.privacy.android.domain.usecase.account.GetFullAccountInfoUseCase
+import mega.privacy.android.domain.usecase.account.ResetAccountDetailsTimeStampUseCase
 import mega.privacy.android.domain.usecase.backup.SetupDeviceNameUseCase
 import mega.privacy.android.domain.usecase.business.BroadcastBusinessAccountExpiredUseCase
 import mega.privacy.android.domain.usecase.chat.UpdatePushNotificationSettingsUseCase
@@ -35,21 +39,30 @@ import javax.inject.Inject
 /**
  * Background request listener
  *
- * @property application [Application]
- * @property myAccountInfo [MyAccountInfo]
- * @property megaChatApi [MegaChatApiAndroid]
- * @property dbH [DatabaseHandler]
- * @property megaApi [MegaApiAndroid]
- * @property transfersManagement [TransfersManagement]
- * @property applicationScope [CoroutineScope]
- * @property getFullAccountInfoUseCase [GetFullAccountInfoUseCase]
- * @property broadcastFetchNodesFinishUseCase [BroadcastFetchNodesFinishUseCase]
+ * @property application
+ * @property myAccountInfo
+ * @property megaChatApi
+ * @property dbH
+ * @property megaApi
+ * @property applicationScope
+ * @property getFullAccountInfoUseCase
+ * @property broadcastFetchNodesFinishUseCase
+ * @property localLogoutAppUseCase
+ * @property setupDeviceNameUseCase
+ * @property broadcastBusinessAccountExpiredUseCase
+ * @property loginMutex
+ * @property updatePushNotificationSettingsUseCase
+ * @property shouldShowRichLinkWarningUseCase
+ * @property isRichPreviewsEnabledUseCase
+ * @property isUseHttpsEnabledUseCase
+ * @property setUseHttpsUseCase
+ * @property resetAccountDetailsTimeStampUseCase
  */
 class BackgroundRequestListener @Inject constructor(
     private val application: Application,
     private val myAccountInfo: MyAccountInfo,
     private val megaChatApi: MegaChatApiAndroid,
-    private val dbH: DatabaseHandler,
+    private val dbH: Lazy<DatabaseHandler>,
     @MegaApi private val megaApi: MegaApiAndroid,
     @ApplicationScope private val applicationScope: CoroutineScope,
     private val getFullAccountInfoUseCase: GetFullAccountInfoUseCase,
@@ -61,6 +74,9 @@ class BackgroundRequestListener @Inject constructor(
     private val updatePushNotificationSettingsUseCase: UpdatePushNotificationSettingsUseCase,
     private val shouldShowRichLinkWarningUseCase: ShouldShowRichLinkWarningUseCase,
     private val isRichPreviewsEnabledUseCase: IsRichPreviewsEnabledUseCase,
+    private val isUseHttpsEnabledUseCase: IsUseHttpsEnabledUseCase,
+    private val setUseHttpsUseCase: SetUseHttpsUseCase,
+    private val resetAccountDetailsTimeStampUseCase: ResetAccountDetailsTimeStampUseCase,
 ) : MegaRequestListenerInterface {
     /**
      * On request start
@@ -113,18 +129,18 @@ class BackgroundRequestListener @Inject constructor(
                             Timber.d("Non-contact")
                             when (request.paramType) {
                                 MegaApiJava.USER_ATTR_FIRSTNAME -> {
-                                    dbH.setNonContactEmail(
+                                    dbH.get().setNonContactEmail(
                                         request.email,
                                         user.handle.toString() + ""
                                     )
-                                    dbH.setNonContactFirstName(
+                                    dbH.get().setNonContactFirstName(
                                         request.text,
                                         user.handle.toString() + ""
                                     )
                                 }
 
                                 MegaApiJava.USER_ATTR_LASTNAME -> {
-                                    dbH.setNonContactLastName(
+                                    dbH.get().setNonContactLastName(
                                         request.text,
                                         user.handle.toString() + ""
                                     )
@@ -150,6 +166,12 @@ class BackgroundRequestListener @Inject constructor(
                 .onFailure { Timber.w("Exception unlocking login mutex", it) }
 
             broadcastFetchNodesFinishUseCase()
+            runCatching {
+                setUseHttpsUseCase(isUseHttpsEnabledUseCase())
+                resetAccountDetailsTimeStampUseCase()
+            }.onFailure {
+                Timber.e(it)
+            }
         }
 
         if (e.errorCode == MegaError.API_OK) {
@@ -163,7 +185,7 @@ class BackgroundRequestListener @Inject constructor(
                 }
             }
             val listener = GetAttrUserListener(application, true)
-            if (dbH.myChatFilesFolderHandle == INVALID_HANDLE) {
+            if (dbH.get().myChatFilesFolderHandle == INVALID_HANDLE) {
                 megaApi.getMyChatFilesFolder(listener)
             }
             MegaApplication.getInstance().setupMegaChatApi()

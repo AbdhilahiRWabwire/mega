@@ -107,4 +107,20 @@ class AppEventFacadeTest {
             assertThat(awaitItem()).isEqualTo(AudioDevice.SpeakerPhone)
         }
     }
+
+    @Test
+    fun `test that broadcast waiting for other participants ended fires an event`() = runTest {
+        underTest.monitorWaitingForOtherParticipantsHasEnded().test {
+            underTest.broadcastWaitingForOtherParticipantsHasEnded(123L, true)
+            assertThat(awaitItem()).isEqualTo(Pair(123L, true))
+        }
+    }
+
+    @Test
+    fun `test that broadcast local video changed fires an event`() = runTest {
+        underTest.monitorLocalVideoChangedDueToProximitySensor().test {
+            underTest.broadcastLocalVideoChangedDueToProximitySensor(isVideoOn = true)
+            assertThat(awaitItem()).isEqualTo(true)
+        }
+    }
 }

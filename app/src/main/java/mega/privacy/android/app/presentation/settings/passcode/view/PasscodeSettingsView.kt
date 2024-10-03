@@ -4,7 +4,10 @@ import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.rememberScaffoldState
@@ -36,6 +39,7 @@ import mega.privacy.android.shared.original.core.ui.controls.appbar.MegaAppBar
 import mega.privacy.android.shared.original.core.ui.controls.layouts.MegaScaffold
 import mega.privacy.android.shared.original.core.ui.preview.CombinedThemePreviews
 import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
+import mega.privacy.android.shared.original.core.ui.utils.showAutoDurationSnackbar
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -43,7 +47,7 @@ internal fun PasscodeSettingsView(
     state: PasscodeSettingsUIState,
     onDisablePasscode: () -> Unit,
     onDisableBiometrics: () -> Unit,
-    navigateToChangePasscode: () -> Unit,
+    navigateToSetOrChangePasscode: (isEdit: Boolean) -> Unit,
     navigateToSelectTimeout: () -> Unit,
     hasBiometricCapability: Boolean,
     authenticateBiometrics: @Composable (onSuccess: () -> Unit, onComplete: () -> Unit) -> Unit,
@@ -60,7 +64,11 @@ internal fun PasscodeSettingsView(
     }
 
     MegaScaffold(
-        modifier = modifier.semantics { testTagsAsResourceId = true },
+        modifier = modifier
+            .semantics { testTagsAsResourceId = true }
+            .fillMaxSize()
+            .systemBarsPadding()
+            .imePadding(),
         scaffoldState = scaffoldState,
         topBar = {
             MegaAppBar(
@@ -80,12 +88,14 @@ internal fun PasscodeSettingsView(
                 EnablePasscodeTile(
                     isChecked = state.isEnabled,
                     onItemClicked = {
-                        if (state.isEnabled) onDisablePasscode() else navigateToChangePasscode()
+                        if (state.isEnabled) onDisablePasscode() else navigateToSetOrChangePasscode(
+                            false
+                        )
                     }
                 )
                 if (state.isEnabled) {
                     ChangePasscodeTile(
-                        onItemClicked = navigateToChangePasscode
+                        onItemClicked = { navigateToSetOrChangePasscode(true) }
                     )
                     if (hasBiometricCapability) {
                         FingerprintIdTile(
@@ -111,7 +121,7 @@ internal fun PasscodeSettingsView(
                 authenticateBiometrics(
                     {
                         coroutineScope.launch {
-                            scaffoldState.snackbarHostState.showSnackbar(message)
+                            scaffoldState.snackbarHostState.showAutoDurationSnackbar(message)
                         }
                         showBiometricPrompt = false
                     },
@@ -149,7 +159,7 @@ private fun PasscodeSettingsViewPreview(
             onDisableBiometrics = {
                 state = state.copy(isBiometricsEnabled = !state.isBiometricsEnabled)
             },
-            navigateToChangePasscode = {},
+            navigateToSetOrChangePasscode = {},
             authenticateBiometrics = { _, _ -> },
             navigateToSelectTimeout = {},
             hasBiometricCapability = params.second,

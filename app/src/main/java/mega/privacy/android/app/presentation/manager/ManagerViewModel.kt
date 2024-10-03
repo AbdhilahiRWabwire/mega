@@ -24,7 +24,6 @@ import mega.privacy.android.app.MegaApplication
 import mega.privacy.android.app.R
 import mega.privacy.android.app.components.ChatManagement
 import mega.privacy.android.app.featuretoggle.ApiFeatures
-import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.main.dialog.removelink.RemovePublicLinkResultMapper
 import mega.privacy.android.app.main.dialog.shares.RemoveShareResultMapper
 import mega.privacy.android.app.meeting.gateway.RTCAudioManagerGateway
@@ -350,7 +349,6 @@ class ManagerViewModel @Inject constructor(
     init {
         checkUsersCallLimitReminders()
         getApiFeatureFlag()
-        loadAndroidSyncWorkManagerFeatureFlag()
 
         viewModelScope.launch {
             val order = getCloudSortOrder()
@@ -538,21 +536,6 @@ class ManagerViewModel @Inject constructor(
         }
     }
 
-    private fun loadAndroidSyncWorkManagerFeatureFlag() {
-        viewModelScope.launch {
-            runCatching {
-                getFeatureFlagValueUseCase(SyncFeatures.AndroidSyncWorkManager)
-            }.onFailure { exception ->
-                Timber.e(exception)
-            }.onSuccess { flag ->
-                _state.update { state ->
-                    state.copy(
-                        isAndroidSyncWorkManagerFeatureFlagEnabled = flag,
-                    )
-                }
-            }
-        }
-    }
 
     /**
      * Start offline sync worker
@@ -660,11 +643,7 @@ class ManagerViewModel @Inject constructor(
     fun checkNumUnreadUserAlerts(type: UnreadUserAlertsCheckType) {
         viewModelScope.launch {
             runCatching {
-                val promoNotificationCount =
-                    if (getFeatureFlagValueUseCase(AppFeatures.PromoNotifications))
-                        getNumUnreadPromoNotificationsUseCase()
-                    else
-                        0
+                val promoNotificationCount = getNumUnreadPromoNotificationsUseCase()
                 val totalCount =
                     getNumUnreadUserAlertsUseCase() + promoNotificationCount
                 _numUnreadUserAlerts.update { Pair(type, totalCount) }

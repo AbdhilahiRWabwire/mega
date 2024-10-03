@@ -28,7 +28,7 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     ComposePasscodeSettings(
         "Use the new compose version of the passcode settings screens",
-        false
+        true
     ),
 
     /**
@@ -72,14 +72,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
     ),
 
     /**
-     * Enables new video section flag
-     */
-    NewVideoSection(
-        "Enable new video section flag",
-        true
-    ),
-
-    /**
      * Enables prefetch timeline photos as soon initialization screen completed
      */
     PrefetchTimeline(
@@ -117,11 +109,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
      * Meeting notification settings
      */
     MeetingNotificationSettings("Enable Meeting notification settings", false),
-
-    /**
-     * To enable showing promo notifications in Notifications screen
-     */
-    PromoNotifications("Enable promotional notifications", true),
 
     /**
      * To enable the new add and manage description feature to node
@@ -189,14 +176,6 @@ enum class AppFeatures(override val description: String, private val defaultValu
      */
     NewUploadDestinationActivity(
         "Enable upload destination activity",
-        false
-    ),
-
-    /**
-     * To show cancellation survey
-     */
-    CancellationSurvey(
-        "Enable Cancellation survey feature",
         false
     );
 

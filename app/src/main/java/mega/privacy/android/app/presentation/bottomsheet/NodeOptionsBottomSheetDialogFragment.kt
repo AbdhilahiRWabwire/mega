@@ -422,11 +422,16 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
                         && accountType != null
                         && isHiddenNodesOnboarded != null
                         && state.isHidingActionAllowed
-                        && megaApi.getParentNode(node)?.let {
-                            megaApi.isSensitiveInherited(it)
-                        } != true
                     ) {
-                        View.VISIBLE
+                        val parentNode = megaApi.getParentNode(node)
+                        val isSensitiveInherited =
+                            parentNode?.let { megaApi.isSensitiveInherited(it) } == true
+
+                        if (!isSensitiveInherited || !accountType.isPaid) {
+                            View.VISIBLE
+                        } else {
+                            View.GONE
+                        }
                     } else {
                         View.GONE
                     }
@@ -1166,16 +1171,6 @@ class NodeOptionsBottomSheetDialogFragment : BaseBottomSheetDialogFragment() {
         val optionRemove = contentView.findViewById<TextView>(R.id.remove_option)
         val optionLink = contentView.findViewById<TextView>(R.id.link_option)
         val optionRemoveLink = contentView.findViewById<TextView>(R.id.remove_link_option)
-        val optionShareFolder = contentView.findViewById<TextView>(R.id.share_folder_option)
-        val optionClearShares = contentView.findViewById<TextView>(R.id.clear_share_option)
-        if (optionShareFolder.isVisible()) {
-            decrementShares()
-            optionShareFolder.visibility = View.GONE
-        }
-        if (optionClearShares.isVisible()) {
-            decrementShares()
-            optionClearShares.visibility = View.GONE
-        }
         optionRemove.visibility = View.GONE
         optionLeaveShares.visibility = View.GONE
         decrementOpen()

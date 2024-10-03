@@ -84,9 +84,13 @@ interface SyncRepository {
     suspend fun tryNodeSync(nodeId: NodeId)
 
     /**
-     * Starts the sync worker that will sync folders when the app is closed
+     * Starts a periodic sync worker that will sync folders when the app is closed
+     * with specified frequency
+     *
+     * @param frequencyInMinutes The frequency in minutes to run the sync worker
+     * @param wifiOnly If the sync should be done only when connected to WiFi
      */
-    suspend fun startSyncWorker()
+    suspend fun startSyncWorker(frequencyInMinutes: Int, wifiOnly: Boolean)
 
     /**
      * Stops the sync worker

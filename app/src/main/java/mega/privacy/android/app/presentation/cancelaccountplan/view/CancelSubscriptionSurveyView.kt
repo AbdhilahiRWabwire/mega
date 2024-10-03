@@ -59,6 +59,7 @@ internal fun CancelSubscriptionSurveyView(
     var selectedOptionId by rememberSaveable { mutableIntStateOf(-1) }
     var selectedOptionString by rememberSaveable { mutableStateOf("") }
     var othersDescriptionText by rememberSaveable { mutableStateOf("") }
+    var othersErrorMessage: String? by rememberSaveable { mutableStateOf(null) }
     val scrollState = rememberScrollState()
 
     val horizontalPadding = if (isTablet()) {
@@ -68,7 +69,11 @@ internal fun CancelSubscriptionSurveyView(
             190.dp
         }
     } else {
-        20.dp
+        if (isScreenOrientationLandscape()) {
+            48.dp
+        } else {
+            24.dp
+        }
     }
 
     Column(
@@ -123,6 +128,7 @@ internal fun CancelSubscriptionSurveyView(
                         context.getString(reason.answerValue)
                     }
                 showError = false
+                othersErrorMessage = null
             },
             modifier = Modifier
                 .padding(top = 20.dp)
@@ -132,13 +138,7 @@ internal fun CancelSubscriptionSurveyView(
         if (selectedOptionId == possibleCancellationReasons.last().answerId) {
             GenericDescriptionWithCharacterLimitTextField(
                 maxCharacterLimit = MAX_CHARACTER_LIMIT,
-                minCharacterLimit = MIN_CHARACTER_LIMIT,
-                emptyErrorMessage = stringResource(
-                    id = SharedR.string.account_cancel_subscription_survey_enter_details
-                ),
-                errorMinLengthMessage = stringResource(
-                    id = SharedR.string.account_cancel_subscription_survey_minimum_character_limit
-                ),
+                errorMessage = othersErrorMessage,
                 value = othersDescriptionText,
                 modifier = Modifier
                     .padding(top = 10.dp)
@@ -146,8 +146,11 @@ internal fun CancelSubscriptionSurveyView(
                 initiallyFocused = true,
                 onValueChange = {
                     othersDescriptionText = it
+                    othersErrorMessage = null
+
                 }, onClearText = {
                     othersDescriptionText = ""
+                    othersErrorMessage = null
                 }
             )
         }
@@ -190,7 +193,13 @@ internal fun CancelSubscriptionSurveyView(
                         showError = true
                     } else {
                         showError = false
-                        if (othersDescriptionText.length <= MAX_CHARACTER_LIMIT)
+                        othersErrorMessage =
+                            if (othersDescriptionText.length < MIN_CHARACTER_LIMIT) {
+                                context.getString(getOtherErrorMessageResource(othersDescriptionText))
+                            } else {
+                                null
+                            }
+                        if (othersDescriptionText.length <= MAX_CHARACTER_LIMIT && othersErrorMessage == null) {
                             if (selectedOptionId == UICancellationSurveyAnswer.Answer8.answerId) {
                                 onCancelSubscriptionButtonClicked(
                                     othersDescriptionText,
@@ -202,6 +211,7 @@ internal fun CancelSubscriptionSurveyView(
                                     allowContact.toInt()
                                 )
                             }
+                        }
                     }
                 },
             )
@@ -214,6 +224,16 @@ internal fun CancelSubscriptionSurveyView(
                     .testTag(DO_NOT_CANCELLATION_BUTTON_TEST_TAG),
             )
         }
+    }
+}
+
+private fun getOtherErrorMessageResource(
+    othersDescriptionText: String,
+): Int {
+    return if (othersDescriptionText.isEmpty()) {
+        SharedR.string.account_cancel_subscription_survey_enter_details
+    } else {
+        SharedR.string.account_cancel_subscription_survey_minimum_character_limit
     }
 }
 

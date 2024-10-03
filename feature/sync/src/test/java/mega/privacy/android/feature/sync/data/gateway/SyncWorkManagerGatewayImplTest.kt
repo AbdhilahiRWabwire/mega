@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.Configuration
+import androidx.work.NetworkType
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.impl.utils.SynchronousExecutor
@@ -13,6 +14,7 @@ import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.domain.monitoring.CrashReporter
+import mega.privacy.android.feature.sync.data.SyncWorker
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -49,11 +51,12 @@ class SyncWorkManagerGatewayImplTest {
     @Test
     fun `test that gateway starts and cancels sync worker`() =
         runTest {
-            val syncTag = "SYNC_WORKER_TAG"
+            underTest.enqueueSyncWorkerRequest(
+                frequencyInMinutes = 15,
+                networkType = NetworkType.UNMETERED
+            )
 
-            underTest.enqueueSyncWorkerRequest()
-
-            val syncWorker = workManager.getWorkInfosByTagFlow(syncTag)
+            val syncWorker = workManager.getWorkInfosByTagFlow(SyncWorker.SYNC_WORKER_TAG)
             syncWorker.test {
                 assertThat(awaitItem()[0].state).isEqualTo(WorkInfo.State.ENQUEUED)
                 underTest.cancelSyncWorkerRequest()

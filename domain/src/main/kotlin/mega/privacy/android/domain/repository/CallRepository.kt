@@ -568,6 +568,34 @@ interface CallRepository {
     fun monitorAudioOutput(): Flow<AudioDevice>
 
     /**
+     * Monitor if waiting for other participants has ended.
+     *
+     * @return Flow [Boolean]
+     */
+    fun monitorWaitingForOtherParticipantsHasEnded(): Flow<Pair<Long, Boolean>>
+
+    /**
+     * Broadcast if waiting for other participants has ended.
+     *
+     * @param isEnded  True, is ended. False if not.
+     */
+    suspend fun broadcastWaitingForOtherParticipantsHasEnded(chatId: Long, isEnded: Boolean)
+
+    /**
+     * Broadcast that local video has changed due to proximity sensor.
+     *
+     * @param isVideoOn  True, if video is on, false if it's off.
+     */
+    suspend fun broadcastLocalVideoChangedDueToProximitySensor(isVideoOn: Boolean)
+
+    /**
+     * Monitor that local video has changed due to proximity sensor.
+     *
+     * @return Flow of Boolean.
+     */
+    fun monitorLocalVideoChangedDueToProximitySensor(): Flow<Boolean>
+
+    /**
      * Mute peers
      *
      * @param chatId            The chat id.

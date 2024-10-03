@@ -40,6 +40,7 @@ internal class AppEventFacade @Inject constructor(
     private val chatArchived = MutableSharedFlow<String>()
     private val homeBadgeCount = MutableSharedFlow<Int>()
     private val isJoinedSuccessfullyToChat = MutableSharedFlow<Boolean>()
+    private val isWaitingForOtherParticipantsEnded = MutableSharedFlow<Pair<Long, Boolean>>()
     private val leaveChat = MutableSharedFlow<Long>()
     private val chatSignalPresence = MutableSharedFlow<Unit>()
     private val accountBlocked = MutableSharedFlow<AccountBlockedDetail>()
@@ -67,6 +68,7 @@ internal class AppEventFacade @Inject constructor(
     private val callEnded = MutableSharedFlow<Long>()
     private val callScreenOpened = MutableSharedFlow<Boolean>()
     private val audioOutput = MutableSharedFlow<AudioDevice>()
+    private val localVideoChangedDueToProximitySensor = MutableSharedFlow<Boolean>()
 
     private val updateUserData = MutableSharedFlow<Unit>()
 
@@ -161,6 +163,15 @@ internal class AppEventFacade @Inject constructor(
     override suspend fun broadcastJoinedSuccessfully() =
         isJoinedSuccessfullyToChat.emit(true)
 
+    override fun monitorWaitingForOtherParticipantsHasEnded(): Flow<Pair<Long, Boolean>> =
+        isWaitingForOtherParticipantsEnded.toSharedFlow(appScope)
+
+    override suspend fun broadcastWaitingForOtherParticipantsHasEnded(
+        chatId: Long,
+        isEnded: Boolean,
+    ) =
+        isWaitingForOtherParticipantsEnded.emit(Pair(chatId, isEnded))
+
     override fun monitorLeaveChat(): Flow<Long> = leaveChat.toSharedFlow(appScope)
 
     override suspend fun broadcastLeaveChat(chatId: Long) = leaveChat.emit(chatId)
@@ -215,6 +226,12 @@ internal class AppEventFacade @Inject constructor(
 
     override suspend fun broadcastAudioOutput(audioDevice: AudioDevice) =
         audioOutput.emit(audioDevice)
+
+    override fun monitorLocalVideoChangedDueToProximitySensor() =
+        localVideoChangedDueToProximitySensor.asSharedFlow()
+
+    override suspend fun broadcastLocalVideoChangedDueToProximitySensor(isVideoOn: Boolean) =
+        localVideoChangedDueToProximitySensor.emit(isVideoOn)
 
     override suspend fun broadcastUpdateUserData() {
         updateUserData.emit(Unit)
