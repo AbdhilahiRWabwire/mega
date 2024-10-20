@@ -7,40 +7,43 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.view.Window
 import android.widget.FrameLayout
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.ActionBar
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.Toolbar
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.ComposeView
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.net.toUri
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanner
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import dagger.hilt.android.AndroidEntryPoint
 import de.palm.composestateevents.StateEventWithContentTriggered
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
-import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import mega.privacy.android.app.R
-import mega.privacy.android.app.ShareInfo
 import mega.privacy.android.app.activities.PasscodeActivity
 import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.activities.contract.SelectFolderToCopyActivityContract
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.constants.BroadcastConstants.BROADCAST_ACTION_DESTROY_ACTION_MODE
 import mega.privacy.android.app.constants.BroadcastConstants.BROADCAST_ACTION_INTENT_MANAGE_SHARE
-import mega.privacy.android.app.generalusecase.FilePrepareUseCase
+import mega.privacy.android.app.extensions.consumeInsetsWithToolbar
 import mega.privacy.android.app.interfaces.ActionNodeCallback
 import mega.privacy.android.app.interfaces.SnackbarShower
 import mega.privacy.android.app.modalbottomsheet.ContactFileListBottomSheetDialogFragment
@@ -49,7 +52,10 @@ import mega.privacy.android.app.modalbottomsheet.UploadBottomSheetDialogFragment
 import mega.privacy.android.app.presentation.bottomsheet.UploadBottomSheetDialogActionListener
 import mega.privacy.android.app.presentation.contact.ContactFileListViewModel
 import mega.privacy.android.app.presentation.copynode.mapper.CopyRequestMessageMapper
-import mega.privacy.android.app.presentation.extensions.uploadFilesManually
+import mega.privacy.android.app.presentation.documentscanner.SaveScannedDocumentsActivity
+import mega.privacy.android.app.presentation.documentscanner.dialogs.DocumentScanningErrorDialog
+import mega.privacy.android.app.presentation.documentscanner.model.HandleScanDocumentResult
+import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.extensions.uploadFolderManually
 import mega.privacy.android.app.presentation.movenode.mapper.MoveRequestMessageMapper
 import mega.privacy.android.app.presentation.transfers.starttransfer.StartDownloadViewModel
@@ -67,6 +73,7 @@ import mega.privacy.android.app.utils.MegaNodeDialogUtil.checkNewTextFileDialogS
 import mega.privacy.android.app.utils.MegaNodeDialogUtil.showNewFolderDialog
 import mega.privacy.android.app.utils.MegaNodeDialogUtil.showNewTxtFileDialog
 import mega.privacy.android.app.utils.MegaProgressDialogUtil.createProgressDialog
+import mega.privacy.android.app.utils.MegaProgressDialogUtil.showProcessFileDialog
 import mega.privacy.android.app.utils.TextUtil
 import mega.privacy.android.app.utils.UploadUtil
 import mega.privacy.android.app.utils.Util
@@ -77,6 +84,7 @@ import mega.privacy.android.app.utils.permission.PermissionUtils.getVideoPermiss
 import mega.privacy.android.app.utils.permission.PermissionUtils.hasPermissions
 import mega.privacy.android.app.utils.permission.PermissionUtils.requestPermission
 import mega.privacy.android.domain.entity.StorageState
+import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.document.DocumentEntity
 import mega.privacy.android.domain.entity.node.MoveRequestResult
 import mega.privacy.android.domain.entity.node.NameCollision
@@ -84,8 +92,10 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.node.NodeNameCollisionType
 import mega.privacy.android.domain.entity.uri.UriPath
 import mega.privacy.android.domain.qualifier.ApplicationScope
+import mega.privacy.android.domain.usecase.GetThemeMode
 import mega.privacy.android.domain.usecase.file.CheckFileNameCollisionsUseCase
 import mega.privacy.android.domain.usecase.node.GetNodeByHandleUseCase
+import mega.privacy.android.shared.original.core.ui.theme.OriginalTempTheme
 import nz.mega.documentscanner.DocumentScannerActivity
 import nz.mega.sdk.MegaApiJava
 import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
@@ -110,9 +120,6 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
     SnackbarShower {
 
     @Inject
-    lateinit var filePrepareUseCase: FilePrepareUseCase
-
-    @Inject
     lateinit var getNodeByHandleUseCase: GetNodeByHandleUseCase
 
     @Inject
@@ -125,11 +132,18 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
     @ApplicationScope
     lateinit var applicationScope: CoroutineScope
 
+    /**
+     * The Application Theme Mode
+     */
+    @Inject
+    lateinit var getThemeMode: GetThemeMode
+
     @Inject
     lateinit var moveRequestMessageMapper: MoveRequestMessageMapper
     private val viewModel: ContactFileListViewModel by viewModels()
     private val startDownloadViewModel: StartDownloadViewModel by viewModels()
     private lateinit var fragmentContainer: FrameLayout
+    private lateinit var documentScanningErrorDialogComposeView: ComposeView
     private var userEmail: String? = null
     private var contact: MegaUser? = null
     private var fullName = ""
@@ -180,6 +194,70 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
         }
     }
 
+    /**
+     * The launcher to scan documents using the old Document Scanner
+     */
+    private val legacyScanDocumentLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            if (it.resultCode == RESULT_OK) {
+                it.data?.let { intent ->
+                    val savedDestination: String? =
+                        intent.getStringExtra(DocumentScannerActivity.EXTRA_PICKED_SAVE_DESTINATION)
+                    val fileIntent =
+                        Intent(this, FileExplorerActivity::class.java).apply {
+                            if (getString(R.string.section_chat) == savedDestination) {
+                                action = FileExplorerActivity.ACTION_UPLOAD_TO_CHAT
+                            } else {
+                                action = FileExplorerActivity.ACTION_SAVE_TO_CLOUD
+                                putExtra(
+                                    FileExplorerActivity.EXTRA_PARENT_HANDLE,
+                                    getParentHandle(),
+                                )
+                            }
+                            putExtra(Intent.EXTRA_STREAM, intent.data)
+                            type = intent.type
+                        }
+                    startActivity(fileIntent)
+                }
+            }
+        }
+
+    /**
+     * The launcher to scan documents using the new ML Document Kit Scanner. After scanning, a
+     * different screen is opened to configure where to save the scanned documents.
+     */
+    private val newScanDocumentLauncher =
+        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                GmsDocumentScanningResult.fromActivityResultIntent(result.data)?.let { data ->
+                    with(data) {
+                        val imageUris = pages?.mapNotNull { page ->
+                            page.imageUri
+                        } ?: emptyList()
+
+                        // The PDF URI must exist before moving to the Scan Confirmation page
+                        pdf?.uri?.let { pdfUri ->
+                            val intent = Intent(
+                                this@ContactFileListActivity,
+                                SaveScannedDocumentsActivity::class.java,
+                            ).apply {
+                                putExtra(
+                                    SaveScannedDocumentsActivity.EXTRA_CLOUD_DRIVE_PARENT_HANDLE,
+                                    getParentHandle(),
+                                )
+                                putExtra(SaveScannedDocumentsActivity.EXTRA_SCAN_PDF_URI, pdfUri)
+                                putExtra(
+                                    SaveScannedDocumentsActivity.EXTRA_SCAN_SOLO_IMAGE_URI,
+                                    if (imageUris.size == 1) imageUris[0] else null,
+                                )
+                            }
+                            this@ContactFileListActivity.startActivity(intent)
+                        } ?: Timber.e("The PDF file could not be retrieved after scanning")
+                    }
+                }
+            }
+        }
+
     public override fun onSaveInstanceState(outState: Bundle) {
         outState.putLong(PARENT_HANDLE, parentHandle)
         checkNewTextFileDialogState(newTextFileDialog, outState)
@@ -193,7 +271,17 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
      * if the Notification Permission is granted or not
      */
     private val manualUploadFilesLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _: Boolean? -> this.uploadFilesManually() }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _: Boolean? -> uploadFilesManually() }
+
+    /**
+     * Launch the system file picker to select multiple files
+     */
+    private val openMultipleDocumentLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {
+            if (it.isNotEmpty()) {
+                handleFileUris(it)
+            }
+        }
 
     /**
      * When manually uploading a Folder and the device is running Android 13 and above, this Launcher
@@ -218,7 +306,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             manualUploadFilesLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            this.uploadFilesManually()
+            uploadFilesManually()
         }
     }
 
@@ -247,12 +335,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
     }
 
     override fun scanDocument() {
-        val saveDestinations = arrayOf(
-            getString(R.string.section_cloud_drive),
-            getString(R.string.section_chat)
-        )
-        val intent = DocumentScannerActivity.getIntent(this, saveDestinations)
-        startActivityForResult(intent, Constants.REQUEST_CODE_SCAN_DOCUMENT)
+        viewModel.handleScanDocument()
     }
 
     override fun showNewFolderDialog(typedText: String?) {
@@ -270,7 +353,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
         Timber.d("createFolder")
         if (!viewModel.isOnline()) {
             showSnackbar(
-                Constants.SNACKBAR_TYPE,
+                SNACKBAR_TYPE,
                 getString(R.string.error_server_connection_problem)
             )
             return
@@ -298,16 +381,13 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
             megaApi.createFolder(folderName, parentNode, this)
         } else {
             showSnackbar(
-                Constants.SNACKBAR_TYPE,
+                SNACKBAR_TYPE,
                 getString(R.string.context_folder_already_exists)
             )
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        supportRequestWindowFeature(Window.FEATURE_NO_TITLE)
-        Timber.d("onCreate first")
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         if (shouldRefreshSessionDueToSDK() || shouldRefreshSessionDueToKarere()) {
             return
@@ -327,10 +407,9 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
         if (extras != null) {
             userEmail = extras.getString(Constants.NAME)
             val currNodePosition = extras.getInt("node_position", -1)
+            enableEdgeToEdge()
             setContentView(R.layout.activity_main_contact_properties)
-            val coordinatorLayout =
-                findViewById<View>(R.id.contact_properties_main_activity_layout) as CoordinatorLayout
-            coordinatorLayout.fitsSystemWindows = false
+            consumeInsetsWithToolbar(customToolbar = findViewById(R.id.app_bar_layout))
 
             //Set toolbar
             tB =
@@ -352,7 +431,6 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
             fragmentContainer =
                 findViewById<View>(R.id.fragment_container_contact_properties) as FrameLayout
             Timber.d("Shared Folders are:")
-            coordinatorLayout.fitsSystemWindows = true
             contactFileListFragment =
                 supportFragmentManager.findFragmentByTag("cflF") as ContactFileListFragment?
             if (contactFileListFragment == null) {
@@ -368,7 +446,6 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
                     "cflF"
                 ).commitNow()
             }
-            coordinatorLayout.invalidate()
             if (savedInstanceState != null && savedInstanceState.getBoolean(
                     IS_NEW_TEXT_FILE_SHOWN,
                     false
@@ -383,8 +460,32 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
             ) {
                 showNewFolderDialog(savedInstanceState.getString(NEW_FOLDER_DIALOG_TEXT))
             }
+            documentScanningErrorDialogComposeView =
+                findViewById(R.id.contact_properties_error_dialog_compose_view)
+            setComposeProperties()
         }
         collectFlows()
+    }
+
+    /**
+     * Sets up the Compose Views for this Activity using the traditional View system
+     */
+    private fun setComposeProperties() {
+        documentScanningErrorDialogComposeView.apply {
+            setContent {
+                val themeMode by getThemeMode().collectAsStateWithLifecycle(initialValue = ThemeMode.System)
+                val isDark = themeMode.isDarkMode()
+                val state by viewModel.state.collectAsStateWithLifecycle()
+
+                OriginalTempTheme(isDark = isDark) {
+                    DocumentScanningErrorDialog(
+                        documentScanningError = state.documentScanningError,
+                        onErrorAcknowledged = { viewModel.onDocumentScanningErrorConsumed() },
+                        onErrorDismissed = { viewModel.onDocumentScanningErrorConsumed() },
+                    )
+                }
+            }
+        }
     }
 
     private fun collectFlows() {
@@ -409,7 +510,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
             }
             uiState.snackBarMessage?.let {
                 showSnackbar(
-                    Constants.SNACKBAR_TYPE,
+                    SNACKBAR_TYPE,
                     getString(it),
                     MegaChatApiJava.MEGACHAT_INVALID_HANDLE
                 )
@@ -419,6 +520,50 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
             if (uiState.uploadEvent is StateEventWithContentTriggered) {
                 startDownloadViewModel.onUploadClicked(uiState.uploadEvent.content)
             }
+
+            uiState.handleScanDocumentResult?.let { handleScanDocumentResult ->
+                when (handleScanDocumentResult) {
+                    HandleScanDocumentResult.UseLegacyImplementation -> {
+                        scanDocumentUsingLegacyScanner()
+                    }
+
+                    is HandleScanDocumentResult.UseNewImplementation -> {
+                        scanDocumentsUsingNewScanner(
+                            documentScanner = handleScanDocumentResult.documentScanner,
+                        )
+                    }
+                }
+                viewModel.onHandleScanDocumentResultConsumed()
+            }
+        }
+    }
+
+    /**
+     * Begin scanning Documents using the old Document Scanner
+     */
+    private fun scanDocumentUsingLegacyScanner() {
+        val saveDestinations = arrayOf(
+            getString(R.string.section_cloud_drive),
+            getString(R.string.section_chat)
+        )
+        val intent = DocumentScannerActivity.getIntent(this, saveDestinations)
+        legacyScanDocumentLauncher.launch(intent)
+    }
+
+    /**
+     * Begin scanning Documents using the new ML Kit Document Scanner
+     *
+     * @param documentScanner the new ML Kit Document Scanner
+     */
+    private fun scanDocumentsUsingNewScanner(documentScanner: GmsDocumentScanner) {
+        documentScanner.apply {
+            getStartScanIntent(this@ContactFileListActivity)
+                .addOnSuccessListener {
+                    newScanDocumentLauncher.launch(IntentSenderRequest.Builder(it).build())
+                }
+                .addOnFailureListener { exception ->
+                    Timber.e("An error occurred when attempting to initialize the ML Kit Document Scanner: $exception")
+                }
         }
     }
 
@@ -431,7 +576,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
                 showMovementResult(data, data.nodes.first())
             }
             showSnackbar(
-                Constants.SNACKBAR_TYPE,
+                SNACKBAR_TYPE,
                 moveRequestMessageMapper(data),
                 MegaChatApiJava.MEGACHAT_INVALID_HANDLE
             )
@@ -540,7 +685,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
         Timber.d("moveToTrash: ")
         if (!viewModel.isOnline()) {
             showSnackbar(
-                Constants.SNACKBAR_TYPE,
+                SNACKBAR_TYPE,
                 getString(R.string.error_server_connection_problem)
             )
             return
@@ -587,31 +732,6 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
                 targetNode = toHandle,
                 type = NodeNameCollisionType.MOVE
             )
-        } else if (requestCode == Constants.REQUEST_CODE_GET_FILES && resultCode == RESULT_OK) {
-            if (intent == null) {
-                return
-            }
-            intent.action = Intent.ACTION_GET_CONTENT
-            try {
-                statusDialog = createProgressDialog(
-                    this,
-                    resources.getQuantityString(
-                        R.plurals.upload_prepare,
-                        1
-                    )
-                ).also { it.show() }
-            } catch (e: Exception) {
-                return
-            }
-            composite.add(
-                filePrepareUseCase.prepareFiles(intent)
-                    .subscribeOn(Schedulers.io())
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe { shareInfo: List<ShareInfo>?, throwable: Throwable? ->
-                        if (throwable == null) {
-                            onIntentProcessed(shareInfo)
-                        }
-                    })
         } else if (requestCode == Constants.REQUEST_CODE_GET_FOLDER) {
             UploadUtil.getFolder(this, resultCode, intent, parentHandle)
         } else if (requestCode == Constants.REQUEST_CODE_GET_FOLDER_CONTENT) {
@@ -620,7 +740,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
                 if (TextUtil.isTextEmpty(result)) {
                     return
                 }
-                showSnackbar(Constants.SNACKBAR_TYPE, result)
+                showSnackbar(SNACKBAR_TYPE, result)
             }
         } else if (requestCode == Constants.TAKE_PHOTO_CODE) {
             if (resultCode == RESULT_OK) {
@@ -653,7 +773,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
                         }.onFailure {
                             Timber.e(it, "Cannot check name collisions")
                             showSnackbar(
-                                Constants.SNACKBAR_TYPE,
+                                SNACKBAR_TYPE,
                                 getString(R.string.general_error)
                             )
                         }
@@ -662,28 +782,15 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
             } else {
                 Timber.w("TAKE_PHOTO_CODE--->ERROR!")
             }
-        } else if (requestCode == Constants.REQUEST_CODE_SCAN_DOCUMENT && resultCode == RESULT_OK && intent != null) {
-            val savedDestination =
-                intent.getStringExtra(DocumentScannerActivity.EXTRA_PICKED_SAVE_DESTINATION)
-            val fileIntent = Intent(this, FileExplorerActivity::class.java)
-            if (getString(R.string.section_chat) == savedDestination) {
-                fileIntent.action = FileExplorerActivity.ACTION_UPLOAD_TO_CHAT
-            } else {
-                fileIntent.action = FileExplorerActivity.ACTION_SAVE_TO_CLOUD
-                fileIntent.putExtra(FileExplorerActivity.EXTRA_PARENT_HANDLE, getParentHandle())
-            }
-            fileIntent.putExtra(Intent.EXTRA_STREAM, intent.data)
-            fileIntent.type = intent.type
-            startActivity(fileIntent)
         }
     }
 
     /**
      * Handle processed upload intent.
      *
-     * @param infos List<ShareInfo> containing all the upload info.
-    </ShareInfo> */
-    private fun onIntentProcessed(infos: List<ShareInfo>?) {
+     * @param infos list of DocumentEntity
+     */
+    private fun onIntentProcessed(infos: List<DocumentEntity>) {
         val parentNode = megaApi.getNodeByHandle(parentHandle)
         if (parentNode == null) {
             dismissAlertDialogIfExists(statusDialog)
@@ -694,7 +801,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
             )
             return
         }
-        if (infos == null) {
+        if (infos.isEmpty()) {
             dismissAlertDialogIfExists(statusDialog)
             Util.showErrorAlertDialog(
                 getString(R.string.upload_can_not_open),
@@ -711,14 +818,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
         lifecycleScope.launch {
             runCatching {
                 checkFileNameCollisionsUseCase(
-                    files = infos.map {
-                        DocumentEntity(
-                            name = it.originalFileName,
-                            size = it.size,
-                            lastModified = it.lastModified,
-                            uri = UriPath(it.fileAbsolutePath),
-                        )
-                    },
+                    files = infos,
                     parentNodeId = NodeId(parentNode.handle)
                 )
             }.onSuccess { collisions ->
@@ -728,10 +828,14 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
                 }
                 val collidedSharesPath = collisions.map { it.path.value }.toSet()
                 val sharesWithoutCollision = infos.filter {
-                    collidedSharesPath.contains(it.fileAbsolutePath).not()
+                    collidedSharesPath.contains(it.uri.value).not()
                 }
                 if (sharesWithoutCollision.isNotEmpty()) {
-                    viewModel.uploadShareInfo(sharesWithoutCollision, parentNode.handle)
+                    viewModel.uploadFiles(
+                        pathsAndNames = sharesWithoutCollision.map { it.uri.value }
+                            .associateWith { null },
+                        destinationId = NodeId(parentNode.handle)
+                    )
                 }
             }.onFailure {
                 dismissAlertDialogIfExists(statusDialog)
@@ -844,7 +948,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
                 val folderNode = megaApi.getNodeByHandle(request.nodeHandle) ?: return
                 if (contactFileListFragment?.isVisible == true) {
                     showSnackbar(
-                        Constants.SNACKBAR_TYPE,
+                        SNACKBAR_TYPE,
                         getString(R.string.context_folder_created)
                     )
                     contactFileListFragment?.navigateToFolder(folderNode)
@@ -852,7 +956,7 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
             } else {
                 if (contactFileListFragment?.isVisible == true) {
                     showSnackbar(
-                        Constants.SNACKBAR_TYPE,
+                        SNACKBAR_TYPE,
                         getString(R.string.context_folder_no_created)
                     )
                     contactFileListFragment?.setNodes()
@@ -940,6 +1044,27 @@ internal class ContactFileListActivity : PasscodeActivity(), MegaGlobalListenerI
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.activity_contact_file_list, menu)
         return super.onCreateOptionsMenu(menu)
+    }
+
+    private fun handleFileUris(uris: List<Uri>) {
+        lifecycleScope.launch {
+            runCatching {
+                statusDialog = showProcessFileDialog(this@ContactFileListActivity, intent)
+                val documents = viewModel.prepareFiles(uris)
+                onIntentProcessed(documents)
+            }.onFailure {
+                dismissAlertDialogIfExists(statusDialog)
+                Timber.e(it)
+            }
+        }
+    }
+
+    private fun uploadFilesManually() {
+        runCatching {
+            openMultipleDocumentLauncher.launch(arrayOf("*/*"))
+        }.onFailure {
+            Timber.e(it)
+        }
     }
 
     companion object {

@@ -59,6 +59,10 @@ import mega.privacy.android.domain.entity.transfer.Transfer
 import mega.privacy.android.domain.entity.transfer.TransferAppData
 import mega.privacy.android.domain.entity.transfer.TransferEvent
 import mega.privacy.android.domain.entity.transfer.TransferType
+import mega.privacy.android.domain.entity.transfer.pending.InsertPendingTransferRequest
+import mega.privacy.android.domain.entity.transfer.pending.PendingTransfer
+import mega.privacy.android.domain.entity.transfer.pending.PendingTransferState
+import mega.privacy.android.domain.entity.transfer.pending.UpdatePendingTransferRequest
 import mega.privacy.android.domain.exception.node.NodeDoesNotExistsException
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.qualifier.IoDispatcher
@@ -156,10 +160,7 @@ internal class DefaultTransfersRepository @Inject constructor(
             cancelToken = cancelTokenProvider.getOrCreateCancelToken(),
             listener = listener,
         )
-
-        awaitClose {
-            megaApiGateway.removeTransferListener(listener)
-        }
+        awaitClose()
     }
         .flowOn(ioDispatcher)
         .cancellable()
@@ -185,9 +186,7 @@ internal class DefaultTransfersRepository @Inject constructor(
             listener = listener,
         )
 
-        awaitClose {
-            megaApiGateway.removeTransferListener(listener)
-        }
+        awaitClose()
     }
         .flowOn(ioDispatcher)
         .cancellable()
@@ -251,6 +250,7 @@ internal class DefaultTransfersRepository @Inject constructor(
         val megaNode = runCatching { megaNodeMapper(node) }.getOrNull()
             ?: throw NodeDoesNotExistsException()
         val listener = transferListener(channel)
+
         megaApiGateway.startDownload(
             node = megaNode,
             localPath = localPath,
@@ -262,9 +262,7 @@ internal class DefaultTransfersRepository @Inject constructor(
             collisionResolution = COLLISION_RESOLUTION_NEW_WITH_N,
             listener = listener,
         )
-        awaitClose {
-            megaApiGateway.removeTransferListener(listener)
-        }
+        awaitClose()
     }
         .flowOn(ioDispatcher)
         .cancellable()
@@ -587,6 +585,12 @@ internal class DefaultTransfersRepository @Inject constructor(
         return@withContext isPauseResponse
     }
 
+    override suspend fun resetPauseTransfers() = withContext(ioDispatcher) {
+        monitorPausedTransfers.emit(false)
+        localStorageGateway.setTransferQueueStatus(false)
+        monitorAskedResumeTransfers.emit(false)
+    }
+
     override suspend fun deleteAllCompletedTransfers() = withContext(ioDispatcher) {
         megaLocalRoomGateway.deleteAllCompletedTransfers()
     }
@@ -730,6 +734,37 @@ internal class DefaultTransfersRepository @Inject constructor(
             inProgressTransfers.filterKeys { it !in tags }
         }
     }
+
+    override fun getPendingTransfersByType(transferType: TransferType): Flow<List<PendingTransfer>> =
+        megaLocalRoomGateway.getPendingTransfersByType(transferType)
+
+    override fun getPendingTransfersByTypeAndState(
+        transferType: TransferType,
+        pendingTransferState: PendingTransferState,
+    ) = megaLocalRoomGateway.getPendingTransfersByTypeAndState(transferType, pendingTransferState)
+
+    override suspend fun insertPendingTransfers(pendingTransfer: List<InsertPendingTransferRequest>) {
+        megaLocalRoomGateway.insertPendingTransfers(pendingTransfer)
+    }
+
+    override suspend fun getPendingTransfersByTag(tag: Int) =
+        megaLocalRoomGateway.getPendingTransfersByTag(tag)
+
+    override suspend fun deletePendingTransferByTag(tag: Int) {
+        megaLocalRoomGateway.deletePendingTransferByTag(tag)
+    }
+
+    override suspend fun deleteAllPendingTransfers() {
+        megaLocalRoomGateway.deleteAllPendingTransfers()
+    }
+
+    override suspend fun updatePendingTransfers(
+        updatePendingTransferRequests: List<UpdatePendingTransferRequest>,
+    ) = megaLocalRoomGateway.updatePendingTransfers(*updatePendingTransferRequests.toTypedArray())
+
+    override suspend fun updatePendingTransfer(
+        updatePendingTransferRequest: UpdatePendingTransferRequest,
+    ) = megaLocalRoomGateway.updatePendingTransfers(updatePendingTransferRequest)
 }
 
 private fun MegaTransfer.isBackgroundTransfer() =

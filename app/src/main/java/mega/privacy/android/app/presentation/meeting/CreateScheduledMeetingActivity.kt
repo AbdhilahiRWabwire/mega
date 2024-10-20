@@ -26,7 +26,6 @@ import mega.privacy.android.app.activities.PasscodeActivity
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.interfaces.SnackbarShower
 import mega.privacy.android.app.main.AddContactActivity
-import mega.privacy.android.app.presentation.extensions.changeStatusBarColor
 import mega.privacy.android.app.presentation.extensions.isDarkMode
 import mega.privacy.android.app.presentation.meeting.CreateScheduledMeetingActivity.DatePickerType.END_DATE
 import mega.privacy.android.app.presentation.meeting.CreateScheduledMeetingActivity.DatePickerType.START_DATE
@@ -37,6 +36,7 @@ import mega.privacy.android.app.presentation.meeting.view.CustomRecurrenceView
 import mega.privacy.android.app.presentation.security.PasscodeCheck
 import mega.privacy.android.app.upgradeAccount.UpgradeAccountActivity
 import mega.privacy.android.app.utils.Constants
+import mega.privacy.android.app.utils.Constants.CHAT_ID
 import mega.privacy.android.domain.entity.ThemeMode
 import mega.privacy.android.domain.entity.meeting.EndsRecurrenceOption
 import mega.privacy.android.domain.entity.meeting.RecurrenceDialogOption
@@ -88,6 +88,9 @@ class CreateScheduledMeetingActivity : PasscodeActivity(), SnackbarShower {
     internal companion object {
         const val CREATE_SCHEDULED_MEETING_TAG = "createScheduledMeetingTag"
         const val CUSTOM_RECURRENCE_TAG = "customRecurrenceTag"
+        const val MEETING_LINK_CREATED_TAG = "meetingLinkCreatedTag"
+        const val MEETING_LINK_TAG = "meetingLinkTag"
+        const val MEETING_TITLE_TAG = "meetingTitleTag"
     }
 
     private lateinit var navController: NavHostController
@@ -96,13 +99,13 @@ class CreateScheduledMeetingActivity : PasscodeActivity(), SnackbarShower {
      * Perform Activity initialization
      */
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
         collectFlows()
 
         val chatId = intent.getLongExtra(
-            Constants.CHAT_ID,
+            CHAT_ID,
             MegaChatApiJava.MEGACHAT_INVALID_HANDLE
         )
 
@@ -173,7 +176,28 @@ class CreateScheduledMeetingActivity : PasscodeActivity(), SnackbarShower {
      * @param result    Result: RESULT_CANCELED or RESULT_OK
      */
     private fun finishCreateScheduledMeeting(result: Int) {
-        setResult(result)
+        setResult(
+            result,
+            Intent().apply {
+                putExtra(
+                    CHAT_ID,
+                    scheduledMeetingManagementViewModel.state.value.chatId
+                )
+                Timber.d("Chat id ${scheduledMeetingManagementViewModel.state.value.chatId}")
+                putExtra(MEETING_TITLE_TAG, viewModel.state.value.meetingTitle)
+                Timber.d("Meeting title ${viewModel.state.value.meetingTitle}")
+                putExtra(
+                    MEETING_LINK_CREATED_TAG,
+                    viewModel.state.value.meetingLink?.isNotBlank()
+                        ?: false
+                )
+                putExtra(
+                    MEETING_LINK_TAG,
+                    viewModel.state.value.meetingLink
+                )
+                Timber.d("Meeting link ${viewModel.state.value.meetingLink}")
+            }
+        )
         finish()
     }
 
@@ -204,12 +228,6 @@ class CreateScheduledMeetingActivity : PasscodeActivity(), SnackbarShower {
                         onStartDateClicked = { showDatePicker(START_DATE) },
                         onEndTimeClicked = { showTimePicker(false) },
                         onEndDateClicked = { showDatePicker(END_DATE) },
-                        onScrollChange = { scrolled ->
-                            this@CreateScheduledMeetingActivity.changeStatusBarColor(
-                                scrolled,
-                                isDark
-                            )
-                        },
                         onDismiss = viewModel::dismissDialog,
                         onResetSnackbarMessage = viewModel::onSnackbarMessageConsumed,
                         onDiscardMeetingDialog = { finishCreateScheduledMeeting(RESULT_CANCELED) },
@@ -235,12 +253,6 @@ class CreateScheduledMeetingActivity : PasscodeActivity(), SnackbarShower {
                 composable(CUSTOM_RECURRENCE_TAG) {
                     CustomRecurrenceView(
                         state = uiState,
-                        onScrollChange = { scrolled ->
-                            this@CreateScheduledMeetingActivity.changeStatusBarColor(
-                                scrolled,
-                                isDark
-                            )
-                        },
                         onAcceptClicked = {
                             viewModel.onAcceptClicked()
                             navController.navigate(CREATE_SCHEDULED_MEETING_TAG)
@@ -284,12 +296,13 @@ class CreateScheduledMeetingActivity : PasscodeActivity(), SnackbarShower {
      */
     private fun openScheduledMeetingInfo(chatId: Long) {
         val intentOpenChat = Intent(this, ScheduledMeetingInfoActivity::class.java).apply {
-            putExtra(Constants.CHAT_ID, chatId)
+            putExtra(CHAT_ID, chatId)
             putExtra(Constants.SCHEDULED_MEETING_ID, -1)
             putExtra(Constants.SCHEDULED_MEETING_CREATED, true)
+            addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT)
         }
+        startActivity(intentOpenChat)
         finish()
-        this.startActivity(intentOpenChat)
     }
 
     /**

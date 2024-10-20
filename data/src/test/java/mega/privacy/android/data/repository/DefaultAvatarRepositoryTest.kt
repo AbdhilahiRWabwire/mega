@@ -2,10 +2,12 @@ package mega.privacy.android.data.repository
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth
+import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -21,13 +23,13 @@ import mega.privacy.android.data.model.GlobalUpdate
 import mega.privacy.android.data.wrapper.AvatarWrapper
 import mega.privacy.android.data.wrapper.BitmapFactoryWrapper
 import mega.privacy.android.domain.exception.MegaException
-import mega.privacy.android.domain.repository.ContactsRepository
 import nz.mega.sdk.MegaError
 import nz.mega.sdk.MegaUser
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
@@ -50,7 +52,6 @@ internal class DefaultAvatarRepositoryTest {
 
     private val megaApiGateway = mock<MegaApiGateway>()
     private val cacheGateway = mock<CacheGateway>()
-    private val contactsRepository = mock<ContactsRepository>()
     private val currentUser = mock<MegaUser> {
         on { it.isOwnChange }.thenReturn(0)
         on { it.hasChanged(MegaUser.CHANGE_TYPE_AVATAR.toLong()) }.thenReturn(true)
@@ -70,7 +71,6 @@ internal class DefaultAvatarRepositoryTest {
             avatarWrapper = avatarWrapper,
             bitmapFactoryWrapper = bitmapFactoryWrapper,
             cacheGateway = cacheGateway,
-            contactsRepository = contactsRepository,
             sharingScope = TestScope(),
             ioDispatcher = UnconfinedTestDispatcher(),
         )
@@ -264,7 +264,9 @@ internal class DefaultAvatarRepositoryTest {
         }
         whenever(megaApiGateway.myUser).thenReturn(currentUser)
         whenever(megaApiGateway.accountEmail).thenReturn(CURRENT_USER_EMAIL)
-        whenever(cacheGateway.buildAvatarFile(CURRENT_USER_EMAIL + FileConstant.JPG_EXTENSION)).thenReturn(expectedFile)
+        whenever(cacheGateway.buildAvatarFile(CURRENT_USER_EMAIL + FileConstant.JPG_EXTENSION)).thenReturn(
+            expectedFile
+        )
         val error = mock<MegaError> {
             on { errorCode }.thenReturn(MegaError.API_OK)
         }
@@ -276,5 +278,39 @@ internal class DefaultAvatarRepositoryTest {
             )
         }
         Truth.assertThat(underTest.getMyAvatarFile(true)).isEqualTo(expectedFile)
+    }
+
+    @Test
+    fun `test that monitorUserAvatarUpdates emits correctly`() = runTest {
+        val userUpdate1 = mock<MegaUser> {
+            on { handle } doReturn 1L
+            on { isOwnChange } doReturn 1
+            on { hasChanged(MegaUser.CHANGE_TYPE_ALIAS.toLong()) } doReturn true
+            on { hasChanged(MegaUser.CHANGE_TYPE_AVATAR.toLong()) } doReturn true
+        }
+        val userUpdate2 = mock<MegaUser> {
+            on { handle } doReturn 2L
+            on { isOwnChange } doReturn 0
+            on { hasChanged(MegaUser.CHANGE_TYPE_AVATAR.toLong()) } doReturn true
+        }
+        val userUpdate3 = mock<MegaUser> {
+            on { handle } doReturn 3L
+            on { isOwnChange } doReturn 0
+            on { hasChanged(MegaUser.CHANGE_TYPE_FIRSTNAME.toLong()) } doReturn true
+            on { hasChanged(MegaUser.CHANGE_TYPE_ALIAS.toLong()) } doReturn true
+        }
+        whenever(megaApiGateway.globalUpdates).thenReturn(
+            flowOf(
+                GlobalUpdate.OnUsersUpdate(
+                    users = arrayListOf(userUpdate1, userUpdate2, userUpdate3)
+                ),
+                GlobalUpdate.OnAccountUpdate,
+            )
+        )
+
+        underTest.monitorUserAvatarUpdates().test {
+            assertThat(awaitItem()).isEqualTo(2L)
+            awaitComplete()
+        }
     }
 }

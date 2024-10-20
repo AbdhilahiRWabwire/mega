@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import mega.privacy.android.data.gateway.api.MegaApiGateway
+import mega.privacy.android.data.listener.IgnoredRequestListener
 import mega.privacy.android.data.listener.OptionalMegaRequestListenerInterface
 import mega.privacy.android.data.listener.OptionalMegaTransferListenerInterface
 import mega.privacy.android.data.mapper.transfer.AppDataTypeConstants
@@ -33,6 +34,7 @@ import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaNodeList
 import nz.mega.sdk.MegaPushNotificationSettings
 import nz.mega.sdk.MegaPushNotificationSettingsAndroid
+import nz.mega.sdk.MegaRecentActionBucket
 import nz.mega.sdk.MegaRecentActionBucketList
 import nz.mega.sdk.MegaRecentActionBucketListAndroid
 import nz.mega.sdk.MegaRequest
@@ -87,6 +89,9 @@ internal class MegaApiFacade @Inject constructor(
     ) {
         megaApi.createSupportTicket(ticketContent, ANDROID_SUPPORT_ISSUE, listener)
     }
+
+    override fun getNodesFromMegaNodeList(nodeList: MegaNodeList): List<MegaNode> =
+        MegaApiJava.nodeListToArray(nodeList)?.toList() ?: emptyList()
 
     override fun startUpload(
         localPath: String,
@@ -317,10 +322,10 @@ internal class MegaApiFacade @Inject constructor(
             },
         )
 
-        megaApi.addTransferListener(listener)
+        addTransferListener(listener)
 
         awaitClose {
-            megaApi.removeTransferListener(listener)
+            removeTransferListener(listener)
         }
     }.buffer(Channel.Factory.UNLIMITED).shareIn(sharingScope, SharingStarted.WhileSubscribed())
 
@@ -683,8 +688,9 @@ internal class MegaApiFacade @Inject constructor(
     override fun getRecentActionsAsync(
         days: Long,
         maxNodes: Long,
+        excludeSensitives: Boolean,
         listener: MegaRequestListenerInterface,
-    ) = megaApi.getRecentActionsAsync(days, maxNodes, listener)
+    ) = megaApi.getRecentActionsAsync(days, maxNodes, excludeSensitives, listener)
 
     override fun copyNode(
         nodeToCopy: MegaNode,
@@ -749,6 +755,9 @@ internal class MegaApiFacade @Inject constructor(
 
     override fun copyBucketList(bucketList: MegaRecentActionBucketList): MegaRecentActionBucketList =
         MegaRecentActionBucketListAndroid.copy(bucketList)
+
+    override fun copyBucket(bucket: MegaRecentActionBucket): MegaRecentActionBucket =
+        megaApi.copyBucket(bucket)
 
     override fun checkAccessErrorExtended(node: MegaNode, level: Int): MegaError =
         megaApi.checkAccessErrorExtended(node, level)
@@ -1210,7 +1219,7 @@ internal class MegaApiFacade @Inject constructor(
         listener: MegaRequestListenerInterface,
     ) = megaApi.setUserAlias(userHandle, name, listener)
 
-    override suspend fun getTransferData(): MegaTransferData? = megaApi.getTransferData(null)
+    override suspend fun getTransferData(): MegaTransferData? = megaApi.transferData
 
     override fun removeContact(user: MegaUser, listener: MegaRequestListenerInterface?) =
         listener?.let {
@@ -1341,7 +1350,7 @@ internal class MegaApiFacade @Inject constructor(
         get() = megaApi.currentUploadSpeed
 
     override suspend fun setNodeCoordinates(node: MegaNode, latitude: Double, longitude: Double) =
-        megaApi.setNodeCoordinates(node, latitude, longitude, null)
+        megaApi.setNodeCoordinates(node, latitude, longitude, IgnoredRequestListener)
 
     override suspend fun createThumbnail(imagePath: String, destinationPath: String) =
         megaApi.createThumbnail(imagePath, destinationPath)
@@ -1537,7 +1546,7 @@ internal class MegaApiFacade @Inject constructor(
         reason: String,
         subscriptionId: String,
         canContact: Int,
-        listener: MegaRequestListenerInterface
+        listener: MegaRequestListenerInterface,
     ) {
         megaApi.creditCardCancelSubscriptions(reason, subscriptionId, canContact, listener)
     }

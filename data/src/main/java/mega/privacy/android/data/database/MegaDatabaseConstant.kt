@@ -8,7 +8,7 @@ object MegaDatabaseConstant {
     /**
      * Database Version
      */
-    const val DATABASE_VERSION = 90
+    const val DATABASE_VERSION = 91
 
     /**
      * Database Name
@@ -79,4 +79,9 @@ object MegaDatabaseConstant {
      * Table recently watched video
      */
     const val TABLE_RECENTLY_WATCHED_VIDEO = "recentlywatchedvideo"
+
+    /**
+     * Table pending transfers
+     */
+    const val TABLE_PENDING_TRANSFER = "pending_transfer"
 }

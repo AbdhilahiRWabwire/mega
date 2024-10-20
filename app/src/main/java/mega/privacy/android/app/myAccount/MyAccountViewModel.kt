@@ -30,7 +30,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mega.privacy.android.app.R
 import mega.privacy.android.app.featuretoggle.AppFeatures
-import mega.privacy.android.app.generalusecase.FilePrepareUseCase
 import mega.privacy.android.app.globalmanagement.MegaChatRequestHandler
 import mega.privacy.android.app.globalmanagement.MyAccountInfo
 import mega.privacy.android.app.interfaces.SnackbarShower
@@ -138,7 +137,6 @@ import javax.inject.Inject
  * @property isUrlMatchesRegexUseCase Checks if the URL Matches any of the Regex Patterns provided
  * @property [confirmCancelAccountUseCase] [ConfirmCancelAccountUseCase]
  * @property confirmChangeEmailUseCase
- * @property filePrepareUseCase
  * @property getAccountDetailsUseCase
  * @property getExtendedAccountDetail
  * @property getNumberOfSubscription
@@ -174,7 +172,6 @@ class MyAccountViewModel @Inject constructor(
     private val isUrlMatchesRegexUseCase: IsUrlMatchesRegexUseCase,
     private val confirmCancelAccountUseCase: ConfirmCancelAccountUseCase,
     private val confirmChangeEmailUseCase: ConfirmChangeEmailUseCase,
-    private val filePrepareUseCase: FilePrepareUseCase,
     private val getAccountDetailsUseCase: GetAccountDetailsUseCase,
     private val getExtendedAccountDetail: GetExtendedAccountDetail,
     private val getNumberOfSubscription: GetNumberOfSubscription,

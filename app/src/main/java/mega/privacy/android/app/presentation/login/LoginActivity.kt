@@ -10,6 +10,7 @@ import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
+import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -258,7 +259,7 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
                     .replace(R.id.fragment_container_login, loginFragment ?: return)
                     .commitNowAllowingStateLoss()
 
-                Util.setDrawUnderStatusBar(this, false)
+                window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
             }
 
             Constants.CREATE_ACCOUNT_FRAGMENT -> {
@@ -272,7 +273,7 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
                     .replace(R.id.fragment_container_login, createAccountFragment ?: return)
                     .commitNowAllowingStateLoss()
 
-                Util.setDrawUnderStatusBar(this, false)
+                window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
             }
 
             Constants.TOUR_FRAGMENT -> {
@@ -291,7 +292,10 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
                     .replace(R.id.fragment_container_login, tourFragment)
                     .commitNowAllowingStateLoss()
 
-                Util.setDrawUnderStatusBar(this@LoginActivity, true)
+                window.setFlags(
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                )
             }
 
             Constants.CONFIRM_EMAIL_FRAGMENT -> {
@@ -308,7 +312,7 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
                         .commitNowAllowingStateLoss()
                 }
 
-                Util.setDrawUnderStatusBar(this, false)
+                window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
             }
 
 
@@ -317,7 +321,7 @@ class LoginActivity : BaseActivity(), MegaRequestListenerInterface {
                     .replace(R.id.fragment_container_login, ReportIssueViaEmailFragment())
                     .commitNowAllowingStateLoss()
 
-                Util.setDrawUnderStatusBar(this, false)
+                window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
             }
 
         }

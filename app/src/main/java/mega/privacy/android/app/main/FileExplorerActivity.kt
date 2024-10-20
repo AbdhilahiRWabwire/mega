@@ -11,10 +11,12 @@ import android.view.View
 import android.view.Window
 import android.view.WindowManager
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.AppCompatAutoCompleteTextView
 import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -39,8 +41,7 @@ import mega.privacy.android.app.activities.PasscodeActivity
 import mega.privacy.android.app.activities.contract.NameCollisionActivityContract
 import mega.privacy.android.app.arch.extensions.collectFlow
 import mega.privacy.android.app.databinding.ActivityFileExplorerBinding
-import mega.privacy.android.app.extensions.enableEdgeToEdgeAndConsumeInsets
-import mega.privacy.android.app.generalusecase.FilePrepareUseCase
+import mega.privacy.android.app.extensions.consumeInsetsWithToolbar
 import mega.privacy.android.app.interfaces.ActionNodeCallback
 import mega.privacy.android.app.interfaces.SnackbarShower
 import mega.privacy.android.app.listeners.CreateChatListener
@@ -63,22 +64,21 @@ import mega.privacy.android.app.main.FileExplorerActivity.Companion.SELECT_CAMER
 import mega.privacy.android.app.main.FileExplorerActivity.Companion.SHARE_LINK
 import mega.privacy.android.app.main.FileExplorerActivity.Companion.UPLOAD
 import mega.privacy.android.app.main.adapters.FileExplorerPagerAdapter
-import mega.privacy.android.app.main.adapters.MegaNodeAdapter
 import mega.privacy.android.app.main.listeners.CreateGroupChatWithPublicLink
 import mega.privacy.android.app.main.megachat.chat.explorer.ChatExplorerFragment
 import mega.privacy.android.app.main.megachat.chat.explorer.ChatExplorerListItem
 import mega.privacy.android.app.modalbottomsheet.ModalBottomSheetUtil.isBottomSheetDialogShown
 import mega.privacy.android.app.modalbottomsheet.SortByBottomSheetDialogFragment.Companion.newInstance
+import mega.privacy.android.app.presentation.extensions.serializable
 import mega.privacy.android.app.presentation.login.LoginActivity
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.StartTransferEvent
 import mega.privacy.android.app.presentation.transfers.starttransfer.model.TransferTriggerEvent
 import mega.privacy.android.app.presentation.transfers.starttransfer.view.createStartTransferView
+import mega.privacy.android.app.presentation.upload.UploadDestinationActivity
 import mega.privacy.android.app.usecase.chat.GetChatChangesUseCase
 import mega.privacy.android.app.utils.AlertDialogUtil.dismissAlertDialogIfExists
 import mega.privacy.android.app.utils.AlertsAndWarnings.showOverDiskQuotaPaywallWarning
 import mega.privacy.android.app.utils.ChatUtil
-import mega.privacy.android.app.utils.ColorUtils.changeStatusBarColorForElevation
-import mega.privacy.android.app.utils.ColorUtils.getColorForElevation
 import mega.privacy.android.app.utils.ColorUtils.tintIcon
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.CONTACT_TYPE_MEGA
@@ -104,7 +104,6 @@ import mega.privacy.android.domain.entity.node.NodeId
 import mega.privacy.android.domain.entity.uri.UriPath
 import mega.privacy.android.domain.entity.user.UserCredentials
 import mega.privacy.android.domain.qualifier.LoginMutex
-import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.file.CheckFileNameCollisionsUseCase
 import mega.privacy.android.domain.usecase.node.CopyNodeUseCase
 import nz.mega.sdk.MegaApiJava
@@ -137,11 +136,9 @@ import javax.inject.Inject
 /**
  * Activity used for several purposes like import content to the cloud, copies or movements.
  *
- * @property filePrepareUseCase        [FilePrepareUseCase]
  * @property getChatChangesUseCase     [GetChatChangesUseCase]
- * @property uploadUseCase             [UploadUseCase]
  * @property copyNodeUseCase           [CopyNodeUseCase]
- * @property getFeatureFlagValueUseCase [GetFeatureFlagValueUseCase]
+ * @property checkFileNameCollisionsUseCase [CheckFileNameCollisionsUseCase]
  * @property loginMutex                Mutex.
  * @property isList                    True if the view is in list mode, false if it is in grid mode.
  * @property mode                      Mode for opening the file explorer: [UPLOAD], [MOVE], [COPY], [CAMERA], [IMPORT], [SELECT], [SELECT_CAMERA_FOLDER], [SHARE_LINK] or [SAVE]
@@ -159,9 +156,6 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     ActionNodeCallback, SnackbarShower {
 
     @Inject
-    lateinit var filePrepareUseCase: FilePrepareUseCase
-
-    @Inject
     lateinit var getChatChangesUseCase: GetChatChangesUseCase
 
     @Inject
@@ -177,6 +171,9 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     private val viewModel by viewModels<FileExplorerViewModel>()
 
     private lateinit var binding: ActivityFileExplorerBinding
+    private val isFromUploadDestinationActivity by lazy {
+        intent.hasExtra(UploadDestinationActivity.EXTRA_NAVIGATION)
+    }
 
     var isList = true
         private set
@@ -235,13 +232,6 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     private var bottomSheetDialogFragment: BottomSheetDialogFragment? = null
     private var parentHandle: Long = 0
 
-    private val transparentColor by lazy {
-        ContextCompat.getColor(
-            this,
-            android.R.color.transparent
-        )
-    }
-
     private val nameCollisionActivityLauncher = registerForActivityResult(
         NameCollisionActivityContract()
     ) { result ->
@@ -253,7 +243,6 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     }
 
     private val elevation by lazy { resources.getDimension(R.dimen.toolbar_elevation) }
-    private val toolbarElevationColor by lazy { getColorForElevation(this, elevation) }
 
     private lateinit var createChatLauncher: ActivityResultLauncher<Intent>
 
@@ -376,8 +365,15 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
         if (action != null && intent != null) {
             intent.action = action
         }
+        if(isFromUploadDestinationActivity) {
+            intent.serializable<HashMap<String,String>>(UploadDestinationActivity.EXTRA_NAME_MAP)?.let { nameMap ->
+                viewModel.setFileNames(nameMap)
+            }
+        }
 
-        if (importFileF) {
+        if (chatListItems.isNotEmpty()) {
+            onIntentProcessed(filePreparedInfos)
+        } else if (importFileF) {
             when {
                 importFragmentSelected != -1 -> chooseFragment(importFragmentSelected)
                 ACTION_UPLOAD_TO_CHAT == action -> chooseFragment(CHAT_FRAGMENT)
@@ -398,7 +394,6 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
 
     override fun onCreate(savedInstanceState: Bundle?) {
         requestWindowFeature(Window.FEATURE_NO_TITLE)
-        enableEdgeToEdgeAndConsumeInsets()
         Timber.d("onCreate first")
         super.onCreate(savedInstanceState)
         credentials = runBlocking {
@@ -578,8 +573,9 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
         if (savedInstanceState != null) {
             folderSelected = savedInstanceState.getBoolean("folderSelected", false)
         }
-
+        enableEdgeToEdge()
         binding = ActivityFileExplorerBinding.inflate(layoutInflater)
+        consumeInsetsWithToolbar(customToolbar = binding.appBarLayoutExplorer)
         setContentView(binding.root)
         addStartUploadTransferView()
 
@@ -622,6 +618,7 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
             afterLoginAndFetch()
         }
 
+        handleImportFromUploadDestination()
         window.setFlags(
             WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
@@ -630,6 +627,15 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
         )
+    }
+
+    private fun handleImportFromUploadDestination() {
+        if (isFromUploadDestinationActivity) {
+            val fragment = intent.getIntExtra(UploadDestinationActivity.EXTRA_NAVIGATION, CLOUD_FRAGMENT)
+            importFileF = true
+            importFragmentSelected = fragment
+            chooseFragment(fragment)
+        }
     }
 
     private fun setupObservers() {
@@ -784,7 +790,7 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
                 }
             }
 
-            title?.let { supportActionBar?.title = it }
+            title.let { supportActionBar?.title = it }
         } else {
             Timber.e("intent error")
         }
@@ -964,32 +970,7 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
      */
     fun changeActionBarElevation(elevate: Boolean, fragmentIndex: Int) {
         if (!isCurrentFragment(fragmentIndex)) return
-
-        changeStatusBarColorForElevation(this, elevate)
-
-        with(binding) {
-            if (fragmentIndex == CHAT_FRAGMENT) {
-                if (Util.isDarkMode(this@FileExplorerActivity)) {
-                    if (tabShown == NO_TABS) {
-                        if (elevate) {
-                            toolbarExplorer.setBackgroundColor(toolbarElevationColor)
-                        } else {
-                            toolbarExplorer.setBackgroundColor(transparentColor)
-                        }
-                    } else {
-                        if (elevate) {
-                            toolbarExplorer.setBackgroundColor(transparentColor)
-                            appBarLayoutExplorer.elevation = elevation
-                        } else {
-                            toolbarExplorer.setBackgroundColor(transparentColor)
-                            appBarLayoutExplorer.elevation = 0F
-                        }
-                    }
-                }
-            } else {
-                appBarLayoutExplorer.elevation = if (elevate) elevation else 0f
-            }
-        }
+        binding.appBarLayoutExplorer.elevation = if (elevate) elevation else 0f
     }
 
     private fun isCurrentFragment(index: Int): Boolean =
@@ -1025,7 +1006,7 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
         newChatMenuItem?.isVisible = false
         searchView = searchMenuItem?.actionView as SearchView?
         val searchAutoComplete =
-            searchView?.findViewById<SearchView.SearchAutoComplete>(androidx.appcompat.R.id.search_src_text)
+            searchView?.findViewById<AppCompatAutoCompleteTextView>(androidx.appcompat.R.id.search_src_text)
 
         searchAutoComplete?.hint = getString(R.string.hint_action_search)
         searchView?.findViewById<View>(androidx.appcompat.R.id.search_plate)
@@ -1394,16 +1375,6 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
         invalidateOptionsMenu()
     }
 
-    /**
-     * Gets a fragment tag.
-     *
-     * @param viewPagerId      The pager it.
-     * @param fragmentPosition The fragment position.
-     * @return The fragment tag.
-     */
-    fun getFragmentTag(viewPagerId: Int, fragmentPosition: Int): String =
-        "android:switcher:$viewPagerId:$fragmentPosition"
-
     override fun onSaveInstanceState(outState: Bundle) {
         Timber.d("onSaveInstanceState")
         super.onSaveInstanceState(outState)
@@ -1438,7 +1409,11 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
 
     private fun performImportFileBack() {
         if (importFileF) {
-            chooseFragment(IMPORT_FRAGMENT)
+            if (isFromUploadDestinationActivity) {
+                finishAndRemoveTask()
+            } else {
+                chooseFragment(IMPORT_FRAGMENT)
+            }
         } else {
             finishAndRemoveTask()
         }
@@ -1637,7 +1612,7 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
                     checkFileNameCollisionsUseCase(
                         files = infos.map {
                             DocumentEntity(
-                                name = it.originalFileName,
+                                name = viewModel.uiState.value.fileNames[it.originalFileName] ?: it.originalFileName,
                                 size = it.size,
                                 lastModified = it.lastModified,
                                 uri = UriPath(it.fileAbsolutePath),
@@ -2381,16 +2356,7 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
                 resources.getQuantityString(R.plurals.upload_prepare, 1)
             )
 
-            filePrepareUseCase.prepareFiles(intent)
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(
-                    { shareInfo: List<ShareInfo> ->
-                        onIntentProcessed(shareInfo)
-                    },
-                    { throwable: Throwable -> Timber.e(throwable) }
-                )
-                .addTo(composite)
+            viewModel.ownFilePrepareTask(this, intent)
         } else {
             onIntentProcessed(filePreparedInfos)
         }
@@ -2471,7 +2437,7 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     }
 
     /**
-     * Gets the paret node to copy.
+     * Gets the parent node to copy.
      *
      * @return The node.
      */
@@ -2515,17 +2481,7 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
         }
 
     /**
-     * View type.
-     */
-    val itemType: Int
-        get() = if (isList) {
-            MegaNodeAdapter.ITEM_VIEW_TYPE_LIST
-        } else {
-            MegaNodeAdapter.ITEM_VIEW_TYPE_GRID
-        }
-
-    /**
-     * Sets a node as "My chat files" foler.
+     * Sets a node as "My chat files" folder.
      *
      * @param myChatFilesNode The node to set.
      */
@@ -2726,6 +2682,11 @@ class FileExplorerActivity : PasscodeActivity(), MegaRequestListenerInterface,
          * Intent extra for the selected MEGA Folder
          */
         const val EXTRA_MEGA_SELECTED_FOLDER = "EXTRA_MEGA_SELECTED_FOLDER"
+
+        /**
+         * Intent extra for the filename used on the scanned document/s
+         */
+        const val EXTRA_DOCUMENT_SCAN_FILENAME = "EXTRA_DOCUMENT_SCAN_FILENAME"
 
         /**
          * Intent action for processed info.

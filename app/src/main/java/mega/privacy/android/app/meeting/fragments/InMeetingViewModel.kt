@@ -50,7 +50,6 @@ import mega.privacy.android.app.presentation.meeting.model.InMeetingUiState
 import mega.privacy.android.app.presentation.meeting.model.ParticipantsChange
 import mega.privacy.android.app.presentation.meeting.model.ParticipantsChangeType
 import mega.privacy.android.app.usecase.call.AmIAloneOnAnyCallUseCase
-import mega.privacy.android.app.usecase.call.GetParticipantsChangesUseCase
 import mega.privacy.android.app.usecase.chat.SetChatVideoInDeviceUseCase
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.ChatUtil.getTitleChat
@@ -83,6 +82,7 @@ import mega.privacy.android.domain.entity.statistics.EndCallForAll
 import mega.privacy.android.domain.entity.statistics.StayOnCallEmptyCall
 import mega.privacy.android.domain.usecase.GetChatRoomUseCase
 import mega.privacy.android.domain.usecase.MonitorChatListItemUpdates
+import mega.privacy.android.domain.usecase.avatar.GetUserAvatarUseCase
 import mega.privacy.android.domain.usecase.call.BroadcastCallEndedUseCase
 import mega.privacy.android.domain.usecase.call.GetChatCallUseCase
 import mega.privacy.android.domain.usecase.call.HangChatCallUseCase
@@ -101,12 +101,13 @@ import mega.privacy.android.domain.usecase.contact.GetMyUserHandleUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
 import mega.privacy.android.domain.usecase.login.ChatLogoutUseCase
 import mega.privacy.android.domain.usecase.meeting.EnableAudioLevelMonitorUseCase
+import mega.privacy.android.domain.usecase.meeting.GetParticipantsChangesUseCase
 import mega.privacy.android.domain.usecase.meeting.IsAudioLevelMonitorEnabledUseCase
 import mega.privacy.android.domain.usecase.meeting.JoinMeetingAsGuestUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatCallUpdatesUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorChatSessionUpdatesUseCase
-import mega.privacy.android.domain.usecase.meeting.MonitorWaitingForOtherParticipantsHasEndedUseCase
 import mega.privacy.android.domain.usecase.meeting.MonitorLocalVideoChangedDueToProximitySensorUseCase
+import mega.privacy.android.domain.usecase.meeting.MonitorWaitingForOtherParticipantsHasEndedUseCase
 import mega.privacy.android.domain.usecase.meeting.RequestHighResolutionVideoUseCase
 import mega.privacy.android.domain.usecase.meeting.RequestLowResolutionVideoUseCase
 import mega.privacy.android.domain.usecase.meeting.SendStatisticsMeetingsUseCase
@@ -117,6 +118,7 @@ import mega.privacy.android.domain.usecase.meeting.raisehandtospeak.LowerHandToS
 import mega.privacy.android.domain.usecase.meeting.raisehandtospeak.RaiseHandToSpeakUseCase
 import mega.privacy.android.domain.usecase.meeting.raisehandtospeak.SetRaiseToHandSuggestionShownUseCase
 import mega.privacy.android.domain.usecase.network.IsConnectedToInternetUseCase
+import mega.privacy.android.domain.usecase.user.MonitorUserAvatarUpdatesUseCase
 import nz.mega.sdk.MegaChatApiJava.MEGACHAT_INVALID_HANDLE
 import nz.mega.sdk.MegaChatRequestListenerInterface
 import nz.mega.sdk.MegaChatRoom
@@ -208,11 +210,13 @@ class InMeetingViewModel @Inject constructor(
     private val setChatTitleUseCase: SetChatTitleUseCase,
     private val isConnectedToInternetUseCase: IsConnectedToInternetUseCase,
     private val getMyUserHandleUseCase: GetMyUserHandleUseCase,
-    private val amIAloneOnAnyCallUseCase: AmIAloneOnAnyCallUseCase,
+    amIAloneOnAnyCallUseCase: AmIAloneOnAnyCallUseCase,
     private val monitorChatListItemUpdates: MonitorChatListItemUpdates,
     private val monitorWaitingForOtherParticipantsHasEndedUseCase: MonitorWaitingForOtherParticipantsHasEndedUseCase,
     private val monitorLocalVideoChangedDueToProximitySensorUseCase: MonitorLocalVideoChangedDueToProximitySensorUseCase,
+    private val monitorUserAvatarUpdatesUseCase: MonitorUserAvatarUpdatesUseCase,
     @ApplicationContext private val context: Context,
+    private val getUserAvatarUseCase: GetUserAvatarUseCase,
 ) : ViewModel(), GetUserEmailListener.OnUserEmailUpdateCallback {
 
     private val composite = CompositeDisposable()
@@ -356,11 +360,11 @@ class InMeetingViewModel @Inject constructor(
             }
         }
 
-        getParticipantsChangesUseCase.getChangesFromParticipants()
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribeBy(
-                onNext = { (chatId, typeChange, peers) ->
+        viewModelScope.launch {
+            getParticipantsChangesUseCase()
+                .catch { Timber.e(it) }
+                .collect { (chatId, typeChange, peers) ->
+                    Timber.d("Participants changes collected $chatId $typeChange $peers")
                     if (_state.value.currentChatId == chatId) {
                         state.value.chat?.let { chat ->
                             if (chat.isMeeting || chat.isGroup) {
@@ -368,13 +372,10 @@ class InMeetingViewModel @Inject constructor(
                                     getParticipantChanges(list, typeChange)
                                 }
                             }
-
                         }
                     }
-                },
-                onError = Timber::e
-            )
-            .addTo(composite)
+                }
+        }
 
         amIAloneOnAnyCallUseCase()
             .asFlowable(viewModelScope.coroutineContext)
@@ -406,6 +407,16 @@ class InMeetingViewModel @Inject constructor(
                 onError = Timber::e
             )
             .addTo(composite)
+
+        monitorAvatarUpdates()
+    }
+
+    private fun monitorAvatarUpdates() {
+        viewModelScope.launch {
+            monitorUserAvatarUpdatesUseCase()
+                .catch { Timber.d(it) }
+                .collect { peerId -> getRemoteUserAvatar(peerId) }
+        }
     }
 
 
@@ -560,7 +571,7 @@ class InMeetingViewModel @Inject constructor(
                 _state.update { it.copy(chat = chat) }
 
                 when {
-                    chat.hasChanged(ChatRoomChange.OwnPrivilege) -> {
+                    chat.hasChanged(ChatRoomChange.OwnPrivilege) && isOneToOneCall().not() -> {
                         if (chat.ownPrivilege == ChatRoomPermission.Moderator) {
                             _state.update { state ->
                                 state.copy(
@@ -978,38 +989,40 @@ class InMeetingViewModel @Inject constructor(
      * @param type Type of change
      */
     private fun getParticipantChanges(list: ArrayList<Long>, type: Int) {
-        val action = when (val numParticipants = list.size) {
-            1 -> { context: Context ->
-                context.getString(
-                    if (type == TYPE_JOIN)
-                        R.string.meeting_call_screen_one_participant_joined_call
-                    else
-                        R.string.meeting_call_screen_one_participant_left_call,
-                    getParticipantName(list.first())
-                )
+        if (list.isNotEmpty()) {
+            val action = when (val numParticipants = list.size) {
+                1 -> { context: Context ->
+                    context.getString(
+                        if (type == TYPE_JOIN)
+                            R.string.meeting_call_screen_one_participant_joined_call
+                        else
+                            R.string.meeting_call_screen_one_participant_left_call,
+                        getParticipantName(list.first())
+                    )
+                }
+
+                2 -> { context: Context ->
+                    context.getString(
+                        if (type == TYPE_JOIN)
+                            R.string.meeting_call_screen_two_participants_joined_call
+                        else
+                            R.string.meeting_call_screen_two_participants_left_call,
+                        getParticipantName(list.first()), getParticipantName(list.last())
+                    )
+                }
+
+                else -> { context: Context ->
+                    context.resources.getQuantityString(
+                        if (type == TYPE_JOIN) R.plurals.meeting_call_screen_more_than_two_participants_joined_call
+                        else
+                            R.plurals.meeting_call_screen_more_than_two_participants_left_call,
+                        numParticipants, getParticipantName(list.first()), (numParticipants - 1)
+                    )
+                }
             }
 
-            2 -> { context: Context ->
-                context.getString(
-                    if (type == TYPE_JOIN)
-                        R.string.meeting_call_screen_two_participants_joined_call
-                    else
-                        R.string.meeting_call_screen_two_participants_left_call,
-                    getParticipantName(list.first()), getParticipantName(list.last())
-                )
-            }
-
-            else -> { context: Context ->
-                context.resources.getQuantityString(
-                    if (type == TYPE_JOIN) R.plurals.meeting_call_screen_more_than_two_participants_joined_call
-                    else
-                        R.plurals.meeting_call_screen_more_than_two_participants_left_call,
-                    numParticipants, getParticipantName(list.first()), (numParticipants - 1)
-                )
-            }
+            _getParticipantsChanges.value = Pair(first = type, second = action)
         }
-
-        _getParticipantsChanges.value = Pair(first = type, second = action)
     }
 
     /**
@@ -1817,7 +1830,9 @@ class InMeetingViewModel @Inject constructor(
             val isContact = isMyContact(session.peerId)
             val hasHiRes = needHiRes()
 
-            val avatar = inMeetingRepository.getAvatarBitmap(session.peerId)
+            val avatar = inMeetingRepository.getAvatarBitmap(session.peerId) {
+                getRemoteUserAvatar(session.peerId)
+            }
             val email = inMeetingRepository.getEmailParticipant(
                 session.peerId,
                 GetUserEmailListener(
@@ -1856,6 +1871,18 @@ class InMeetingViewModel @Inject constructor(
         }
 
         return null
+    }
+
+    private fun getRemoteUserAvatar(peerId: Long) {
+        viewModelScope.launch {
+            runCatching { getUserAvatarUseCase(peerId) }
+                .onSuccess {
+                    _state.update { state ->
+                        state.copy(userAvatarUpdateId = peerId)
+                    }
+                }
+                .onFailure { Timber.d(it) }
+        }
     }
 
     /**
@@ -2149,7 +2176,11 @@ class InMeetingViewModel @Inject constructor(
      */
     fun getAvatarBitmap(peerId: Long): Bitmap? =
         inMeetingRepository.getChatRoom(_state.value.currentChatId)
-            ?.let { inMeetingRepository.getAvatarBitmap(peerId) }
+            ?.let {
+                inMeetingRepository.getAvatarBitmap(peerId) {
+                    getRemoteUserAvatar(peerId)
+                }
+            }
 
     /**
      * Method to get the first participant in the list, who will be the new speaker
@@ -2848,7 +2879,9 @@ class InMeetingViewModel @Inject constructor(
             getOwnPrivileges() == PRIV_MODERATOR,
             audio,
             video
-        )
+        ) {
+            state.value.myUserHandle?.let { getRemoteUserAvatar(it) }
+        }
         participant.hasOptionsAllowed =
             shouldParticipantsOptionBeVisible(participant.isMe, participant.isGuest)
 
@@ -2983,16 +3016,6 @@ class InMeetingViewModel @Inject constructor(
     fun addContact(context: Context, peerId: Long, callback: (String) -> Unit) {
         inMeetingRepository.addContact(context, peerId, callback)
     }
-
-    /**
-     * Get avatar from sdk
-     *
-     * @param peerId the peerId of participant
-     */
-    fun getRemoteAvatar(peerId: Long) {
-        inMeetingRepository.getRemoteAvatar(peerId)
-    }
-
     /**
      * Method for clearing the list of speakers
      */

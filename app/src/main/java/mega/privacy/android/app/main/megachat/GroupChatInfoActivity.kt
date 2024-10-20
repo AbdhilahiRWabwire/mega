@@ -48,6 +48,7 @@ import mega.privacy.android.app.components.PositionDividerItemDecoration
 import mega.privacy.android.app.components.twemoji.EmojiEditText
 import mega.privacy.android.app.constants.BroadcastConstants
 import mega.privacy.android.app.databinding.ActivityGroupChatPropertiesBinding
+import mega.privacy.android.app.extensions.consumeInsetsWithToolbar
 import mega.privacy.android.app.interfaces.SnackbarShower
 import mega.privacy.android.app.listeners.GetAttrUserListener
 import mega.privacy.android.app.listeners.GetPeerAttributesListener
@@ -62,7 +63,6 @@ import mega.privacy.android.app.modalbottomsheet.chatmodalbottomsheet.Participan
 import mega.privacy.android.app.presentation.chat.dialog.AddParticipantsNoContactsDialogFragment
 import mega.privacy.android.app.presentation.chat.dialog.AddParticipantsNoContactsLeftToAddDialogFragment
 import mega.privacy.android.app.presentation.chat.groupInfo.GroupChatInfoViewModel
-import mega.privacy.android.app.usecase.call.GetCallUseCase
 import mega.privacy.android.app.usecase.chat.GetChatChangesUseCase
 import mega.privacy.android.app.utils.AlertDialogUtil.createForceAppUpdateDialog
 import mega.privacy.android.app.utils.AlertDialogUtil.dismissAlertDialogIfExists
@@ -71,7 +71,6 @@ import mega.privacy.android.app.utils.AvatarUtil
 import mega.privacy.android.app.utils.CacheFolderManager.buildAvatarFile
 import mega.privacy.android.app.utils.CallUtil
 import mega.privacy.android.app.utils.ChatUtil
-import mega.privacy.android.app.utils.ColorUtils.changeStatusBarColorForElevation
 import mega.privacy.android.app.utils.ColorUtils.getThemeColor
 import mega.privacy.android.app.utils.Constants
 import mega.privacy.android.app.utils.Constants.INTENT_EXTRA_KEY_CHAT
@@ -83,6 +82,8 @@ import mega.privacy.android.app.utils.TextUtil
 import mega.privacy.android.app.utils.TimeUtils
 import mega.privacy.android.app.utils.Util
 import mega.privacy.android.app.utils.permission.PermissionUtils
+import mega.privacy.android.domain.entity.ChatRoomPermission
+import mega.privacy.android.domain.entity.call.ChatCallStatus
 import mega.privacy.android.navigation.MegaNavigator
 import nz.mega.sdk.MegaApiAndroid
 import nz.mega.sdk.MegaApiJava
@@ -108,9 +109,7 @@ import javax.inject.Inject
  * Activity which shows group chat room information.
  *
  * @property getChatChangesUseCase [GetChatChangesUseCase]
- * @property getCallUseCase [GetCallUseCase]
  * @property binding [ActivityGroupChatPropertiesBinding]
- * @property isChatOpen True when the megaChatApi.openChatRoom() method has already been called from ChatActivity. False, otherwise
  * @property chatLink The chat link
  * @property chat [MegaChatRoom]
  * @property chatC [ChatController]
@@ -125,9 +124,6 @@ class GroupChatInfoActivity : PasscodeActivity(), MegaChatRequestListenerInterfa
 
     @Inject
     lateinit var getChatChangesUseCase: GetChatChangesUseCase
-
-    @Inject
-    lateinit var getCallUseCase: GetCallUseCase
 
     @Inject
     lateinit var chatManagement: ChatManagement
@@ -196,8 +192,8 @@ class GroupChatInfoActivity : PasscodeActivity(), MegaChatRequestListenerInterfa
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         Timber.d("onCreate")
 
         groupChatInfoActivity = this
@@ -228,6 +224,7 @@ class GroupChatInfoActivity : PasscodeActivity(), MegaChatRequestListenerInterfa
             setContentView(binding.root)
 
             setSupportActionBar(binding.toolbarGroupChatProperties)
+            consumeInsetsWithToolbar(customToolbar = binding.toolbarGroupChatProperties)
             supportActionBar?.apply {
                 setHomeButtonEnabled(true)
                 setDisplayHomeAsUpEnabled(true)
@@ -253,11 +250,8 @@ class GroupChatInfoActivity : PasscodeActivity(), MegaChatRequestListenerInterfa
                         super.onScrolled(recyclerView, dx, dy)
                         val withElevation =
                             recyclerView.canScrollVertically(Constants.SCROLLING_UP_DIRECTION)
-                        Util.changeViewElevation(supportActionBar, withElevation, outMetrics)
-
-                        groupChatInfoActivity?.let { activity ->
-                            changeStatusBarColorForElevation(activity, withElevation)
-                        }
+                        binding.toolbarGroupChatProperties.elevation =
+                            if (withElevation) resources.getDimension(R.dimen.toolbar_elevation) else 0f
 
                         if (recyclerView.scrollState == RecyclerView.SCROLL_STATE_IDLE) {
                             checkIfShouldAskForUsersAttributes(RecyclerView.SCROLL_STATE_IDLE)
@@ -284,28 +278,6 @@ class GroupChatInfoActivity : PasscodeActivity(), MegaChatRequestListenerInterfa
             updateAdapterHeader()
 
             adapter?.checkNotifications(chatHandle)
-
-            chat?.let { chatRoom ->
-                if (chatRoom.isPreview || !chatRoom.isActive) {
-                    endCallForAllShouldBeVisible = false
-                } else {
-                    getCallUseCase.isThereACallAndIAmModerator(
-                        chatRoom.chatId
-                    )
-                        .subscribeOn(Schedulers.io())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe({ shouldBeVisible: Boolean ->
-                            endCallForAllShouldBeVisible = shouldBeVisible
-                            adapter?.updateEndCallOption(endCallForAllShouldBeVisible)
-
-                            if (!endCallForAllShouldBeVisible) {
-                                endCallForAllDialog?.dismiss()
-                            }
-
-                        }) { error: Throwable -> Timber.e("Error $error") }
-                        .addTo(composite)
-                }
-            }
 
             savedInstanceState?.let {
                 val isEndCallForAllDialogShown = it.getBoolean(
@@ -338,6 +310,19 @@ class GroupChatInfoActivity : PasscodeActivity(), MegaChatRequestListenerInterfa
                 invalidateOptionsMenu()
             }
             updateParticipantsWarning()
+            val call = state.call
+            val chatRoom = state.chatRoom
+            val endCallVisible = call != null && call.status != ChatCallStatus.Initial
+                    && call.status != ChatCallStatus.TerminatingUserParticipation
+                    && call.status != ChatCallStatus.Destroyed
+                    && chatRoom != null && chatRoom.ownPrivilege == ChatRoomPermission.Moderator
+            if (endCallVisible != endCallForAllShouldBeVisible) {
+                endCallForAllShouldBeVisible = endCallVisible
+                adapter?.updateEndCallOption(endCallForAllShouldBeVisible)
+                if (!endCallVisible) {
+                    endCallForAllDialog?.dismiss()
+                }
+            }
         }
 
         collectFlow(viewModel.state.map { it.retentionTime }.distinctUntilChanged()) {
@@ -402,7 +387,7 @@ class GroupChatInfoActivity : PasscodeActivity(), MegaChatRequestListenerInterfa
                 participants.add(participant)
                 val userStatus = ChatUtil.getUserStatus(peerHandle)
                 if (userStatus != MegaChatApi.STATUS_ONLINE && userStatus != MegaChatApi.STATUS_BUSY && userStatus != MegaChatApi.STATUS_INVALID) {
-                    megaChatApi.requestLastGreen(participant.handle, null)
+                    megaChatApi.requestLastGreen(participant.handle)
                 }
             }
 

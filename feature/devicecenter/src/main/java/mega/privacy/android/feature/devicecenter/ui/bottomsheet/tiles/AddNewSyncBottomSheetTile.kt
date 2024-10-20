@@ -30,7 +30,7 @@ internal fun AddNewSyncBottomSheetTile(
     dividerType: DividerType? = DividerType.BigStartPadding,
 ) {
     MenuActionListTile(
-        text = stringResource(id = sharedResR.string.device_center_sync_add_new_syn_button_option),
+        text = stringResource(id = sharedResR.string.device_center_add_sync_button_option),
         modifier = Modifier.testTag(TEST_TAG_BOTTOM_SHEET_TILE_ADD_NEW_SYNC),
         icon = painterResource(id = iconPackR.drawable.ic_sync_01),
         dividerType = dividerType,
@@ -39,7 +39,7 @@ internal fun AddNewSyncBottomSheetTile(
             if (isFreeAccount) {
                 MegaText(
                     text = stringResource(id = sharedResR.string.general_pro_only_label),
-                    textColor = TextColor.Accent,
+                    textColor = TextColor.Primary,
                     modifier = Modifier.testTag(
                         TEST_TAG_BOTTOM_SHEET_TILE_ADD_NEW_SYNC_PRO_ONLY_LABEL
                     )

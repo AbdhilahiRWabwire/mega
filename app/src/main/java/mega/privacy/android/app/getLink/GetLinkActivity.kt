@@ -6,19 +6,16 @@ import android.view.MenuItem
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import mega.privacy.android.app.R
 import mega.privacy.android.app.activities.PasscodeActivity
 import mega.privacy.android.app.databinding.GetLinkActivityLayoutBinding
+import mega.privacy.android.app.extensions.consumeInsetsWithToolbar
 import mega.privacy.android.app.interfaces.SnackbarShower
-import mega.privacy.android.app.utils.ColorUtils
-import mega.privacy.android.app.utils.ColorUtils.getColorForElevation
 import mega.privacy.android.app.utils.Constants.HANDLE
 import mega.privacy.android.app.utils.Constants.HANDLE_LIST
 import mega.privacy.android.app.utils.Constants.INVALID_VALUE
-import mega.privacy.android.app.utils.Util.isDarkMode
 import nz.mega.sdk.MegaApiJava.INVALID_HANDLE
 import timber.log.Timber
 
@@ -42,14 +39,7 @@ class GetLinkActivity : PasscodeActivity(), SnackbarShower {
     private lateinit var binding: GetLinkActivityLayoutBinding
     private lateinit var navController: NavController
 
-    private val transparentColor by lazy {
-        ContextCompat.getColor(
-            this,
-            android.R.color.transparent
-        )
-    }
     private val elevation by lazy { resources.getDimension(R.dimen.toolbar_elevation) }
-    private val toolbarElevationColor by lazy { getColorForElevation(this, elevation) }
 
     private var viewType = INVALID_VALUE
 
@@ -63,10 +53,11 @@ class GetLinkActivity : PasscodeActivity(), SnackbarShower {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         binding = GetLinkActivityLayoutBinding.inflate(layoutInflater)
+        enableEdgeToEdge()
         setContentView(binding.root)
+        consumeInsetsWithToolbar(customToolbar = binding.toolbarGetLink)
 
         if (intent == null || shouldRefreshSessionDueToSDK()) {
             return
@@ -183,21 +174,8 @@ class GetLinkActivity : PasscodeActivity(), SnackbarShower {
      *
      * @param withElevation True if should set elevation, false otherwise.
      */
-    private fun changeElevation(withElevation: Boolean) {
-        val isDark = isDarkMode(this)
-        val darkAndElevation = withElevation && isDark
-
-        if (darkAndElevation) {
-            ColorUtils.changeStatusBarColorForElevation(this, true)
-        } else {
-            window?.statusBarColor = transparentColor
-        }
-
-        binding.toolbarGetLink.setBackgroundColor(
-            if (darkAndElevation) toolbarElevationColor else transparentColor
-        )
-
-        binding.appBarGetLink.elevation = if (withElevation && !isDark) elevation else 0F
+    fun changeElevation(withElevation: Boolean) {
+        binding.toolbarGetLink.elevation = if (withElevation) elevation else 0f
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {

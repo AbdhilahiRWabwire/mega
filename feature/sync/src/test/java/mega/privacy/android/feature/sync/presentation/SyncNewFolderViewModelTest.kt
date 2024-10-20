@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import mega.privacy.android.core.test.extension.CoroutineMainDispatcherExtension
+import mega.privacy.android.domain.entity.sync.SyncType
 import mega.privacy.android.domain.usecase.account.IsStorageOverQuotaUseCase
 import mega.privacy.android.domain.usecase.file.GetExternalPathByContentUriUseCase
 import mega.privacy.android.feature.sync.domain.entity.RemoteFolder
@@ -66,7 +67,11 @@ internal class SyncNewFolderViewModelTest {
         val localFolderUri: Uri = mock()
         val localFolderFolderStoragePath = "/storage/emulated/0/Sync/someFolder"
         val localDCIMFolderPath = "/storage/emulated/0/DCIM"
-        val expectedState = SyncNewFolderState(selectedLocalFolder = localFolderFolderStoragePath)
+        val expectedState = SyncNewFolderState(
+            syncType = SyncType.TYPE_TWOWAY,
+            deviceName = "Device Name",
+            selectedLocalFolder = localFolderFolderStoragePath
+        )
         whenever(getExternalPathByContentUriUseCase.invoke(localFolderContentUri)).thenReturn(
             localFolderFolderStoragePath
         )
@@ -121,7 +126,11 @@ internal class SyncNewFolderViewModelTest {
             awaitCancellation()
         })
         initViewModel()
-        val expectedState = SyncNewFolderState(selectedMegaFolder = remoteFolder)
+        val expectedState = SyncNewFolderState(
+            syncType = SyncType.TYPE_TWOWAY,
+            deviceName = "Device Name",
+            selectedMegaFolder = remoteFolder,
+        )
 
         assertThat(expectedState).isEqualTo(underTest.state.value)
     }
@@ -136,20 +145,26 @@ internal class SyncNewFolderViewModelTest {
         })
         whenever(
             syncFolderPairUseCase.invoke(
-                name = remoteFolder.name, localPath = "", remotePath = remoteFolder
+                syncType = SyncType.TYPE_TWOWAY,
+                name = remoteFolder.name,
+                localPath = "",
+                remotePath = remoteFolder,
             )
         ).thenReturn(true)
         val state = SyncNewFolderState(
-            selectedMegaFolder = remoteFolder
+            syncType = SyncType.TYPE_TWOWAY,
+            deviceName = "Device Name",
+            selectedMegaFolder = remoteFolder,
         )
         initViewModel()
 
         underTest.handleAction(SyncNewFolderAction.NextClicked)
 
         verify(syncFolderPairUseCase).invoke(
+            syncType = SyncType.TYPE_TWOWAY,
             name = remoteFolder.name,
             localPath = state.selectedLocalFolder,
-            remotePath = remoteFolder
+            remotePath = remoteFolder,
         )
         assertThat(underTest.state.value.openSyncListScreen).isEqualTo(triggered)
     }
@@ -204,12 +219,14 @@ internal class SyncNewFolderViewModelTest {
 
     private fun initViewModel() {
         underTest = SyncNewFolderViewModel(
-            getExternalPathByContentUriUseCase,
-            monitorSelectedMegaFolderUseCase,
-            syncFolderPairUseCase,
-            isStorageOverQuotaUseCase,
-            getLocalDCIMFolderPathUseCase,
-            clearSelectedMegaFolderUseCase
+            syncType = SyncType.TYPE_TWOWAY,
+            deviceName = "Device Name",
+            getExternalPathByContentUriUseCase = getExternalPathByContentUriUseCase,
+            monitorSelectedMegaFolderUseCase = monitorSelectedMegaFolderUseCase,
+            syncFolderPairUseCase = syncFolderPairUseCase,
+            isStorageOverQuotaUseCase = isStorageOverQuotaUseCase,
+            getLocalDCIMFolderPathUseCase = getLocalDCIMFolderPathUseCase,
+            clearSelectedMegaFolderUseCase = clearSelectedMegaFolderUseCase,
         )
     }
 }

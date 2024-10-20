@@ -121,7 +121,7 @@
             android:name=".presentation.upload.UploadDestinationActivity"
             android:configChanges="orientation|screenSize"
             android:exported="true"
-            android:launchMode="singleTop">
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
 
@@ -163,6 +163,9 @@
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"
             android:value="barcode_ui,doc_scanner" />
+        <meta-data
+            android:name="com.google.android.gms.ads.flag.OPTIMIZE_AD_LOADING"
+            android:value="true" />
 
         <activity
             android:name=".presentation.login.LoginActivity"

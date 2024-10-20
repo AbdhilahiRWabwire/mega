@@ -82,6 +82,7 @@ import mega.privacy.android.domain.usecase.RemoveFromChat
 import mega.privacy.android.domain.usecase.SetOpenInviteWithChatIdUseCase
 import mega.privacy.android.domain.usecase.account.GetCurrentSubscriptionPlanUseCase
 import mega.privacy.android.domain.usecase.account.MonitorStorageStateEventUseCase
+import mega.privacy.android.domain.usecase.avatar.GetUserAvatarUseCase
 import mega.privacy.android.domain.usecase.call.AllowUsersJoinCallUseCase
 import mega.privacy.android.domain.usecase.call.AnswerChatCallUseCase
 import mega.privacy.android.domain.usecase.call.BroadcastCallEndedUseCase
@@ -102,8 +103,6 @@ import mega.privacy.android.domain.usecase.contact.GetMyFullNameUseCase
 import mega.privacy.android.domain.usecase.contact.GetMyUserHandleUseCase
 import mega.privacy.android.domain.usecase.contact.InviteContactWithHandleUseCase
 import mega.privacy.android.domain.usecase.featureflag.GetFeatureFlagValueUseCase
-import mega.privacy.android.domain.usecase.login.LogoutUseCase
-import mega.privacy.android.domain.usecase.login.MonitorFinishActivityUseCase
 import mega.privacy.android.domain.usecase.meeting.BroadcastCallScreenOpenedUseCase
 import mega.privacy.android.domain.usecase.meeting.EnableOrDisableAudioUseCase
 import mega.privacy.android.domain.usecase.meeting.EnableOrDisableVideoUseCase
@@ -139,8 +138,6 @@ import javax.inject.Inject
  * @property chatManagement                                 [ChatManagement]
  * @property setChatVideoInDeviceUseCase                    [SetChatVideoInDeviceUseCase]
  * @property checkChatLink                                  [CheckChatLinkUseCase]
- * @property logoutUseCase                                  [LogoutUseCase]
- * @property monitorFinishActivityUseCase                   [MonitorFinishActivityUseCase]
  * @property monitorChatCallUpdatesUseCase                  [MonitorChatCallUpdatesUseCase]
  * @property getChatRoomUseCase                             [GetChatRoomUseCase]
  * @property getChatCallUseCase                             [GetChatCallUseCase]
@@ -184,8 +181,6 @@ class MeetingActivityViewModel @Inject constructor(
     private val checkChatLink: CheckChatLinkUseCase,
     private val getChatParticipants: GetChatParticipants,
     monitorConnectivityUseCase: MonitorConnectivityUseCase,
-    private val logoutUseCase: LogoutUseCase,
-    private val monitorFinishActivityUseCase: MonitorFinishActivityUseCase,
     private val monitorChatCallUpdatesUseCase: MonitorChatCallUpdatesUseCase,
     private val monitorChatSessionUpdatesUseCase: MonitorChatSessionUpdatesUseCase,
     private val getChatRoomUseCase: GetChatRoomUseCase,
@@ -229,6 +224,8 @@ class MeetingActivityViewModel @Inject constructor(
     private val monitorChatConnectionStateUseCase: MonitorChatConnectionStateUseCase,
     savedStateHandle: SavedStateHandle,
     @ApplicationContext private val context: Context,
+    private val getUserAvatarUseCase: GetUserAvatarUseCase,
+    private val megaChatRequestHandler: MegaChatRequestHandler,
 ) : ViewModel() {
     private val _state = MutableStateFlow(
         MeetingState(
@@ -1135,14 +1132,9 @@ class MeetingActivityViewModel @Inject constructor(
      */
     fun logout() = viewModelScope.launch {
         runCatching {
-            logoutUseCase()
+            megaChatRequestHandler.setIsLoggingRunning(true)
         }.onSuccess {
-            //We need to observe finish activity only when logout is success
-            //We are waiting for the logout process in MegaChatRequestHandler to finish with this monitor flow and then triggers navigating to LeftMeetingActivity
-            //if we navigate earlier MegaChatRequestHandler.isLoggingRunning will be false and app will navigate to default LoginActivity
-            monitorFinishActivityUseCase().collect { logoutFinished ->
-                _state.update { it.copy(shouldLaunchLeftMeetingActivity = logoutFinished) }
-            }
+            _state.update { it.copy(shouldLaunchLeftMeetingActivity = true) }
         }.onFailure {
             Timber.d("Error on logout $it")
         }
@@ -1728,7 +1720,21 @@ class MeetingActivityViewModel @Inject constructor(
      * @return The bitmap of a participant's avatar
      */
     fun getAvatarBitmapByPeerId(peerId: Long): Bitmap? {
-        return meetingActivityRepository.getAvatarBitmapByPeerId(peerId)
+        return meetingActivityRepository.getAvatarBitmapByPeerId(peerId) {
+            getRemoteUserAvatar(peerId)
+        }
+    }
+
+    private fun getRemoteUserAvatar(peerId: Long) {
+        viewModelScope.launch {
+            runCatching { getUserAvatarUseCase(peerId) }
+                .onSuccess {
+                    _state.update { state ->
+                        state.copy(userAvatarUpdateId = peerId)
+                    }
+                }
+                .onFailure { Timber.d(it) }
+        }
     }
 
     /**

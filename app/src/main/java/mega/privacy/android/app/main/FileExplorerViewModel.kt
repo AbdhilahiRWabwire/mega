@@ -56,7 +56,6 @@ import javax.inject.Inject
  *
  * @property storageState    [StorageState]
  * @property isImportingText True if it is importing text, false if it is importing files.
- * @property fileNames       File names.
  * @property uiState     [FileExplorerUiState]
  */
 @HiltViewModel
@@ -229,8 +228,13 @@ class FileExplorerViewModel @Inject constructor(
                 } else {
                     getParcelableExtra(Intent.EXTRA_STREAM)
                 })?.let { uri ->
-                    Timber.d("Single file")
-                    setUrisAndNames(mapOf(uri to getFileName(uri, context)))
+                    // getFileName(uri, context) is added for compatibility purposes with the
+                    // legacy Document Scanner. The filename Intent parameter will be solely used
+                    // once the legacy Document Scanner has been removed from the codebase
+                    val filenameToUse =
+                        getStringExtra(FileExplorerActivity.EXTRA_DOCUMENT_SCAN_FILENAME)
+                            ?: getFileName(uri, context)
+                    setUrisAndNames(mapOf(uri to filenameToUse))
                 }
             }
         }

@@ -82,9 +82,7 @@ import androidx.viewpager2.widget.ViewPager2
 import androidx.work.WorkManager
 import com.anggrayudi.storage.file.getAbsolutePath
 import com.google.android.gms.ads.AdListener
-import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.admanager.AdManagerAdRequest
 import com.google.android.gms.ads.admanager.AdManagerAdView
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.MaterialToolbar
@@ -122,7 +120,6 @@ import mega.privacy.android.app.contacts.ContactsActivity
 import mega.privacy.android.app.extensions.enableEdgeToEdgeAndConsumeInsets
 import mega.privacy.android.app.extensions.isPortrait
 import mega.privacy.android.app.extensions.isTablet
-import mega.privacy.android.app.featuretoggle.ABTestFeatures
 import mega.privacy.android.app.featuretoggle.AppFeatures
 import mega.privacy.android.app.fragments.homepage.HomepageSearchable
 import mega.privacy.android.app.fragments.homepage.SortByHeaderViewModel
@@ -164,6 +161,7 @@ import mega.privacy.android.app.modalbottomsheet.SortByBottomSheetDialogFragment
 import mega.privacy.android.app.modalbottomsheet.UploadBottomSheetDialogFragment
 import mega.privacy.android.app.modalbottomsheet.nodelabel.NodeLabelBottomSheetDialogFragment
 import mega.privacy.android.app.myAccount.MyAccountActivity
+import mega.privacy.android.app.presentation.advertisements.GoogleAdsManager
 import mega.privacy.android.app.presentation.advertisements.model.AdsSlotIDs.TAB_CLOUD_SLOT_ID
 import mega.privacy.android.app.presentation.advertisements.model.AdsSlotIDs.TAB_HOME_SLOT_ID
 import mega.privacy.android.app.presentation.advertisements.model.AdsSlotIDs.TAB_PHOTOS_SLOT_ID
@@ -194,7 +192,6 @@ import mega.privacy.android.app.presentation.manager.model.SharesTab
 import mega.privacy.android.app.presentation.manager.model.Tab
 import mega.privacy.android.app.presentation.manager.model.TransfersTab
 import mega.privacy.android.app.presentation.mapper.RestoreNodeResultMapper
-import mega.privacy.android.app.presentation.meeting.CreateScheduledMeetingActivity
 import mega.privacy.android.app.presentation.meeting.WaitingRoomManagementViewModel
 import mega.privacy.android.app.presentation.meeting.chat.extension.getInfo
 import mega.privacy.android.app.presentation.meeting.chat.view.sheet.UpgradeProPlanBottomSheet
@@ -327,7 +324,6 @@ import mega.privacy.android.domain.usecase.file.CheckFileNameCollisionsUseCase
 import mega.privacy.android.domain.usecase.login.MonitorEphemeralCredentialsUseCase
 import mega.privacy.android.feature.devicecenter.ui.DeviceCenterFragment
 import mega.privacy.android.feature.sync.ui.SyncMonitorViewModel
-import mega.privacy.android.feature.sync.ui.navigator.SyncNavigator
 import mega.privacy.android.feature.sync.ui.views.SyncPromotionBottomSheet
 import mega.privacy.android.feature.sync.ui.views.SyncPromotionViewModel
 import mega.privacy.android.navigation.MegaNavigator
@@ -341,9 +337,9 @@ import mega.privacy.mobile.analytics.event.IncomingSharesTabEvent
 import mega.privacy.mobile.analytics.event.JoinMeetingPressedEvent
 import mega.privacy.mobile.analytics.event.LinkSharesTabEvent
 import mega.privacy.mobile.analytics.event.OutgoingSharesTabEvent
-import mega.privacy.mobile.analytics.event.ScheduleMeetingPressedEvent
 import mega.privacy.mobile.analytics.event.SharedItemsScreenEvent
 import mega.privacy.mobile.analytics.event.StartMeetingNowPressedEvent
+import mega.privacy.mobile.analytics.event.SyncPromotionBottomSheetDismissedEvent
 import nz.mega.sdk.MegaAccountDetails
 import nz.mega.sdk.MegaApiAndroid
 import nz.mega.sdk.MegaApiJava
@@ -486,13 +482,13 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     lateinit var isFirstLaunchUseCase: IsFirstLaunchUseCase
 
     @Inject
-    lateinit var syncNavigator: SyncNavigator
-
-    @Inject
     lateinit var workManager: WorkManager
 
     @Inject
     lateinit var crashReporter: CrashReporter
+
+    @Inject
+    lateinit var googleAdsManager: GoogleAdsManager
 
     @Inject
     @ApplicationScope
@@ -675,7 +671,7 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     private val adView: AdManagerAdView by lazy {
         AdManagerAdView(this).apply {
             adUnitId = BuildConfig.AD_UNIT_ID
-            setAdSize(AD_SIZE)
+            setAdSize(googleAdsManager.AD_SIZE)
             adListener = object : AdListener() {
                 override fun onAdClicked() {
                     Timber.d("Ad clicked")
@@ -697,7 +693,7 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
 
                 override fun onAdLoaded() {
                     Timber.i("Ad loaded")
-                    onAdsViewLoaded()
+                    handleShowingAds("")
                 }
 
                 override fun onAdOpened() {
@@ -897,7 +893,6 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
         Timber.d("onCreate")
         enableEdgeToEdgeAndConsumeInsets()
         super.onCreate(savedInstanceState)
-
         Timber.d("onCreate after call super")
         registerViewModelObservers()
         onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
@@ -912,7 +907,7 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
         CacheFolderManager.createCacheFolders()
         checkChatChanges()
         Timber.d("retryChatPendingConnections()")
-        megaChatApi.retryPendingConnections(false, null)
+        megaChatApi.retryPendingConnections(false)
 
         val display: Display = windowManager.defaultDisplay
         display.getMetrics(outMetrics)
@@ -993,17 +988,16 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     private fun checkForInAppAdvertisement() {
         lifecycleScope.launch {
             runCatching {
-                val isAdseFlagEnabled = getFeatureFlagValueUseCase(ABTestFeatures.adse)
-                if (isAdseFlagEnabled) {
-                    if (this@ManagerActivity.isPortrait()) {
-                        setupAdsView()
-                    } else {
-                        hideAdsView()
-                    }
-                    adsViewModel.enableAdsFeature()
+                googleAdsManager.checkForAdsAvailability()
+                if (googleAdsManager.isAdsEnabled()) {
+                    setupAdsView()
+                    googleAdsManager.checkLatestConsentInformation(
+                        activity = this@ManagerActivity,
+                        onConsentInformationUpdated = { fetchNewAd() }
+                    )
                 }
             }.onFailure {
-                Timber.e("Failed to fetch ab_adse flag with error: ${it.message}")
+                Timber.e("Failed to fetch latest consent information : ${it.message}")
             }
         }
     }
@@ -1146,7 +1140,7 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
 
                 OriginalTempTheme(isDark = isDark) {
                     DocumentScanningErrorDialog(
-                        documentScanningErrorTypeUiItem = state.documentScanningErrorTypeUiItem,
+                        documentScanningError = state.documentScanningError,
                         onErrorAcknowledged = { viewModel.onDocumentScanningErrorConsumed() },
                         onErrorDismissed = { viewModel.onDocumentScanningErrorConsumed() },
                     )
@@ -2284,13 +2278,15 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     }
 
     /**
-     * Checks the onboarding is pending on in progress
+     * Checks the onboarding is pending or in progress
      *
-     * @return True in case the the onboarding is pending on in progress. False otherwise.
+     * @return True in case the the onboarding is pending or in progress. False otherwise.
      */
     private fun isOnboarding(): Boolean {
         when {
-            viewModel.state.value.isFirstLogin -> return true
+            drawerItem == DrawerItem.ASK_PERMISSIONS -> return true
+
+            viewModel.state.value.isFirstLogin && drawerItem != DrawerItem.PHOTOS -> return true
 
             firstTimeAfterInstallation || askPermissions || newCreationAccount -> {
                 if (!initialPermissionsAlreadyAsked && !onAskingPermissionsFragment) {
@@ -2449,8 +2445,12 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
      */
     fun handleShowingAds(slotId: String) {
         //slotId is not used for now during the implementation of the new Ads SDK
-        if (this.isPortrait() && adsViewModel.isAdsFeatureEnabled()) {
-            fetchNewAd()
+        if (this.isPortrait() && googleAdsManager.isAdRequestAvailable() &&
+            (drawerItem == DrawerItem.CLOUD_DRIVE || isInMainHomePage || isInPhotosPage)
+        ) {
+            showAdsView()
+            showBNVImmediate()
+            showHideBottomNavigationView(hide = false)
         } else {
             hideAdsView()
         }
@@ -2459,14 +2459,16 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     private fun setupAdsView() {
         adsContainerView.removeAllViews()
         adsContainerView.addView(adView)
+        fetchNewAd()
     }
 
     /**
-     * Fetch a new Ad by creating new request
+     * Fetch a new Ad by fetching a new AdRequest and loading it into the AdView
      */
     private fun fetchNewAd() {
-        val adRequest = AdManagerAdRequest.Builder().build()
-        adView.loadAd(adRequest)
+        googleAdsManager.fetchAdRequest()?.let {
+            adView.loadAd(it)
+        }
     }
 
     private fun showAdsView() {
@@ -2475,22 +2477,6 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
 
     fun hideAdsView() {
         adsContainerView.isVisible = false
-    }
-
-    /**
-     * Checks if we can still show the Ad because loading the webpage takes
-     * time and the user could have navigated to another screen where the Ad shouldn't show
-     */
-    private fun onAdsViewLoaded() {
-
-        if (drawerItem == DrawerItem.CLOUD_DRIVE || isInMainHomePage || isInPhotosPage
-        ) {
-            showAdsView()
-            showBNVImmediate()
-            showHideBottomNavigationView(hide = false)
-        } else {
-            hideAdsView()
-        }
     }
 
     override fun onResume() {
@@ -2907,7 +2893,7 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     override fun onPause() {
         Timber.d("onPause")
         transfersManagement.isOnTransfersSection = false
-        adView?.pause()
+        adView.pause()
         super.onPause()
     }
 
@@ -2919,7 +2905,7 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
         reconnectDialog?.cancel()
         dismissAlertDialogIfExists(processFileDialog)
         cookieDialogHandler.onDestroy()
-        adView?.destroy()
+        adView.destroy()
         super.onDestroy()
     }
 
@@ -4717,7 +4703,7 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         typesCameraPermission = Constants.INVALID_TYPE_PERMISSIONS
         megaApi.retryPendingConnections()
-        megaChatApi.retryPendingConnections(false, null)
+        megaChatApi.retryPendingConnections(false)
         return when (item.itemId) {
             android.R.id.home -> {
                 if (isFirstNavigationLevel) {
@@ -4958,6 +4944,7 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     private fun goBack() {
         retryConnectionsAndSignalPresence()
         if (syncPromotionViewModel.state.value.shouldShowSyncPromotion) {
+            Analytics.tracker.trackEvent(SyncPromotionBottomSheetDismissedEvent)
             syncPromotionViewModel.onConsumeShouldShowSyncPromotion()
             return
         }
@@ -5686,11 +5673,6 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     override fun onCreateMeeting() {
         Analytics.tracker.trackEvent(StartMeetingNowPressedEvent)
         chatsFragment?.onCreateMeeting()
-    }
-
-    override fun onScheduleMeeting() {
-        Analytics.tracker.trackEvent(ScheduleMeetingPressedEvent)
-        startActivity(Intent(this, CreateScheduledMeetingActivity::class.java))
     }
 
     /**
@@ -7938,7 +7920,6 @@ class ManagerActivity : PasscodeActivity(), MegaRequestListenerInterface,
     }
 
     companion object {
-        val AD_SIZE = AdSize(320, 50)
         const val TRANSFERS_TAB = "TRANSFERS_TAB"
         private const val BOTTOM_ITEM_BEFORE_OPEN_FULLSCREEN_OFFLINE =
             "BOTTOM_ITEM_BEFORE_OPEN_FULLSCREEN_OFFLINE"

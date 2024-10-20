@@ -13,7 +13,6 @@ public class Constants {
 
     public static final int DEFAULT_AVATAR_WIDTH_HEIGHT = 250; //in pixels
 
-    public static final int REQUEST_CODE_GET_FILES = 1000;
     public static final int REQUEST_CODE_SELECT_FOLDER_TO_MOVE = 1001;
     public static final int REQUEST_CODE_SELECT_FOLDER_TO_COPY = 1002;
     public static final int REQUEST_CODE_SELECT_LOCAL_FOLDER = 1004;
@@ -30,7 +29,6 @@ public class Constants {
     public static final int REQUEST_CODE_FILE_INFO = 1027;
     public static final int REQUEST_CODE_REFRESH_API_SERVER = 1028;
     public static final int REQUEST_CODE_DELETE_VERSIONS_HISTORY = 1029;
-    public static final int REQUEST_CODE_SCAN_DOCUMENT = 1036;
     public static final int REQUEST_CODE_GET_FOLDER = 1038;
     public static final int REQUEST_CODE_GET_FOLDER_CONTENT = 1039;
 
@@ -198,6 +196,7 @@ public class Constants {
     public static final String INTENT_EXTRA_KEY_SCREEN_POSITION = "screenPosition";
     public static final String INTENT_EXTRA_KEY_ADAPTER_TYPE = "adapterType";
     public static final String INTENT_EXTRA_KEY_MEDIA_QUEUE_TITLE = "mediaQueueTitle";
+    public static final String INTENT_EXTRA_KEY_VIDEO_COLLECTION_TITLE = "videoCollectionTitle";
     public static final String INTENT_EXTRA_KEY_VIEWER_FROM = "viewerFrom";
     public static final String INTENT_EXTRA_KEY_FROM_DOWNLOAD_SERVICE = "fromDownloadService";
     public static final String INTENT_EXTRA_KEY_INSIDE = "inside";

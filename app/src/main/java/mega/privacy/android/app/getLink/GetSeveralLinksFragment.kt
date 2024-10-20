@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.filterNotNull
@@ -111,9 +112,9 @@ class GetSeveralLinksFragment : Fragment() {
 
         viewModel.hasSensitiveItemsFlow
             .filterNotNull()
-            .onEach { hasSensitiveItems ->
-                if (hasSensitiveItems) {
-                    showSharingSensitiveItemsWarningDialog()
+            .onEach { sensitiveType ->
+                if (sensitiveType > 0) {
+                    showSharingSensitiveItemsWarningDialog(sensitiveType)
                 } else {
                     initNodes()
 
@@ -127,11 +128,15 @@ class GetSeveralLinksFragment : Fragment() {
         viewModel.checkSensitiveItems(handles.toList())
     }
 
-    private fun showSharingSensitiveItemsWarningDialog() {
+    private fun showSharingSensitiveItemsWarningDialog(sensitiveType: Int) {
         val context = context ?: return
         MaterialAlertDialogBuilder(context)
             .setTitle(getString(sharedR.string.hidden_items))
-            .setMessage(getString(sharedR.string.share_hidden_item_links_description))
+            .setMessage(
+                getString(sharedR.string.share_hidden_item_links_description).takeIf {
+                    sensitiveType == 1
+                } ?: getString(sharedR.string.share_hidden_folders_description)
+            )
             .setCancelable(false)
             .setPositiveButton(R.string.button_continue) { _, _ ->
                 initNodes()
@@ -207,6 +212,15 @@ class GetSeveralLinksFragment : Fragment() {
                     0
                 )
             )
+
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    super.onScrolled(recyclerView, dx, dy)
+                    (requireActivity() as GetLinkActivity).changeElevation(
+                        recyclerView.canScrollVertically(-1)
+                    )
+                }
+            })
         }
 
         binding.copyButton.apply {

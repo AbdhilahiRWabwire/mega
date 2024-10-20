@@ -13,7 +13,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import mega.privacy.android.app.R
-import mega.privacy.android.app.generalusecase.FilePrepareUseCase
 import mega.privacy.android.app.globalmanagement.MyAccountInfo
 import mega.privacy.android.app.interfaces.SnackbarShower
 import mega.privacy.android.app.presentation.snackbar.MegaSnackbarDuration
@@ -116,7 +115,6 @@ internal class MyAccountViewModelTest {
     private val isUrlMatchesRegexUseCase: IsUrlMatchesRegexUseCase = mock()
     private val confirmCancelAccountUseCase: ConfirmCancelAccountUseCase = mock()
     private val confirmChangeEmailUseCase: ConfirmChangeEmailUseCase = mock()
-    private val filePrepareUseCase: FilePrepareUseCase = mock()
     private val getAccountDetailsUseCase: GetAccountDetailsUseCase = mock()
     private val getExtendedAccountDetail: GetExtendedAccountDetail = mock()
     private val getNumberOfSubscription: GetNumberOfSubscription = mock()
@@ -200,7 +198,6 @@ internal class MyAccountViewModelTest {
             isUrlMatchesRegexUseCase = isUrlMatchesRegexUseCase,
             confirmCancelAccountUseCase = confirmCancelAccountUseCase,
             confirmChangeEmailUseCase = confirmChangeEmailUseCase,
-            filePrepareUseCase = filePrepareUseCase,
             getAccountDetailsUseCase = getAccountDetailsUseCase,
             getExtendedAccountDetail = getExtendedAccountDetail,
             getNumberOfSubscription = getNumberOfSubscription,
@@ -859,7 +856,6 @@ internal class MyAccountViewModelTest {
             isUrlMatchesRegexUseCase,
             confirmCancelAccountUseCase,
             confirmChangeEmailUseCase,
-            filePrepareUseCase,
             getAccountDetailsUseCase,
             getExtendedAccountDetail,
             getNumberOfSubscription,

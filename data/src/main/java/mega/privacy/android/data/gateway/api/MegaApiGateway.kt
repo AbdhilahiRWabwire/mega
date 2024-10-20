@@ -16,6 +16,7 @@ import nz.mega.sdk.MegaLoggerInterface
 import nz.mega.sdk.MegaNode
 import nz.mega.sdk.MegaNodeList
 import nz.mega.sdk.MegaPushNotificationSettings
+import nz.mega.sdk.MegaRecentActionBucket
 import nz.mega.sdk.MegaRecentActionBucketList
 import nz.mega.sdk.MegaRequestListenerInterface
 import nz.mega.sdk.MegaSearchFilter
@@ -81,6 +82,12 @@ interface MegaApiGateway {
         ticketContent: String,
         listener: MegaRequestListenerInterface,
     )
+
+    /**
+     * Create a list of [MegaNode] from a [MegaNodeList]
+     * where [MegaNode] objects are copied and have memory ownership
+     */
+    fun getNodesFromMegaNodeList(nodeList: MegaNodeList): List<MegaNode>
 
     /**
      * Upload a file or folder
@@ -1035,11 +1042,13 @@ interface MegaApiGateway {
      *
      * @param days     Age of actions since added/modified nodes will be considered (in days).
      * @param maxNodes Maximum amount of nodes to be considered.
+     * @param excludeSensitives Exclude sensitive nodes from the list.
      * @param listener [MegaRequestListenerInterface]
      */
     fun getRecentActionsAsync(
         days: Long,
         maxNodes: Long,
+        excludeSensitives: Boolean,
         listener: MegaRequestListenerInterface,
     )
 
@@ -1090,6 +1099,14 @@ interface MegaApiGateway {
      * @return A copy of MegaRecentActionBucketList.
      */
     fun copyBucketList(bucketList: MegaRecentActionBucketList): MegaRecentActionBucketList
+
+    /**
+     * Creates a copy of MegaRecentActionBucket required for its usage in the app.
+     *
+     * @param bucket The MegaRecentActionBucket received.
+     * @return A copy of MegaRecentActionBucket.
+     */
+    fun copyBucket(bucket: MegaRecentActionBucket): MegaRecentActionBucket
 
     /**
      * Check access error extended

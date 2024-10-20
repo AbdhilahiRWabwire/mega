@@ -62,6 +62,7 @@ import mega.privacy.android.domain.entity.user.UserChanges
 import mega.privacy.android.domain.entity.user.UserId
 import mega.privacy.android.domain.entity.user.UserUpdate
 import mega.privacy.android.domain.exception.ContactDoesNotExistException
+import mega.privacy.android.domain.extension.mapAsync
 import mega.privacy.android.domain.qualifier.ApplicationScope
 import mega.privacy.android.domain.qualifier.IoDispatcher
 import mega.privacy.android.domain.repository.ContactsRepository
@@ -170,15 +171,15 @@ internal class DefaultContactsRepository @Inject constructor(
 
     private fun contactChanges(user: MegaUser, myUserHandle: Long) =
         user.handle != myUserHandle &&
-                            (user.changes == 0L ||
-                                    (user.hasChanged(MegaUser.CHANGE_TYPE_AVATAR.toLong()) && user.isOwnChange == 0) ||
-                                    user.hasChanged(MegaUser.CHANGE_TYPE_FIRSTNAME.toLong()) ||
-                                    user.hasChanged(MegaUser.CHANGE_TYPE_LASTNAME.toLong()) ||
+                (user.changes == 0L ||
+                        (user.hasChanged(MegaUser.CHANGE_TYPE_AVATAR.toLong()) && user.isOwnChange == 0) ||
+                        user.hasChanged(MegaUser.CHANGE_TYPE_FIRSTNAME.toLong()) ||
+                        user.hasChanged(MegaUser.CHANGE_TYPE_LASTNAME.toLong()) ||
                         user.hasChanged(MegaUser.CHANGE_TYPE_EMAIL.toLong()))
 
     private fun currentUserAuthOrAliasChange(user: MegaUser, myUserHandle: Long) =
-                            (user.handle == myUserHandle &&
-                                    (user.hasChanged(MegaUser.CHANGE_TYPE_ALIAS.toLong()) ||
+        (user.handle == myUserHandle &&
+                (user.hasChanged(MegaUser.CHANGE_TYPE_ALIAS.toLong()) ||
                         user.hasChanged(MegaUser.CHANGE_TYPE_AUTHRING.toLong())))
 
     override suspend fun getVisibleContacts(): List<ContactItem> = withContext(ioDispatcher) {
@@ -186,6 +187,15 @@ internal class DefaultContactsRepository @Inject constructor(
             .filter { contact -> contact.visibility == MegaUser.VISIBILITY_VISIBLE }
             .map { getContactItem(it, false) }
             .sortList()
+    }
+
+    override suspend fun getAllContactsName() = withContext(ioDispatcher) {
+        megaApiGateway.getContacts()
+            .mapAsync {
+                it.email to runCatching {
+                    getUserFullName(it.handle, false)
+                }.getOrNull()
+            }.toMap()
     }
 
     /**
